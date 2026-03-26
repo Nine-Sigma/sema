@@ -126,11 +126,13 @@ class TestVocabularyEngineWithLLMClient:
         terms = [{"code": "CRC", "label": "Colorectal Cancer"}]
         assertions = engine.expand_synonyms("unity://cdm.clinical.tbl.col", terms)
 
-        syn = [a for a in assertions if a.predicate == AssertionPredicate.HAS_SYNONYM]
-        assert len(syn) == 2
-        values = {a.payload["value"] for a in syn}
+        aliases = [a for a in assertions if a.predicate == AssertionPredicate.HAS_ALIAS]
+        assert len(aliases) == 2
+        values = {a.payload["value"] for a in aliases}
         assert "colon cancer" in values
         assert "CRC" in values
+        # First alias should be preferred
+        assert aliases[0].payload["is_preferred"] is True
 
     def test_llm_stage_error_propagates_from_detect(self):
         mock_client = MagicMock(spec=LLMClient)

@@ -53,7 +53,7 @@ class TestEmbeddingTextConstruction:
 
 class TestEmbeddingEngine:
     def test_embed_batch(self):
-        mock_model = MagicMock()
+        mock_model = MagicMock(spec=["encode"])
         mock_model.encode.return_value = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
 
         engine = EmbeddingEngine(model=mock_model)
@@ -62,7 +62,7 @@ class TestEmbeddingEngine:
         assert results[0] == [0.1, 0.2, 0.3]
 
     def test_embed_and_store(self):
-        mock_model = MagicMock()
+        mock_model = MagicMock(spec=["encode"])
         mock_model.encode.return_value = [[0.1, 0.2, 0.3]]
 
         mock_loader = MagicMock()

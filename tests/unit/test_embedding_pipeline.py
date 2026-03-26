@@ -22,16 +22,16 @@ from sema.pipeline.orchestrate_utils import (
 class TestEmbeddingComputation:
     def test_embed_and_store_called_for_all_node_types(self):
         mock_loader = MagicMock()
-        mock_model = MagicMock()
+        # Use spec=[] to prevent MagicMock from auto-creating embed_documents
+        mock_model = MagicMock(spec=["encode"])
         mock_model.encode.return_value = [[0.1, 0.2]]
 
         fake_nodes = {
             "Entity": [{"name": "Order", "description": "A purchase order"}],
             "Property": [{"name": "order_id", "entity_name": "Order"}],
             "Term": [{"code": "ACTIVE", "label": "Active"}],
-            "Synonym": [{"text": "purchase"}],
+            "Alias": [{"text": "purchase"}],
             "Metric": [{"name": "total_revenue", "description": "Sum of sales"}],
-            "Transformation": [{"name": "stg_orders"}],
         }
         mock_loader.query_nodes_by_label.side_effect = lambda label: fake_nodes.get(label, [])
 
@@ -42,20 +42,22 @@ class TestEmbeddingComputation:
             match_prop = "name"
             if label == "Term":
                 match_prop = "code"
-            elif label == "Synonym":
+            elif label in ("Alias", "Synonym"):
                 match_prop = "text"
             engine.embed_and_store(
                 label=label,
                 match_prop=match_prop,
                 items=nodes,
-                text_fn=lambda item: build_embedding_text(label.lower(), **item),
+                text_fn=lambda item, lbl=label: build_embedding_text(lbl.lower(), **item),
             )
 
-        assert mock_loader.set_embedding.call_count == len(fake_nodes)
+        # One set_embedding call per node with data in fake_nodes
+        expected = sum(len(v) for v in fake_nodes.values())
+        assert mock_loader.set_embedding.call_count == expected
 
     def test_property_embedding_uses_composite_key(self):
         mock_loader = MagicMock()
-        mock_model = MagicMock()
+        mock_model = MagicMock(spec=["encode"])
         mock_model.encode.return_value = [[0.1], [0.2]]
 
         property_nodes = [
@@ -84,7 +86,7 @@ class TestEmbeddingComputation:
 
     def test_per_label_match_property(self):
         mock_loader = MagicMock()
-        mock_model = MagicMock()
+        mock_model = MagicMock(spec=["encode"])
         mock_model.encode.return_value = [[0.5]]
 
         engine = EmbeddingEngine(model=mock_model, loader=mock_loader)
@@ -100,12 +102,12 @@ class TestEmbeddingComputation:
         mock_loader.reset_mock()
         mock_model.encode.return_value = [[0.5]]
         engine.embed_and_store(
-            label="Synonym", match_prop="text",
+            label="Alias", match_prop="text",
             items=[{"text": "order"}],
-            text_fn=lambda item: build_embedding_text("synonym", **item),
+            text_fn=lambda item: build_embedding_text("alias", **item),
         )
-        syn_call = mock_loader.set_embedding.call_args
-        assert syn_call.kwargs["match_prop"] == "text"
+        alias_call = mock_loader.set_embedding.call_args
+        assert alias_call.kwargs["match_prop"] == "text"
 
         mock_loader.reset_mock()
         mock_model.encode.return_value = [[0.5]]

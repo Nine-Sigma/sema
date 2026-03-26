@@ -62,10 +62,13 @@ class TestJoinAssertions:
             "unity://cdm.clinical.cancer_surgery": ["patient_id", "procedure_date"],
         }
         assertions = engine.infer_joins(table_columns)
-        join_assertions = [a for a in assertions if a.predicate == AssertionPredicate.JOINS_TO]
+        join_assertions = [
+            a for a in assertions
+            if a.predicate == AssertionPredicate.HAS_JOIN_EVIDENCE
+        ]
         assert len(join_assertions) >= 1
         assert join_assertions[0].source == "heuristic"
-        assert join_assertions[0].payload["on_column"] == "patient_id"
+        assert "patient_id" in join_assertions[0].payload["join_predicates"]
 
     def test_join_has_both_subject_and_object(self):
         engine = JoinInferenceEngine(run_id="test-run")
@@ -75,5 +78,19 @@ class TestJoinAssertions:
         }
         assertions = engine.infer_joins(table_columns)
         for a in assertions:
-            if a.predicate == AssertionPredicate.JOINS_TO:
+            if a.predicate == AssertionPredicate.HAS_JOIN_EVIDENCE:
                 assert a.object_ref is not None
+
+    def test_join_payload_has_required_fields(self):
+        engine = JoinInferenceEngine(run_id="test-run")
+        table_columns = {
+            "unity://cdm.clinical.tbl1": ["patient_id"],
+            "unity://cdm.clinical.tbl2": ["patient_id"],
+        }
+        assertions = engine.infer_joins(table_columns)
+        for a in assertions:
+            if a.predicate == AssertionPredicate.HAS_JOIN_EVIDENCE:
+                assert "join_predicates" in a.payload
+                assert "hop_count" in a.payload
+                assert "cardinality" in a.payload
+                assert isinstance(a.payload["join_predicates"], list)
