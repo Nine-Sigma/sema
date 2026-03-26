@@ -1,0 +1,60 @@
+{
+  "entity_name": "Cancer Diagnosis",
+  "entity_description": "Primary cancer diagnosis record containing diagnosis type, staging, and date information",
+  "synonyms": ["diagnosis", "dx", "cancer dx", "cancer diagnosis record"],
+  "properties": [
+    {
+      "column": "dx_type_cd",
+      "name": "Diagnosis Type",
+      "description": "Cancer type classification using OncoTree short codes",
+      "semantic_type": "categorical",
+      "vocabulary_guess": "OncoTree",
+      "confidence": 0.85,
+      "synonyms": ["cancer type", "diagnosis code", "dx type"],
+      "decoded_values": [
+        {"raw": "CRC", "label": "Colorectal Cancer"},
+        {"raw": "BRCA", "label": "Breast Cancer"},
+        {"raw": "NSCLC", "label": "Non-Small Cell Lung Cancer"},
+        {"raw": "MEL", "label": "Melanoma"}
+      ]
+    },
+    {
+      "column": "tnm_best_ovrl_stg",
+      "name": "TNM Best Overall Stage",
+      "description": "AJCC best overall TNM staging classification",
+      "semantic_type": "categorical",
+      "vocabulary_guess": "AJCC 8th Edition",
+      "confidence": 0.90,
+      "synonyms": ["stage", "cancer stage", "tnm stage", "staging"],
+      "decoded_values": [
+        {"raw": "Stage I", "label": "Stage I"},
+        {"raw": "Stage IA", "label": "Stage IA"},
+        {"raw": "Stage II", "label": "Stage II"},
+        {"raw": "Stage III", "label": "Stage III"},
+        {"raw": "Stage IIIA", "label": "Stage IIIA"},
+        {"raw": "Stage IIIB", "label": "Stage IIIB"},
+        {"raw": "Stage IV", "label": "Stage IV"}
+      ]
+    },
+    {
+      "column": "dt_of_dx",
+      "name": "Date of Diagnosis",
+      "description": "Date when cancer was diagnosed",
+      "semantic_type": "temporal",
+      "vocabulary_guess": null,
+      "confidence": 0.95,
+      "synonyms": ["diagnosis date", "dx date"],
+      "decoded_values": []
+    },
+    {
+      "column": "patient_id",
+      "name": "Patient ID",
+      "description": "Unique patient identifier",
+      "semantic_type": "identifier",
+      "vocabulary_guess": null,
+      "confidence": 0.99,
+      "synonyms": ["patient identifier", "pt id"],
+      "decoded_values": []
+    }
+  ]
+}

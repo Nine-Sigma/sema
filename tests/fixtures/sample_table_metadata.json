@@ -1,0 +1,55 @@
+{
+  "table_ref": "unity://cdm.clinical.cancer_diagnosis",
+  "table_name": "cancer_diagnosis",
+  "schema_name": "clinical",
+  "catalog": "cdm",
+  "comment": "Cancer diagnosis records",
+  "columns": [
+    {
+      "name": "dx_type_cd",
+      "data_type": "STRING",
+      "nullable": true,
+      "comment": "Diagnosis type code",
+      "top_values": [
+        {"value": "CRC", "frequency": 1200},
+        {"value": "BRCA", "frequency": 950},
+        {"value": "NSCLC", "frequency": 800},
+        {"value": "MEL", "frequency": 300}
+      ]
+    },
+    {
+      "name": "tnm_best_ovrl_stg",
+      "data_type": "STRING",
+      "nullable": true,
+      "comment": null,
+      "top_values": [
+        {"value": "Stage I", "frequency": 500},
+        {"value": "Stage IA", "frequency": 300},
+        {"value": "Stage II", "frequency": 450},
+        {"value": "Stage III", "frequency": 400},
+        {"value": "Stage IIIA", "frequency": 200},
+        {"value": "Stage IIIB", "frequency": 150},
+        {"value": "Stage IV", "frequency": 350}
+      ]
+    },
+    {
+      "name": "dt_of_dx",
+      "data_type": "DATE",
+      "nullable": true,
+      "comment": "Date of diagnosis",
+      "top_values": null
+    },
+    {
+      "name": "patient_id",
+      "data_type": "STRING",
+      "nullable": false,
+      "comment": "Patient identifier",
+      "top_values": null
+    }
+  ],
+  "sample_rows": [
+    {"dx_type_cd": "CRC", "tnm_best_ovrl_stg": "Stage IIIA", "dt_of_dx": "2024-01-15", "patient_id": "P12345"},
+    {"dx_type_cd": "BRCA", "tnm_best_ovrl_stg": "Stage II", "dt_of_dx": "2024-02-20", "patient_id": "P67890"},
+    {"dx_type_cd": "NSCLC", "tnm_best_ovrl_stg": "Stage IV", "dt_of_dx": "2024-03-10", "patient_id": "P11111"}
+  ]
+}
