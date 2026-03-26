@@ -19,6 +19,7 @@ from sema.pipeline.orchestrate_utils import (
     _discover_tables,
     _execute_by_mode,
     _log_result,
+    _register_datasource,
     _retrieve_context,
     _spawn_workers,
     _spawn_workers_parallel,
@@ -51,6 +52,7 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     discovery_connector = DatabricksConnector(
         config=config.databricks, profiling=config.profiling,
     )
+    _register_datasource(discovery_connector, loader)
     work_items = _discover_tables(discovery_connector, config)
 
     if not work_items:

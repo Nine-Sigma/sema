@@ -7,10 +7,10 @@ from sema.graph.queries import CypherQueries
 from sema.models.constants import MATCH_TYPE_BOOST
 from sema.models.context import SemanticCandidateSet
 from sema.pipeline.retrieval_utils import (
+    _expand_ancestry,
     _expand_joins,
     _expand_metrics,
     _expand_physical,
-    _expand_transformations,
     _expand_values,
     merge_and_rank_candidates,
 )
@@ -44,9 +44,9 @@ class RetrievalEngine:
         candidates = []
 
         for index in [
-            "entity_embeddings", "property_embeddings",
-            "term_embeddings", "synonym_embeddings",
-            "metric_embeddings", "transformation_embeddings",
+            "entity_embedding_index", "property_embedding_index",
+            "term_embedding_index", "alias_embedding_index",
+            "metric_embedding_index",
         ]:
             try:
                 query = CypherQueries.vector_search(index, top_k)
@@ -77,17 +77,16 @@ class RetrievalEngine:
         ]
 
         joins = _expand_joins(self, table_names)
-        transformations = _expand_transformations(self, table_names)
         values = _expand_values(self, physical)
         metrics = _expand_metrics(self, entity_names)
+        ancestry = _expand_ancestry(self, entity_names)
 
         return {
             "physical": physical,
             "joins": joins,
             "values": values,
-            "ancestry": [],
+            "ancestry": ancestry,
             "metrics": metrics,
-            "transformations": transformations,
         }
 
     def retrieve(
@@ -135,9 +134,6 @@ class RetrievalEngine:
 
         for m in expansion.get("metrics", []):
             all_candidates.append({"type": "metric", **m})
-
-        for t in expansion.get("transformations", []):
-            all_candidates.append({"type": "transformation", **t})
 
         return SemanticCandidateSet(
             query=question,

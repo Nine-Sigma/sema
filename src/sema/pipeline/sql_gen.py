@@ -24,9 +24,20 @@ def build_sql_prompt(sco: SemanticContextObject, question: str) -> str:
     if sco.join_paths:
         parts.append("\nJOIN PATHS:")
         for jp in sco.join_paths:
+            if jp.sql_snippet:
+                predicates_str = jp.sql_snippet
+            elif jp.join_predicates:
+                predicates_str = " AND ".join(
+                    f"{p.left_table}.{p.left_column} {p.operator} "
+                    f"{p.right_table}.{p.right_column}"
+                    for p in jp.join_predicates
+                )
+            else:
+                predicates_str = "(unknown join condition)"
+            cardinality = jp.cardinality_hint or "unknown"
             parts.append(
                 f"  {jp.from_table} -> {jp.to_table} "
-                f"ON {jp.on_column} ({jp.cardinality})"
+                f"ON {predicates_str} ({cardinality})"
             )
 
     if sco.governed_values:
