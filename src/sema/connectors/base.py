@@ -27,3 +27,13 @@ class Connector(ABC):
     def list_catalogs(self) -> list[str]:
         """Return available catalog names from the source."""
         ...
+
+    @abstractmethod
+    def get_datasource_ref(self) -> tuple[str, str, str]:
+        """Return (ref, platform, workspace) for this data source.
+
+        ref      — canonical URI, e.g. ``databricks://<workspace>``
+        platform — platform name, e.g. ``"databricks"``
+        workspace — workspace identifier, e.g. the host name
+        """
+        ...
