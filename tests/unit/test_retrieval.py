@@ -59,29 +59,27 @@ class TestHybridRetrieval:
             }
             return r
 
-        # 6 vector searches (one per index) + expansion queries
+        # 5 vector searches (one per index) + expansion queries
         session.run.side_effect = [
-            # entity_embeddings vector search
+            # entity_embedding_index vector search
             [make_vector_result("Cancer Diagnosis", 0.9)],
-            # property_embeddings
+            # property_embedding_index
             [],
-            # term_embeddings
+            # term_embedding_index
             [],
-            # synonym_embeddings
+            # alias_embedding_index
             [],
-            # metric_embeddings
-            [],
-            # transformation_embeddings
+            # metric_embedding_index
             [],
             # physical mapping for "Cancer Diagnosis"
             [make_physical_result()],
             # join paths
             [],
-            # transformations
-            [],
             # value set expansion
             [],
             # metrics
+            [],
+            # ancestry
             [],
         ]
         engine = RetrievalEngine(driver=driver, embedder=mock_embedder)
@@ -212,34 +210,21 @@ class TestExpandFromEntitiesCharacterization:
                 "confidence": 0.7,
             }
 
-        def make_transformation():
-            return {
-                "name": "stage_rollup",
-                "type": "aggregation",
-                "depends_on": "cancer_diagnosis",
-                "produces": "cancer_summary",
-                "confidence": 0.8,
-            }
-
         # session.run is called for: physical mapping, join paths,
-        # transformations, value sets (one per categorical column), metrics
+        # value sets (one per categorical column), metrics, ancestry
         call_count = [0]
         physical_result = make_physical()
 
         def run_side_effect(query, **params):
             call_count[0] += 1
             r = MagicMock()
-            # resolve_physical_mapping
-            if "IMPLEMENTED_BY" in query and "entity_name" in params:
+            # resolve_physical_mapping (new: ENTITY_ON_TABLE)
+            if "ENTITY_ON_TABLE" in query and "entity_name" in params:
                 r.data.return_value = physical_result
                 return [r]
-            # find_join_paths
-            elif "CANDIDATE_JOIN" in query:
+            # find_join_paths (new: JoinPath nodes)
+            elif "JoinPath" in query or "USES" in query:
                 r.data.return_value = make_join()
-                return [r]
-            # expand_transformations
-            elif "Transformation" in query or "PRODUCES" in query:
-                r.data.return_value = make_transformation()
                 return [r]
             # expand_value_set
             elif "MEMBER_OF" in query:
@@ -266,7 +251,6 @@ class TestExpandFromEntitiesCharacterization:
         assert "values" in result
         assert "ancestry" in result
         assert "metrics" in result
-        assert "transformations" in result
 
         # Physical has the table data
         assert len(result["physical"]) >= 1

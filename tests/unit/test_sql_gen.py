@@ -17,6 +17,7 @@ from sema.models.context import (
     ResolvedProperty,
     PhysicalAsset,
     JoinPath,
+    JoinPredicate,
     GovernedValue,
     Provenance,
 )
@@ -65,8 +66,15 @@ def sample_sco():
             JoinPath(
                 from_table="cdm.clinical.cancer_diagnosis",
                 to_table="cdm.clinical.cancer_surgery",
-                on_column="patient_id",
-                cardinality="one-to-many",
+                join_predicates=[
+                    JoinPredicate(
+                        left_table="cdm.clinical.cancer_diagnosis",
+                        left_column="patient_id",
+                        right_table="cdm.clinical.cancer_surgery",
+                        right_column="patient_id",
+                    ),
+                ],
+                cardinality_hint="one-to-many",
                 confidence=0.8,
             ),
         ],
