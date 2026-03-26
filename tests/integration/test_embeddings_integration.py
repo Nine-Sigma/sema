@@ -22,8 +22,8 @@ def loaded_graph(clean_neo4j):
                         source="llm", confidence=0.8,
                         table_name="cancer_diagnosis", schema_name="clinical", catalog="cdm")
     loader.upsert_term("CRC", "Colorectal Cancer", source="llm", confidence=0.85)
-    loader.upsert_synonym("colon cancer", parent_label=":Entity",
-                         parent_name="Cancer Diagnosis", source="llm", confidence=0.8)
+    loader.upsert_alias("colon cancer", parent_label=":Entity",
+                       parent_name="Cancer Diagnosis", source="llm", confidence=0.8)
     return clean_neo4j, loader
 
 
@@ -53,4 +53,4 @@ class TestVectorIndexCreation:
         with driver.session() as s:
             indexes = list(s.run("SHOW INDEXES YIELD name RETURN name"))
         index_names = {r["name"] for r in indexes}
-        assert "entity_embeddings" in index_names
+        assert "entity_embedding_index" in index_names

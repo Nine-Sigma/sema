@@ -82,7 +82,7 @@ class TestL1EndToEnd:
         assert _count_rels(driver, "IN_CATALOG") == 1
         assert _count_rels(driver, "IN_SCHEMA") == 2  # 2 tables in schema
         assert _count_rels(driver, "IN_TABLE") == 3   # 3 columns in tables
-        assert _count_rels(driver, "CANDIDATE_JOIN") == 1
+        assert _count(driver, "JoinPath") == 1
 
         # Verify table properties
         with driver.session() as s:
