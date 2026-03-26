@@ -37,11 +37,21 @@ class PhysicalAsset(BaseModel):
     columns: list[str] = Field(default_factory=list)
 
 
+class JoinPredicate(BaseModel):
+    left_table: str
+    left_column: str
+    right_table: str
+    right_column: str
+    operator: str = "="
+
+
 class JoinPath(BaseModel):
     from_table: str
     to_table: str
-    on_column: str
-    cardinality: str
+    join_predicates: list[JoinPredicate] = Field(default_factory=list)
+    hop_count: int = 1
+    cardinality_hint: str | None = None
+    sql_snippet: str | None = None
     confidence: float = Field(ge=0.0, le=1.0)
 
 
@@ -67,6 +77,12 @@ class ResolvedTransformation(BaseModel):
     provenance: Provenance
 
 
+class AncestryTerm(BaseModel):
+    code: str
+    label: str
+    parent_code: str | None = None
+
+
 class SemanticCandidateSet(BaseModel):
     query: str
     candidates: list[dict[str, Any]] = Field(default_factory=list)
@@ -79,5 +95,6 @@ class SemanticContextObject(BaseModel):
     physical_assets: list[PhysicalAsset] = Field(default_factory=list)
     join_paths: list[JoinPath] = Field(default_factory=list)
     governed_values: list[GovernedValue] = Field(default_factory=list)
+    ancestry: list[AncestryTerm] = Field(default_factory=list)
     consumer_hint: str = "nl2sql"
     retrieval_rationale: str | None = None
