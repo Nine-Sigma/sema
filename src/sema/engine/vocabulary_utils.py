@@ -104,6 +104,18 @@ def detect_by_llm_legacy(
     return assertions
 
 
+def _alias_expand_prompt(labels: list[str]) -> str:
+    """Build LLM prompt for term alias expansion."""
+    return (
+        f"For each of these terms, provide common aliases "
+        f"and abbreviations:\n"
+        f"{json.dumps(labels)}\n"
+        f'Return JSON: {{"synonyms": [{{"term": "X", '
+        f'"synonyms": ["y", "z"]}}]}}\n'
+        f"Return ONLY valid JSON."
+    )
+
+
 def expand_via_llm(
     engine: VocabularyEngine, subject_ref: str, terms: list[dict[str, str]]
 ) -> list[dict[str, Any]]:
@@ -112,14 +124,7 @@ def expand_via_llm(
             SynonymExpansion,
         )
         labels = [t["label"] for t in terms[:20]]
-        prompt = (
-            f"For each of these terms, provide common synonyms "
-            f"and abbreviations:\n"
-            f"{json.dumps(labels)}\n"
-            f'Return JSON: {{"synonyms": [{{"term": "X", '
-            f'"synonyms": ["y", "z"]}}]}}\n'
-            f"Return ONLY valid JSON."
-        )
+        prompt = _alias_expand_prompt(labels)
         result = engine._llm_client.invoke(
             prompt,
             SynonymExpansion,
@@ -133,14 +138,7 @@ def expand_via_llm(
     elif engine._llm and terms:
         try:
             labels = [t["label"] for t in terms[:20]]
-            prompt = (
-                f"For each of these terms, provide common "
-                f"synonyms and abbreviations:\n"
-                f"{json.dumps(labels)}\n"
-                f'Return JSON: {{"synonyms": [{{"term": "X", '
-                f'"synonyms": ["y", "z"]}}]}}\n'
-                f"Return ONLY valid JSON."
-            )
+            prompt = _alias_expand_prompt(labels)
             response = engine._llm.invoke(prompt)
             content = (
                 response.content
@@ -154,8 +152,7 @@ def expand_via_llm(
             ]
         except Exception as e:
             logger.warning(
-                f"LLM synonym expansion failed for "
-                f"{subject_ref}: {e}"
+                "LLM alias expansion failed for %s: %s", subject_ref, e
             )
     return []
 
@@ -163,14 +160,18 @@ def expand_via_llm(
 def build_synonym_assertions(
     engine: VocabularyEngine, subject_ref: str, synonyms: list[dict[str, Any]]
 ) -> list[Assertion]:
+    """Emit HAS_ALIAS assertions for term synonym expansions.
+
+    The first alias for each term gets is_preferred=True; subsequent ones False.
+    """
     assertions: list[Assertion] = []
     for item in synonyms:
         term_name = item.get("term", "")
-        for syn in item.get("synonyms", []):
+        for i, syn in enumerate(item.get("synonyms", [])):
             assertions.append(engine._make_assertion(
                 subject_ref,
-                AssertionPredicate.HAS_SYNONYM,
-                {"term": term_name, "value": syn},
+                AssertionPredicate.HAS_ALIAS,
+                {"term": term_name, "value": syn, "is_preferred": i == 0},
                 source="llm_interpretation",
                 confidence=0.7,
             ))

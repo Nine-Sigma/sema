@@ -52,7 +52,11 @@ class JoinInferenceEngine:
     def infer_joins(
         self, table_columns: dict[str, list[str]]
     ) -> list[Assertion]:
-        """Produce join assertions from heuristic candidates."""
+        """Produce HAS_JOIN_EVIDENCE assertions from heuristic candidates.
+
+        Payload includes join_predicates (ordered list of join columns),
+        hop_count (always 1 for direct heuristic joins), and cardinality.
+        """
         candidates = self.find_heuristic_joins(table_columns)
         assertions: list[Assertion] = []
 
@@ -60,10 +64,11 @@ class JoinInferenceEngine:
             assertions.append(Assertion(
                 id=str(uuid.uuid4()),
                 subject_ref=candidate["from_ref"],
-                predicate=AssertionPredicate.JOINS_TO,
+                predicate=AssertionPredicate.HAS_JOIN_EVIDENCE,
                 payload={
-                    "on_column": candidate["on_column"],
-                    "cardinality": "unknown",
+                    "join_predicates": [candidate["on_column"]],
+                    "hop_count": 1,
+                    "cardinality": candidate.get("cardinality", "unknown"),
                 },
                 object_ref=candidate["to_ref"],
                 source="heuristic",

@@ -6,11 +6,14 @@ from typing import Any
 
 from sema.engine.resolution_utils import (
     _pick_winner,
+    resolve_aliases,
     resolve_decoded_values,
     resolve_entities,
     resolve_hierarchies,
+    resolve_join_paths,
+    resolve_metrics,
     resolve_properties,
-    resolve_synonyms,
+    resolve_synonyms,  # deprecated alias kept for import backward compat
 )
 from sema.graph.loader import GraphLoader
 from sema.models.assertions import (
@@ -41,5 +44,5 @@ class ResolutionEngine:
         resolve_entities(groups, loader)
         resolve_properties(groups, loader)
         resolve_decoded_values(groups, loader)
-        resolve_synonyms(groups, loader)
+        resolve_aliases(groups, loader)
         resolve_hierarchies(groups, loader)

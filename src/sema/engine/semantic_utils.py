@@ -12,10 +12,23 @@ if TYPE_CHECKING:
     from sema.engine.semantic import (
         SemanticEngine,
         TableInterpretation,
-        _PropertyBatchResult,
     )
 
 logger = logging.getLogger(__name__)
+
+
+def _alias_payload(
+    value: str,
+    is_preferred: bool,
+    description: str | None = None,
+) -> dict[str, Any]:
+    """Build a HAS_ALIAS assertion payload."""
+    payload: dict[str, Any] = {
+        "value": value, "is_preferred": is_preferred,
+    }
+    if description is not None:
+        payload["description"] = description
+    return payload
 
 
 def run_summary_pass(
@@ -41,14 +54,32 @@ def run_summary_pass(
             "description": summary.entity_description,
         },
     ))
-    for syn in summary.synonyms:
+    for i, syn in enumerate(summary.synonyms):
         assertions.append(engine._make_assertion(
             table_ref,
-            AssertionPredicate.HAS_SYNONYM,
-            {"value": syn},
+            AssertionPredicate.HAS_ALIAS,
+            _alias_payload(syn, is_preferred=(i == 0)),
         ))
 
     return assertions, summary
+
+
+def _prop_alias_assertions(
+    engine: SemanticEngine,
+    col_ref: str,
+    synonyms: list[str],
+    confidence: float,
+) -> list[Assertion]:
+    """Emit HAS_ALIAS assertions for property synonyms."""
+    return [
+        engine._make_assertion(
+            col_ref,
+            AssertionPredicate.HAS_ALIAS,
+            _alias_payload(syn, is_preferred=(i == 0)),
+            confidence=confidence,
+        )
+        for i, syn in enumerate(synonyms)
+    ]
 
 
 def run_property_pass(
@@ -89,17 +120,20 @@ def run_property_pass(
                 {"value": prop.semantic_type},
                 confidence=prop.confidence,
             ))
-            for syn in prop.synonyms:
-                assertions.append(engine._make_assertion(
-                    col_ref,
-                    AssertionPredicate.HAS_SYNONYM,
-                    {"value": syn},
-                ))
+            assertions.extend(_prop_alias_assertions(
+                engine, col_ref,
+                prop.synonyms or [], prop.confidence,
+            ))
             for dv in prop.decoded_values:
                 assertions.append(engine._make_assertion(
                     col_ref,
                     AssertionPredicate.HAS_DECODED_VALUE,
-                    {"raw": dv.get("raw", dv.get("code", "")), "label": dv.get("label", dv.get("name", dv.get("raw", "")))},
+                    {
+                        "raw": dv.get("raw", dv.get("code", "")),
+                        "label": dv.get(
+                            "label", dv.get("name", dv.get("raw", "")),
+                        ),
+                    },
                     confidence=prop.confidence,
                 ))
             if prop.vocabulary_guess:
@@ -114,7 +148,9 @@ def run_property_pass(
 
 
 def entity_assertions(
-    engine: SemanticEngine, interpretation: TableInterpretation, table_ref: str
+    engine: SemanticEngine,
+    interpretation: TableInterpretation,
+    table_ref: str,
 ) -> list[Assertion]:
     assertions: list[Assertion] = []
 
@@ -127,18 +163,20 @@ def entity_assertions(
         },
     ))
 
-    for syn in (interpretation.synonyms or []):
+    for i, syn in enumerate(interpretation.synonyms or []):
         assertions.append(engine._make_assertion(
             table_ref,
-            AssertionPredicate.HAS_SYNONYM,
-            {"value": syn},
+            AssertionPredicate.HAS_ALIAS,
+            _alias_payload(syn, is_preferred=(i == 0)),
         ))
 
     return assertions
 
 
 def property_assertions(
-    engine: SemanticEngine, interpretation: TableInterpretation, table_ref: str
+    engine: SemanticEngine,
+    interpretation: TableInterpretation,
+    table_ref: str,
 ) -> list[Assertion]:
     assertions: list[Assertion] = []
 
@@ -159,18 +197,22 @@ def property_assertions(
             confidence=prop.confidence,
         ))
 
-        for syn in (prop.synonyms or []):
-            assertions.append(engine._make_assertion(
-                col_ref,
-                AssertionPredicate.HAS_SYNONYM,
-                {"value": syn},
-            ))
+        assertions.extend(_prop_alias_assertions(
+            engine, col_ref,
+            prop.synonyms or [], prop.confidence,
+        ))
 
         for dv in (prop.decoded_values or []):
             assertions.append(engine._make_assertion(
                 col_ref,
                 AssertionPredicate.HAS_DECODED_VALUE,
-                {"raw": dv.get("raw", dv.get("code", "")), "label": dv.get("label", dv.get("name", dv.get("raw", "")))},
+                {
+                    "raw": dv.get("raw", dv.get("code", "")),
+                    "label": dv.get(
+                        "label",
+                        dv.get("name", dv.get("raw", "")),
+                    ),
+                },
                 confidence=prop.confidence,
             ))
 
