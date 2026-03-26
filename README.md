@@ -65,13 +65,26 @@ Sema is domain-agnostic. If your warehouse has tables and columns, Sema can extr
 
 ---
 
+## Connector & Model Support
+
+Sema currently ships with a **Databricks** connector. Additional warehouse connectors (Snowflake, BigQuery, etc.) are on the roadmap — the connector interface is pluggable.
+
+For LLM and embedding providers, **bring your own model**. Sema works with any provider through a unified interface:
+
+| | Supported Providers |
+|---|---|
+| **LLM** | OpenRouter, Anthropic, OpenAI, Databricks Model Serving, any OpenAI-compatible endpoint |
+| **Embeddings** | OpenRouter, OpenAI, sentence-transformers (local), Databricks, any OpenAI-compatible endpoint |
+
+---
+
 ## Prerequisites
 
 - **Python 3.12+**
 - **Neo4j 5.x** — local via Docker or remote
-- **Databricks SQL Warehouse** — data source
-- **LLM API key** — OpenRouter, Anthropic, OpenAI, or Databricks-hosted
-- **Embedding API key** — OpenRouter, OpenAI, or local sentence-transformers
+- **Databricks SQL Warehouse** — data source (currently the only supported connector)
+- **LLM API key** — any supported provider above
+- **Embedding API key** — any supported provider above, or use local sentence-transformers
 
 ---
 
