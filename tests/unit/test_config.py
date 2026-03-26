@@ -111,6 +111,16 @@ class TestEmbeddingConfig:
         config = EmbeddingConfig(provider="sentence-transformers", model="all-MiniLM-L6-v2")
         assert config.provider == "sentence-transformers"
 
+    def test_embeddable_labels_default(self):
+        config = EmbeddingConfig()
+        assert config.embeddable_labels == [
+            "Entity", "Property", "Alias", "Term", "Metric",
+        ]
+
+    def test_embeddable_labels_custom(self):
+        config = EmbeddingConfig(embeddable_labels=["Entity", "Alias"])
+        assert config.embeddable_labels == ["Entity", "Alias"]
+
     def test_databricks_provider(self):
         config = EmbeddingConfig(
             provider="databricks",

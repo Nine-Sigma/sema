@@ -17,8 +17,12 @@ from sema.models.assertions import (
 def mock_driver():
     driver = MagicMock()
     session = MagicMock()
-    driver.session.return_value.__enter__ = MagicMock(return_value=session)
-    driver.session.return_value.__exit__ = MagicMock(return_value=False)
+    driver.session.return_value.__enter__ = MagicMock(
+        return_value=session
+    )
+    driver.session.return_value.__exit__ = MagicMock(
+        return_value=False
+    )
     return driver, session
 
 
@@ -28,8 +32,11 @@ def loader(mock_driver):
     return GraphLoader(driver)
 
 
-def _make_assertion(subject, predicate, payload=None, object_ref=None, source="test",
-                    confidence=0.9, status=AssertionStatus.AUTO, run_id="run-1"):
+def _make_assertion(
+    subject, predicate, payload=None, object_ref=None,
+    source="test", confidence=0.9,
+    status=AssertionStatus.AUTO, run_id="run-1",
+):
     return Assertion(
         id=f"a-{subject}-{predicate.value}",
         subject_ref=subject,
@@ -44,6 +51,19 @@ def _make_assertion(subject, predicate, payload=None, object_ref=None, source="t
     )
 
 
+class TestUpsertDataSource:
+    def test_upsert_datasource(self, loader, mock_driver):
+        _, session = mock_driver
+        loader.upsert_datasource(
+            "ds-1", "databricks://ws", "databricks", "ws",
+        )
+        session.run.assert_called()
+        cypher = session.run.call_args[0][0]
+        assert "MERGE" in cypher
+        assert ":DataSource" in cypher
+        assert "ON CREATE SET" in cypher
+
+
 class TestUpsertPhysicalNodes:
     def test_upsert_catalog(self, loader, mock_driver):
         _, session = mock_driver
@@ -52,6 +72,7 @@ class TestUpsertPhysicalNodes:
         cypher = session.run.call_args[0][0]
         assert "MERGE" in cypher
         assert ":Catalog" in cypher
+        assert "ON CREATE SET" in cypher
 
     def test_upsert_schema(self, loader, mock_driver):
         _, session = mock_driver
@@ -64,142 +85,260 @@ class TestUpsertPhysicalNodes:
 
     def test_upsert_table(self, loader, mock_driver):
         _, session = mock_driver
-        loader.upsert_table("cancer_diagnosis", "clinical", "cdm", table_type="TABLE", comment="Diagnosis records")
+        loader.upsert_table(
+            "cancer_diagnosis", "clinical", "cdm",
+            table_type="TABLE", comment="Records",
+        )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
         assert "MERGE" in cypher
         assert ":Table" in cypher
         assert "IN_SCHEMA" in cypher
+        assert "ON CREATE SET" in cypher
 
     def test_upsert_column(self, loader, mock_driver):
         _, session = mock_driver
-        loader.upsert_column("dx_type_cd", "cancer_diagnosis", "clinical", "cdm",
-                            data_type="STRING", nullable=True, comment="Type code")
+        loader.upsert_column(
+            "dx_type_cd", "cancer_diagnosis", "clinical",
+            "cdm", data_type="STRING",
+        )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
         assert "MERGE" in cypher
         assert ":Column" in cypher
         assert "IN_TABLE" in cypher
+        assert "ON CREATE SET" in cypher
 
 
 class TestUpsertSemanticNodes:
-    def test_upsert_entity(self, loader, mock_driver):
+    def test_upsert_entity_uses_entity_on_table(
+        self, loader, mock_driver,
+    ):
         _, session = mock_driver
-        loader.upsert_entity("Cancer Diagnosis", description="Primary dx",
-                            source="llm", confidence=0.8, table_name="cancer_diagnosis",
-                            schema_name="clinical", catalog="cdm")
+        loader.upsert_entity(
+            "Cancer Diagnosis", description="Primary dx",
+            source="llm", confidence=0.8,
+            table_name="cancer_diagnosis",
+            schema_name="clinical", catalog="cdm",
+        )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
-        assert "MERGE" in cypher
-        assert ":Entity" in cypher
-        assert "IMPLEMENTED_BY" in cypher
+        assert "ENTITY_ON_TABLE" in cypher
+        assert "IMPLEMENTED_BY" not in cypher
+        assert "ON CREATE SET" in cypher
 
-    def test_upsert_property(self, loader, mock_driver):
+    def test_upsert_property_uses_property_on_column(
+        self, loader, mock_driver,
+    ):
         _, session = mock_driver
-        loader.upsert_property("Diagnosis Type", semantic_type="categorical",
-                              source="llm", confidence=0.8,
-                              entity_name="Cancer Diagnosis",
-                              column_name="dx_type_cd", table_name="cancer_diagnosis",
-                              schema_name="clinical", catalog="cdm")
+        loader.upsert_property(
+            "Diagnosis Type", semantic_type="categorical",
+            source="llm", confidence=0.8,
+            entity_name="Cancer Diagnosis",
+            column_name="dx_type_cd",
+            table_name="cancer_diagnosis",
+            schema_name="clinical", catalog="cdm",
+        )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
-        assert "MERGE" in cypher
-        assert ":Property" in cypher
+        assert "PROPERTY_ON_COLUMN" in cypher
+        assert "IMPLEMENTED_BY" not in cypher
+        assert "ON CREATE SET" in cypher
 
     def test_upsert_term(self, loader, mock_driver):
         _, session = mock_driver
-        loader.upsert_term("CRC", "Colorectal Cancer", source="llm", confidence=0.85)
+        loader.upsert_term(
+            "CRC", "Colorectal Cancer", source="llm",
+            confidence=0.85,
+        )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
         assert "MERGE" in cypher
         assert ":Term" in cypher
+        assert "ON CREATE SET" in cypher
 
     def test_upsert_value_set(self, loader, mock_driver):
         _, session = mock_driver
-        loader.upsert_value_set("oncotree_types", column_name="dx_type_cd",
-                               table_name="cancer_diagnosis",
-                               schema_name="clinical", catalog="cdm")
+        loader.upsert_value_set(
+            "oncotree_types", column_name="dx_type_cd",
+            table_name="cancer_diagnosis",
+            schema_name="clinical", catalog="cdm",
+        )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
         assert "MERGE" in cypher
         assert ":ValueSet" in cypher
         assert "STORED_IN" in cypher
+        assert "ON CREATE SET" in cypher
 
-    def test_upsert_synonym(self, loader, mock_driver):
+
+class TestAliasOperations:
+    def test_upsert_alias(self, loader, mock_driver):
         _, session = mock_driver
-        loader.upsert_synonym("colon cancer", parent_label=":Entity", parent_name="Cancer Diagnosis",
-                             source="llm", confidence=0.8)
+        loader.upsert_alias(
+            "colon cancer", parent_label=":Entity",
+            parent_name="Cancer Diagnosis",
+            source="llm", confidence=0.8,
+            is_preferred=False,
+            description="Common name",
+        )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
         assert "MERGE" in cypher
-        assert ":Synonym" in cypher
-        assert "SYNONYM_OF" in cypher
+        assert ":Alias" in cypher
+        assert "REFERS_TO" in cypher
+        assert "ON CREATE SET" in cypher
+        assert "is_preferred" in cypher
+
+    def test_no_synonym_method(self, loader):
+        assert not hasattr(loader, "upsert_synonym")
+
+    def test_no_candidate_join_method(self, loader):
+        assert not hasattr(loader, "upsert_candidate_join")
 
 
-class TestAssertionSupersession:
-    def test_store_assertion_creates_node(self, loader, mock_driver):
+class TestJoinPathOperations:
+    def test_upsert_join_path(self, loader, mock_driver):
         _, session = mock_driver
-        assertion = _make_assertion(
-            "unity://cdm.clinical.tbl.col",
-            AssertionPredicate.HAS_LABEL,
-            {"value": "My Label"},
+        loader.upsert_join_path(
+            name="t1/c1=t2/c2",
+            join_predicates=[{
+                "left_table": "t1", "left_column": "c1",
+                "right_table": "t2", "right_column": "c2",
+                "operator": "=",
+            }],
+            hop_count=1, source="heuristic", confidence=0.85,
         )
-        loader.store_assertion(assertion)
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
-        assert "CREATE" in cypher or "MERGE" in cypher
-        assert ":Assertion" in cypher
+        assert "MERGE" in cypher
+        assert ":JoinPath" in cypher
+        assert "ON CREATE SET" in cypher
 
-    def test_supersession_marks_old_as_superseded(self, loader, mock_driver):
+    def test_add_join_path_entity_links(
+        self, loader, mock_driver,
+    ):
         _, session = mock_driver
-        assertion = _make_assertion(
-            "unity://cdm.clinical.tbl.col",
-            AssertionPredicate.HAS_LABEL,
-            {"value": "New Label"},
-            run_id="run-2",
+        loader.add_join_path_entity_links(
+            "t1/c1=t2/c2",
+            from_table_ref="databricks://ws/cat/sch/t1",
+            to_table_ref="databricks://ws/cat/sch/t2",
+        )
+        session.run.assert_called()
+        cypher = session.run.call_args[0][0]
+        assert "FROM_ENTITY" in cypher
+        assert "TO_ENTITY" in cypher
+        assert "ENTITY_ON_TABLE" in cypher
+
+
+class TestAssertionStorage:
+    def test_store_assertion_includes_subject_id(
+        self, loader, mock_driver,
+    ):
+        _, session = mock_driver
+        assertion = Assertion(
+            id="a-1",
+            subject_ref="databricks://ws/cdm/clinical/tbl/col",
+            subject_id="node-1",
+            predicate=AssertionPredicate.HAS_LABEL,
+            payload={"value": "My Label"},
+            source="test",
+            confidence=0.9,
+            run_id="run-1",
+            observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
         )
         loader.store_assertion(assertion)
         calls = [str(c) for c in session.run.call_args_list]
-        # Should have a call that sets status to 'superseded' for old assertions
+        assert any("subject_id" in c for c in calls)
+        assert any("object_id" in c for c in calls)
+
+    def test_supersession_marks_old_as_superseded(
+        self, loader, mock_driver,
+    ):
+        _, session = mock_driver
+        assertion = _make_assertion(
+            "databricks://ws/cdm/clinical/tbl/col",
+            AssertionPredicate.HAS_LABEL,
+            {"value": "New Label"}, run_id="run-2",
+        )
+        loader.store_assertion(assertion)
+        calls = [str(c) for c in session.run.call_args_list]
         assert any("superseded" in c for c in calls)
 
-    def test_pinned_assertions_not_superseded(self, loader, mock_driver):
+
+class TestProvenanceEdges:
+    def test_materialize_provenance_edges(
+        self, loader, mock_driver,
+    ):
         _, session = mock_driver
-        assertion = _make_assertion(
-            "unity://cdm.clinical.tbl.col",
-            AssertionPredicate.HAS_LABEL,
-            {"value": "New Label"},
-            run_id="run-2",
+        assertion = Assertion(
+            id="a-prov",
+            subject_ref="databricks://ws/cdm/clinical/tbl",
+            subject_id="ent-1",
+            predicate=AssertionPredicate.HAS_ENTITY_NAME,
+            payload={"value": "Test"},
+            object_id="tbl-1",
+            source="llm_interpretation",
+            confidence=0.9,
+            run_id="run-1",
+            observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
         )
-        loader.store_assertion(assertion)
+        loader.materialize_provenance_edges([assertion])
         calls = [str(c) for c in session.run.call_args_list]
-        # Supersession query should exclude pinned/accepted/rejected
-        supersede_calls = [c for c in calls if "superseded" in c]
-        assert all("auto" in c for c in supersede_calls)
+        assert any("SUBJECT" in c for c in calls)
+        assert any("OBJECT" in c for c in calls)
 
-
-class TestCandidateJoins:
-    def test_upsert_candidate_join(self, loader, mock_driver):
+    def test_skips_structural_predicates(
+        self, loader, mock_driver,
+    ):
         _, session = mock_driver
-        loader.upsert_candidate_join(
-            from_table="cancer_diagnosis", from_schema="clinical", from_catalog="cdm",
-            to_table="cancer_surgery", to_schema="clinical", to_catalog="cdm",
-            on_column="patient_id", cardinality="one-to-many",
-            source="heuristic", confidence=0.8,
+        assertion = Assertion(
+            id="a-struct",
+            subject_ref="databricks://ws/cdm/clinical/tbl",
+            subject_id="tbl-1",
+            predicate=AssertionPredicate.TABLE_EXISTS,
+            payload={"table_type": "TABLE"},
+            source="unity_catalog",
+            confidence=1.0,
+            run_id="run-1",
+            observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
         )
-        session.run.assert_called()
-        cypher = session.run.call_args[0][0]
-        assert "CANDIDATE_JOIN" in cypher
+        loader.materialize_provenance_edges([assertion])
+        session.run.assert_not_called()
+
+
+class TestVectorIndexes:
+    def test_create_vector_indexes_from_config(
+        self, loader, mock_driver,
+    ):
+        _, session = mock_driver
+        loader.create_vector_indexes_from_config(
+            ["Entity", "Property", "Alias"],
+        )
+        assert session.run.call_count == 3
+        calls = [
+            session.run.call_args_list[i][0][0]
+            for i in range(3)
+        ]
+        assert any("entity_embedding_index" in c for c in calls)
+        assert any("property_embedding_index" in c for c in calls)
+        assert any("alias_embedding_index" in c for c in calls)
 
 
 class TestBatchOperations:
     def test_batch_upsert_columns(self, loader, mock_driver):
         _, session = mock_driver
         columns = [
-            {"name": "col1", "data_type": "STRING", "nullable": True, "comment": None},
-            {"name": "col2", "data_type": "INT", "nullable": False, "comment": "test"},
+            {
+                "name": "col1", "data_type": "STRING",
+                "nullable": True, "comment": None,
+                "id": "c1", "ref": "r1",
+            },
         ]
-        loader.batch_upsert_columns(columns, "tbl", "schema", "catalog")
+        loader.batch_upsert_columns(
+            columns, "tbl", "schema", "catalog",
+        )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
         assert "UNWIND" in cypher
+        assert "ON CREATE SET" in cypher
