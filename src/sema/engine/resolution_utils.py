@@ -135,40 +135,124 @@ def resolve_decoded_values(
             loader.add_term_to_value_set(raw, vs_name)
 
 
-def resolve_synonyms(
+def _collect_alias_groups(
+    groups: dict[tuple[str, str], list[Assertion]],
+) -> dict[str, list[Assertion]]:
+    """Collect alias assertions keyed by subject_ref."""
+    alias_groups: dict[str, list[Assertion]] = {}
+    for (subj, pred), group in groups.items():
+        if pred in (
+            AssertionPredicate.HAS_ALIAS.value,
+            AssertionPredicate.HAS_SYNONYM.value,  # backward compat
+        ):
+            alias_groups.setdefault(subj, []).extend(group)
+    return alias_groups
+
+
+def resolve_aliases(
     groups: dict[tuple[str, str], list[Assertion]],
     loader: GraphLoader,
 ) -> None:
-    synonym_groups = {
-        subj: group
-        for (subj, pred), group in groups.items()
-        if pred == AssertionPredicate.HAS_SYNONYM.value
-    }
-    for subject_ref, group in synonym_groups.items():
+    """Resolve HAS_ALIAS (and deprecated HAS_SYNONYM) assertions into synonym nodes."""
+    alias_groups = _collect_alias_groups(groups)
+    for subject_ref, group in alias_groups.items():
         _, _, table_or_col, column = parse_unity_ref(subject_ref)
         if column:
-            # Column-level synonym -> Property
-            prop_group = groups.get((subject_ref, AssertionPredicate.HAS_PROPERTY_NAME.value), [])
+            prop_group = groups.get(
+                (subject_ref, AssertionPredicate.HAS_PROPERTY_NAME.value), []
+            )
             prop_winner = _pick_winner(prop_group)
             parent_label = ":Property"
-            parent_name = prop_winner.payload.get("value", column) if prop_winner else column
+            parent_name = (
+                prop_winner.payload.get("value", column) if prop_winner else column
+            )
         else:
-            # Table-level synonym -> Entity
-            entity_group = groups.get((subject_ref, AssertionPredicate.HAS_ENTITY_NAME.value), [])
+            entity_group = groups.get(
+                (subject_ref, AssertionPredicate.HAS_ENTITY_NAME.value), []
+            )
             entity_winner = _pick_winner(entity_group)
             parent_label = ":Entity"
-            parent_name = entity_winner.payload.get("value", table_or_col) if entity_winner else table_or_col
+            parent_name = (
+                entity_winner.payload.get("value", table_or_col)
+                if entity_winner
+                else table_or_col
+            )
 
         for a in group:
             if a.status in (AssertionStatus.REJECTED, AssertionStatus.SUPERSEDED):
                 continue
-            loader.upsert_synonym(
+            loader.upsert_alias(
                 text=a.payload.get("value", ""),
                 parent_label=parent_label,
                 parent_name=parent_name,
                 source=a.source,
                 confidence=a.confidence,
+                is_preferred=a.payload.get("is_preferred", False),
+                description=a.payload.get("description"),
             )
+
+
+# Deprecated alias kept for backward compatibility
+resolve_synonyms = resolve_aliases
+
+
+def resolve_join_paths(
+    groups: dict[tuple[str, str], list[Assertion]],
+) -> list[dict]:
+    """Return join path data structures from HAS_JOIN_EVIDENCE assertions.
+
+    Does NOT call loader methods — returns raw data for callers to act on.
+    Each dict has: subject_ref, object_ref, join_predicates, hop_count,
+    cardinality, source, confidence.
+    """
+    results: list[dict] = []
+    for (subj, pred), group in groups.items():
+        if pred != AssertionPredicate.HAS_JOIN_EVIDENCE.value:
+            continue
+        for a in group:
+            if a.status in (AssertionStatus.REJECTED, AssertionStatus.SUPERSEDED):
+                continue
+            results.append({
+                "subject_ref": a.subject_ref,
+                "object_ref": a.object_ref,
+                "join_predicates": a.payload.get("join_predicates", []),
+                "hop_count": a.payload.get("hop_count", 1),
+                "cardinality": a.payload.get("cardinality", "unknown"),
+                "source": a.source,
+                "confidence": a.confidence,
+            })
+    return results
+
+
+def resolve_metrics(
+    groups: dict[tuple[str, str], list[Assertion]],
+) -> list[dict]:
+    """Return metric data structures from metric-related assertions.
+
+    Collects MEASURES, AGGREGATES, FILTERS_BY, AT_GRAIN predicates.
+    Does NOT call loader methods — returns raw data for callers to act on.
+    Each dict has: subject_ref, predicate, object_ref, payload, source,
+    confidence.
+    """
+    metric_predicates = {
+        "measures", "aggregates", "filters_by", "at_grain",
+    }
+    results: list[dict] = []
+    for (subj, pred), group in groups.items():
+        if pred not in metric_predicates:
+            continue
+        for a in group:
+            if a.status in (AssertionStatus.REJECTED, AssertionStatus.SUPERSEDED):
+                continue
+            results.append({
+                "subject_ref": a.subject_ref,
+                "predicate": pred,
+                "object_ref": a.object_ref,
+                "payload": a.payload,
+                "source": a.source,
+                "confidence": a.confidence,
+            })
+    return results
 
 
 def resolve_hierarchies(

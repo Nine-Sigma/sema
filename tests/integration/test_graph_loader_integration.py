@@ -176,20 +176,22 @@ class TestAssertionSupersession:
         assert results[0]["status"] == "accepted"  # preserved
 
 
-class TestCandidateJoins:
-    def test_candidate_join_edge_created(self, loader, clean_neo4j):
+class TestJoinPaths:
+    def test_join_path_node_created(self, loader, clean_neo4j):
+        import json as _json
         loader.upsert_table("tbl1", "schema", "catalog")
         loader.upsert_table("tbl2", "schema", "catalog")
-        loader.upsert_candidate_join(
-            "tbl1", "schema", "catalog",
-            "tbl2", "schema", "catalog",
-            on_column="patient_id", cardinality="one-to-many",
+        loader.upsert_join_path(
+            name="tbl1__tbl2__patient_id",
+            join_predicates=[{"from_table": "tbl1", "to_table": "tbl2", "on_column": "patient_id"}],
+            hop_count=1,
             source="heuristic", confidence=0.8,
         )
-        assert _count_rels(clean_neo4j, "CANDIDATE_JOIN") == 1
+        assert _count(clean_neo4j, "JoinPath") == 1
 
         with clean_neo4j.session() as s:
             r = s.run(
-                "MATCH ()-[j:CANDIDATE_JOIN]->() RETURN j.on_column AS on_col"
+                "MATCH (jp:JoinPath {name: 'tbl1__tbl2__patient_id'}) RETURN jp.join_predicates AS preds"
             ).single()
-        assert r["on_col"] == "patient_id"
+        predicates = _json.loads(r["preds"])
+        assert predicates[0]["on_column"] == "patient_id"

@@ -61,6 +61,9 @@ class EmbeddingConfig(BaseSettings):
     model: str = "google/gemini-embedding-001"
     api_key: SecretStr = SecretStr("")
     base_url: str | None = None
+    embeddable_labels: list[str] = [
+        "Entity", "Property", "Alias", "Term", "Metric",
+    ]
 
 
 class ProfilingConfig(BaseSettings):

@@ -77,12 +77,12 @@ class TestFullResolution:
         assert _count(driver, "Property") == 1
         assert _count(driver, "Term") >= 2
         assert _count(driver, "ValueSet") == 1
-        assert _count(driver, "Synonym") >= 1
-        assert _count_rels(driver, "IMPLEMENTED_BY") >= 1
+        assert _count(driver, "Alias") >= 1
+        assert _count_rels(driver, "ENTITY_ON_TABLE") >= 1
         assert _count_rels(driver, "HAS_PROPERTY") == 1
         assert _count_rels(driver, "MEMBER_OF") >= 2
         assert _count_rels(driver, "STORED_IN") == 1
-        assert _count_rels(driver, "SYNONYM_OF") >= 1
+        assert _count_rels(driver, "REFERS_TO") >= 1
         assert _count_rels(driver, "PARENT_OF") >= 1
 
     def test_assertions_stored_with_subject_edges(self, resolver):

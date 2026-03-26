@@ -124,14 +124,16 @@ class TestAssertionEmission:
         crc = next(a for a in decoded if a.payload.get("raw") == "CRC")
         assert crc.payload["label"] == "Colorectal Cancer"
 
-    def test_emits_synonym_assertions(self, engine, sample_metadata):
+    def test_emits_alias_assertions(self, engine, sample_metadata):
         assertions = engine.interpret_table(sample_metadata)
-        synonyms = [a for a in assertions
-                   if a.predicate == AssertionPredicate.HAS_SYNONYM]
-        assert len(synonyms) > 0
-        entity_synonyms = [a for a in synonyms
+        aliases = [a for a in assertions
+                   if a.predicate == AssertionPredicate.HAS_ALIAS]
+        assert len(aliases) > 0
+        entity_aliases = [a for a in aliases
                           if a.subject_ref == sample_metadata["table_ref"]]
-        assert len(entity_synonyms) > 0
+        assert len(entity_aliases) > 0
+        # First alias should be preferred
+        assert entity_aliases[0].payload["is_preferred"] is True
 
     def test_all_assertions_have_llm_source(self, engine, sample_metadata):
         assertions = engine.interpret_table(sample_metadata)
@@ -222,10 +224,16 @@ class TestInterpretationToAssertionsCharacterization:
         assert len(entity_a) == 1
         assert entity_a[0].payload["value"] == "Patient"
 
-        # HAS_SYNONYM for entity-level synonym
-        assert AssertionPredicate.HAS_SYNONYM in predicates
-        syn_a = [a for a in assertions if a.predicate == AssertionPredicate.HAS_SYNONYM]
+        # HAS_ALIAS for entity-level alias (replaces HAS_SYNONYM)
+        assert AssertionPredicate.HAS_ALIAS in predicates
+        syn_a = [a for a in assertions if a.predicate == AssertionPredicate.HAS_ALIAS]
         assert any(a.payload["value"] == "Subject" for a in syn_a)
+        # First alias should be marked preferred
+        entity_aliases = [
+            a for a in syn_a
+            if a.subject_ref == table_ref
+        ]
+        assert entity_aliases[0].payload["is_preferred"] is True
 
         # HAS_PROPERTY_NAME for each property
         prop_a = [a for a in assertions if a.predicate == AssertionPredicate.HAS_PROPERTY_NAME]

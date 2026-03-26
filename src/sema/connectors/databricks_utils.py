@@ -19,6 +19,12 @@ if TYPE_CHECKING:
     )
 
 
+def _make_table_ref(connector: DatabricksConnector, catalog: str, schema: str, table: str) -> str:
+    """Build a canonical table ref using the connector's workspace."""
+    workspace = connector._config.host.replace("https://", "").rstrip("/")
+    return f"databricks://{workspace}/{catalog}/{schema}/{table}"
+
+
 def _build_table_assertion(
     connector: DatabricksConnector, work_item: TableWorkItem
 ) -> list[Assertion]:
@@ -34,12 +40,13 @@ def _build_table_assertion(
 
     fks = connector._get_fk_constraints(catalog, schema, table_name)
     for fk in fks:
+        to_ref = _make_table_ref(connector, catalog, schema, fk["to_table"])
         assertions.append(
             connector._make_assertion(
                 fqn,
                 AssertionPredicate.JOINS_TO,
                 {"on_column": fk["from_col"], "to_column": fk["to_col"]},
-                object_ref=f"unity://{catalog}.{schema}.{fk['to_table']}",
+                object_ref=to_ref,
                 confidence=0.95,
             )
         )

@@ -71,7 +71,7 @@ class TestTableExtraction:
 
         table_assertions = [a for a in assertions if a.predicate == AssertionPredicate.TABLE_EXISTS]
         assert len(table_assertions) == 1
-        assert table_assertions[0].subject_ref == "unity://cdm.clinical.cancer_diagnosis"
+        assert table_assertions[0].subject_ref == "databricks://test.databricks.com/cdm/clinical/cancer_diagnosis"
         assert table_assertions[0].source == "unity_catalog"
         assert table_assertions[0].payload["table_type"] == "TABLE"
 
@@ -291,7 +291,7 @@ class TestDiscoverTables:
         assert items[0].catalog == "cdm"
         assert items[0].schema == "clinical"
         assert items[0].table_name == "cancer_diagnosis"
-        assert items[0].fqn == "unity://cdm.clinical.cancer_diagnosis"
+        assert items[0].fqn == "databricks://test.databricks.com/cdm/clinical/cancer_diagnosis"
         assert items[1].table_name == "patients"
         assert items[2].schema == "staging"
 

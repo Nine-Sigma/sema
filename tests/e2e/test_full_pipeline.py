@@ -171,9 +171,12 @@ class TestE2EBuild:
     def test_graph_has_correct_edges(self, built_graph):
         with built_graph.session() as s:
             for rel in ["IN_CATALOG", "IN_SCHEMA", "IN_TABLE",
-                       "IMPLEMENTED_BY", "HAS_PROPERTY", "CANDIDATE_JOIN"]:
+                       "ENTITY_ON_TABLE", "HAS_PROPERTY"]:
                 count = s.run(f"MATCH ()-[r:{rel}]->() RETURN count(r) AS c").single()["c"]
                 assert count >= 1, f"Missing {rel} edges"
+            # JoinPath is a node, not an edge, in the v1 model
+            jp_count = s.run("MATCH (jp:JoinPath) RETURN count(jp) AS c").single()["c"]
+            assert jp_count >= 1, "Missing JoinPath nodes"
 
 
 class TestE2EContext:

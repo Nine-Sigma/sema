@@ -127,7 +127,7 @@ class TestLLMVocabularyDetection:
 
 
 class TestSynonymExpansion:
-    def test_synonym_assertions_for_decoded_terms(self):
+    def test_alias_assertions_for_decoded_terms(self):
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(
             content=json.dumps({
@@ -140,8 +140,11 @@ class TestSynonymExpansion:
         engine = VocabularyEngine(llm=mock_llm, run_id="test-run")
         terms = [{"code": "CRC", "label": "Colorectal Cancer"}, {"code": "BRCA", "label": "Breast Cancer"}]
         assertions = engine.expand_synonyms("unity://cdm.clinical.tbl.col", terms)
-        syn_assertions = [a for a in assertions if a.predicate == AssertionPredicate.HAS_SYNONYM]
-        assert len(syn_assertions) >= 4  # at least 2 per term
+        alias_assertions = [a for a in assertions if a.predicate == AssertionPredicate.HAS_ALIAS]
+        assert len(alias_assertions) >= 4  # at least 2 per term
+        # First alias per term should be preferred
+        first = alias_assertions[0]
+        assert first.payload["is_preferred"] is True
 
 
 class TestFullVocabularyPipeline:
@@ -164,4 +167,4 @@ class TestFullVocabularyPipeline:
 
         predicates = {a.predicate for a in assertions}
         assert AssertionPredicate.VOCABULARY_MATCH in predicates
-        assert AssertionPredicate.HAS_SYNONYM in predicates
+        assert AssertionPredicate.HAS_ALIAS in predicates

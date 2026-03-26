@@ -17,7 +17,8 @@ class CypherQueries:
         return (
             f"MATCH (t:Term)-[:PARENT_OF*1..{max_depth}]->(child:Term) "
             f"WHERE t.code = $code "
-            f"RETURN child.code AS code, child.label AS label"
+            f"RETURN child.code AS code, child.label AS label, "
+            f"t.code AS parent_code"
         )
 
     @staticmethod
@@ -30,8 +31,9 @@ class CypherQueries:
     @staticmethod
     def resolve_physical_mapping() -> str:
         return (
-            "MATCH (e:Entity {name: $entity_name})-[:IMPLEMENTED_BY]->(t:Table) "
-            "OPTIONAL MATCH (e)-[:HAS_PROPERTY]->(p:Property)-[:IMPLEMENTED_BY]->(c:Column) "
+            "MATCH (e:Entity {name: $entity_name})-[:ENTITY_ON_TABLE]->(t:Table) "
+            "OPTIONAL MATCH (e)-[:HAS_PROPERTY]->(p:Property)"
+            "-[:PROPERTY_ON_COLUMN]->(c:Column) "
             "RETURN t.name AS table_name, t.schema_name AS schema_name, "
             "t.catalog AS catalog, "
             "collect({property: p.name, column: c.name, "
@@ -41,33 +43,51 @@ class CypherQueries:
     @staticmethod
     def find_join_paths() -> str:
         return (
-            "MATCH (t1:Table)-[j:CANDIDATE_JOIN]->(t2:Table) "
-            "WHERE t1.name IN $table_names OR t2.name IN $table_names "
-            "RETURN t1.name AS from_table, t1.schema_name AS from_schema, "
-            "t1.catalog AS from_catalog, "
-            "t2.name AS to_table, t2.schema_name AS to_schema, "
-            "t2.catalog AS to_catalog, "
-            "j.on_column AS on_column, j.cardinality AS cardinality, "
-            "j.confidence AS confidence, j.semantic_label AS semantic_label"
+            "MATCH (jp:JoinPath)-[:USES]->(t:Table) "
+            "WHERE t.name IN $table_names "
+            "RETURN jp.id AS id, jp.name AS name, "
+            "jp.join_predicates AS join_predicates, "
+            "jp.hop_count AS hop_count, "
+            "jp.cardinality_hint AS cardinality_hint, "
+            "jp.sql_snippet AS sql_snippet, "
+            "jp.confidence AS confidence"
         )
 
     @staticmethod
     def expand_metrics() -> str:
         return (
             "MATCH (m:Metric)-[:MEASURES]->(e:Entity {name: $entity_name}) "
+            "OPTIONAL MATCH (m)-[:AGGREGATES]->(p:Property) "
+            "OPTIONAL MATCH (m)-[:FILTERS_BY]->(f) "
+            "OPTIONAL MATCH (m)-[:AT_GRAIN]->(g) "
             "RETURN m.name AS name, m.description AS description, "
-            "m.formula AS formula, m.confidence AS confidence"
+            "m.formula AS formula, m.grain AS grain, "
+            "m.confidence AS confidence, "
+            "collect(DISTINCT p.name) AS aggregates, "
+            "collect(DISTINCT f.name) AS filters, "
+            "collect(DISTINCT g.name) AS grains"
         )
 
     @staticmethod
-    def expand_transformations() -> str:
+    def expand_aliases() -> str:
         return (
-            "MATCH (tr:Transformation)-[:DEPENDS_ON]->(src:Table) "
-            "MATCH (tr)-[:PRODUCES]->(tgt:Table) "
-            "WHERE src.name IN $table_names OR tgt.name IN $table_names "
-            "RETURN tr.name AS name, tr.transform_type AS type, "
-            "src.name AS depends_on, tgt.name AS produces, "
-            "tr.confidence AS confidence"
+            "MATCH (a:Alias)-[:REFERS_TO]->(n) "
+            "WHERE n.name = $name "
+            "RETURN a.text AS text, a.description AS description, "
+            "a.is_preferred AS is_preferred, "
+            "a.confidence AS confidence"
+        )
+
+    @staticmethod
+    def get_provenance() -> str:
+        return (
+            "MATCH (a:Assertion)-[:SUBJECT]->(n) "
+            "WHERE n.id = $node_id "
+            "OPTIONAL MATCH (a)-[:OBJECT]->(o) "
+            "RETURN a.id AS assertion_id, a.predicate AS predicate, "
+            "a.payload AS payload, a.source AS source, "
+            "a.confidence AS confidence, a.status AS status, "
+            "o.id AS object_id"
         )
 
     @staticmethod

@@ -26,12 +26,24 @@ if TYPE_CHECKING:
     from sema.llm_client import LLMClient
 
 
+def _parse_table_ref(ref: str) -> tuple[str, str, str, str | None]:
+    """Parse a table ref in either legacy unity:// or new databricks:// format.
+
+    Returns (catalog, schema, table, column).
+    """
+    from sema.models.constants import parse_ref, parse_unity_ref
+
+    parts = parse_ref(ref)
+    if parts is not None:
+        return parts.catalog, parts.schema, parts.table, parts.column
+    # Fall back to legacy unity://catalog.schema.table format
+    return parse_unity_ref(ref)
+
+
 def _build_table_metadata(
     assertions: list[Assertion],
     table_ref: str,
 ) -> dict[str, Any]:
-    from sema.models.constants import parse_unity_ref_strict as _parse_ref
-
     meta: dict[str, Any] = {
         "table_ref": table_ref,
         "columns": [],
@@ -41,7 +53,7 @@ def _build_table_metadata(
 
     for a in assertions:
         if a.predicate == AssertionPredicate.TABLE_EXISTS:
-            cat, sch, tbl, _ = _parse_ref(a.subject_ref)
+            cat, sch, tbl, _ = _parse_table_ref(a.subject_ref)
             meta.update({
                 "table_name": tbl,
                 "schema_name": sch,

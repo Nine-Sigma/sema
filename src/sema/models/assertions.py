@@ -17,17 +17,26 @@ class AssertionPredicate(str, Enum):
     HAS_TAG = "has_tag"
     HAS_TOP_VALUES = "has_top_values"
     HAS_SAMPLE_ROWS = "has_sample_rows"
+
+    # Deprecated: use HAS_JOIN_EVIDENCE instead
     JOINS_TO = "joins_to"
 
     HAS_ENTITY_NAME = "has_entity_name"
     HAS_PROPERTY_NAME = "has_property_name"
     HAS_SEMANTIC_TYPE = "has_semantic_type"
     HAS_DECODED_VALUE = "has_decoded_value"
+
+    # Deprecated: use HAS_ALIAS instead
     HAS_SYNONYM = "has_synonym"
 
     VOCABULARY_MATCH = "vocabulary_match"
     PARENT_OF = "parent_of"
     MAPS_TO = "maps_to"
+
+    HAS_ALIAS = "has_alias"
+    HAS_JOIN_EVIDENCE = "has_join_evidence"
+    ENTITY_ON_TABLE = "entity_on_table"
+    PROPERTY_ON_COLUMN = "property_on_column"
 
 
 class AssertionStatus(str, Enum):
@@ -41,9 +50,11 @@ class AssertionStatus(str, Enum):
 class Assertion(BaseModel):
     id: str
     subject_ref: str
+    subject_id: str | None = None
     predicate: AssertionPredicate
     payload: dict[str, Any] = Field(default_factory=dict)
     object_ref: str | None = None
+    object_id: str | None = None
     source: str
     confidence: float = Field(ge=0.0, le=1.0)
     status: AssertionStatus = AssertionStatus.AUTO

@@ -13,6 +13,9 @@ class FakeConnector(Connector):
     def list_catalogs(self) -> list[str]:
         return ["catalog_a", "catalog_b"]
 
+    def get_datasource_ref(self) -> tuple[str, str, str]:
+        return "fake://workspace", "fake", "workspace"
+
 
 class TestConnectorProtocol:
     def test_extract_returns_assertions(self):

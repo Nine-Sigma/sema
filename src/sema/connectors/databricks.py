@@ -55,6 +55,12 @@ class DatabricksConnector(Connector):
             cursor.execute(query)
             return cursor.fetchall(), cursor.description or []  # type: ignore[return-value]
 
+    def get_datasource_ref(self) -> tuple[str, str, str]:
+        """Return (ref, platform, workspace) for this Databricks instance."""
+        workspace = self._config.host.replace("https://", "").rstrip("/")
+        ref = f"databricks://{workspace}"
+        return ref, "databricks", workspace
+
     def list_catalogs(self) -> list[str]:
         rows = self._execute("SHOW CATALOGS")
         return [row[0] for row in rows]
@@ -193,7 +199,13 @@ class DatabricksConnector(Connector):
             for table_name, _table_type in tables:
                 if table_pattern and not fnmatch.fnmatch(table_name, table_pattern):
                     continue
-                fqn = f"unity://{catalog}.{schema}.{table_name}"
+                workspace = self._config.host.replace(
+                    "https://", ""
+                ).rstrip("/")
+                fqn = (
+                    f"databricks://{workspace}"
+                    f"/{catalog}/{schema}/{table_name}"
+                )
                 work_items.append(TableWorkItem(
                     catalog=catalog,
                     schema=schema,

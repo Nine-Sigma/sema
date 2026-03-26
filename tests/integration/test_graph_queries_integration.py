@@ -42,15 +42,15 @@ def loaded_graph(clean_neo4j):
     loader.add_term_hierarchy("CRC", "COAD")
     loader.add_term_hierarchy("CRC", "READ")
 
-    # Synonym
-    loader.upsert_synonym("colon cancer", parent_label=":Entity",
-                         parent_name="Cancer Diagnosis", source="llm", confidence=0.8)
+    # Alias
+    loader.upsert_alias("colon cancer", parent_label=":Entity",
+                        parent_name="Cancer Diagnosis", source="llm", confidence=0.8)
 
     # Join
-    loader.upsert_candidate_join(
-        "cancer_diagnosis", "clinical", "cdm",
-        "cancer_surgery", "clinical", "cdm",
-        on_column="patient_id", cardinality="one-to-many",
+    loader.upsert_join_path(
+        name="cancer_diagnosis__cancer_surgery__patient_id",
+        join_predicates=[{"from_table": "cancer_diagnosis", "to_table": "cancer_surgery", "on_column": "patient_id"}],
+        hop_count=1,
         source="heuristic", confidence=0.8,
     )
 
@@ -91,11 +91,15 @@ class TestPhysicalMapping:
 
 class TestJoinPaths:
     def test_find_joins_for_tables(self, loaded_graph):
+        import json as _json
         query = CypherQueries.find_join_paths()
         with loaded_graph.session() as s:
             results = list(s.run(query, table_names=["cancer_diagnosis", "cancer_surgery"]))
         assert len(results) >= 1
-        assert results[0]["on_column"] == "patient_id"
+        jp = results[0]
+        assert jp["name"] == "cancer_diagnosis__cancer_surgery__patient_id"
+        predicates = _json.loads(jp["join_predicates"])
+        assert predicates[0]["on_column"] == "patient_id"
 
 
 class TestAssertionQueries:

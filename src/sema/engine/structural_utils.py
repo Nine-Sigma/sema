@@ -4,12 +4,27 @@ import logging
 from typing import TYPE_CHECKING
 
 from sema.models.assertions import Assertion, AssertionPredicate
-from sema.models.constants import parse_unity_ref_strict
+from sema.models.constants import parse_ref, parse_unity_ref_strict
 
 if TYPE_CHECKING:
     from sema.graph.loader import GraphLoader
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_ref_parts(ref: str) -> tuple[str, str, str, str | None]:
+    """Parse catalog/schema/table/column from either ref format.
+
+    Supports databricks://<workspace>/<catalog>/<schema>/<table>[/<column>]
+    and legacy unity://<catalog>.<schema>.<table>[.<column>].
+    Returns (catalog, schema, table, column).
+    Raises ValueError if ref cannot be parsed.
+    """
+    parts = parse_ref(ref)
+    if parts is not None:
+        return parts.catalog, parts.schema, parts.table, parts.column
+    # Fall back to legacy unity:// parser
+    return parse_unity_ref_strict(ref)
 
 
 def process_tables(
@@ -25,7 +40,7 @@ def process_tables(
             continue
 
         try:
-            catalog, schema, table, _ = parse_unity_ref_strict(subject_ref)
+            catalog, schema, table, _ = _parse_ref_parts(subject_ref)
         except ValueError:
             continue
 
@@ -44,21 +59,49 @@ def process_tables(
 
         table_type = table_exists[0].payload.get("table_type", "TABLE")
         loader.upsert_table(table, schema, catalog,
-                                  table_type=table_type, comment=comment)
+                            table_type=table_type, comment=comment)
 
-        for a in subject_assertions:
-            if a.predicate == AssertionPredicate.JOINS_TO and a.object_ref:
-                try:
-                    to_cat, to_schema, to_table, _ = parse_unity_ref_strict(a.object_ref)
-                    loader.upsert_candidate_join(
-                        from_table=table, from_schema=schema, from_catalog=catalog,
-                        to_table=to_table, to_schema=to_schema, to_catalog=to_cat,
-                        on_column=a.payload.get("on_column", ""),
-                        cardinality=a.payload.get("cardinality", "unknown"),
-                        source=a.source, confidence=a.confidence,
-                    )
-                except ValueError:
-                    logger.warning(f"Invalid join target ref: {a.object_ref}")
+        _process_join_assertions(
+            loader, subject_assertions, table, schema, catalog
+        )
+
+
+def _process_join_assertions(
+    loader: GraphLoader,
+    subject_assertions: list[Assertion],
+    table: str,
+    schema: str,
+    catalog: str,
+) -> None:
+    """Emit join path records for JOINS_TO / HAS_JOIN_EVIDENCE assertions on a table."""
+    join_predicates = (
+        AssertionPredicate.JOINS_TO,
+        AssertionPredicate.HAS_JOIN_EVIDENCE,
+    )
+    for a in subject_assertions:
+        if a.predicate not in join_predicates or not a.object_ref:
+            continue
+        try:
+            to_cat, to_schema, to_table, _ = _parse_ref_parts(a.object_ref)
+            join_cols = a.payload.get(
+                "join_predicates",
+                [a.payload.get("on_column", "")],
+            )
+            name = (
+                f"{catalog}.{schema}.{table}"
+                f"--{to_cat}.{to_schema}.{to_table}"
+                f"[{','.join(join_cols)}]"
+            )
+            loader.upsert_join_path(
+                name=name,
+                join_predicates=[{"column": c} for c in join_cols],
+                hop_count=a.payload.get("hop_count", 1),
+                source=a.source,
+                confidence=a.confidence,
+                cardinality_hint=a.payload.get("cardinality", "unknown"),
+            )
+        except (ValueError, AttributeError):
+            logger.warning("Invalid join target ref: %s", a.object_ref)
 
 
 def process_columns(
@@ -72,7 +115,7 @@ def process_columns(
             continue
 
         try:
-            catalog, schema, table, column = parse_unity_ref_strict(subject_ref)
+            catalog, schema, table, column = _parse_ref_parts(subject_ref)
         except ValueError:
             continue
 

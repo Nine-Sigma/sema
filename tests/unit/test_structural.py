@@ -90,7 +90,7 @@ class TestColumnNodes:
 
 
 class TestCandidateJoins:
-    def test_fk_creates_candidate_join(self, engine, mock_loader):
+    def test_fk_creates_join_path(self, engine, mock_loader):
         assertions = [
             _make_assertion("unity://cdm.clinical.cancer_diagnosis",
                           AssertionPredicate.TABLE_EXISTS, {"table_type": "TABLE"}),
@@ -102,9 +102,9 @@ class TestCandidateJoins:
             ),
         ]
         engine.process(assertions)
-        mock_loader.upsert_candidate_join.assert_called_once()
-        call_kwargs = mock_loader.upsert_candidate_join.call_args
-        assert call_kwargs[1]["on_column"] == "patient_id" or call_kwargs[0][6] == "patient_id"
+        mock_loader.upsert_join_path.assert_called_once()
+        call_kwargs = mock_loader.upsert_join_path.call_args[1]
+        assert "patient_id" in call_kwargs["name"]
 
 
 class TestMultipleTables:

@@ -7,21 +7,25 @@ from sema.graph.loader import GraphLoader
 
 logger = logging.getLogger(__name__)
 
+# Default index configs — Transformation removed; Alias replaces Synonym.
+# Override by passing embeddable_labels to EmbeddingEngine.__init__.
 INDEX_CONFIGS: Final[tuple[tuple[str, str], ...]] = (
-    ("entity_embeddings", "Entity"),
-    ("property_embeddings", "Property"),
-    ("term_embeddings", "Term"),
-    ("synonym_embeddings", "Synonym"),
-    ("metric_embeddings", "Metric"),
-    ("transformation_embeddings", "Transformation"),
+    ("entity_embedding_index", "Entity"),
+    ("property_embedding_index", "Property"),
+    ("term_embedding_index", "Term"),
+    ("alias_embedding_index", "Alias"),
+    ("metric_embedding_index", "Metric"),
 )
 
 EMBEDDING_KEY_MAP: Final[dict[str, str | tuple[str, ...]]] = {
     "Entity": "name",
     "Property": ("name", "entity_name"),
     "Term": "code",
-    "Synonym": "text",
+    "Alias": "text",
     "Metric": "name",
+    # Synonym kept for backward compat with existing Neo4j nodes
+    "Synonym": "text",
+    # Transformation kept for backward compat
     "Transformation": "name",
 }
 
@@ -43,7 +47,7 @@ def build_embedding_text(node_type: str, **kwargs: Any) -> str:
     elif node_type == "term":
         return kwargs.get("label", kwargs.get("code", ""))  # type: ignore[no-any-return]
 
-    elif node_type == "synonym":
+    elif node_type in ("synonym", "alias"):
         return kwargs.get("text", "")  # type: ignore[no-any-return]
 
     elif node_type == "metric":
@@ -59,11 +63,33 @@ def build_embedding_text(node_type: str, **kwargs: Any) -> str:
 
 
 class EmbeddingEngine:
-    """Compute and store embeddings for graph nodes."""
+    """Compute and store embeddings for graph nodes.
 
-    def __init__(self, model: Any = None, loader: GraphLoader | None = None) -> None:
+    Pass embeddable_labels to override the default INDEX_CONFIGS set.
+    This allows config-driven control over which node types get embedded.
+    """
+
+    def __init__(
+        self,
+        model: Any = None,
+        loader: GraphLoader | None = None,
+        embeddable_labels: list[str] | None = None,
+    ) -> None:
         self._model = model
         self._loader = loader
+        self._index_configs = self._build_index_configs(embeddable_labels)
+
+    @staticmethod
+    def _build_index_configs(
+        embeddable_labels: list[str] | None,
+    ) -> tuple[tuple[str, str], ...]:
+        """Build index configs from label list, falling back to defaults."""
+        if embeddable_labels is None:
+            return INDEX_CONFIGS
+        return tuple(
+            (f"{label.lower()}_embedding_index", label)
+            for label in embeddable_labels
+        )
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Embed a batch of texts."""
@@ -98,7 +124,7 @@ class EmbeddingEngine:
     def create_all_indexes(self, dimensions: int = 1536) -> None:
         """Create vector indexes for all embeddable node types."""
         assert self._loader is not None
-        for index_name, label in INDEX_CONFIGS:
+        for index_name, label in self._index_configs:
             self._loader.create_vector_index(
                 index_name, label, dimensions,
             )

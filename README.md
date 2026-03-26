@@ -50,6 +50,66 @@ The SCO contains entities, physical assets, join paths, governed values, and met
 
 ---
 
+## Graph Data Model (v1)
+
+Sema builds a multi-layer knowledge graph in Neo4j. Every node has a stable `id` (UUID); source-backed nodes also carry a `ref` that anchors them to the external system.
+
+### Node Types
+
+| Layer | Nodes | Purpose |
+|-------|-------|---------|
+| **Physical** | `DataSource`, `Catalog`, `Schema`, `Table`, `Column` | Mirrors your warehouse structure. Each carries a platform-scoped `ref` (e.g. `databricks://workspace/catalog/schema/table`) |
+| **Semantic** | `Entity`, `Property`, `Alias`, `Metric` | LLM-inferred business concepts. Entities map to tables via `ENTITY_ON_TABLE`, properties map to columns via `PROPERTY_ON_COLUMN`. Aliases replace synonyms with `is_preferred` and `description` fields |
+| **Vocabulary** | `ValueSet`, `Term` | Coded value sets, term hierarchies (ICD-10, AJCC, etc.), and aliases for search expansion |
+| **Joins** | `JoinPath` | First-class join artifacts with ordered `join_predicates`, `hop_count`, `cardinality_hint`, and optional `sql_snippet`. Linked to tables via `USES` and to entities via `FROM_ENTITY`/`TO_ENTITY` |
+| **Provenance** | `Assertion` | Every fact is backed by an assertion with `source`, `confidence`, and `status` (`auto`, `accepted`, `rejected`, `pinned`, `superseded`). Selective `SUBJECT`/`OBJECT` edges link assertions to their resolved nodes |
+
+### Relationships
+
+| Relationship | From | To | Purpose |
+|---|---|---|---|
+| `IN_SOURCE` | Catalog | DataSource | Catalog belongs to data source |
+| `IN_CATALOG` | Schema | Catalog | Schema belongs to catalog |
+| `IN_SCHEMA` | Table | Schema | Table belongs to schema |
+| `IN_TABLE` | Column | Table | Column belongs to table |
+| `ENTITY_ON_TABLE` | Entity | Table | Entity is implemented by table |
+| `PROPERTY_ON_COLUMN` | Property | Column | Property is implemented by column |
+| `HAS_PROPERTY` | Entity | Property | Entity has semantic property |
+| `REFERS_TO` | Alias | Entity/Property/Term | Alias refers to canonical node |
+| `STORED_IN` | ValueSet | Column | Value set lives in column |
+| `MEMBER_OF` | Term | ValueSet | Term belongs to value set |
+| `PARENT_OF` | Term | Term | Hierarchical term relationship |
+| `MEASURES` | Metric | Entity | Metric measures entity |
+| `AGGREGATES` | Metric | Property | Metric aggregates property |
+| `FROM_ENTITY` | JoinPath | Entity | Join starts from entity |
+| `TO_ENTITY` | JoinPath | Entity | Join ends at entity |
+| `USES` | JoinPath | Table/Column | Join uses physical asset |
+| `SUBJECT` | Assertion | Node | Assertion is about this node |
+| `OBJECT` | Assertion | Node | Assertion references this node |
+
+### Assertion-Driven Architecture
+
+All extracted and inferred facts are stored as first-class `Assertion` records before being resolved into the graph. This enables:
+
+- **Conflict resolution** — multiple sources can assert different facts; winner selection uses `pinned > accepted > source_precedence > confidence`
+- **Human overrides** — pin or reject assertions without losing the original extraction
+- **Auditability** — every node traces back to the assertions that created it
+- **Safe rebuilds** — wipe and rebuild from source; human overrides are exported and re-imported via `translate_ref()`
+
+### SCO Visibility Policy
+
+The Semantic Context Object filters nodes by assertion status before serving them to consumers:
+
+| Status | Included in SCO |
+|--------|----------------|
+| `pinned` | Always |
+| `accepted` | Always |
+| `auto` | If confidence >= threshold (structural: 0.5, semantic: 0.7) |
+| `rejected` | Never |
+| `superseded` | Never |
+
+---
+
 ## Works With Any Domain
 
 Sema is domain-agnostic. If your warehouse has tables and columns, Sema can extract the ontology.

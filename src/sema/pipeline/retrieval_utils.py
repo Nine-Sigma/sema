@@ -63,20 +63,6 @@ def _expand_joins(
         return []
 
 
-def _expand_transformations(
-    engine: RetrievalEngine, table_names: list[str]
-) -> list[dict[str, Any]]:
-    if not table_names:
-        return []
-    try:
-        return engine._run_query(
-            CypherQueries.expand_transformations(),
-            table_names=table_names,
-        )
-    except Exception:
-        return []
-
-
 def _expand_values(
     engine: RetrievalEngine, physical: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -117,3 +103,20 @@ def _expand_metrics(
         except Exception:
             pass
     return metrics
+
+
+def _expand_ancestry(
+    engine: RetrievalEngine, entity_names: list[str]
+) -> list[dict[str, Any]]:
+    """Expand Term ancestry for matched entities via PARENT_OF traversal."""
+    ancestry: list[dict[str, Any]] = []
+    for name in entity_names:
+        try:
+            results = engine._run_query(
+                CypherQueries.expand_ancestry(),
+                code=name,
+            )
+            ancestry.extend(results)
+        except Exception:
+            pass
+    return ancestry

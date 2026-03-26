@@ -167,17 +167,17 @@ class TestIdempotency:
 
 
 class TestSynonymResolution:
-    def test_synonym_creates_synonym_node(self, engine, mock_loader):
+    def test_synonym_creates_alias_node(self, engine, mock_loader):
         assertions = [
             _a("unity://cdm.clinical.tbl", AssertionPredicate.HAS_ENTITY_NAME,
                {"value": "Cancer Diagnosis"}, source="llm_interpretation"),
-            _a("unity://cdm.clinical.tbl", AssertionPredicate.HAS_SYNONYM,
-               {"value": "cancer dx"}, source="llm_interpretation"),
-            _a("unity://cdm.clinical.tbl", AssertionPredicate.HAS_SYNONYM,
-               {"value": "diagnosis"}, source="llm_interpretation"),
+            _a("unity://cdm.clinical.tbl", AssertionPredicate.HAS_ALIAS,
+               {"value": "cancer dx", "is_preferred": True}, source="llm_interpretation"),
+            _a("unity://cdm.clinical.tbl", AssertionPredicate.HAS_ALIAS,
+               {"value": "diagnosis", "is_preferred": False}, source="llm_interpretation"),
         ]
         engine.resolve(assertions)
-        assert mock_loader.upsert_synonym.call_count == 2
+        assert mock_loader.upsert_alias.call_count == 2
 
     def test_hierarchy_creates_parent_of_edges(self, engine, mock_loader):
         assertions = [
@@ -195,8 +195,8 @@ class TestAssertionStorage:
         assertions = [
             _a("unity://cdm.clinical.tbl", AssertionPredicate.HAS_ENTITY_NAME,
                {"value": "Entity"}, source="llm_interpretation"),
-            _a("unity://cdm.clinical.tbl", AssertionPredicate.HAS_SYNONYM,
-               {"value": "syn"}, source="llm_interpretation"),
+            _a("unity://cdm.clinical.tbl", AssertionPredicate.HAS_ALIAS,
+               {"value": "syn", "is_preferred": True}, source="llm_interpretation"),
         ]
         engine.resolve(assertions)
         assert mock_loader.store_assertion.call_count == 2

@@ -22,6 +22,18 @@ from sema.pipeline.context import prune_to_sco
 from sema.pipeline.retrieval import RetrievalEngine
 
 
+def _register_datasource(connector: Any, loader: Any) -> None:
+    """Create or update the DataSource node for the given connector."""
+    import uuid
+    ref, platform, workspace = connector.get_datasource_ref()
+    loader.upsert_datasource(
+        id=str(uuid.uuid4()),
+        ref=ref,
+        platform=platform,
+        workspace=workspace,
+    )
+
+
 def _discover_tables(
     connector: Any,
     config: BuildConfig,
@@ -157,15 +169,18 @@ def _compute_embeddings(
     from sema.engine.embeddings import (
         EMBEDDING_KEY_MAP,
         EmbeddingEngine,
-        INDEX_CONFIGS,
         build_embedding_text,
     )
 
     if config.verbose:
         click.echo("Step 3: Computing embeddings...")
     try:
+        embeddable_labels = config.embedding.embeddable_labels
         embedder = _get_embedder(config.embedding)
-        emb_engine = EmbeddingEngine(model=embedder, loader=loader)
+        emb_engine = EmbeddingEngine(
+            model=embedder, loader=loader,
+            embeddable_labels=embeddable_labels,
+        )
         if hasattr(embedder, "get_sentence_embedding_dimension"):
             dimensions: int = embedder.get_sentence_embedding_dimension()
         else:
@@ -180,7 +195,7 @@ def _compute_embeddings(
                 click.echo("  Skipping embed_and_store (skip_embeddings=True)")
             return
 
-        for _index_name, label in INDEX_CONFIGS:
+        for label in embeddable_labels:
             nodes = loader.query_nodes_by_label(label)
             if not nodes:
                 continue

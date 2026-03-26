@@ -14,7 +14,7 @@ class TestAssertionModel:
     def test_create_unary_assertion(self):
         a = Assertion(
             id="test-1",
-            subject_ref="unity://cdm.clinical.cancer_diagnosis.dx_type_cd",
+            subject_ref="databricks://ws/cdm/clinical/cancer_diagnosis/dx_type_cd",
             predicate=AssertionPredicate.HAS_LABEL,
             payload={"value": "Diagnosis Type Code"},
             source="unity_catalog",
@@ -22,28 +22,70 @@ class TestAssertionModel:
             run_id="run-1",
             observed_at=datetime.now(timezone.utc),
         )
-        assert a.subject_ref == "unity://cdm.clinical.cancer_diagnosis.dx_type_cd"
+        assert a.subject_ref == "databricks://ws/cdm/clinical/cancer_diagnosis/dx_type_cd"
         assert a.predicate == AssertionPredicate.HAS_LABEL
         assert a.payload["value"] == "Diagnosis Type Code"
         assert a.object_ref is None
-        assert a.source == "unity_catalog"
-        assert a.confidence == 0.95
+        assert a.subject_id is None
+        assert a.object_id is None
         assert a.status == AssertionStatus.AUTO
+
+    def test_create_with_subject_id_and_object_id(self):
+        a = Assertion(
+            id="test-id",
+            subject_ref="databricks://ws/cdm/clinical/diagnosis",
+            predicate=AssertionPredicate.HAS_ENTITY_NAME,
+            payload={"value": "Cancer Diagnosis"},
+            source="llm_interpretation",
+            confidence=0.85,
+            run_id="run-1",
+            observed_at=datetime.now(timezone.utc),
+            subject_id="ent-123",
+            object_id="tbl-456",
+        )
+        assert a.subject_id == "ent-123"
+        assert a.object_id == "tbl-456"
+
+    def test_subject_id_object_id_default_none(self):
+        a = Assertion(
+            id="test-none",
+            subject_ref="test://col",
+            predicate=AssertionPredicate.HAS_LABEL,
+            payload={},
+            source="test",
+            confidence=0.9,
+            run_id="run-1",
+            observed_at=datetime.now(timezone.utc),
+        )
+        assert a.subject_id is None
+        assert a.object_id is None
 
     def test_create_relational_assertion(self):
         a = Assertion(
             id="test-2",
-            subject_ref="unity://cdm.clinical.cancer_diagnosis",
-            predicate=AssertionPredicate.JOINS_TO,
-            object_ref="unity://cdm.clinical.cancer_surgery",
-            payload={"on_column": "patient_id", "cardinality": "one-to-many"},
+            subject_ref="databricks://ws/cdm/clinical/cancer_diagnosis",
+            predicate=AssertionPredicate.HAS_JOIN_EVIDENCE,
+            object_ref="databricks://ws/cdm/clinical/cancer_surgery",
+            payload={
+                "join_predicates": [
+                    {
+                        "left_table": "databricks://ws/cdm/clinical/cancer_diagnosis",
+                        "left_column": "patient_id",
+                        "right_table": "databricks://ws/cdm/clinical/cancer_surgery",
+                        "right_column": "patient_id",
+                        "operator": "=",
+                    }
+                ],
+                "hop_count": 1,
+                "cardinality": "one-to-many",
+            },
             source="heuristic",
             confidence=0.8,
             run_id="run-1",
             observed_at=datetime.now(timezone.utc),
         )
-        assert a.object_ref == "unity://cdm.clinical.cancer_surgery"
-        assert a.payload["on_column"] == "patient_id"
+        assert a.object_ref == "databricks://ws/cdm/clinical/cancer_surgery"
+        assert a.payload["hop_count"] == 1
 
     def test_assertion_status_default_is_auto(self):
         a = Assertion(
@@ -110,13 +152,16 @@ class TestAssertionModel:
             confidence=1.0,
             run_id="run-1",
             observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            subject_id="node-1",
         )
         data = a.model_dump(mode="json")
         assert data["subject_ref"] == "test://table"
         assert data["predicate"] == "table_exists"
-        assert data["source"] == "unity_catalog"
+        assert data["subject_id"] == "node-1"
+        assert data["object_id"] is None
         roundtrip = Assertion.model_validate(data)
         assert roundtrip.id == a.id
+        assert roundtrip.subject_id == "node-1"
 
     def test_assertion_run_id_required(self):
         with pytest.raises(Exception):
@@ -161,13 +206,32 @@ class TestAssertionPredicates:
         expected = [
             "table_exists", "column_exists", "has_datatype", "has_label",
             "has_description", "has_comment", "has_tag", "has_top_values",
-            "has_sample_rows", "joins_to", "has_entity_name",
+            "has_sample_rows", "has_entity_name",
             "has_property_name", "has_semantic_type", "has_decoded_value",
-            "has_synonym", "vocabulary_match", "parent_of", "maps_to",
+            "vocabulary_match", "parent_of", "maps_to",
+            # New predicates
+            "has_alias", "has_join_evidence",
+            "entity_on_table", "property_on_column",
         ]
         predicate_values = [p.value for p in AssertionPredicate]
         for exp in expected:
             assert exp in predicate_values, f"Missing predicate: {exp}"
+
+    def test_deprecated_predicates_still_exist(self):
+        assert AssertionPredicate.HAS_SYNONYM.value == "has_synonym"
+        assert AssertionPredicate.JOINS_TO.value == "joins_to"
+
+    def test_new_alias_predicate(self):
+        assert AssertionPredicate.HAS_ALIAS.value == "has_alias"
+
+    def test_new_join_evidence_predicate(self):
+        assert AssertionPredicate.HAS_JOIN_EVIDENCE.value == "has_join_evidence"
+
+    def test_entity_on_table_predicate(self):
+        assert AssertionPredicate.ENTITY_ON_TABLE.value == "entity_on_table"
+
+    def test_property_on_column_predicate(self):
+        assert AssertionPredicate.PROPERTY_ON_COLUMN.value == "property_on_column"
 
 
 class TestAssertionStatus:
