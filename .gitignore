@@ -1,4 +1,4 @@
-# Python-generated files
+# Python
 __pycache__/
 *.py[oc]
 build/
@@ -8,12 +8,33 @@ wheels/
 
 # Virtual environments
 .venv
-.env
 
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# IDE / editor
 .codex/
 .claude/
-openspec/
+.vscode/
+.idea/
+*.swp
+*.swo
 
-.mypy_cache
+# OS
 .DS_Store
+Thumbs.db
+
+# Project tooling
+openspec/
+.mypy_cache
+.pytest_cache
+htmlcov/
+.coverage
+coverage.xml
+
+# Docs (generated, source lives elsewhere)
 docs/
