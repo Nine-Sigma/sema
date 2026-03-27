@@ -256,4 +256,4 @@ uv run pytest -m "unit or integration or e2e"
 
 ## License
 
-Proprietary. Copyright Nine Sigma.
+Apache License 2.0. See [LICENSE](LICENSE).
