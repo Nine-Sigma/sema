@@ -23,7 +23,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev && uv pip install -e .
 
       - name: Run unit tests with coverage
         run: |
@@ -43,15 +43,30 @@ jobs:
 
   dco:
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: DCO check
-        uses: dcoapp/app@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check DCO sign-off
+        run: |
+          base=${{ github.event.pull_request.base.sha }}
+          head=${{ github.event.pull_request.head.sha }}
+          failed=0
+          for sha in $(git rev-list "$base".."$head"); do
+            if ! git log -1 --format='%B' "$sha" | grep -q '^Signed-off-by: '; then
+              echo "FAIL: $(git log -1 --format='%h %s' "$sha") — missing Signed-off-by"
+              failed=1
+            fi
+          done
+          if [ "$failed" -eq 1 ]; then
+            echo ""
+            echo "All commits must include a Signed-off-by line."
+            echo "Use: git commit -s -m \"your message\""
+            exit 1
+          fi
+          echo "All commits have DCO sign-off."
 
   lint:
     runs-on: ubuntu-latest
@@ -65,7 +80,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev && uv pip install -e .
 
       - name: Check imports
         run: uv run python -c "import sema; print('OK')"
