@@ -13,6 +13,9 @@ from sema.pipeline.retrieval_utils import (
     _expand_physical,
     _expand_values,
     merge_and_rank_candidates,
+    _expand_property_hit,
+    _expand_term_hit,
+    _expand_alias_hit,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,23 +92,30 @@ class RetrievalEngine:
             "metrics": metrics,
         }
 
-    def retrieve(
-        self, question: str, top_k: int = 10
-    ) -> SemanticCandidateSet:
-        """Full hybrid retrieval pipeline."""
-        vector_candidates = self.vector_search(question, top_k)
-        ranked = merge_and_rank_candidates(vector_candidates)
+    def _index_to_node_type(self, index: str) -> str:
+        """Map vector index name to node type."""
+        mapping = {
+            "entity_embedding_index": "entity",
+            "property_embedding_index": "property",
+            "term_embedding_index": "term",
+            "alias_embedding_index": "alias",
+            "metric_embedding_index": "metric",
+        }
+        for key, node_type in mapping.items():
+            if key in index:
+                return node_type
+        return "unknown"
 
-        entity_names = [
-            c["name"] for c in ranked
-            if c.get("name") and "entity" in c.get("index", "")
-        ]
-
+    def _expand_entity_hits(
+        self,
+        entity_names: list[str],
+    ) -> list[dict[str, Any]]:
+        """Expand entity vector hits via graph traversal."""
+        candidates: list[dict[str, Any]] = []
         expansion = self.expand_from_entities(entity_names)
-        all_candidates = []
 
         for r in expansion.get("physical", []):
-            all_candidates.append({
+            candidates.append({
                 "type": "entity",
                 "name": next(
                     (n for n in entity_names), r["table_name"]
@@ -120,10 +130,10 @@ class RetrievalEngine:
             })
 
         for j in expansion.get("joins", []):
-            all_candidates.append({"type": "join", **j})
+            candidates.append({"type": "join", **j})
 
         for v in expansion.get("values", []):
-            all_candidates.append({
+            candidates.append({
                 "type": "value",
                 "property_name": v.get("property", ""),
                 "column": v.get("column", ""),
@@ -133,7 +143,57 @@ class RetrievalEngine:
             })
 
         for m in expansion.get("metrics", []):
-            all_candidates.append({"type": "metric", **m})
+            candidates.append({"type": "metric", **m})
+
+        return candidates
+
+    def _dispatch_non_entity_hit(
+        self, c: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Expand a single non-entity vector hit by its node type."""
+        node_type = c.get("node_type", "")
+        name = c.get("name", "")
+
+        if node_type == "property" and name:
+            return _expand_property_hit(self, c)
+        if node_type == "term":
+            return _expand_term_hit(self, c)
+        if node_type == "alias":
+            return _expand_alias_hit(self, c)
+        if node_type == "metric" and name:
+            return [{
+                "type": "metric", "name": name,
+                "score": c.get("final_score", 0.0),
+                **{k: v for k, v in c.items()
+                   if k not in ("name", "score", "final_score")},
+            }]
+        return []
+
+    def retrieve(
+        self, question: str, top_k: int = 10
+    ) -> SemanticCandidateSet:
+        """Full hybrid retrieval pipeline — type-aware, not entity-gated."""
+        vector_candidates = self.vector_search(question, top_k)
+        ranked = merge_and_rank_candidates(vector_candidates)
+
+        all_candidates: list[dict[str, Any]] = []
+        entity_names: list[str] = []
+
+        for c in ranked:
+            c["node_type"] = self._index_to_node_type(
+                c.get("index", "")
+            )
+            if c["node_type"] == "entity" and c.get("name"):
+                entity_names.append(c["name"])
+            else:
+                all_candidates.extend(
+                    self._dispatch_non_entity_hit(c)
+                )
+
+        if entity_names:
+            all_candidates.extend(
+                self._expand_entity_hits(entity_names)
+            )
 
         return SemanticCandidateSet(
             query=question,

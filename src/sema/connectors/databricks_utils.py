@@ -55,7 +55,7 @@ def _build_table_assertion(
     for tag in tags:
         assertions.append(
             connector._make_assertion(
-                f"{fqn}.{tag['column_name']}",
+                f"{fqn}/{tag['column_name']}",
                 AssertionPredicate.HAS_TAG,
                 {"tag_key": tag["tag_key"], "tag_value": tag["tag_value"]},
             )
@@ -71,7 +71,7 @@ def _build_column_assertions(
     fqn = work_item.fqn
 
     for col in columns:
-        col_ref = f"{fqn}.{col['name']}"
+        col_ref = f"{fqn}/{col['name']}"
         assertions.append(
             connector._make_assertion(
                 col_ref,
@@ -112,7 +112,7 @@ def _build_profiling_assertions(
     fqn = work_item.fqn
 
     for col in columns:
-        col_ref = f"{fqn}.{col['name']}"
+        col_ref = f"{fqn}/{col['name']}"
 
         if connector._should_skip_profiling(col["data_type"]):
             continue

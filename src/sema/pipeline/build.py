@@ -138,6 +138,21 @@ class LLMClientFactory:
         )
 
 
+def _try_resume(
+    work_item: TableWorkItem,
+    loader: GraphLoader,
+) -> TableResult | None:
+    """Check if table can be resumed from stored assertions."""
+    if not loader.has_assertions(work_item.fqn):
+        return None
+    logger.info(f"[{work_item.table_name}] Skipping (resume): assertions exist")
+    stored_dicts = loader.load_assertions(work_item.fqn)
+    stored_assertions = _reconstruct_assertions(stored_dicts)
+    from sema.graph.materializer import materialize_unified
+    materialize_unified(loader, stored_assertions)
+    return TableResult.skipped(work_item.fqn, "resume: assertions exist")
+
+
 def process_table(
     work_item: TableWorkItem,
     connector: DatabricksConnector,
@@ -148,21 +163,11 @@ def process_table(
     vocab_workers: int = 8,
     resume: bool = False,
 ) -> TableResult:
-    """Process a single table through all pipeline stages.
-
-    This is the single catch boundary for stage errors.
-    On success: assertions are committed and graph is materialized.
-    On failure: no assertions are committed (all-or-nothing).
-
-    When *resume* is True, tables that already have assertions in the
-    graph are skipped (no extraction / LLM) but still re-materialized.
-    """
-    if resume and loader.has_assertions(work_item.fqn):
-        logger.info(f"[{work_item.table_name}] Skipping (resume): assertions exist")
-        stored_dicts = loader.load_assertions(work_item.fqn)
-        stored_assertions = _reconstruct_assertions(stored_dicts)
-        loader.materialize_table_graph(stored_assertions)
-        return TableResult.skipped(work_item.fqn, "resume: assertions exist")
+    """Process a single table through all pipeline stages."""
+    if resume:
+        resume_result = _try_resume(work_item, loader)
+        if resume_result is not None:
+            return resume_result
 
     try:
         result = _run_pipeline_stages(
@@ -175,26 +180,15 @@ def process_table(
         all_assertions = result
     except CircuitOpenError as e:
         logger.warning(f"Table {work_item.fqn} skipped (circuit open): {e}")
-        return TableResult.failed(
-            work_item.fqn, "circuit_breaker", str(e)
-        )
+        return TableResult.failed(work_item.fqn, "circuit_breaker", str(e))
     except LLMStageError as e:
         logger.warning(f"Table {work_item.fqn} failed: {e}")
-        return TableResult.failed(
-            work_item.fqn, e.stage_name, str(e)
-        )
+        return TableResult.failed(work_item.fqn, e.stage_name, str(e))
     except Exception as e:
-        logger.warning(
-            f"Table {work_item.fqn} failed: {e}"
-        )
-        return TableResult.failed(
-            work_item.fqn, "unknown", str(e)
-        )
+        logger.warning(f"Table {work_item.fqn} failed: {e}")
+        return TableResult.failed(work_item.fqn, "unknown", str(e))
 
-    entity_count, prop_count, term_count = _count_results(
-        all_assertions
-    )
-
+    entity_count, prop_count, term_count = _count_results(all_assertions)
     return TableResult.success(
         work_item.fqn,
         entities=entity_count,

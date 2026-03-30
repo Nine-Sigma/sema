@@ -143,7 +143,7 @@ def _passes_confidence_threshold(candidate: dict[str, Any]) -> bool:
         if source == "structural"
         else _SEMANTIC_CONFIDENCE_THRESHOLD
     )
-    return confidence >= threshold
+    return bool(confidence >= threshold)
 
 
 def _apply_visibility_policy(
