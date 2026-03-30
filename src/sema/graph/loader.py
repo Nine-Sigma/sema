@@ -7,14 +7,12 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
-from sema.graph.materializer import (
-    _apply_resolution_edges,
-    _materialize_metrics,
-    _materialize_provenance_edges,
-    _pick_winner,
-    _upsert_column_nodes,
-    _upsert_physical_nodes,
-    _upsert_semantic_nodes,
+from sema.graph.materializer_utils import (
+    apply_resolution_edges as _apply_resolution_edges,
+    pick_winner as _pick_winner,
+    upsert_column_nodes as _upsert_column_nodes,
+    upsert_physical_nodes as _upsert_physical_nodes,
+    upsert_semantic_nodes as _upsert_semantic_nodes,
 )
 from sema.models.assertions import (
     Assertion,
@@ -358,20 +356,9 @@ class GraphLoader:
         )
 
     def store_assertion(self, assertion: Assertion) -> None:
-        self._run(
-            "MATCH (a:Assertion) "
-            "WHERE a.subject_ref = $subject_ref "
-            "AND a.predicate = $predicate "
-            "AND a.source = $source "
-            "AND a.status = 'auto' "
-            "AND a.run_id <> $run_id "
-            "SET a.status = 'superseded'",
-            subject_ref=assertion.subject_ref,
-            predicate=assertion.predicate.value,
-            source=assertion.source,
-            run_id=assertion.run_id,
-        )
-
+        # NOTE: No longer mutating prior assertions to 'superseded'.
+        # Status transitions are now handled via StatusEvent log.
+        # Prior assertions remain as immutable history.
         self._run(
             "CREATE (a:Assertion {"
             "  id: $id, subject_ref: $subject_ref,"
@@ -392,7 +379,7 @@ class GraphLoader:
             object_id=assertion.object_id,
             source=assertion.source,
             confidence=assertion.confidence,
-            status=assertion.status.value,
+            status="auto",
             run_id=assertion.run_id,
             observed_at=assertion.observed_at.isoformat(),
         )
@@ -402,16 +389,6 @@ class GraphLoader:
     ) -> None:
         for assertion in assertions:
             self.store_assertion(assertion)
-
-    def _build_supersession_groups(
-        self, assertions: list[Assertion],
-    ) -> dict[tuple[str, str, str], str]:
-        groups: dict[tuple[str, str, str], str] = {}
-        for a in assertions:
-            groups[
-                (a.subject_ref, a.predicate.value, a.source)
-            ] = a.run_id
-        return groups
 
     def _build_assertion_dicts(
         self, assertions: list[Assertion],
@@ -427,7 +404,7 @@ class GraphLoader:
                 "object_id": a.object_id,
                 "source": a.source,
                 "confidence": a.confidence,
-                "status": a.status.value,
+                "status": "auto",
                 "run_id": a.run_id,
                 "observed_at": a.observed_at.isoformat(),
             }
@@ -440,19 +417,8 @@ class GraphLoader:
         with self._driver.session() as session:
             tx = session.begin_transaction()
             try:
-                groups = self._build_supersession_groups(assertions)
-                for (subj, pred, src), run_id in groups.items():
-                    tx.run(
-                        "MATCH (a:Assertion) "
-                        "WHERE a.subject_ref = $subject_ref "
-                        "AND a.predicate = $predicate "
-                        "AND a.source = $source "
-                        "AND a.status = 'auto' "
-                        "AND a.run_id <> $run_id "
-                        "SET a.status = 'superseded'",
-                        subject_ref=subj, predicate=pred,
-                        source=src, run_id=run_id,
-                    )
+                # NOTE: No longer mutating prior assertions to 'superseded'.
+                # Status transitions are now handled via StatusEvent log.
                 assertion_dicts = self._build_assertion_dicts(
                     assertions
                 )
@@ -507,21 +473,9 @@ class GraphLoader:
     def materialize_table_graph(
         self, assertions: list[Assertion],
     ) -> None:
-        by_subject: dict[str, list[Assertion]] = defaultdict(list)
-        for a in assertions:
-            by_subject[a.subject_ref].append(a)
-        groups: dict[tuple[str, str], list[Assertion]] = defaultdict(
-            list
-        )
-        for a in assertions:
-            groups[(a.subject_ref, a.predicate.value)].append(a)
-
-        _upsert_physical_nodes(self, by_subject)
-        _upsert_column_nodes(self, by_subject)
-        _upsert_semantic_nodes(self, by_subject, groups)
-        _apply_resolution_edges(self, groups)
-        _materialize_metrics(self, groups)
-        _materialize_provenance_edges(self, assertions)
+        """Legacy entry point — delegates to unified materializer."""
+        from sema.graph.materializer import materialize_unified
+        materialize_unified(self, assertions)
 
     def query_nodes_by_label(
         self, label: str,
