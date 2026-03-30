@@ -17,6 +17,7 @@ class ResolvedProperty(BaseModel):
     physical_column: str
     physical_table: str
     description: str | None = None
+    vocabulary: str | None = None
     provenance: Provenance
 
 

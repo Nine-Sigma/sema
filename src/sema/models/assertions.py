@@ -57,6 +57,10 @@ class Assertion(BaseModel):
     object_id: str | None = None
     source: str
     confidence: float = Field(ge=0.0, le=1.0)
+    # DEPRECATED: status is vestigial. The canonical status model uses
+    # StatusEvent (see sema.models.lifecycle). This field is kept for
+    # backward compatibility with legacy materialization code that reads
+    # it directly. New code should use effective_status() from status_store.
     status: AssertionStatus = AssertionStatus.AUTO
     run_id: str
     observed_at: datetime
