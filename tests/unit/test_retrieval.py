@@ -171,6 +171,126 @@ class TestContextPruning:
         assert len(sco.entities) <= 5
 
 
+class TestIndexToNodeType:
+    def test_known_indices(self, mock_driver):
+        driver, _ = mock_driver
+        engine = RetrievalEngine(driver=driver, embedder=None)
+        assert engine._index_to_node_type("entity_embedding_index") == "entity"
+        assert engine._index_to_node_type("property_embedding_index") == "property"
+        assert engine._index_to_node_type("term_embedding_index") == "term"
+        assert engine._index_to_node_type("alias_embedding_index") == "alias"
+        assert engine._index_to_node_type("metric_embedding_index") == "metric"
+
+    def test_unknown_index(self, mock_driver):
+        driver, _ = mock_driver
+        engine = RetrievalEngine(driver=driver, embedder=None)
+        assert engine._index_to_node_type("something_else") == "unknown"
+
+
+class TestDispatchNonEntityHit:
+    def test_metric_hit(self, mock_driver):
+        driver, _ = mock_driver
+        engine = RetrievalEngine(driver=driver, embedder=None)
+        hit = {"node_type": "metric", "name": "revenue", "final_score": 0.9}
+        result = engine._dispatch_non_entity_hit(hit)
+        assert len(result) == 1
+        assert result[0]["type"] == "metric"
+        assert result[0]["name"] == "revenue"
+
+    def test_unknown_type_returns_empty(self, mock_driver):
+        driver, _ = mock_driver
+        engine = RetrievalEngine(driver=driver, embedder=None)
+        hit = {"node_type": "unknown", "name": "x"}
+        assert engine._dispatch_non_entity_hit(hit) == []
+
+    def test_property_without_name_returns_empty(self, mock_driver):
+        driver, _ = mock_driver
+        engine = RetrievalEngine(driver=driver, embedder=None)
+        hit = {"node_type": "property", "name": ""}
+        assert engine._dispatch_non_entity_hit(hit) == []
+
+
+class TestRetrieveNonEntityHits:
+    def test_non_entity_hits_dispatched(self, mock_driver, mock_embedder):
+        driver, session = mock_driver
+
+        def make_result(name, score):
+            r = MagicMock()
+            r.data.return_value = {
+                "node": {"name": name}, "score": score,
+            }
+            return r
+
+        session.run.side_effect = [
+            [],  # entity index
+            [make_result("diagnosis_code", 0.85)],  # property index
+            [],  # term index
+            [],  # alias index
+            [],  # metric index
+        ]
+        engine = RetrievalEngine(driver=driver, embedder=mock_embedder)
+        result = engine.retrieve("diagnosis codes", top_k=5)
+        assert isinstance(result, SemanticCandidateSet)
+
+    def test_vector_search_without_embedder(self, mock_driver):
+        driver, _ = mock_driver
+        engine = RetrievalEngine(driver=driver, embedder=None)
+        assert engine.vector_search("test") == []
+
+    def test_vector_search_encode_fallback(self, mock_driver):
+        driver, session = mock_driver
+        session.run.return_value = []
+        embedder = MagicMock(spec=["encode"])
+        embedder.encode.return_value = [[0.1, 0.2]]
+        engine = RetrievalEngine(driver=driver, embedder=embedder)
+        engine.vector_search("test")
+        embedder.encode.assert_called_once()
+
+
+class TestExpandEntityHits:
+    def test_includes_joins_values_metrics(self, mock_driver):
+        driver, session = mock_driver
+
+        def run_side_effect(query, **params):
+            r = MagicMock()
+            if "ENTITY_ON_TABLE" in query:
+                r.data.return_value = {
+                    "table_name": "tbl", "schema_name": "sch",
+                    "catalog": "cat", "columns": [
+                        {"property": "Status", "column": "status",
+                         "data_type": "STRING", "semantic_type": "categorical"},
+                    ],
+                }
+                return [r]
+            if "JoinPath" in query or "USES" in query:
+                r.data.return_value = {
+                    "from_table": "tbl", "to_table": "tbl2",
+                    "on_column": "id", "confidence": 0.8,
+                }
+                return [r]
+            if "MEMBER_OF" in query:
+                r.data.return_value = {
+                    "property": "Status", "column": "status",
+                    "table": "tbl", "code": "A", "label": "Active",
+                }
+                return [r]
+            if "MEASURES" in query:
+                r.data.return_value = {
+                    "name": "total", "description": "sum",
+                }
+                return [r]
+            return []
+
+        session.run.side_effect = run_side_effect
+        engine = RetrievalEngine(driver=driver, embedder=None)
+        result = engine._expand_entity_hits(["Test Entity"])
+        types = {c["type"] for c in result}
+        assert "entity" in types
+        assert "join" in types
+        assert "value" in types
+        assert "metric" in types
+
+
 class TestExpandFromEntitiesCharacterization:
     """Characterization tests capturing current behavior of expand_from_entities."""
 

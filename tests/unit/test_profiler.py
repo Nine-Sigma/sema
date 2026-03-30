@@ -86,6 +86,22 @@ class TestUnknownDomain:
         assert profile.primary_domain is None
 
 
+class TestWarehouseProfile:
+    def test_domain_weight_existing(
+        self, profiler: WarehouseProfiler,
+    ) -> None:
+        tables = _tables("patient", "encounter", "diagnosis")
+        profile = profiler.profile(tables, [], "ds1", "run-1")
+        assert profile.domain_weight("healthcare") > 0.0
+
+    def test_domain_weight_missing(
+        self, profiler: WarehouseProfiler,
+    ) -> None:
+        tables = _tables("patient", "encounter")
+        profile = profiler.profile(tables, [], "ds1", "run-1")
+        assert profile.domain_weight("nonexistent_domain") == 0.0
+
+
 class TestRealEstateDominant:
     def test_proptech_warehouse(
         self, profiler: WarehouseProfiler,

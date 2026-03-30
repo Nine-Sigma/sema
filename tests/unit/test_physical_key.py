@@ -194,6 +194,16 @@ class TestNodeKey:
         )
         assert k1["join_columns_hash"] != k2["join_columns_hash"]
 
+    def test_table_key_with_schema(self) -> None:
+        pk = PhysicalKey("ds1", "cat", "sch", "tbl")
+        key = NodeKey.table(pk)
+        assert key == {
+            "datasource_id": "ds1",
+            "catalog": "cat",
+            "name": "tbl",
+            "schema_name": "sch",
+        }
+
     def test_table_key_no_schema(self) -> None:
         pk = PhysicalKey("ds1", "mydb", None, "users")
         key = NodeKey.table(pk)
@@ -203,3 +213,35 @@ class TestNodeKey:
             "name": "users",
         }
         assert "schema_name" not in key
+
+    def test_column_key_with_schema(self) -> None:
+        pk = PhysicalKey("ds1", "cat", "sch", "tbl", "col")
+        key = NodeKey.column(pk)
+        assert key == {
+            "datasource_id": "ds1",
+            "catalog": "cat",
+            "table_name": "tbl",
+            "name": "col",
+            "schema_name": "sch",
+        }
+
+    def test_column_key_no_schema(self) -> None:
+        pk = PhysicalKey("ds1", "mydb", None, "tbl", "col")
+        key = NodeKey.column(pk)
+        assert key == {
+            "datasource_id": "ds1",
+            "catalog": "mydb",
+            "table_name": "tbl",
+            "name": "col",
+        }
+        assert "schema_name" not in key
+
+    def test_column_key_requires_column(self) -> None:
+        pk = PhysicalKey("ds1", "cat", "sch", "tbl")
+        with pytest.raises(ValueError, match="no column"):
+            NodeKey.column(pk)
+
+    def test_valueset_key_requires_column(self) -> None:
+        pk = PhysicalKey("ds1", "cat", "sch", "tbl")
+        with pytest.raises(ValueError, match="no column"):
+            NodeKey.valueset(pk)

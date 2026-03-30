@@ -65,6 +65,25 @@ class TestStatusEventStore:
         # Should not create file
         assert store.query_by_assertion_id("ds1", "a1") == []
 
+    def test_query_by_family_key_no_index(
+        self, store: StatusEventStore
+    ) -> None:
+        assert store.query_by_family_key("ds1", "fk1") == []
+        assert store.query_by_family_key("ds1", "fk1", None) == []
+
+    def test_query_by_family_key_missing_key(
+        self, store: StatusEventStore
+    ) -> None:
+        assert store.query_by_family_key("ds1", "fk1", {"other": "a1"}) == []
+
+    def test_query_by_family_key_found(
+        self, store: StatusEventStore
+    ) -> None:
+        store.append("ds1", _event("a1", AssertionStatusValue.PINNED))
+        result = store.query_by_family_key("ds1", "fk1", {"fk1": "a1"})
+        assert len(result) == 1
+        assert result[0].status == AssertionStatusValue.PINNED
+
     def test_separate_datasources(self, store: StatusEventStore) -> None:
         store.append("ds1", _event("a1", AssertionStatusValue.PINNED))
         store.append("ds2", _event("a1", AssertionStatusValue.REJECTED))
