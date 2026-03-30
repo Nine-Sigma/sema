@@ -9,7 +9,7 @@ from sema.engine.structural_utils import (
 )
 from sema.graph.loader import GraphLoader
 from sema.models.assertions import Assertion, AssertionPredicate
-from sema.models.constants import parse_ref, parse_unity_ref_strict, translate_ref
+from sema.models.constants import translate_ref
 
 logger = logging.getLogger(__name__)
 
