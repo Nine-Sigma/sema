@@ -5,6 +5,7 @@ import sys
 from typing import Any
 
 import click
+from pydantic import SecretStr
 
 from sema.models.config import (
     BuildConfig,
@@ -207,6 +208,71 @@ def context(
     try:
         sco = run_context(query_config)
         click.echo(json.dumps(sco, indent=2, default=str))
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--threshold", default=0.85, type=float, help="Confidence threshold for review")
+@click.option("--neo4j-uri", default=None, help="Neo4j bolt URI")
+@click.option("--neo4j-user", default=None, help="Neo4j username")
+@click.option("--neo4j-password", default=None, help="Neo4j password")
+@click.option("--output", default=None, help="Output file path (default: stdout)")
+def review(
+    threshold: float,
+    neo4j_uri: str | None,
+    neo4j_user: str | None,
+    neo4j_password: str | None,
+    output: str | None,
+) -> None:
+    """Export low-confidence assertions for human review."""
+    from sema.models.config import Neo4jConfig
+
+    neo4j = Neo4jConfig(
+        uri=neo4j_uri or "bolt://localhost:7687",
+        user=neo4j_user or "neo4j",
+        password=SecretStr(neo4j_password or "password"),
+    )
+
+    try:
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(
+            neo4j.uri, auth=(neo4j.user, neo4j.password.get_secret_value()),
+        )
+        with driver.session() as session:
+            result = session.run(
+                "MATCH (a:Assertion) "
+                "WHERE a.confidence < $threshold "
+                "RETURN a.id AS id, a.subject_ref AS subject_ref, "
+                "a.predicate AS predicate, a.payload AS payload, "
+                "a.source AS source, a.confidence AS confidence "
+                "ORDER BY a.confidence ASC",
+                threshold=threshold,
+            )
+            assertions = [dict(r) for r in result]
+        driver.close()
+
+        # Group by subject_ref column
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for a in assertions:
+            ref = a.get("subject_ref", "unknown")
+            grouped.setdefault(ref, []).append(a)
+
+        review_data = {
+            "threshold": threshold,
+            "total_assertions": len(assertions),
+            "columns": grouped,
+        }
+
+        output_str = json.dumps(review_data, indent=2, default=str)
+        if output:
+            with open(output, "w") as f:
+                f.write(output_str)
+            click.echo(f"Exported {len(assertions)} assertions to {output}")
+        else:
+            click.echo(output_str)
+
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
