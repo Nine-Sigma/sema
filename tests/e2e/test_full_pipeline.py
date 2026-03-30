@@ -9,9 +9,9 @@ pytestmark = pytest.mark.e2e
 from sema.engine.structural import StructuralEngine
 from sema.engine.semantic import SemanticEngine
 from sema.engine.vocabulary import VocabularyEngine
-from sema.engine.resolution import ResolutionEngine
 from sema.engine.embeddings import EmbeddingEngine, build_embedding_text
 from sema.graph.loader import GraphLoader
+from sema.graph.materializer import materialize_unified
 from sema.pipeline.context import prune_to_sco
 from sema.pipeline.sql_gen import SQLGenerator, build_sql_prompt
 from sema.pipeline.validate import validate_sql_against_sco
@@ -141,9 +141,8 @@ def built_graph(clean_neo4j):
         ["Stage I", "Stage III", "Stage IIIA"], None,
     )
 
-    # Resolution
-    resolver = ResolutionEngine(loader)
-    resolver.resolve(semantic_assertions + vocab_assertions)
+    # Materialization
+    materialize_unified(loader, semantic_assertions + vocab_assertions)
 
     # Embeddings
     emb_engine = EmbeddingEngine(model=FakeEmbedder(), loader=loader)
@@ -245,7 +244,6 @@ class TestE2EQuery:
 class TestE2ERebuild:
     def test_rebuild_preserves_human_overrides(self, clean_neo4j):
         loader = GraphLoader(clean_neo4j)
-        resolver = ResolutionEngine(loader)
 
         # First build
         assertions_v1 = [
@@ -256,7 +254,7 @@ class TestE2ERebuild:
                      status=AssertionStatus.AUTO, run_id="run-1",
                      observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc)),
         ]
-        resolver.resolve(assertions_v1)
+        materialize_unified(loader, assertions_v1)
 
         # Human pins a different name
         pinned = Assertion(
@@ -278,7 +276,7 @@ class TestE2ERebuild:
                      status=AssertionStatus.AUTO, run_id="run-2",
                      observed_at=datetime(2026, 1, 3, tzinfo=timezone.utc)),
         ]
-        resolver.resolve(assertions_v2)
+        materialize_unified(loader, assertions_v2)
 
         # Pinned assertion should survive
         with clean_neo4j.session() as s:
