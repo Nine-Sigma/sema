@@ -94,7 +94,11 @@ class TestLLMConfig:
 
 
 class TestEmbeddingConfig:
-    def test_defaults(self):
+    def test_defaults(self, monkeypatch):
+        monkeypatch.delenv("EMBEDDING_MODEL", raising=False)
+        monkeypatch.delenv("EMBEDDING_PROVIDER", raising=False)
+        monkeypatch.delenv("EMBEDDING_BASE_URL", raising=False)
+        monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
         config = EmbeddingConfig()
         assert config.provider == "openrouter"
         assert config.model == "google/gemini-embedding-001"

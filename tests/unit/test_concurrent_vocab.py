@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timezone
+from typing import Any
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -78,7 +79,7 @@ def test_vocabulary_columns_processed_concurrently() -> None:
 
     mock_vocab = MagicMock()
     mock_vocab.process_column = MagicMock(
-        side_effect=lambda ref, vals, dec: _make_vocab_result(ref)
+        side_effect=lambda ref, vals, dec, ctx=None: _make_vocab_result(ref)
     )
 
     with patch(
@@ -139,7 +140,7 @@ def test_concurrent_vocab_results_match_sequential() -> None:
 
     mock_vocab_engine = MagicMock()
     mock_vocab_engine.process_column = MagicMock(
-        side_effect=lambda ref, vals, dec: vocab_results[ref]
+        side_effect=lambda ref, vals, dec, ctx=None: vocab_results[ref]
     )
 
     sequential: list[Assertion] = []
@@ -180,7 +181,9 @@ def test_single_column_failure_doesnt_block_others() -> None:
     ]
     semantic_assertions: list[Assertion] = []
 
-    def side_effect(ref: str, vals: list[str], dec: list[dict[str, str]] | None) -> list[Assertion]:
+    def side_effect(
+        ref: str, vals: list[str], dec: list[dict[str, str]] | None, ctx: Any = None,
+    ) -> list[Assertion]:
         if "col_fail" in ref:
             raise RuntimeError("LLM timeout")
         return _make_vocab_result(ref)

@@ -1,10 +1,10 @@
 import pytest
-from unittest.mock import MagicMock
-from datetime import datetime, timezone
 
-pytestmark = pytest.mark.unit
-
-from sema.engine.resolution import ResolutionEngine
+pytest.skip(
+    "ResolutionEngine removed — replaced by unified materializer. "
+    "See openspec/changes/pipeline-consolidation-v2/",
+    allow_module_level=True,
+)
 from sema.models.assertions import (
     Assertion,
     AssertionPredicate,

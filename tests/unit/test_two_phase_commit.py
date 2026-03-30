@@ -52,9 +52,8 @@ def mock_driver():
 # ---------------------------------------------------------------------------
 
 class TestCommitTableAssertions:
-    def test_supersession_and_create_in_single_transaction(
-        self, mock_driver
-    ):
+    def test_create_in_single_transaction(self, mock_driver):
+        """Assertions are created in a single transaction (no supersession mutation)."""
         driver, session, tx = mock_driver
         loader = GraphLoader(driver)
 
@@ -73,23 +72,17 @@ class TestCommitTableAssertions:
 
         loader.commit_table_assertions(assertions)
 
-        # Transaction was opened, committed
         session.begin_transaction.assert_called_once()
         tx.commit.assert_called_once()
         tx.rollback.assert_not_called()
-
-        # At least one supersession call + one UNWIND create
-        assert tx.run.call_count >= 2
+        # One UNWIND create call (no supersession mutations)
+        assert tx.run.call_count == 1
 
     def test_rollback_on_failure(self, mock_driver):
         driver, session, tx = mock_driver
         loader = GraphLoader(driver)
 
-        # Make the UNWIND create fail
-        tx.run.side_effect = [
-            None,  # supersession succeeds
-            Exception("Neo4j error"),  # UNWIND fails
-        ]
+        tx.run.side_effect = Exception("Neo4j error")
 
         assertions = [
             _make_assertion(
@@ -105,11 +98,11 @@ class TestCommitTableAssertions:
         tx.rollback.assert_called_once()
         tx.commit.assert_not_called()
 
-    def test_grouped_supersession(self, mock_driver):
+    def test_no_supersession_mutations(self, mock_driver):
+        """Assertions are immutable — no 'superseded' mutations in commit."""
         driver, session, tx = mock_driver
         loader = GraphLoader(driver)
 
-        # Two assertions with same (subject, predicate, source) group
         assertions = [
             _make_assertion(
                 "unity://cat.sch.tbl",
@@ -123,25 +116,15 @@ class TestCommitTableAssertions:
                 {"data_type": "STRING"},
                 source="unity_catalog",
             ),
-            _make_assertion(
-                "unity://cat.sch.tbl.col2",
-                AssertionPredicate.COLUMN_EXISTS,
-                {"data_type": "INT"},
-                source="unity_catalog",
-            ),
         ]
 
         loader.commit_table_assertions(assertions)
 
-        # 3 unique supersession groups + 1 UNWIND = 4 tx.run calls
-        # (tbl/TABLE_EXISTS/unity_catalog,
-        #  tbl.col1/COLUMN_EXISTS/unity_catalog,
-        #  tbl.col2/COLUMN_EXISTS/unity_catalog)
         supersession_calls = [
             c for c in tx.run.call_args_list
             if "superseded" in str(c)
         ]
-        assert len(supersession_calls) == 3
+        assert len(supersession_calls) == 0
 
     def test_unwind_creates_all_assertions(self, mock_driver):
         driver, session, tx = mock_driver
@@ -345,8 +328,8 @@ class TestBackwardCompatibility:
         )
         loader.store_assertion(a)
 
-        # Two calls: supersede + create
-        assert session_mock.run.call_count == 2
+        # One call: create only (no supersession mutation)
+        assert session_mock.run.call_count == 1
 
     def test_batch_store_assertions_still_works(self):
         driver = MagicMock()
@@ -368,5 +351,5 @@ class TestBackwardCompatibility:
         ]
         loader.batch_store_assertions(assertions)
 
-        # 2 calls per assertion × 3 = 6
-        assert session_mock.run.call_count == 6
+        # 1 call per assertion × 3 = 3 (no supersession mutations)
+        assert session_mock.run.call_count == 3

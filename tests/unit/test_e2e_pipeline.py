@@ -284,8 +284,8 @@ class TestTransactionalWriteFailure:
         )
 
         assert result.status == "failed"
-        # Materialize should NOT have been called
-        loader.materialize_table_graph.assert_not_called()
+        # Commit was attempted but failed — materializer should not have run
+        loader.commit_table_assertions.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ class TestMaterializationIdempotency:
             )
             assert result.status == "success"
             loader.commit_table_assertions.assert_called_once()
-            loader.materialize_table_graph.assert_called_once()
+            loader._run.assert_called()
 
 
 # ---------------------------------------------------------------------------

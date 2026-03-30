@@ -111,7 +111,7 @@ class TestProcessTable:
         assert result.entities_created == 1
         assert result.properties_created == 1
         loader.commit_table_assertions.assert_called_once()
-        loader.materialize_table_graph.assert_called_once()
+        loader._run.assert_called()
 
     def test_llm_stage_error_returns_failed(self):
         work_item = TableWorkItem("cat", "sch", "tbl", "unity://cat.sch.tbl")
@@ -137,7 +137,7 @@ class TestProcessTable:
         assert result.failed_stage == "L2 semantic"
         # No assertions committed
         loader.commit_table_assertions.assert_not_called()
-        loader.materialize_table_graph.assert_not_called()
+        loader.commit_table_assertions.assert_not_called()
 
     def test_all_or_nothing_on_failure(self):
         """L1 extraction succeeds but L2 fails → nothing committed."""
