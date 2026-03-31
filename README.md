@@ -138,67 +138,79 @@ For LLM and embedding providers, **bring your own model**. Sema works with any p
 
 ---
 
-## Prerequisites
+## Getting Started
+
+### Prerequisites
 
 - **Python 3.12+**
+- **[uv](https://docs.astral.sh/uv/)** — Python package manager (recommended)
 - **Neo4j 5.x** — local via Docker or remote
 - **Databricks SQL Warehouse** — data source (currently the only supported connector)
 - **LLM API key** — any supported provider above
 - **Embedding API key** — any supported provider above, or use local sentence-transformers
 
----
-
-## Installation
+### 1. Clone and install
 
 ```bash
 git clone git@github.com:Nine-Sigma/sema.git
 cd sema
+uv sync            # installs all dependencies into a virtual environment
 ```
 
-Install with [uv](https://docs.astral.sh/uv/) (recommended):
-
-```bash
-uv sync
-```
-
-Or with pip:
+<details>
+<summary>Using pip instead of uv</summary>
 
 ```bash
 pip install -e .
 ```
+</details>
 
----
-
-## Configuration
-
-Copy the example environment file and fill in your credentials:
+### 2. Configure credentials
 
 ```bash
 cp .env.example .env
 ```
 
-All settings are read from environment variables. See `.env.example` for the full list.
+Edit `.env` with your credentials — see `.env.example` for the full list. Settings can also be passed via CLI flags or a YAML config file (`--config path/to/config.yaml`). CLI flags override env vars, and env vars override config file values.
 
-Configuration can also be passed via CLI flags or a YAML config file (`--config path/to/config.yaml`).
-
----
-
-## Start Neo4j
+### 3. Start Neo4j
 
 ```bash
 docker compose up -d
 ```
 
-Neo4j 5.26 with APOC on `bolt://localhost:7687`. Browser UI at `http://localhost:7474`.
+This starts Neo4j 5.26 with APOC on `bolt://localhost:7687`. Browser UI at `http://localhost:7474`.
+
+### 4. Build the knowledge graph
+
+```bash
+uv run sema build --catalog my_catalog --schemas schema1,schema2
+```
+
+This runs the full pipeline: structural extraction, semantic interpretation, vocabulary detection, graph materialization, and embedding computation. On a typical catalog with ~50 tables, expect 5-15 minutes depending on your LLM provider.
+
+### 5. Query
+
+```bash
+# Get a Semantic Context Object (JSON)
+uv run sema context --question "How many patients have stage III breast cancer?"
+
+# Generate SQL from natural language
+uv run sema query --question "Average age of patients by cancer type"
+```
 
 ---
 
-## Usage
+## CLI Reference
 
-### Build the knowledge graph
+All commands are run with `uv run sema` (or just `sema` if you installed with pip).
+
+### `sema build`
+
+Build the knowledge graph from your warehouse catalog.
 
 ```bash
-sema build --catalog my_catalog --schemas schema1,schema2
+uv run sema build --catalog my_catalog --schemas schema1,schema2
 ```
 
 | Flag | Description | Default |
@@ -209,14 +221,18 @@ sema build --catalog my_catalog --schemas schema1,schema2
 | `--table-workers` | Parallel table workers | `4` |
 | `--llm-provider` | LLM provider | `openrouter` |
 | `--llm-model` | LLM model name | `anthropic/claude-sonnet-4` |
+| `--llm-timeout` | LLM request timeout in seconds | `120` |
 | `--skip-embeddings` | Create indexes only, skip embeddings | `false` |
 | `--resume` | Skip tables already in the graph | `false` |
 | `--config` | Path to YAML config file | — |
+| `--verbose` | Enable verbose output | `false` |
 
-### Get a Semantic Context Object
+### `sema context`
+
+Retrieve a Semantic Context Object — a query-relevant slice of the knowledge graph.
 
 ```bash
-sema context --question "How many patients have stage III breast cancer?"
+uv run sema context --question "How many patients have stage III breast cancer?"
 ```
 
 | Flag | Description | Default |
@@ -224,32 +240,65 @@ sema context --question "How many patients have stage III breast cancer?"
 | `--question` | Natural language question | required |
 | `--consumer-hint` | Pruning strategy: `nl2sql`, `catalog`, `lineage` | `nl2sql` |
 
-### Query with NL2SQL
+### `sema query`
+
+Generate and optionally execute SQL from natural language.
 
 ```bash
 # Plan — generate SQL without executing
-sema query --question "Average age of patients by cancer type" --mode plan
+uv run sema query --question "Average age of patients by cancer type" --mode plan
 
-# Explain — generate SQL with explanation
-sema query --question "Average age of patients by cancer type" --mode explain
+# Explain — generate SQL and show the execution plan
+uv run sema query --question "Average age of patients by cancer type" --mode explain
 
-# Execute — run the SQL against Databricks
-sema query --question "Average age of patients by cancer type" --mode execute
+# Execute — generate and run SQL against Databricks
+uv run sema query --question "Average age of patients by cancer type" --mode execute
 ```
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--question` | Natural language question | required |
+| `--mode` | `plan`, `explain`, or `execute` | `plan` |
+| `--llm-provider` | LLM provider | `openrouter` |
+| `--llm-model` | LLM model name | `anthropic/claude-sonnet-4` |
+| `--llm-timeout` | LLM request timeout in seconds | `120` |
+| `--embedding-provider` | Embedding provider | `openrouter` |
+| `--embedding-model` | Embedding model name | `google/gemini-embedding-001` |
+| `--verbose` | Return full response JSON | `false` |
+
+### `sema review`
+
+Export low-confidence assertions for human review. Useful for identifying extraction results that may need manual correction.
+
+```bash
+# Print to stdout
+uv run sema review --threshold 0.85
+
+# Save to file
+uv run sema review --threshold 0.7 --output review.json
+```
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--threshold` | Confidence threshold — assertions below this are exported | `0.85` |
+| `--output` | Output file path | stdout |
 
 ---
 
 ## Running Tests
 
 ```bash
-# Unit tests (no external services)
+# Unit tests (no external services needed)
 uv run pytest
 
-# Integration tests (requires Neo4j)
+# Integration tests (requires Neo4j running)
 uv run pytest -m integration
 
-# All tests
-uv run pytest -m "unit or integration or e2e"
+# All tests with coverage
+uv run pytest --cov=sema --cov-report=term-missing
+
+# Type checking
+uv run mypy src/sema/
 ```
 
 ---
