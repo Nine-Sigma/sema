@@ -144,15 +144,17 @@ def upsert_entities(
         winner = pick_winner(group)
         if not winner:
             continue
-        catalog, schema, table, _ = parse_ref_any(subject_ref)
+        pk = CanonicalRef.parse(subject_ref)
         batch.append({
             "name": winner.payload.get("value", ""),
             "description": winner.payload.get("description"),
             "source": winner.source,
             "confidence": winner.confidence,
-            "table_name": table,
-            "schema_name": schema,
-            "catalog": catalog,
+            "datasource_id": pk.datasource_id,
+            "table_key": pk.table_key,
+            "table_name": pk.table,
+            "schema_name": pk.schema or "",
+            "catalog": pk.catalog_or_db,
         })
     batch_upsert_entities(loader, batch)
 
@@ -165,8 +167,11 @@ def _resolve_property_details(
     winner = pick_winner(group)
     if not winner:
         return None
-    catalog, schema, table, column = parse_ref_any(col_ref)
-    if not column:
+    try:
+        pk = CanonicalRef.parse(col_ref)
+    except ValueError:
+        return None
+    if not pk.column:
         return None
 
     type_group = groups.get(
@@ -178,19 +183,15 @@ def _resolve_property_details(
         if type_winner else "free_text"
     )
 
-    try:
-        pk = CanonicalRef.parse(col_ref)
-        table_ref = col_ref.rsplit("/", 1)[0] if pk.column else col_ref
-    except ValueError:
-        table_ref = col_ref.rsplit("/", 1)[0]
+    table_ref = col_ref.rsplit("/", 1)[0] if pk.column else col_ref
 
     entity_group = groups.get(
         (table_ref, AssertionPredicate.HAS_ENTITY_NAME.value), [],
     )
     entity_winner = pick_winner(entity_group)
     entity_name = (
-        entity_winner.payload.get("value", table)
-        if entity_winner else table
+        entity_winner.payload.get("value", pk.table)
+        if entity_winner else pk.table
     )
 
     return {
@@ -199,10 +200,13 @@ def _resolve_property_details(
         "source": winner.source,
         "confidence": winner.confidence,
         "entity_name": entity_name,
-        "column_name": column,
-        "table_name": table,
-        "schema_name": schema,
-        "catalog": catalog,
+        "datasource_id": pk.datasource_id,
+        "table_key": pk.table_key,
+        "column_key": pk.column_key,
+        "column_name": pk.column,
+        "table_name": pk.table,
+        "schema_name": pk.schema or "",
+        "catalog": pk.catalog_or_db,
     }
 
 
@@ -236,14 +240,19 @@ def upsert_decoded_values(
     term_batch: list[dict[str, Any]] = []
 
     for col_ref, decoded in decoded_groups.items():
-        catalog, schema, table, column = parse_ref_any(col_ref)
-        if not column:
+        try:
+            pk = CanonicalRef.parse(col_ref)
+        except ValueError:
             continue
-        vs_name = f"{table}_{column}_values"
+        if not pk.column:
+            continue
+        vs_name = f"{pk.table}_{pk.column}_values"
         vs_batch.append({
             "name": vs_name,
-            "column_name": column, "table_name": table,
-            "schema_name": schema, "catalog": catalog,
+            "datasource_id": pk.datasource_id,
+            "column_key": pk.column_key,
+            "column_name": pk.column, "table_name": pk.table,
+            "schema_name": pk.schema or "", "catalog": pk.catalog_or_db,
         })
         for a in decoded:
             if a.status in (
@@ -254,6 +263,7 @@ def upsert_decoded_values(
             label = a.payload.get("label", raw)
             term_batch.append({
                 "code": raw, "label": label,
+                "vocabulary_name": vs_name,
                 "source": a.source, "confidence": a.confidence,
             })
             loader.add_term_to_value_set(raw, vs_name)
@@ -268,29 +278,34 @@ def _collect_alias_batch(
     groups: dict[tuple[str, str], list[Assertion]],
 ) -> tuple[list[dict[str, Any]], str]:
     """Collect alias batch entries and determine parent label."""
-    _, _, table_or_col, column = parse_ref_any(subject_ref)
+    try:
+        pk = CanonicalRef.parse(subject_ref)
+    except ValueError:
+        return [], ":Entity"
     batch: list[dict[str, Any]] = []
 
-    if column:
+    if pk.column:
         prop_group = groups.get(
             (subject_ref, AssertionPredicate.HAS_PROPERTY_NAME.value), [],
         )
         prop_winner = pick_winner(prop_group)
         parent_name = (
-            prop_winner.payload.get("value", column)
-            if prop_winner else column
+            prop_winner.payload.get("value", pk.column)
+            if prop_winner else pk.column
         )
         parent_label = ":Property"
+        target_key = pk.column_key or subject_ref
     else:
         entity_group = groups.get(
             (subject_ref, AssertionPredicate.HAS_ENTITY_NAME.value), [],
         )
         entity_winner = pick_winner(entity_group)
         parent_name = (
-            entity_winner.payload.get("value", table_or_col)
-            if entity_winner else table_or_col
+            entity_winner.payload.get("value", pk.table)
+            if entity_winner else pk.table
         )
         parent_label = ":Entity"
+        target_key = pk.table_key
 
     for a in group:
         if a.status in (
@@ -299,6 +314,7 @@ def _collect_alias_batch(
             continue
         batch.append({
             "text": a.payload.get("value", ""),
+            "target_key": target_key,
             "parent_name": parent_name,
             "source": a.source, "confidence": a.confidence,
             "is_preferred": a.payload.get("is_preferred", False),
