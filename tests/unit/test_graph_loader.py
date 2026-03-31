@@ -252,9 +252,10 @@ class TestAssertionStorage:
         assert any("subject_id" in c for c in calls)
         assert any("object_id" in c for c in calls)
 
-    def test_supersession_marks_old_as_superseded(
+    def test_no_supersession_mutation_on_store(
         self, loader, mock_driver,
     ):
+        """store_assertion no longer mutates prior assertions."""
         _, session = mock_driver
         assertion = _make_assertion(
             "databricks://ws/cdm/clinical/tbl/col",
@@ -263,7 +264,7 @@ class TestAssertionStorage:
         )
         loader.store_assertion(assertion)
         calls = [str(c) for c in session.run.call_args_list]
-        assert any("superseded" in c for c in calls)
+        assert not any("superseded" in c for c in calls)
 
 
 class TestProvenanceEdges:

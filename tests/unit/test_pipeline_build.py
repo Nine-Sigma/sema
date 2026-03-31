@@ -20,6 +20,7 @@ from sema.models.assertions import (
 )
 from sema.llm_client import LLMStageError, LLMClient
 from sema.engine.semantic import TableInterpretation, PropertyInterpretation
+from sema.pipeline.build_utils import _build_table_metadata
 
 
 def _make_assertion(subject_ref, predicate, payload=None, source="test",
@@ -51,6 +52,33 @@ def _make_extraction_assertions():
             {"data_type": "STRING", "nullable": True, "comment": None},
         ),
     ]
+
+
+# ---------------------------------------------------------------------------
+# _build_table_metadata tests
+# ---------------------------------------------------------------------------
+
+class TestBuildTableMetadata:
+    def test_assembles_full_metadata(self):
+        table_ref = "unity://cat.sch.tbl"
+        assertions = [
+            _make_assertion(table_ref, AssertionPredicate.TABLE_EXISTS,
+                           {"table_type": "TABLE"}),
+            _make_assertion(table_ref, AssertionPredicate.HAS_COMMENT,
+                           {"value": "A comment"}),
+            _make_assertion(f"{table_ref}/col1", AssertionPredicate.COLUMN_EXISTS,
+                           {"data_type": "STRING", "nullable": True, "comment": "c1"}),
+            _make_assertion(f"{table_ref}/col1", AssertionPredicate.HAS_TOP_VALUES,
+                           {"values": [{"value": "A", "frequency": 10}]}),
+            _make_assertion(table_ref, AssertionPredicate.HAS_SAMPLE_ROWS,
+                           {"rows": [{"col1": "A"}]}),
+        ]
+        meta = _build_table_metadata(assertions, table_ref)
+        assert meta["table_name"] == "tbl"
+        assert meta["comment"] == "A comment"
+        assert len(meta["columns"]) == 1
+        assert meta["columns"][0]["top_values"] == [{"value": "A", "frequency": 10}]
+        assert meta["sample_rows"] == [{"col1": "A"}]
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +139,7 @@ class TestProcessTable:
         assert result.entities_created == 1
         assert result.properties_created == 1
         loader.commit_table_assertions.assert_called_once()
-        loader.materialize_table_graph.assert_called_once()
+        loader._run.assert_called()
 
     def test_llm_stage_error_returns_failed(self):
         work_item = TableWorkItem("cat", "sch", "tbl", "unity://cat.sch.tbl")
@@ -137,7 +165,7 @@ class TestProcessTable:
         assert result.failed_stage == "L2 semantic"
         # No assertions committed
         loader.commit_table_assertions.assert_not_called()
-        loader.materialize_table_graph.assert_not_called()
+        loader.commit_table_assertions.assert_not_called()
 
     def test_all_or_nothing_on_failure(self):
         """L1 extraction succeeds but L2 fails → nothing committed."""

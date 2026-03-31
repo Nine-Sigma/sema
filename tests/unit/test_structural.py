@@ -58,6 +58,7 @@ class TestCatalogSchemaTable:
         engine.process(assertions)
         mock_loader.upsert_table.assert_called_with(
             "cancer_diagnosis", "clinical", "cdm", table_type="TABLE", comment=None,
+            ref="unity://cdm.clinical.cancer_diagnosis",
         )
 
     def test_table_with_comment(self, engine, mock_loader):
@@ -70,6 +71,7 @@ class TestCatalogSchemaTable:
         engine.process(assertions)
         mock_loader.upsert_table.assert_called_with(
             "cancer_diagnosis", "clinical", "cdm", table_type="TABLE", comment="Diagnosis records",
+            ref="unity://cdm.clinical.cancer_diagnosis",
         )
 
 
@@ -86,6 +88,7 @@ class TestColumnNodes:
         mock_loader.upsert_column.assert_called_with(
             "dx_type_cd", "tbl", "clinical", "cdm",
             data_type="STRING", nullable=True, comment="Type code",
+            ref="unity://cdm.clinical.tbl.dx_type_cd",
         )
 
 

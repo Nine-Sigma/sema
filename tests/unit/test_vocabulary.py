@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 pytestmark = pytest.mark.unit
 
 from sema.engine.vocabulary import (
+    VocabColumnContext,
     VocabularyEngine,
     detect_vocabulary_pattern,
     infer_hierarchy,
@@ -58,6 +59,70 @@ class TestPatternDetection:
 
     def test_empty_values(self):
         result = detect_vocabulary_pattern([])
+        assert result is None
+
+    def test_loinc_format(self):
+        values = ["2093-3", "2085-9", "13457-7", "718-7"]
+        result = detect_vocabulary_pattern(values)
+        assert result is not None
+        assert result["vocabulary"] == "LOINC"
+        assert result["confidence"] >= 0.9
+
+    def test_cpt_format_with_procedure_context(self):
+        values = ["99213", "99214", "99215", "99203"]
+        result = detect_vocabulary_pattern(
+            values,
+            VocabColumnContext(column_name="procedure_code"),
+        )
+        assert result is not None
+        assert result["vocabulary"] == "CPT"
+        assert result["confidence"] >= 0.9
+
+    def test_no_cpt_pattern_without_context(self):
+        values = ["99213", "99214", "99215", "99203"]
+        result = detect_vocabulary_pattern(values)
+        assert result is None
+
+    def test_zip_code_column_matches_zip_not_cpt(self):
+        """Column named 'zip_code' with 5-digit values matches ZIP
+        (not CPT) via context_keywords disambiguation."""
+        values = ["10001", "30301", "60601", "94105"]
+        result = detect_vocabulary_pattern(
+            values,
+            VocabColumnContext(column_name="zip_code"),
+        )
+        assert result is not None
+        assert result["vocabulary"] == "ZIP"
+
+    def test_ndc_format(self):
+        values = ["0078-0357-05", "0002-3227-30", "0069-0770-01"]
+        result = detect_vocabulary_pattern(values)
+        assert result is not None
+        assert result["vocabulary"] == "NDC"
+        assert result["confidence"] >= 0.9
+
+    def test_ndc_other_segment_layouts(self):
+        values = ["60574-4114-1", "50242-040-62", "00006-4047-61"]
+        result = detect_vocabulary_pattern(values)
+        assert result is not None
+        assert result["vocabulary"] == "NDC"
+
+    def test_hgnc_format(self):
+        values = ["HGNC:1100", "HGNC:11998", "HGNC:3430"]
+        result = detect_vocabulary_pattern(values)
+        assert result is not None
+        assert result["vocabulary"] == "HGNC"
+        assert result["confidence"] >= 0.9
+
+    def test_icd10_cm_extended_format(self):
+        values = ["S52.521A", "T14.90XA", "M80.08XA"]
+        result = detect_vocabulary_pattern(values)
+        assert result is not None
+        assert result["vocabulary"] == "ICD-10"
+
+    def test_no_pattern_for_mixed_vocabs(self):
+        values = ["C18.0", "99213", "HGNC:1100", "Stage I"]
+        result = detect_vocabulary_pattern(values)
         assert result is None
 
 
@@ -115,6 +180,23 @@ class TestLLMVocabularyDetection:
         assert vocab_assertions[0].source == "pattern_match"
         assert vocab_assertions[0].confidence >= 0.9
         mock_llm.invoke.assert_not_called()
+
+    def test_five_digit_values_fall_back_without_cpt_context(self):
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(
+            content=json.dumps({"vocabulary": "ZIP", "confidence": 0.7})
+        )
+        engine = VocabularyEngine(llm=mock_llm, run_id="test-run")
+        values = ["10001", "30301", "60601", "94105"]
+        assertions = engine.detect_vocabulary("unity://cdm.clinical.tbl.col", values)
+        vocab_assertions = [
+            a for a in assertions
+            if a.predicate == AssertionPredicate.VOCABULARY_MATCH
+        ]
+        assert len(vocab_assertions) == 1
+        assert vocab_assertions[0].payload["value"] == "ZIP"
+        assert vocab_assertions[0].source == "llm_interpretation"
+        mock_llm.invoke.assert_called_once()
 
     def test_llm_failure_returns_empty(self):
         mock_llm = MagicMock()

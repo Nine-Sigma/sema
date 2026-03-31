@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from sema.models.assertions import Assertion, AssertionPredicate
-from sema.models.constants import parse_ref, parse_unity_ref_strict
+from sema.models.physical_key import CanonicalRef
 
 if TYPE_CHECKING:
     from sema.graph.loader import GraphLoader
@@ -15,16 +15,12 @@ logger = logging.getLogger(__name__)
 def _parse_ref_parts(ref: str) -> tuple[str, str, str, str | None]:
     """Parse catalog/schema/table/column from either ref format.
 
-    Supports databricks://<workspace>/<catalog>/<schema>/<table>[/<column>]
-    and legacy unity://<catalog>.<schema>.<table>[.<column>].
+    Supports databricks://, postgres://, mysql://, and legacy unity:// refs.
     Returns (catalog, schema, table, column).
     Raises ValueError if ref cannot be parsed.
     """
-    parts = parse_ref(ref)
-    if parts is not None:
-        return parts.catalog, parts.schema, parts.table, parts.column
-    # Fall back to legacy unity:// parser
-    return parse_unity_ref_strict(ref)
+    pk = CanonicalRef.parse(ref)
+    return pk.catalog_or_db, pk.schema or "", pk.table, pk.column
 
 
 def process_tables(
@@ -59,7 +55,8 @@ def process_tables(
 
         table_type = table_exists[0].payload.get("table_type", "TABLE")
         loader.upsert_table(table, schema, catalog,
-                            table_type=table_type, comment=comment)
+                            table_type=table_type, comment=comment,
+                            ref=subject_ref)
 
         _process_join_assertions(
             loader, subject_assertions, table, schema, catalog
@@ -128,4 +125,5 @@ def process_columns(
             data_type=col_data.get("data_type", "UNKNOWN"),
             nullable=col_data.get("nullable", True),
             comment=col_data.get("comment"),
+            ref=subject_ref,
         )

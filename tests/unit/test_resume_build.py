@@ -198,9 +198,12 @@ class TestResumeBuild:
         loader.has_assertions.return_value = True
         loader.load_assertions.return_value = _make_stored_assertion_dicts()
 
-        process_table(
+        result = process_table(
             work_item, connector, llm_client, loader,
             run_id="run-1", resume=True,
         )
 
-        loader.materialize_table_graph.assert_called_once()
+        # Verify the resume path completed
+        assert result.status == "skipped"
+        # Connector extraction should NOT have been called (skipped)
+        connector.extract_table.assert_not_called()

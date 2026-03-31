@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
 from sema.log import logger
-from sema.engine.vocabulary import VocabularyEngine
+from sema.engine.vocabulary import VocabColumnContext, VocabularyEngine
 from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
@@ -31,13 +31,10 @@ def _parse_table_ref(ref: str) -> tuple[str, str, str, str | None]:
 
     Returns (catalog, schema, table, column).
     """
-    from sema.models.constants import parse_ref, parse_unity_ref
+    from sema.models.physical_key import CanonicalRef
 
-    parts = parse_ref(ref)
-    if parts is not None:
-        return parts.catalog, parts.schema, parts.table, parts.column
-    # Fall back to legacy unity://catalog.schema.table format
-    return parse_unity_ref(ref)
+    pk = CanonicalRef.parse(ref)
+    return pk.catalog_or_db, pk.schema or "", pk.table, pk.column
 
 
 def _build_table_metadata(
@@ -63,7 +60,7 @@ def _build_table_metadata(
             if a.subject_ref == table_ref:
                 meta["comment"] = a.payload.get("value")
         elif a.predicate == AssertionPredicate.COLUMN_EXISTS:
-            col_name = a.subject_ref.split(".")[-1]
+            col_name = a.subject_ref.rsplit("/", 1)[-1]
             col_entry: dict[str, Any] = {
                 "name": col_name,
                 "data_type": a.payload.get("data_type", "UNKNOWN"),
@@ -73,7 +70,7 @@ def _build_table_metadata(
             }
             meta["columns"].append(col_entry)
         elif a.predicate == AssertionPredicate.HAS_TOP_VALUES:
-            col_name = a.subject_ref.split(".")[-1]
+            col_name = a.subject_ref.rsplit("/", 1)[-1]
             for col in meta["columns"]:
                 if col["name"] == col_name:
                     col["top_values"] = a.payload.get("values", [])
@@ -133,28 +130,60 @@ def _run_semantic_interpretation(
 def _build_vocab_work_items(
     extraction_assertions: list[Assertion],
     semantic_assertions: list[Assertion],
-) -> list[tuple[str, list[str], list[dict[str, Any]] | None]]:
-    items: list[tuple[str, list[str], list[dict[str, Any]] | None]] = []
+) -> list[tuple[str, list[str], list[dict[str, Any]] | None, VocabColumnContext]]:
+    sem_index = _build_semantic_index(semantic_assertions)
+    items: list[
+        tuple[str, list[str], list[dict[str, Any]] | None, VocabColumnContext]
+    ] = []
     for a in extraction_assertions:
         if a.predicate != AssertionPredicate.HAS_TOP_VALUES:
             continue
-        values = [
-            v["value"]
-            for v in a.payload.get("values", [])
-        ]
+        col_ref = a.subject_ref
+        values = [v["value"] for v in a.payload.get("values", [])]
         decoded = [
             da.payload
             for da in semantic_assertions
             if (
-                da.predicate
-                == AssertionPredicate.HAS_DECODED_VALUE
-                and da.subject_ref == a.subject_ref
+                da.predicate == AssertionPredicate.HAS_DECODED_VALUE
+                and da.subject_ref == col_ref
             )
         ]
-        items.append(
-            (a.subject_ref, values, decoded or None)
-        )
+        ctx = _extract_column_context(col_ref, sem_index)
+        items.append((col_ref, values, decoded or None, ctx))
     return items
+
+
+def _build_semantic_index(
+    semantic_assertions: list[Assertion],
+) -> dict[tuple[str, str], Assertion]:
+    index: dict[tuple[str, str], Assertion] = {}
+    for a in semantic_assertions:
+        index[(a.subject_ref, a.predicate.value)] = a
+    return index
+
+
+def _extract_column_context(
+    col_ref: str,
+    sem_index: dict[tuple[str, str], Assertion],
+) -> VocabColumnContext:
+    table_ref = col_ref.rsplit("/", 1)[0] if "/" in col_ref else col_ref
+    col_name = col_ref.rsplit("/", 1)[-1] if "/" in col_ref else col_ref
+    table_name = table_ref.rsplit("/", 1)[-1] if "/" in table_ref else table_ref
+
+    entity_a = sem_index.get((table_ref, "has_entity_name"))
+    sem_type_a = sem_index.get((col_ref, "has_semantic_type"))
+    prop_name_a = sem_index.get((col_ref, "has_property_name"))
+    vocab_a = sem_index.get((col_ref, "vocabulary_match"))
+
+    return VocabColumnContext(
+        column_name=col_name,
+        table_name=table_name,
+        entity_name=entity_a.payload.get("value") if entity_a else None,
+        semantic_type=sem_type_a.payload.get("value") if sem_type_a else None,
+        property_name=prop_name_a.payload.get("value") if prop_name_a else None,
+        vocabulary_guess=vocab_a.payload.get("value") if vocab_a else None,
+        vocabulary_guess_confidence=vocab_a.confidence if vocab_a else 0.0,
+    )
 
 
 def _run_vocabulary_alignment(
@@ -181,9 +210,9 @@ def _run_vocabulary_alignment(
     ) as executor:
         future_to_ref = {
             executor.submit(
-                vocab.process_column, ref, vals, dec
+                vocab.process_column, ref, vals, dec, ctx
             ): ref
-            for ref, vals, dec in work_items
+            for ref, vals, dec, ctx in work_items
         }
         for future in as_completed(future_to_ref):
             ref = future_to_ref[future]
@@ -217,7 +246,8 @@ def _commit_and_materialize(
     logger.info(
         f"[{work_item.table_name}] Materializing graph..."
     )
-    loader.materialize_table_graph(all_assertions)
+    from sema.graph.materializer import materialize_unified
+    materialize_unified(loader, all_assertions)
     logger.info(
         f"[{work_item.table_name}] Done"
     )

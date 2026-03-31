@@ -9,12 +9,20 @@ from sema.models.assertions import (
     AssertionPredicate,
     AssertionStatus,
 )
-from sema.models.constants import parse_unity_ref
+from sema.models.physical_key import CanonicalRef
 
 if TYPE_CHECKING:
     from sema.graph.loader import GraphLoader
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_ref(ref: str) -> tuple[str, str, str, str | None]:
+    try:
+        pk = CanonicalRef.parse(ref)
+        return pk.catalog_or_db, pk.schema or "", pk.table, pk.column
+    except ValueError:
+        return "", "", ref, None
 
 
 def _pick_winner(assertions: list[Assertion]) -> Assertion | None:
@@ -55,7 +63,7 @@ def resolve_entities(
         winner = _pick_winner(group)
         if not winner:
             continue
-        catalog, schema, table, _ = parse_unity_ref(subject_ref)
+        catalog, schema, table, _ = _parse_ref(subject_ref)
         loader.upsert_entity(
             name=winner.payload.get("value", ""),
             description=winner.payload.get("description"),
@@ -80,7 +88,7 @@ def resolve_properties(
         winner = _pick_winner(group)
         if not winner:
             continue
-        catalog, schema, table, column = parse_unity_ref(col_ref)
+        catalog, schema, table, column = _parse_ref(col_ref)
         if not column:
             continue
 
@@ -116,7 +124,7 @@ def resolve_decoded_values(
             decoded_groups[subj].extend(group)
 
     for col_ref, decoded_assertions in decoded_groups.items():
-        catalog, schema, table, column = parse_unity_ref(col_ref)
+        catalog, schema, table, column = _parse_ref(col_ref)
         if not column:
             continue
 
@@ -156,7 +164,7 @@ def resolve_aliases(
     """Resolve HAS_ALIAS (and deprecated HAS_SYNONYM) assertions into synonym nodes."""
     alias_groups = _collect_alias_groups(groups)
     for subject_ref, group in alias_groups.items():
-        _, _, table_or_col, column = parse_unity_ref(subject_ref)
+        _, _, table_or_col, column = _parse_ref(subject_ref)
         if column:
             prop_group = groups.get(
                 (subject_ref, AssertionPredicate.HAS_PROPERTY_NAME.value), []
@@ -198,14 +206,14 @@ resolve_synonyms = resolve_aliases
 
 def resolve_join_paths(
     groups: dict[tuple[str, str], list[Assertion]],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Return join path data structures from HAS_JOIN_EVIDENCE assertions.
 
     Does NOT call loader methods — returns raw data for callers to act on.
     Each dict has: subject_ref, object_ref, join_predicates, hop_count,
     cardinality, source, confidence.
     """
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
     for (subj, pred), group in groups.items():
         if pred != AssertionPredicate.HAS_JOIN_EVIDENCE.value:
             continue
@@ -226,7 +234,7 @@ def resolve_join_paths(
 
 def resolve_metrics(
     groups: dict[tuple[str, str], list[Assertion]],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Return metric data structures from metric-related assertions.
 
     Collects MEASURES, AGGREGATES, FILTERS_BY, AT_GRAIN predicates.
@@ -237,7 +245,7 @@ def resolve_metrics(
     metric_predicates = {
         "measures", "aggregates", "filters_by", "at_grain",
     }
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
     for (subj, pred), group in groups.items():
         if pred not in metric_predicates:
             continue

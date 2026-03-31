@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 
 pytestmark = pytest.mark.integration
 
-from sema.engine.resolution import ResolutionEngine
 from sema.graph.loader import GraphLoader
+from sema.graph.materializer import materialize_unified
 from sema.models.assertions import (
     Assertion, AssertionPredicate, AssertionStatus,
 )
@@ -34,20 +34,20 @@ def _count_rels(driver, rel_type):
 
 
 @pytest.fixture
-def resolver(clean_neo4j):
+def graph_env(clean_neo4j):
     loader = GraphLoader(clean_neo4j)
-    # Pre-create physical nodes that resolution will reference
+    # Pre-create physical nodes that materialization will reference
     loader.upsert_catalog("cdm")
     loader.upsert_schema("clinical", "cdm")
     loader.upsert_table("cancer_diagnosis", "clinical", "cdm")
     loader.upsert_column("dx_type_cd", "cancer_diagnosis", "clinical", "cdm",
                         data_type="STRING", nullable=True)
-    return ResolutionEngine(loader), clean_neo4j
+    return loader, clean_neo4j
 
 
 class TestFullResolution:
-    def test_entity_property_term_synonym_created(self, resolver):
-        engine, driver = resolver
+    def test_entity_property_term_synonym_created(self, graph_env):
+        loader, driver = graph_env
         assertions = [
             _a("unity://cdm.clinical.cancer_diagnosis",
                AssertionPredicate.HAS_ENTITY_NAME,
@@ -71,7 +71,7 @@ class TestFullResolution:
                AssertionPredicate.PARENT_OF,
                {"parent": "CRC", "child": "COAD"}, source="pattern_match"),
         ]
-        engine.resolve(assertions)
+        materialize_unified(loader, assertions)
 
         assert _count(driver, "Entity") == 1
         assert _count(driver, "Property") == 1
@@ -85,29 +85,29 @@ class TestFullResolution:
         assert _count_rels(driver, "REFERS_TO") >= 1
         assert _count_rels(driver, "PARENT_OF") >= 1
 
-    def test_assertions_stored_with_subject_edges(self, resolver):
-        engine, driver = resolver
+    def test_assertions_stored_with_subject_edges(self, graph_env):
+        loader, driver = graph_env
         assertions = [
             _a("unity://cdm.clinical.cancer_diagnosis",
                AssertionPredicate.HAS_ENTITY_NAME,
                {"value": "Test Entity"}),
         ]
-        engine.resolve(assertions)
+        materialize_unified(loader, assertions)
 
         assert _count(driver, "Assertion") >= 1
 
-    def test_supersession_on_re_resolve(self, resolver):
-        engine, driver = resolver
+    def test_supersession_on_re_resolve(self, graph_env):
+        loader, driver = graph_env
 
         # First run
-        engine.resolve([
+        materialize_unified(loader, [
             _a("unity://cdm.clinical.cancer_diagnosis",
                AssertionPredicate.HAS_ENTITY_NAME,
                {"value": "Old Name"}, run_id="run-1"),
         ])
 
         # Second run
-        engine.resolve([
+        materialize_unified(loader, [
             _a("unity://cdm.clinical.cancer_diagnosis",
                AssertionPredicate.HAS_ENTITY_NAME,
                {"value": "New Name"}, run_id="run-2"),

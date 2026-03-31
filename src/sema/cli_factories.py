@@ -20,6 +20,7 @@ def _get_neo4j_driver(neo4j_config: Neo4jConfig) -> Any:
 def _get_llm(llm_config: LLMConfig) -> Any:
     provider = llm_config.provider.lower()
     api_key = llm_config.api_key.get_secret_value()
+    timeout = llm_config.request_timeout
 
     if provider == "openrouter":
         from langchain_openai import ChatOpenAI
@@ -27,19 +28,29 @@ def _get_llm(llm_config: LLMConfig) -> Any:
             model=llm_config.model,
             api_key=api_key,  # type: ignore[arg-type]
             base_url="https://openrouter.ai/api/v1",
+            request_timeout=timeout,  # type: ignore[call-arg]
         )
     elif provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(model=llm_config.model, api_key=api_key)  # type: ignore[call-arg, arg-type]
+        return ChatAnthropic(
+            model=llm_config.model,
+            api_key=api_key,  # type: ignore[call-arg, arg-type]
+            timeout=float(timeout),
+        )
     elif provider == "openai":
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(model=llm_config.model, api_key=api_key)  # type: ignore[arg-type]
+        return ChatOpenAI(
+            model=llm_config.model,
+            api_key=api_key,  # type: ignore[arg-type]
+            request_timeout=timeout,  # type: ignore[call-arg]
+        )
     elif provider in ("databricks", "custom"):
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             model=llm_config.model,
             api_key=api_key,  # type: ignore[arg-type]
             base_url=llm_config.base_url,
+            request_timeout=timeout,  # type: ignore[call-arg]
         )
     else:
         raise ValueError(f"Unknown LLM provider: {provider}")

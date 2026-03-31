@@ -17,7 +17,10 @@ class CypherQueries:
         return (
             f"MATCH (t:Term)-[:PARENT_OF*1..{max_depth}]->(child:Term) "
             f"WHERE t.code = $code "
+            f"AND (t.vocabulary_name = $vocabulary_name "
+            f"OR $vocabulary_name IS NULL) "
             f"RETURN child.code AS code, child.label AS label, "
+            f"child.vocabulary_name AS vocabulary_name, "
             f"t.code AS parent_code"
         )
 

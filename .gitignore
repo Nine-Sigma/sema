@@ -19,6 +19,7 @@ wheels/
 # IDE / editor
 .codex/
 .claude/
+CLAUDE.md
 .vscode/
 .idea/
 *.swp
@@ -38,3 +39,4 @@ coverage.xml
 
 # Docs (generated, source lives elsewhere)
 docs/
+backups/
