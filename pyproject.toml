@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "sema"
 version = "0.1.0"
@@ -12,7 +16,7 @@ dependencies = [
     "langgraph>=0.2.0",
     "fastapi[standard]",
     "neo4j>=5.0.0",
-    "databricks-sql-connector>=3.0.0",
+    "databricks-sql-connector[pyarrow]>=3.0.0",
     "sqlglot>=25.0.0",
     "sentence-transformers>=3.0.0",
     "pydantic>=2.0.0",
