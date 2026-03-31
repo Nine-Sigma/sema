@@ -54,6 +54,7 @@ def _build_config_from_args(
     neo4j_password: str | None,
     llm_provider: str | None,
     llm_model: str | None,
+    llm_timeout: int | None,
     config_file: str | None,
     skip_embeddings: bool,
     resume: bool,
@@ -90,11 +91,16 @@ def _build_config_from_args(
             password=neo4j_password or build_config.neo4j.password,  # type: ignore[arg-type]
         )
 
-    if llm_provider is not None or llm_model is not None:
-        build_config.llm = LLMConfig(
-            provider=llm_provider or build_config.llm.provider,
-            model=llm_model or build_config.llm.model,
-            api_key=build_config.llm.api_key,
+    llm_overrides: dict[str, Any] = {}
+    if llm_provider is not None:
+        llm_overrides["provider"] = llm_provider
+    if llm_model is not None:
+        llm_overrides["model"] = llm_model
+    if llm_timeout is not None:
+        llm_overrides["request_timeout"] = llm_timeout
+    if llm_overrides:
+        build_config.llm = build_config.llm.model_copy(
+            update=llm_overrides,
         )
 
     return build_config
@@ -111,6 +117,7 @@ def _build_config_from_args(
 @click.option("--neo4j-password", default=None, help="Neo4j password")
 @click.option("--llm-provider", default=None, help="LLM provider (anthropic, openai)")
 @click.option("--llm-model", default=None, help="LLM model name")
+@click.option("--llm-timeout", default=None, type=int, help="LLM request timeout in seconds (default: 120)")
 @click.option("--config", "config_file", default=None, help="Path to config YAML file")
 @click.option("--skip-embeddings", is_flag=True, default=False, help="Create indexes only, skip embedding computation")
 @click.option("--resume", is_flag=True, default=False, help="Skip tables that already have assertions in the graph")
@@ -126,6 +133,7 @@ def build(
     neo4j_password: str | None,
     llm_provider: str | None,
     llm_model: str | None,
+    llm_timeout: int | None,
     config_file: str | None,
     skip_embeddings: bool,
     resume: bool,
@@ -137,7 +145,8 @@ def build(
         table_pattern=table_pattern, table_workers=table_workers,
         neo4j_uri=neo4j_uri, neo4j_user=neo4j_user,
         neo4j_password=neo4j_password, llm_provider=llm_provider,
-        llm_model=llm_model, config_file=config_file,
+        llm_model=llm_model, llm_timeout=llm_timeout,
+        config_file=config_file,
         skip_embeddings=skip_embeddings, resume=resume, verbose=verbose,
     )
     try:
@@ -294,6 +303,7 @@ def review(
 @click.option("--databricks-http-path", default=None, help="Databricks HTTP path")
 @click.option("--llm-provider", default=None, help="LLM provider")
 @click.option("--llm-model", default=None, help="LLM model name")
+@click.option("--llm-timeout", default=None, type=int, help="LLM request timeout in seconds (default: 120)")
 @click.option("--embedding-provider", default=None, help="Embedding provider")
 @click.option("--embedding-model", default=None, help="Embedding model name")
 @click.option("--verbose", is_flag=True, default=False, help="Enable verbose output")
@@ -308,6 +318,7 @@ def query(
     databricks_http_path: str | None,
     llm_provider: str | None,
     llm_model: str | None,
+    llm_timeout: int | None,
     embedding_provider: str | None,
     embedding_model: str | None,
     verbose: bool,
@@ -326,11 +337,16 @@ def query(
             password=neo4j_password or query_config.neo4j.password,  # type: ignore[arg-type]
         )
 
-    if llm_provider is not None or llm_model is not None:
-        query_config.llm = LLMConfig(
-            provider=llm_provider or query_config.llm.provider,
-            model=llm_model or query_config.llm.model,
-            api_key=query_config.llm.api_key,
+    llm_overrides: dict[str, Any] = {}
+    if llm_provider is not None:
+        llm_overrides["provider"] = llm_provider
+    if llm_model is not None:
+        llm_overrides["model"] = llm_model
+    if llm_timeout is not None:
+        llm_overrides["request_timeout"] = llm_timeout
+    if llm_overrides:
+        query_config.llm = query_config.llm.model_copy(
+            update=llm_overrides,
         )
 
     if embedding_provider is not None or embedding_model is not None:

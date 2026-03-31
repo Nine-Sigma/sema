@@ -42,6 +42,7 @@ class LLMConfig(BaseSettings):
     api_key: SecretStr = SecretStr("")
     base_url: str | None = None
     use_structured_output: str = "auto"
+    request_timeout: int = 120
 
 
 class EmbeddingConfig(BaseSettings):
