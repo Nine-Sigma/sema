@@ -256,46 +256,9 @@ def _retrieve_context(config: QueryConfig) -> Any:
 
     engine = RetrievalEngine(driver=driver, embedder=embedder)
     candidate_set = engine.retrieve(config.question)
-    sco = prune_to_sco(candidate_set, consumer_hint=config.consumer_hint)
+    sco = prune_to_sco(candidate_set, consumer=config.consumer)
 
     driver.close()
     return sco
 
 
-def _execute_by_mode(
-    config: QueryConfig,
-    result: dict[str, Any],
-    response: dict[str, Any],
-    llm: Any,
-) -> None:
-    from sema.pipeline.execute import DatabricksExecutor
-    from sema.pipeline.synthesize import synthesize_results
-
-    if config.mode.value == "plan":
-        pass  # just return SQL
-
-    elif config.mode.value == "explain":
-        if result.get("valid"):
-            try:
-                executor = DatabricksExecutor(config.databricks)
-                response["explain"] = executor.explain(result["sql"])
-                executor.close()
-            except Exception as e:
-                response["explain_error"] = str(e)
-
-    elif config.mode.value == "execute":
-        if result.get("valid"):
-            try:
-                executor = DatabricksExecutor(config.databricks)
-                exec_result = executor.execute(result["sql"])
-                response["results"] = exec_result["rows"]
-                response["row_count"] = exec_result["row_count"]
-                response["columns"] = exec_result["columns"]
-
-                summary = synthesize_results(
-                    llm, config.question, result["sql"], exec_result,
-                )
-                response["summary"] = summary
-                executor.close()
-            except Exception as e:
-                response["execution_error"] = str(e)

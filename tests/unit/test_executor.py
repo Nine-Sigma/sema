@@ -1,4 +1,4 @@
-"""Unit tests for sema.pipeline.execute.DatabricksExecutor."""
+"""Unit tests for sema.runtimes.databricks.DatabricksRuntime."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 pytestmark = pytest.mark.unit
 
 from sema.models.config import DatabricksConfig
-from sema.pipeline.execute import DatabricksExecutor
+from sema.runtimes.databricks import DatabricksRuntime
 
 
 @pytest.fixture
@@ -30,12 +30,16 @@ def mock_connection():
     return conn, cursor
 
 
-class TestDatabricksExecutor:
+class TestDatabricksRuntime:
+    def test_dialect(self, config):
+        runtime = DatabricksRuntime(config)
+        assert runtime.dialect == "databricks"
+
     @patch("databricks.sql.connect")
     def test_get_connection_strips_https(self, mock_connect, config):
         mock_connect.return_value = MagicMock()
-        executor = DatabricksExecutor(config)
-        executor._get_connection()
+        runtime = DatabricksRuntime(config)
+        runtime._get_connection()
         mock_connect.assert_called_once_with(
             server_hostname="my-workspace.databricks.com",
             http_path="/sql/1.0/endpoints/abc123",
@@ -45,9 +49,9 @@ class TestDatabricksExecutor:
     @patch("databricks.sql.connect")
     def test_connection_cached(self, mock_connect, config):
         mock_connect.return_value = MagicMock()
-        executor = DatabricksExecutor(config)
-        conn1 = executor._get_connection()
-        conn2 = executor._get_connection()
+        runtime = DatabricksRuntime(config)
+        conn1 = runtime._get_connection()
+        conn2 = runtime._get_connection()
         assert conn1 is conn2
         mock_connect.assert_called_once()
 
@@ -61,8 +65,8 @@ class TestDatabricksExecutor:
         conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         mock_connect.return_value = conn
 
-        executor = DatabricksExecutor(config)
-        result = executor.execute("SELECT * FROM users")
+        runtime = DatabricksRuntime(config)
+        result = runtime.execute("SELECT * FROM users")
 
         assert result["columns"] == ["id", "name"]
         assert result["row_count"] == 2
@@ -80,8 +84,8 @@ class TestDatabricksExecutor:
         conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         mock_connect.return_value = conn
 
-        executor = DatabricksExecutor(config)
-        plan = executor.explain("SELECT * FROM users WHERE id > 5")
+        runtime = DatabricksRuntime(config)
+        plan = runtime.explain("SELECT * FROM users WHERE id > 5")
 
         assert "Scan parquet" in plan
         assert "Filter: id > 5" in plan
@@ -92,13 +96,13 @@ class TestDatabricksExecutor:
         mock_conn = MagicMock()
         mock_connect.return_value = mock_conn
 
-        executor = DatabricksExecutor(config)
-        executor._get_connection()
-        executor.close()
+        runtime = DatabricksRuntime(config)
+        runtime._get_connection()
+        runtime.close()
 
         mock_conn.close.assert_called_once()
-        assert executor._connection is None
+        assert runtime._connection is None
 
     def test_close_noop_when_no_connection(self, config):
-        executor = DatabricksExecutor(config)
-        executor.close()  # should not raise
+        runtime = DatabricksRuntime(config)
+        runtime.close()  # should not raise

@@ -15,7 +15,7 @@ def store():
 def sample_sco():
     return SemanticContextObject(
         entities=[], physical_assets=[], join_paths=[],
-        governed_values=[], consumer_hint="nl2sql",
+        governed_values=[], consumer="nl2sql",
     )
 
 
@@ -28,14 +28,14 @@ class TestContextStore:
         store.put("sess-1", "stage 3 patients", "nl2sql", "v1", sample_sco)
         result = store.get("sess-1", "stage 3 patients", "nl2sql", "v1")
         assert result is not None
-        assert result.consumer_hint == "nl2sql"
+        assert result.consumer == "nl2sql"
 
     def test_different_sessions_dont_share(self, store, sample_sco):
         store.put("sess-1", "stage 3 patients", "nl2sql", "v1", sample_sco)
         result = store.get("sess-2", "stage 3 patients", "nl2sql", "v1")
         assert result is None
 
-    def test_different_consumer_hints_dont_share(self, store, sample_sco):
+    def test_different_consumers_dont_share(self, store, sample_sco):
         store.put("sess-1", "stage 3 patients", "nl2sql", "v1", sample_sco)
         result = store.get("sess-1", "stage 3 patients", "discovery", "v1")
         assert result is None

@@ -25,13 +25,13 @@ from sema.pipeline.context_utils import (
 
 def prune_to_sco(
     candidate_set: SemanticCandidateSet,
-    consumer_hint: str = "nl2sql",
+    consumer: str = "nl2sql",
     max_entities: int = 10,
     max_joins: int = 20,
 ) -> SemanticContextObject:
     """Prune candidate set into a task-ready SCO."""
     visible_candidates = _apply_visibility_policy(
-        candidate_set.candidates, consumer_hint
+        candidate_set.candidates, consumer
     )
     visible_set = SemanticCandidateSet(
         query=candidate_set.query, candidates=visible_candidates
@@ -48,5 +48,5 @@ def prune_to_sco(
         join_paths=join_paths,
         governed_values=governed_values,
         ancestry=ancestry,
-        consumer_hint=consumer_hint,
+        consumer=consumer,
     )

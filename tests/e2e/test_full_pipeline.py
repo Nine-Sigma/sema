@@ -13,8 +13,9 @@ from sema.engine.embeddings import EmbeddingEngine, build_embedding_text
 from sema.graph.loader import GraphLoader
 from sema.graph.materializer import materialize_unified
 from sema.pipeline.context import prune_to_sco
-from sema.pipeline.sql_gen import SQLGenerator, build_sql_prompt
-from sema.pipeline.validate import validate_sql_against_sco
+from sema.consumers.nl2sql.consumer import NL2SQLConsumer
+from sema.consumers.nl2sql.prompting import build_sql_prompt
+from sema.consumers.nl2sql.validation import validate_sql_against_sco
 from sema.models.assertions import (
     Assertion, AssertionPredicate, AssertionStatus,
 )
@@ -201,7 +202,7 @@ class TestE2EContext:
                  "code": "Stage III", "label": "Stage III"},
             ],
         )
-        sco = prune_to_sco(candidates, consumer_hint="nl2sql")
+        sco = prune_to_sco(candidates, consumer="nl2sql")
         assert len(sco.entities) == 1
         assert len(sco.physical_assets) >= 1
         assert len(sco.join_paths) == 1
@@ -224,20 +225,26 @@ class TestE2EQuery:
                  ]},
             ],
         )
-        sco = prune_to_sco(candidates, consumer_hint="nl2sql")
+        sco = prune_to_sco(candidates, consumer="nl2sql")
 
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(
             content="SELECT patient_id, tnm_stage FROM cdm.clinical.cancer_diagnosis WHERE tnm_stage = 'Stage III'"
         )
-        gen = SQLGenerator(llm=mock_llm)
-        result = gen.generate(sco, "stage 3 patients")
+        from sema.consumers.base import ConsumerDeps, ConsumerRequest
 
-        assert result["valid"]
-        assert "cancer_diagnosis" in result["sql"]
-        assert "tnm_stage" in result["sql"]
+        consumer = NL2SQLConsumer()
+        deps = ConsumerDeps(llm=mock_llm)
+        req = ConsumerRequest(
+            question="stage 3 patients", operation="plan",
+        )
+        plan = consumer.plan(req, sco, deps)
 
-        errors = validate_sql_against_sco(result["sql"], sco)
+        assert plan.valid
+        assert "cancer_diagnosis" in plan.sql
+        assert "tnm_stage" in plan.sql
+
+        errors = validate_sql_against_sco(plan.sql, sco)
         assert len(errors) == 0
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Provenance(BaseModel):
@@ -97,5 +97,12 @@ class SemanticContextObject(BaseModel):
     join_paths: list[JoinPath] = Field(default_factory=list)
     governed_values: list[GovernedValue] = Field(default_factory=list)
     ancestry: list[AncestryTerm] = Field(default_factory=list)
-    consumer_hint: str = "nl2sql"
+    consumer: str = "nl2sql"
     retrieval_rationale: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_consumer_hint(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "consumer_hint" in data:
+            data.setdefault("consumer", data.pop("consumer_hint"))
+        return data

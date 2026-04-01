@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 pytestmark = pytest.mark.unit
 
-from sema.pipeline.synthesize import synthesize_results
+from sema.consumers.nl2sql.synthesize import synthesize_results
 
 
 class TestResultSynthesis:
@@ -14,10 +14,10 @@ class TestResultSynthesis:
             content="Found 5 Stage III colorectal patients diagnosed in 2024."
         )
         result = synthesize_results(
-            mock_llm,
             "stage 3 colorectal patients",
             "SELECT * FROM cancer_diagnosis WHERE stage = 'Stage III'",
             {"rows": [{"patient_id": "P1", "stage": "Stage III"}], "row_count": 1},
+            mock_llm,
         )
         assert "Stage III" in result or "colorectal" in result
 
@@ -27,10 +27,10 @@ class TestResultSynthesis:
             content="No matching records were found for the query."
         )
         result = synthesize_results(
-            mock_llm,
             "rare cancer type",
             "SELECT * FROM cancer_diagnosis WHERE dx = 'RARE'",
             {"rows": [], "row_count": 0},
+            mock_llm,
         )
         assert "no" in result.lower() or "No" in result
 
@@ -38,9 +38,9 @@ class TestResultSynthesis:
         mock_llm = MagicMock()
         mock_llm.invoke.side_effect = Exception("LLM timeout")
         result = synthesize_results(
-            mock_llm,
             "test",
             "SELECT 1",
             {"rows": [{"a": 1}], "row_count": 1},
+            mock_llm,
         )
         assert "1 rows" in result
