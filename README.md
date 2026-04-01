@@ -17,7 +17,7 @@
 Sema automatically extracts semantic ontology from any data warehouse, builds a knowledge graph, and serves it as a structured context layer for downstream consumers — NL2SQL engines, AI agents, data catalogs, lineage tools, and more.
 
 ```
-Warehouse Metadata → LLM Interpretation → Knowledge Graph → Semantic Search (GraphRAG) → Consumer
+Warehouse Metadata → LLM Interpretation → Knowledge Graph → Hybrid Search (GraphRAG) → Consumer
                            ↑
                    External Enrichment
                    (Atlan, etc.) [optional]
@@ -43,10 +43,16 @@ Databricks Catalog
 **Retrieve** (per question):
 
 ```
-Natural language question → Embed → Vector search → Graph expansion → Prune → SCO
+Natural language question
+    → Hybrid search (vector + lexical)
+    → Normalize + dedup seed hits
+    → Type-aware graph expansion
+    → Dedup expanded artifacts
+    → Visibility policy pruning
+    → SCO
 ```
 
-The SCO contains entities, physical assets, join paths, governed values, and metrics — everything a consumer needs to understand the data.
+The SCO contains entities, physical assets, join paths, governed values, metrics, ancestry, and semantic type annotations — everything a consumer needs to understand the data.
 
 ---
 
@@ -60,7 +66,7 @@ Sema builds a multi-layer knowledge graph in Neo4j. Every node has a stable `id`
 |-------|-------|---------|
 | **Physical** | `DataSource`, `Catalog`, `Schema`, `Table`, `Column` | Mirrors your warehouse structure. Each carries a platform-scoped `ref` (e.g. `databricks://workspace/catalog/schema/table`) |
 | **Semantic** | `Entity`, `Property`, `Alias`, `Metric` | LLM-inferred business concepts. Entities map to tables via `ENTITY_ON_TABLE`, properties map to columns via `PROPERTY_ON_COLUMN`. Aliases replace synonyms with `is_preferred` and `description` fields |
-| **Vocabulary** | `ValueSet`, `Term` | Coded value sets, term hierarchies (ICD-10, AJCC, etc.), and aliases for search expansion |
+| **Vocabulary** | `Vocabulary`, `ValueSet`, `Term` | Named vocabularies, coded value sets, term hierarchies (ICD-10, AJCC, etc.), and aliases for search expansion |
 | **Joins** | `JoinPath` | First-class join artifacts with ordered `join_predicates`, `hop_count`, `cardinality_hint`, and optional `sql_snippet`. Linked to tables via `USES` and to entities via `FROM_ENTITY`/`TO_ENTITY` |
 | **Provenance** | `Assertion` | Every fact is backed by an assertion with `source`, `confidence`, and `status` (`auto`, `accepted`, `rejected`, `pinned`, `superseded`). Selective `SUBJECT`/`OBJECT` edges link assertions to their resolved nodes |
 
@@ -76,11 +82,15 @@ Sema builds a multi-layer knowledge graph in Neo4j. Every node has a stable `id`
 | `PROPERTY_ON_COLUMN` | Property | Column | Property is implemented by column |
 | `HAS_PROPERTY` | Entity | Property | Entity has semantic property |
 | `REFERS_TO` | Alias | Entity/Property/Term | Alias refers to canonical node |
-| `STORED_IN` | ValueSet | Column | Value set lives in column |
+| `HAS_VALUE_SET` | Column | ValueSet | Column has a set of permissible values |
 | `MEMBER_OF` | Term | ValueSet | Term belongs to value set |
 | `PARENT_OF` | Term | Term | Hierarchical term relationship |
+| `CLASSIFIED_AS` | Property | Vocabulary | Property classified under vocabulary |
+| `IN_VOCABULARY` | Term | Vocabulary | Term belongs to vocabulary |
 | `MEASURES` | Metric | Entity | Metric measures entity |
 | `AGGREGATES` | Metric | Property | Metric aggregates property |
+| `FILTERS_BY` | Metric | Property/Term | Metric filters by property or term |
+| `AT_GRAIN` | Metric | Property/Term | Metric operates at this grain |
 | `FROM_ENTITY` | JoinPath | Entity | Join starts from entity |
 | `TO_ENTITY` | JoinPath | Entity | Join ends at entity |
 | `USES` | JoinPath | Table/Column | Join uses physical asset |
@@ -98,15 +108,17 @@ All extracted and inferred facts are stored as first-class `Assertion` records b
 
 ### SCO Visibility Policy
 
-The Semantic Context Object filters nodes by assertion status before serving them to consumers:
+The Semantic Context Object filters candidates by assertion status and confidence policy before serving them to consumers:
 
 | Status | Included in SCO |
 |--------|----------------|
 | `pinned` | Always |
 | `accepted` | Always |
-| `auto` | If confidence >= threshold (structural: 0.5, semantic: 0.7) |
+| `auto` | If confidence >= threshold |
 | `rejected` | Never |
 | `superseded` | Never |
+
+Confidence thresholds are determined by `confidence_policy` on each candidate: `structural` uses 0.5, `semantic` uses 0.7. When `confidence_policy` is absent, the threshold is inferred from the `source` field for backward compatibility.
 
 ---
 
@@ -238,27 +250,28 @@ uv run sema context --question "How many patients have stage III breast cancer?"
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--question` | Natural language question | required |
-| `--consumer-hint` | Pruning strategy: `nl2sql`, `catalog`, `lineage` | `nl2sql` |
+| `--consumer` | Consumer type for pruning: `nl2sql`, `discovery` | `nl2sql` |
 
 ### `sema query`
 
-Generate and optionally execute SQL from natural language.
+Generate and optionally execute SQL from natural language. Uses the NL2SQL consumer with plan/explain/execute operations.
 
 ```bash
 # Plan — generate SQL without executing
-uv run sema query --question "Average age of patients by cancer type" --mode plan
+uv run sema query --question "Average age of patients by cancer type" --operation plan
 
 # Explain — generate SQL and show the execution plan
-uv run sema query --question "Average age of patients by cancer type" --mode explain
+uv run sema query --question "Average age of patients by cancer type" --operation explain
 
 # Execute — generate and run SQL against Databricks
-uv run sema query --question "Average age of patients by cancer type" --mode execute
+uv run sema query --question "Average age of patients by cancer type" --operation execute
 ```
 
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--question` | Natural language question | required |
-| `--mode` | `plan`, `explain`, or `execute` | `plan` |
+| `--operation` | `plan`, `explain`, or `execute` | `plan` |
+| `--consumer` | Consumer type | `nl2sql` |
 | `--llm-provider` | LLM provider | `openrouter` |
 | `--llm-model` | LLM model name | `anthropic/claude-sonnet-4` |
 | `--llm-timeout` | LLM request timeout in seconds | `120` |
@@ -282,6 +295,46 @@ uv run sema review --threshold 0.7 --output review.json
 |------|-------------|---------|
 | `--threshold` | Confidence threshold — assertions below this are exported | `0.85` |
 | `--output` | Output file path | stdout |
+
+---
+
+## Consumer Architecture
+
+Sema uses a pluggable consumer protocol. Consumers receive a pruned SCO and produce task-specific outputs.
+
+### NL2SQL Consumer
+
+The built-in NL2SQL consumer generates constrained SQL from natural language questions:
+
+- **Plan** — generates SQL with closed-world validation against the SCO
+- **Explain** — generates SQL and shows the Databricks execution plan
+- **Execute** — generates, validates, executes SQL, and synthesizes results
+
+The consumer receives the SQL dialect explicitly and the prompt includes:
+- Entity context (name + description)
+- Table/column listing with semantic type annotations (e.g., `tnm_stage (categorical)`)
+- Join paths with predicates
+- Governed filter values (exact values for WHERE clauses)
+- Metric definitions (name, formula, aggregates, filters, grains)
+- Term hierarchy context
+- Dialect-specific guidance (Databricks SQL rules, ANSI fallback)
+
+Prompt truncation follows a strict deterministic cut order when the budget is exceeded.
+
+### Writing a Custom Consumer
+
+Implement the `Consumer` protocol in `src/sema/consumers/base.py`:
+
+```python
+class MyConsumer:
+    name: str = "my_consumer"
+    capabilities: set[str] = {"analyze"}
+
+    def context_profile(self) -> ContextProfile: ...
+    def run(self, request, sco, deps) -> ConsumerResult: ...
+```
+
+Register it in `src/sema/consumers/__init__.py` and it becomes available via `--consumer my_consumer`.
 
 ---
 
