@@ -1,24 +1,26 @@
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from sema.graph.queries import CypherQueries
+from sema.log import logger
 from sema.models.constants import MATCH_TYPE_BOOST
 from sema.models.context import SemanticCandidateSet
 from sema.pipeline.retrieval_utils import (
+    _dedup_artifacts,
+    _dedup_seeds,
     _expand_ancestry,
+    _expand_alias_hit,
     _expand_joins,
     _expand_metrics,
     _expand_physical,
-    _expand_values,
-    merge_and_rank_candidates,
     _expand_property_hit,
     _expand_term_hit,
-    _expand_alias_hit,
+    _expand_values,
+    _normalize_vector_hit,
+    merge_and_rank_candidates,
+    tokenize_query,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class RetrievalEngine:
@@ -106,6 +108,49 @@ class RetrievalEngine:
                 return node_type
         return "unknown"
 
+    def _lexical_search(
+        self, question: str,
+    ) -> list[dict[str, Any]]:
+        """Keyword search across all node types."""
+        tokens = tokenize_query(question)
+        if not tokens:
+            return []
+
+        search_methods = [
+            ("entity", CypherQueries.lexical_search_entities),
+            ("property", CypherQueries.lexical_search_properties),
+            ("term", CypherQueries.lexical_search_terms),
+            ("alias", CypherQueries.lexical_search_aliases),
+            ("metric", CypherQueries.lexical_search_metrics),
+        ]
+        hits: list[dict[str, Any]] = []
+        for token in tokens:
+            for node_type, query_fn in search_methods:
+                try:
+                    results = self._run_query(
+                        query_fn(), token=token,
+                    )
+                    for r in results:
+                        node = r.get("node", {})
+                        hits.append({
+                            **node,
+                            "node_type": node_type,
+                            "match_type": "lexical_exact",
+                            "score": 1.0,
+                            "confidence": node.get(
+                                "confidence", 0.5
+                            ),
+                            "status": node.get(
+                                "status", "auto"
+                            ),
+                        })
+                except Exception as e:
+                    logger.debug(
+                        "Lexical search {} for '{}': {}",
+                        node_type, token, e,
+                    )
+        return hits
+
     def _expand_entity_hits(
         self,
         entity_names: list[str],
@@ -127,10 +172,17 @@ class RetrievalEngine:
                 "confidence": 0.8,
                 "source": "retrieval",
                 "columns": r.get("columns", []),
+                "status": "auto",
+                "confidence_policy": "semantic",
             })
 
         for j in expansion.get("joins", []):
-            candidates.append({"type": "join", **j})
+            candidates.append({
+                "type": "join",
+                **j,
+                "status": j.get("status", "auto"),
+                "confidence_policy": "structural",
+            })
 
         for v in expansion.get("values", []):
             candidates.append({
@@ -140,6 +192,9 @@ class RetrievalEngine:
                 "table": v.get("table", ""),
                 "code": v.get("code", ""),
                 "label": v.get("label", ""),
+                "status": "auto",
+                "confidence": 0.5,
+                "confidence_policy": "semantic",
             })
 
         for m in expansion.get("metrics", []):
@@ -172,18 +227,26 @@ class RetrievalEngine:
     def retrieve(
         self, question: str, top_k: int = 10
     ) -> SemanticCandidateSet:
-        """Full hybrid retrieval pipeline — type-aware, not entity-gated."""
+        """Full hybrid retrieval pipeline — type-aware."""
+        # Phase 1: Search seeds (vector + lexical)
         vector_candidates = self.vector_search(question, top_k)
-        ranked = merge_and_rank_candidates(vector_candidates)
-
-        all_candidates: list[dict[str, Any]] = []
-        entity_names: list[str] = []
-
-        for c in ranked:
+        for c in vector_candidates:
             c["node_type"] = self._index_to_node_type(
                 c.get("index", "")
             )
-            if c["node_type"] == "entity" and c.get("name"):
+        lexical_candidates = self._lexical_search(question)
+
+        # Phase 2: Normalize, merge, rank, and dedup seeds
+        all_seeds = vector_candidates + lexical_candidates
+        ranked = merge_and_rank_candidates(all_seeds)
+        deduped_seeds = _dedup_seeds(ranked)
+
+        # Phase 3: Type-aware expansion
+        all_candidates: list[dict[str, Any]] = []
+        entity_names: list[str] = []
+
+        for c in deduped_seeds:
+            if c.get("node_type") == "entity" and c.get("name"):
                 entity_names.append(c["name"])
             else:
                 all_candidates.extend(
@@ -194,6 +257,9 @@ class RetrievalEngine:
             all_candidates.extend(
                 self._expand_entity_hits(entity_names)
             )
+
+        # Phase 4: Artifact deduplication
+        all_candidates = _dedup_artifacts(all_candidates)
 
         return SemanticCandidateSet(
             query=question,

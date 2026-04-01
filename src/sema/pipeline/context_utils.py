@@ -17,6 +17,7 @@ from sema.models.context import (
     PhysicalAsset,
     Provenance,
     ResolvedEntity,
+    ResolvedMetric,
     ResolvedProperty,
     SemanticCandidateSet,
 )
@@ -51,6 +52,7 @@ def _build_entities_and_assets(
                 semantic_type=col.get("semantic_type") or "free_text",
                 physical_column=col_name,
                 physical_table=f"{ec.get('catalog', '')}.{ec.get('schema', '')}.{ec.get('table', '')}",
+                vocabulary=col.get("vocabulary"),
                 provenance=Provenance(
                     source=ec.get("source", "retrieval"),
                     confidence=ec.get("confidence", 0.5),
@@ -139,14 +141,26 @@ _SEMANTIC_CONFIDENCE_THRESHOLD = 0.7
 
 
 def _passes_confidence_threshold(candidate: dict[str, Any]) -> bool:
-    """Return True if an 'auto' candidate meets its source threshold."""
+    """Return True if an 'auto' candidate meets its source threshold.
+
+    Uses confidence_policy when present, falls back to source-string
+    inference when absent.
+    """
     confidence = candidate.get("confidence", 0.0)
-    source = candidate.get("source", "")
-    threshold = (
-        _STRUCTURAL_CONFIDENCE_THRESHOLD
-        if source == "structural"
-        else _SEMANTIC_CONFIDENCE_THRESHOLD
-    )
+    policy = candidate.get("confidence_policy")
+    if policy is not None:
+        threshold = (
+            _STRUCTURAL_CONFIDENCE_THRESHOLD
+            if policy == "structural"
+            else _SEMANTIC_CONFIDENCE_THRESHOLD
+        )
+    else:
+        source = candidate.get("source", "")
+        threshold = (
+            _STRUCTURAL_CONFIDENCE_THRESHOLD
+            if source == "structural"
+            else _SEMANTIC_CONFIDENCE_THRESHOLD
+        )
     return bool(confidence >= threshold)
 
 
@@ -187,6 +201,31 @@ def _build_ancestry(
             parent_code=c.get("parent_code"),
         )
         for c in ancestry_candidates
+    ]
+
+
+def _build_metrics(
+    candidate_set: SemanticCandidateSet,
+) -> list[ResolvedMetric]:
+    """Build ResolvedMetric list from metric candidates."""
+    metric_candidates = [
+        c for c in candidate_set.candidates
+        if c.get("type") == "metric"
+    ]
+    return [
+        ResolvedMetric(
+            name=mc.get("name", ""),
+            description=mc.get("description"),
+            formula=mc.get("formula"),
+            aggregates=mc.get("aggregates", []),
+            filters=mc.get("filters", []),
+            grains=mc.get("grains", []),
+            provenance=Provenance(
+                source=mc.get("source", "retrieval"),
+                confidence=mc.get("confidence", 0.5),
+            ),
+        )
+        for mc in metric_candidates
     ]
 
 

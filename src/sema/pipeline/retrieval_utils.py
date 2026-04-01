@@ -8,36 +8,25 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from sema.graph.queries import CypherQueries
-from sema.models.constants import MATCH_TYPE_BOOST
+from sema.log import logger
+from sema.pipeline.dedup_utils import (
+    dedup_artifacts as _dedup_artifacts,
+    dedup_seeds as _dedup_seeds,
+    merge_and_rank_candidates,
+    normalize_vector_hit as _normalize_vector_hit,
+    tokenize_query,
+)
 
 if TYPE_CHECKING:
     from sema.pipeline.retrieval import RetrievalEngine
 
-
-def merge_and_rank_candidates(
-    candidates: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    """Rank candidates using multi-signal scoring.
-
-    Excludes DEPRECATED nodes from results.
-    """
-    active = [
-        c for c in candidates
-        if c.get("status", "ACTIVE") != "DEPRECATED"
-    ]
-    for c in active:
-        base_score = c.get("score", 0.5)
-        confidence = c.get("confidence", 0.5)
-        match_boost = MATCH_TYPE_BOOST.get(
-            c.get("match_type", "vector"), 0.0
-        )
-        c["final_score"] = (
-            base_score * 0.4
-            + confidence * 0.3
-            + match_boost
-            + 0.3
-        )
-    return sorted(active, key=lambda c: c["final_score"], reverse=True)
+__all__ = [
+    "_dedup_artifacts",
+    "_dedup_seeds",
+    "_normalize_vector_hit",
+    "merge_and_rank_candidates",
+    "tokenize_query",
+]
 
 
 def _expand_physical(
@@ -73,26 +62,30 @@ def _expand_joins(
 def _expand_values(
     engine: RetrievalEngine, physical: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
+    """Expand governed values via HAS_VALUE_SET graph edges."""
     values: list[dict[str, Any]] = []
     for r in physical:
         for col in r.get("columns", []):
-            if col.get("semantic_type") == "categorical":
-                try:
-                    vs_name = (
-                        f"{r['table_name']}_{col['column']}_values"
-                    )
-                    vs_results = engine._run_query(
-                        CypherQueries.expand_value_set(),
-                        value_set_name=vs_name,
-                    )
-                    values.extend([
-                        {**v, "property": col["property"],
-                         "column": col["column"],
-                         "table": r["table_name"]}
-                        for v in vs_results
-                    ])
-                except Exception:
-                    pass
+            if col.get("semantic_type") != "categorical":
+                continue
+            col_name = col.get("column", "")
+            table_name = r.get("table_name", "")
+            if not col_name or not table_name:
+                continue
+            try:
+                vs_results = engine._run_query(
+                    CypherQueries.find_value_set_members_by_column(),
+                    column_name=col_name,
+                    table_name=table_name,
+                )
+                values.extend([
+                    {**v, "property": col["property"],
+                     "column": col_name,
+                     "table": table_name}
+                    for v in vs_results
+                ])
+            except Exception:
+                pass
     return values
 
 
@@ -102,11 +95,23 @@ def _expand_metrics(
     metrics: list[dict[str, Any]] = []
     for name in entity_names:
         try:
-            m = engine._run_query(
+            results = engine._run_query(
                 CypherQueries.expand_metrics(),
                 entity_name=name,
             )
-            metrics.extend(m)
+            for m in results:
+                metrics.append({
+                    "name": m.get("name", ""),
+                    "description": m.get("description"),
+                    "formula": m.get("formula"),
+                    "confidence": m.get("confidence", 0.5),
+                    "aggregates": m.get("aggregates", []),
+                    "filters": m.get("filters", []),
+                    "grains": m.get("grains", []),
+                    "source": "retrieval",
+                    "status": "auto",
+                    "confidence_policy": "semantic",
+                })
         except Exception:
             pass
     return metrics
@@ -141,7 +146,7 @@ def _expand_property_hit(
     """Expand a Property vector hit using graph edges.
 
     Traverses: owning Entity (HAS_PROPERTY), physical Column
-    (PROPERTY_ON_COLUMN), governed ValueSet (STORED_IN),
+    (PROPERTY_ON_COLUMN), governed ValueSet (HAS_VALUE_SET),
     Vocabulary (CLASSIFIED_AS).
     """
     results: list[dict[str, Any]] = []
@@ -150,21 +155,25 @@ def _expand_property_hit(
     datasource_id = hit.get("datasource_id", "")
     column_key = hit.get("column_key", "")
 
+    hit_confidence = hit.get("confidence", 0.5)
+    hit_status = hit.get("status", "auto")
+
     prop_candidate: dict[str, Any] = {
         "type": "property",
         "name": name,
         "entity_name": entity_name,
         "score": hit.get("final_score", 0.0),
         "source": "retrieval",
+        "status": hit_status,
+        "confidence": hit_confidence,
+        "confidence_policy": "semantic",
     }
 
     # Try to get vocabulary classification via CLASSIFIED_AS
     if datasource_id and column_key:
         try:
             vocab_results = engine._run_query(
-                "MATCH (p:Property {datasource_id: $ds, column_key: $ck})"
-                "-[:CLASSIFIED_AS]->(v:Vocabulary) "
-                "RETURN v.name AS vocabulary_name",
+                CypherQueries.find_property_vocabulary(),
                 ds=datasource_id, ck=column_key,
             )
             if vocab_results:
@@ -190,6 +199,8 @@ def _expand_property_hit(
                 "confidence": 0.6,
                 "source": "retrieval_property_expansion",
                 "columns": r.get("columns", []),
+                "status": hit_status,
+                "confidence_policy": "semantic",
             })
 
     return results
@@ -207,6 +218,8 @@ def _expand_term_hit(
     code = hit.get("code", hit.get("name", ""))
     label = hit.get("label", "")
     vocabulary_name = hit.get("vocabulary_name", "")
+    hit_confidence = hit.get("confidence", 0.5)
+    hit_status = hit.get("status", "auto")
 
     term_candidate: dict[str, Any] = {
         "type": "term",
@@ -214,6 +227,9 @@ def _expand_term_hit(
         "label": label,
         "score": hit.get("final_score", 0.0),
         "source": "retrieval",
+        "status": hit_status,
+        "confidence": hit_confidence,
+        "confidence_policy": "semantic",
     }
 
     # Try to get vocabulary via IN_VOCABULARY
@@ -222,9 +238,7 @@ def _expand_term_hit(
     elif code:
         try:
             vocab_results = engine._run_query(
-                "MATCH (t:Term {code: $code})"
-                "-[:IN_VOCABULARY]->(v:Vocabulary) "
-                "RETURN v.name AS vocabulary_name LIMIT 1",
+                CypherQueries.find_vocabulary_for_term(),
                 code=code,
             )
             if vocab_results:
@@ -236,10 +250,20 @@ def _expand_term_hit(
 
     results.append(term_candidate)
 
+    # Term→MEMBER_OF→ValueSet←HAS_VALUE_SET←Column
+    if code:
+        results.extend(
+            _expand_term_governed_values(
+                engine, code, hit_status, hit_confidence,
+            )
+        )
+
     # Expand ancestry from term code (vocabulary-scoped)
     vocab = term_candidate.get("vocabulary")
     if code:
-        ancestry = _expand_ancestry(engine, [code], vocabulary_name=vocab)
+        ancestry = _expand_ancestry(
+            engine, [code], vocabulary_name=vocab,
+        )
         for a in ancestry:
             results.append({
                 "type": "ancestry",
@@ -248,9 +272,48 @@ def _expand_term_hit(
                 "vocabulary": a.get("vocabulary_name", vocab),
                 "parent_code": a.get("parent_code", code),
                 "source": "retrieval_ancestry",
+                "status": hit_status,
+                "confidence": hit_confidence,
+                "confidence_policy": "semantic",
             })
 
     return results
+
+
+def _expand_term_governed_values(
+    engine: RetrievalEngine,
+    code: str,
+    status: str,
+    confidence: float,
+) -> list[dict[str, Any]]:
+    """Traverse Term→MEMBER_OF→ValueSet←HAS_VALUE_SET←Column."""
+    try:
+        vs_results = engine._run_query(
+            CypherQueries.find_value_sets_for_term(),
+            code=code,
+        )
+    except Exception:
+        return []
+
+    values: list[dict[str, Any]] = []
+    for vs in vs_results:
+        col = vs.get("column_name", "")
+        table = vs.get("table_name", "")
+        if not col or not table:
+            continue
+        values.append({
+            "type": "value",
+            "property_name": col,
+            "column": col,
+            "table": table,
+            "code": code,
+            "label": code,
+            "source": "retrieval_term_expansion",
+            "status": status,
+            "confidence": confidence,
+            "confidence_policy": "semantic",
+        })
+    return values
 
 
 def _expand_alias_hit(
@@ -258,11 +321,13 @@ def _expand_alias_hit(
 ) -> list[dict[str, Any]]:
     """Expand an Alias vector hit by dereferencing REFERS_TO target.
 
-    Delegates to the target node type's expansion.
+    Dispatches by target label (Entity/Property/Term).
     """
     results: list[dict[str, Any]] = []
     text = hit.get("text", hit.get("name", ""))
     target_name = hit.get("parent_name", hit.get("target_name", ""))
+    hit_confidence = hit.get("confidence", 0.5)
+    hit_status = hit.get("status", "auto")
 
     results.append({
         "type": "alias",
@@ -270,22 +335,86 @@ def _expand_alias_hit(
         "target": target_name,
         "score": hit.get("final_score", 0.0),
         "source": "retrieval",
+        "status": hit_status,
+        "confidence": hit_confidence,
+        "confidence_policy": "semantic",
     })
 
-    # Try to expand target as entity
-    if target_name:
-        physical = _expand_physical(engine, [target_name])
-        for r in physical:
+    if not text:
+        return results
+
+    # Dereference alias to get target labels
+    target_labels: list[str] = []
+    resolved_name = target_name
+    try:
+        deref = engine._run_query(
+            CypherQueries.dereference_alias(), text=text,
+        )
+        if deref:
+            target_labels = deref[0].get("target_labels", [])
+            resolved_name = (
+                deref[0].get("target_name") or target_name
+            )
+    except Exception:
+        pass
+
+    if not resolved_name:
+        return results
+
+    # Dispatch by target type
+    if "Entity" in target_labels:
+        for r in _expand_physical(engine, [resolved_name]):
             results.append({
                 "type": "entity",
-                "name": target_name,
+                "name": resolved_name,
                 "table": r.get("table_name", ""),
                 "schema": r.get("schema_name", ""),
                 "catalog": r.get("catalog", ""),
                 "description": None,
-                "confidence": 0.5,
+                "confidence": hit_confidence,
                 "source": "retrieval_alias_expansion",
                 "columns": r.get("columns", []),
+                "status": hit_status,
+                "confidence_policy": "semantic",
+            })
+    elif "Property" in target_labels:
+        prop_hit = {
+            "name": resolved_name,
+            "entity_name": "",
+            "final_score": hit.get("final_score", 0.0),
+            "status": hit_status,
+            "confidence": hit_confidence,
+        }
+        results.extend(_expand_property_hit(engine, prop_hit))
+    elif "Term" in target_labels:
+        term_hit = {
+            "code": resolved_name,
+            "label": resolved_name,
+            "final_score": hit.get("final_score", 0.0),
+            "status": hit_status,
+            "confidence": hit_confidence,
+        }
+        results.extend(_expand_term_hit(engine, term_hit))
+    elif target_labels:
+        logger.debug(
+            "Alias '{}' refers to unknown type: {}",
+            text, target_labels,
+        )
+    else:
+        # Fallback: try entity expansion (legacy behavior)
+        for r in _expand_physical(engine, [resolved_name]):
+            results.append({
+                "type": "entity",
+                "name": resolved_name,
+                "table": r.get("table_name", ""),
+                "schema": r.get("schema_name", ""),
+                "catalog": r.get("catalog", ""),
+                "description": None,
+                "confidence": hit_confidence,
+                "source": "retrieval_alias_expansion",
+                "columns": r.get("columns", []),
+                "status": hit_status,
+                "confidence_policy": "semantic",
             })
 
     return results

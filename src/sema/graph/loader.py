@@ -241,7 +241,7 @@ class GraphLoader:
             "MERGE (c:Column {name: $column_name, "
             "table_name: $table_name, "
             "schema_name: $schema_name, catalog: $catalog}) "
-            "MERGE (vs)-[:STORED_IN]->(c)",
+            "MERGE (c)-[:HAS_VALUE_SET]->(vs)",
             name=name, column_name=column_name,
             table_name=table_name, schema_name=schema_name,
             catalog=catalog, id=id_,

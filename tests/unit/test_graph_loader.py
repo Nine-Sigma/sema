@@ -168,7 +168,7 @@ class TestUpsertSemanticNodes:
         cypher = session.run.call_args[0][0]
         assert "MERGE" in cypher
         assert ":ValueSet" in cypher
-        assert "STORED_IN" in cypher
+        assert "HAS_VALUE_SET" in cypher
         assert "ON CREATE SET" in cypher
 
 

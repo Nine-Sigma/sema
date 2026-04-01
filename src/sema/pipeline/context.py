@@ -19,6 +19,7 @@ from sema.pipeline.context_utils import (
     _build_entities_and_assets,
     _build_governed_values,
     _build_join_paths,
+    _build_metrics,
     _filter_entity_candidates,
 )
 
@@ -41,9 +42,11 @@ def prune_to_sco(
     join_paths = _build_join_paths(visible_set, max_joins)
     governed_values = _build_governed_values(visible_set)
     ancestry = _build_ancestry(visible_set)
+    metrics = _build_metrics(visible_set)
 
     return SemanticContextObject(
         entities=entities,
+        metrics=metrics,
         physical_assets=physical_assets,
         join_paths=join_paths,
         governed_values=governed_values,

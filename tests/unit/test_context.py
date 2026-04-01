@@ -8,6 +8,7 @@ from sema.models.context import (
     SemanticCandidateSet,
     SemanticContextObject,
     ResolvedEntity,
+    ResolvedMetric,
     ResolvedProperty,
     PhysicalAsset,
     JoinPath,
@@ -125,6 +126,32 @@ class TestSemanticCandidateSet:
     def test_candidate_set_empty(self):
         cs = SemanticCandidateSet(query="unknown question", candidates=[])
         assert len(cs.candidates) == 0
+
+
+class TestResolvedMetric:
+    def test_metric_with_new_fields(self):
+        metric = ResolvedMetric(
+            name="Average Length of Stay",
+            description="Mean days per admission",
+            formula="AVG(discharge_date - admit_date)",
+            aggregates=["Length of Stay"],
+            filters=["Admission Type"],
+            grains=["Department"],
+            provenance=Provenance(source="llm", confidence=0.8),
+        )
+        assert metric.name == "Average Length of Stay"
+        assert metric.aggregates == ["Length of Stay"]
+        assert metric.filters == ["Admission Type"]
+        assert metric.grains == ["Department"]
+
+    def test_metric_defaults_empty_lists(self):
+        metric = ResolvedMetric(
+            name="Count",
+            provenance=Provenance(source="llm", confidence=0.7),
+        )
+        assert metric.aggregates == []
+        assert metric.filters == []
+        assert metric.grains == []
 
 
 class TestGovernedValue:

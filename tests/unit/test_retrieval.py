@@ -59,29 +59,18 @@ class TestHybridRetrieval:
             }
             return r
 
-        # 5 vector searches (one per index) + expansion queries
-        session.run.side_effect = [
-            # entity_embedding_index vector search
-            [make_vector_result("Cancer Diagnosis", 0.9)],
-            # property_embedding_index
-            [],
-            # term_embedding_index
-            [],
-            # alias_embedding_index
-            [],
-            # metric_embedding_index
-            [],
-            # physical mapping for "Cancer Diagnosis"
-            [make_physical_result()],
-            # join paths
-            [],
-            # value set expansion
-            [],
-            # metrics
-            [],
-            # ancestry
-            [],
-        ]
+        def run_side_effect(query, **params):
+            if "db.index.vector.queryNodes" in query:
+                if "entity" in query:
+                    return [make_vector_result("Cancer Diagnosis", 0.9)]
+                return []
+            if "ENTITY_ON_TABLE" in query:
+                return [make_physical_result()]
+            if "CONTAINS" in query:
+                return []  # lexical search — no results
+            return []
+
+        session.run.side_effect = run_side_effect
         engine = RetrievalEngine(driver=driver, embedder=mock_embedder)
         candidate_set = engine.retrieve("stage 3 colorectal", top_k=5)
         assert isinstance(candidate_set, SemanticCandidateSet)
@@ -221,13 +210,14 @@ class TestRetrieveNonEntityHits:
             }
             return r
 
-        session.run.side_effect = [
-            [],  # entity index
-            [make_result("diagnosis_code", 0.85)],  # property index
-            [],  # term index
-            [],  # alias index
-            [],  # metric index
-        ]
+        def run_side_effect(query, **params):
+            if "db.index.vector.queryNodes" in query:
+                if "property" in query:
+                    return [make_result("diagnosis_code", 0.85)]
+                return []
+            return []
+
+        session.run.side_effect = run_side_effect
         engine = RetrievalEngine(driver=driver, embedder=mock_embedder)
         result = engine.retrieve("diagnosis codes", top_k=5)
         assert isinstance(result, SemanticCandidateSet)

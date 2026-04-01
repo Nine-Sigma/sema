@@ -147,7 +147,7 @@ def batch_upsert_value_sets(
         "MERGE (c:Column {name: r.column_name, "
         "table_name: r.table_name, "
         "schema_name: r.schema_name, catalog: r.catalog}) "
-        "MERGE (vs)-[:STORED_IN]->(c)",
+        "MERGE (c)-[:HAS_VALUE_SET]->(vs)",
         rows=rows,
     )
 

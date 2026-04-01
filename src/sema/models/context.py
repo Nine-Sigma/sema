@@ -67,6 +67,9 @@ class ResolvedMetric(BaseModel):
     name: str
     description: str | None = None
     formula: str | None = None
+    aggregates: list[str] = Field(default_factory=list)
+    filters: list[str] = Field(default_factory=list)
+    grains: list[str] = Field(default_factory=list)
     provenance: Provenance
 
 
