@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from enum import Enum
 from typing import Any
 
 import yaml
@@ -76,12 +75,6 @@ class ProfilingConfig(BaseSettings):
     skip_numeric_profiling: bool = False
 
 
-class QueryMode(str, Enum):
-    PLAN = "plan"
-    EXPLAIN = "explain"
-    EXECUTE = "execute"
-
-
 class BuildConfig(BaseSettings):
     source: str = "databricks"
     catalog: str = ""
@@ -117,8 +110,8 @@ class BuildConfig(BaseSettings):
 
 class QueryConfig(BaseSettings):
     question: str
-    mode: QueryMode = QueryMode.PLAN
-    consumer_hint: str = "nl2sql"
+    consumer: str = "nl2sql"
+    operation: str = "plan"
     verbose: bool = False
     session_id: str | None = None
 

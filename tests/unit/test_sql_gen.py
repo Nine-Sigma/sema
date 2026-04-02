@@ -4,13 +4,9 @@ from unittest.mock import MagicMock
 
 pytestmark = pytest.mark.unit
 
-from sema.pipeline.sql_gen import (
-    SQLGenerator,
-    build_sql_prompt,
-)
-from sema.pipeline.validate import (
-    validate_sql_against_sco,
-)
+from sema.consumers.nl2sql.consumer import NL2SQLConsumer
+from sema.consumers.nl2sql.prompting import build_sql_prompt
+from sema.consumers.nl2sql.validation import validate_sql_against_sco
 from sema.models.context import (
     SemanticContextObject,
     ResolvedEntity,
@@ -90,7 +86,7 @@ def sample_sco():
                 ],
             ),
         ],
-        consumer_hint="nl2sql",
+        consumer="nl2sql",
     )
 
 
@@ -156,36 +152,47 @@ class TestSQLValidation:
 
 class TestRetryLoop:
     def test_retry_on_validation_failure(self, sample_sco):
+        from sema.consumers.base import ConsumerDeps, ConsumerRequest
+
         mock_llm = MagicMock()
-        # First attempt: invalid SQL, second: valid
         mock_llm.invoke.side_effect = [
             MagicMock(content="SELECT unknown_col FROM cdm.clinical.cancer_diagnosis"),
             MagicMock(content="SELECT dx_type_cd FROM cdm.clinical.cancer_diagnosis"),
         ]
-        gen = SQLGenerator(llm=mock_llm)
-        result = gen.generate(sample_sco, "test", max_retries=2)
-        assert result["valid"]
+        consumer = NL2SQLConsumer()
+        deps = ConsumerDeps(llm=mock_llm)
+        req = ConsumerRequest(question="test", operation="plan")
+        plan = consumer.plan(req, sample_sco, deps)
+        assert plan.valid
         assert mock_llm.invoke.call_count == 2
 
     def test_max_retries_returns_errors(self, sample_sco):
+        from sema.consumers.base import ConsumerDeps, ConsumerRequest
+
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(
             content="SELECT bad_col FROM bad_table"
         )
-        gen = SQLGenerator(llm=mock_llm)
-        result = gen.generate(sample_sco, "test", max_retries=2)
-        assert not result["valid"]
-        assert len(result["errors"]) > 0
+        consumer = NL2SQLConsumer()
+        deps = ConsumerDeps(llm=mock_llm)
+        req = ConsumerRequest(question="test", operation="plan")
+        plan = consumer.plan(req, sample_sco, deps)
+        assert not plan.valid
+        assert len(plan.errors) > 0
         assert mock_llm.invoke.call_count == 3  # initial + 2 retries
 
 
 class TestExecutionModes:
-    def test_plan_mode_returns_sql_only(self, sample_sco):
+    def test_plan_returns_sql_plan(self, sample_sco):
+        from sema.consumers.base import ConsumerDeps, ConsumerRequest
+
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(
             content="SELECT dx_type_cd FROM cdm.clinical.cancer_diagnosis"
         )
-        gen = SQLGenerator(llm=mock_llm)
-        result = gen.generate(sample_sco, "test")
-        assert "sql" in result
-        assert "results" not in result
+        consumer = NL2SQLConsumer()
+        deps = ConsumerDeps(llm=mock_llm)
+        req = ConsumerRequest(question="test", operation="plan")
+        plan = consumer.plan(req, sample_sco, deps)
+        assert plan.sql
+        assert plan.valid

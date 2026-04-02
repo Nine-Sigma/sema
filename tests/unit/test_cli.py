@@ -129,23 +129,23 @@ class TestContextCommand:
 
 
 class TestQueryCommand:
-    def test_query_default_plan_mode(self, runner):
+    def test_query_default_plan_operation(self, runner):
         with patch("sema.cli.run_query") as mock_query:
             mock_query.return_value = {
-                "mode": "plan",
+                "operation": "plan",
                 "sql": "SELECT * FROM cancer_diagnosis WHERE stage = 'Stage III'",
                 "validation": {"valid": True, "errors": []},
             }
             result = runner.invoke(cli, ["query", "--question", "stage 3 patients"])
             assert result.exit_code == 0
             call_config = mock_query.call_args[0][0]
-            assert call_config.mode.value == "plan"
+            assert call_config.operation == "plan"
             assert "SELECT" in result.output
 
-    def test_query_execute_mode(self, runner):
+    def test_query_execute_via_mode_alias(self, runner):
         with patch("sema.cli.run_query") as mock_query:
             mock_query.return_value = {
-                "mode": "execute",
+                "operation": "execute",
                 "sql": "SELECT * FROM cancer_diagnosis",
                 "validation": {"valid": True, "errors": []},
                 "results": [{"patient_id": "P1", "stage": "Stage III"}],
@@ -154,12 +154,12 @@ class TestQueryCommand:
             result = runner.invoke(cli, ["query", "--question", "test", "--mode", "execute"])
             assert result.exit_code == 0
             call_config = mock_query.call_args[0][0]
-            assert call_config.mode.value == "execute"
+            assert call_config.operation == "execute"
 
-    def test_query_explain_mode(self, runner):
+    def test_query_explain_via_mode_alias(self, runner):
         with patch("sema.cli.run_query") as mock_query:
             mock_query.return_value = {
-                "mode": "explain",
+                "operation": "explain",
                 "sql": "SELECT * FROM cancer_diagnosis",
                 "validation": {"valid": True, "errors": []},
                 "explain": "== Physical Plan ==\nScan parquet",
@@ -170,7 +170,7 @@ class TestQueryCommand:
     def test_query_verbose(self, runner):
         with patch("sema.cli.run_query") as mock_query:
             mock_query.return_value = {
-                "mode": "plan",
+                "operation": "plan",
                 "sql": "SELECT 1",
                 "validation": {"valid": True, "errors": []},
             }

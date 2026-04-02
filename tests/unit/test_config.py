@@ -192,22 +192,22 @@ class TestQueryConfig:
     def test_defaults(self):
         config = QueryConfig(question="stage 3 colorectal patients")
         assert config.question == "stage 3 colorectal patients"
-        assert config.mode == "plan"
-        assert config.consumer_hint == "nl2sql"
+        assert config.operation == "plan"
+        assert config.consumer == "nl2sql"
         assert config.verbose is False
 
-    def test_execute_mode(self, monkeypatch):
+    def test_execute_operation(self, monkeypatch):
         monkeypatch.setenv("DATABRICKS_HOST", "https://example.databricks.com")
         monkeypatch.setenv("DATABRICKS_TOKEN", "dapi123")
         monkeypatch.setenv("DATABRICKS_HTTP_PATH", "/sql/1.0/warehouses/abc")
         config = QueryConfig(
             question="stage 3 colorectal patients",
-            mode="execute",
+            operation="execute",
             verbose=True,
         )
-        assert config.mode == "execute"
+        assert config.operation == "execute"
         assert config.verbose is True
 
-    def test_invalid_mode(self):
-        with pytest.raises(Exception):
-            QueryConfig(question="test", mode="invalid")
+    def test_freeform_operation(self):
+        config = QueryConfig(question="test", operation="custom_op")
+        assert config.operation == "custom_op"

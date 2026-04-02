@@ -43,10 +43,13 @@ def _build_entities_and_assets(
     for ec in entity_candidates:
         properties = []
         for col in ec.get("columns", []):
+            col_name = col.get("column") or col.get("property") or ""
+            if not col_name:
+                continue
             properties.append(ResolvedProperty(
-                name=col.get("property", col.get("column", "")),
-                semantic_type=col.get("semantic_type", "free_text"),
-                physical_column=col.get("column", ""),
+                name=col.get("property") or col_name,
+                semantic_type=col.get("semantic_type") or "free_text",
+                physical_column=col_name,
                 physical_table=f"{ec.get('catalog', '')}.{ec.get('schema', '')}.{ec.get('table', '')}",
                 provenance=Provenance(
                     source=ec.get("source", "retrieval"),
@@ -73,8 +76,9 @@ def _build_entities_and_assets(
                 schema=ec.get("schema", ""),
                 table=ec.get("table", ""),
                 columns=[
-                    col.get("column", "")
+                    col.get("column") or ""
                     for col in ec.get("columns", [])
+                    if col.get("column")
                 ],
             ))
 
@@ -148,7 +152,7 @@ def _passes_confidence_threshold(candidate: dict[str, Any]) -> bool:
 
 def _apply_visibility_policy(
     candidates: list[dict[str, Any]],
-    consumer_hint: str,
+    consumer: str,
 ) -> list[dict[str, Any]]:
     """Filter candidates by assertion status.
 

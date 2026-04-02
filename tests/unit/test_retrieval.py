@@ -139,8 +139,8 @@ class TestContextPruning:
                  "code": "Stage III", "label": "Stage III"},
             ],
         )
-        sco = prune_to_sco(candidate_set, consumer_hint="nl2sql")
-        assert sco.consumer_hint == "nl2sql"
+        sco = prune_to_sco(candidate_set, consumer="nl2sql")
+        assert sco.consumer == "nl2sql"
         assert len(sco.entities) >= 1
         assert len(sco.physical_assets) >= 1
 
@@ -154,8 +154,8 @@ class TestContextPruning:
                  "source": "llm", "columns": []},
             ],
         )
-        sco = prune_to_sco(candidate_set, consumer_hint="discovery")
-        assert sco.consumer_hint == "discovery"
+        sco = prune_to_sco(candidate_set, consumer="discovery")
+        assert sco.consumer == "discovery"
         assert sco.entities[0].description == "Primary diagnosis record"
 
     def test_context_budget(self):
@@ -167,7 +167,7 @@ class TestContextPruning:
             for i in range(20)
         ]
         candidate_set = SemanticCandidateSet(query="test", candidates=candidates)
-        sco = prune_to_sco(candidate_set, consumer_hint="nl2sql", max_entities=5)
+        sco = prune_to_sco(candidate_set, consumer="nl2sql", max_entities=5)
         assert len(sco.entities) <= 5
 
 

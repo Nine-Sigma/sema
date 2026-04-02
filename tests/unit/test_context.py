@@ -64,7 +64,7 @@ def sample_sco():
                 ],
             ),
         ],
-        consumer_hint="nl2sql",
+        consumer="nl2sql",
     )
 
 
@@ -85,17 +85,17 @@ class TestSemanticContextObject:
         data = sample_sco.model_dump(mode="json")
         roundtrip = SemanticContextObject.model_validate(data)
         assert roundtrip.entities[0].name == "Cancer Diagnosis"
-        assert roundtrip.consumer_hint == "nl2sql"
+        assert roundtrip.consumer == "nl2sql"
 
-    def test_sco_consumer_hint(self):
+    def test_sco_consumer(self):
         sco = SemanticContextObject(
             entities=[],
             physical_assets=[],
             join_paths=[],
             governed_values=[],
-            consumer_hint="discovery",
+            consumer="discovery",
         )
-        assert sco.consumer_hint == "discovery"
+        assert sco.consumer == "discovery"
 
     def test_sco_provenance_on_entities(self, sample_sco):
         entity = sample_sco.entities[0]

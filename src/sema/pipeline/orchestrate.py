@@ -17,7 +17,6 @@ from sema.pipeline.orchestrate_utils import (
     _collect_results,
     _compute_embeddings,
     _discover_tables,
-    _execute_by_mode,
     _log_result,
     _register_datasource,
     _retrieve_context,
@@ -101,40 +100,67 @@ def run_context(config: QueryConfig) -> dict[str, Any]:
 
     engine = RetrievalEngine(driver=driver, embedder=embedder)
     candidate_set = engine.retrieve(config.question)
-    sco = prune_to_sco(candidate_set, consumer_hint=config.consumer_hint)
+    sco = prune_to_sco(candidate_set, consumer=config.consumer)
 
     driver.close()
     return sco.model_dump(mode="json")
 
 
 def run_query(config: QueryConfig) -> dict[str, Any]:
-    """Run retrieval + NL2SQL consumer."""
-    from sema.pipeline.sql_gen import SQLGenerator
+    """Run retrieval + consumer dispatch."""
+    from sema.consumers import resolve_consumer
+    from sema.consumers.base import ConsumerDeps, ConsumerRequest
+    from sema.runtimes.databricks import DatabricksRuntime
+
+    consumer = resolve_consumer(config.consumer)
+    if config.operation not in consumer.capabilities:
+        raise ValueError(
+            f"Operation {config.operation!r} not supported by "
+            f"{consumer.name!r}. "
+            f"Supported: {sorted(consumer.capabilities)}"
+        )
 
     llm = _get_llm(config.llm)
-
     sco = _retrieve_context(config)
 
     if config.verbose:
-        click.echo(f"SCO: {len(sco.entities)} entities, "
-                    f"{len(sco.physical_assets)} tables, "
-                    f"{len(sco.join_paths)} joins")
+        click.echo(
+            f"SCO: {len(sco.entities)} entities, "
+            f"{len(sco.physical_assets)} tables, "
+            f"{len(sco.join_paths)} joins"
+        )
 
-    gen = SQLGenerator(llm=llm)
-    result = gen.generate(sco, config.question)
+    needs_runtime = config.operation in ("explain", "execute")
+    runtime = (
+        DatabricksRuntime(config.databricks)
+        if needs_runtime else None
+    )
+
+    try:
+        request = ConsumerRequest(
+            question=config.question,
+            operation=config.operation,
+        )
+        deps = ConsumerDeps(llm=llm, sql_runtime=runtime)
+        result = consumer.run(request, sco, deps)
+    finally:
+        if runtime is not None:
+            runtime.close()
 
     response: dict[str, Any] = {
-        "mode": config.mode.value,
-        "sql": result.get("sql", ""),
+        "operation": config.operation,
+        "sql": result.artifact,
         "validation": {
-            "valid": result.get("valid", False),
-            "errors": result.get("errors", []),
+            "valid": result.valid,
+            "errors": result.errors,
         },
     }
 
+    if result.data:
+        response.update(result.data)
+    if result.summary:
+        response["summary"] = result.summary
     if config.verbose:
         response["sco"] = sco.model_dump(mode="json")
-
-    _execute_by_mode(config, result, response, llm)
 
     return response

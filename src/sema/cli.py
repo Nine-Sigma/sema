@@ -13,7 +13,6 @@ from sema.models.config import (
     LLMConfig,
     Neo4jConfig,
     QueryConfig,
-    QueryMode,
 )
 from sema.pipeline.orchestrate import (
     run_build,
@@ -179,7 +178,7 @@ def build(
 @click.option("--neo4j-uri", default=None, help="Neo4j bolt URI")
 @click.option("--neo4j-user", default=None, help="Neo4j username")
 @click.option("--neo4j-password", default=None, help="Neo4j password")
-@click.option("--consumer-hint", default="nl2sql", help="Consumer hint for SCO pruning")
+@click.option("--consumer", default="nl2sql", help="Consumer for SCO pruning")
 @click.option("--embedding-provider", default=None, help="Embedding provider")
 @click.option("--embedding-model", default=None, help="Embedding model name")
 @click.option("--verbose", is_flag=True, default=False, help="Enable verbose output")
@@ -188,7 +187,7 @@ def context(
     neo4j_uri: str | None,
     neo4j_user: str | None,
     neo4j_password: str | None,
-    consumer_hint: str,
+    consumer: str,
     embedding_provider: str | None,
     embedding_model: str | None,
     verbose: bool,
@@ -196,7 +195,7 @@ def context(
     """Produce a Semantic Context Object for a question."""
     query_config = QueryConfig(
         question=question,
-        consumer_hint=consumer_hint,
+        consumer=consumer,
         verbose=verbose,
     )
 
@@ -289,12 +288,9 @@ def review(
 
 @cli.command()
 @click.option("--question", required=True, help="Natural language question")
-@click.option(
-    "--mode",
-    type=click.Choice(["plan", "explain", "execute"], case_sensitive=False),
-    default="plan",
-    help="Execution mode",
-)
+@click.option("--consumer", default="nl2sql", help="Consumer name")
+@click.option("--operation", default=None, help="Operation (e.g. plan, explain, execute)")
+@click.option("--mode", default=None, help="Alias for --operation")
 @click.option("--neo4j-uri", default=None, help="Neo4j bolt URI")
 @click.option("--neo4j-user", default=None, help="Neo4j username")
 @click.option("--neo4j-password", default=None, help="Neo4j password")
@@ -309,7 +305,9 @@ def review(
 @click.option("--verbose", is_flag=True, default=False, help="Enable verbose output")
 def query(
     question: str,
-    mode: str,
+    consumer: str,
+    operation: str | None,
+    mode: str | None,
     neo4j_uri: str | None,
     neo4j_user: str | None,
     neo4j_password: str | None,
@@ -324,9 +322,11 @@ def query(
     verbose: bool,
 ) -> None:
     """Query the knowledge graph with natural language."""
+    resolved_operation = operation or mode or "plan"
     query_config = QueryConfig(
         question=question,
-        mode=QueryMode(mode),
+        consumer=consumer,
+        operation=resolved_operation,
         verbose=verbose,
     )
 
