@@ -99,7 +99,9 @@ class NL2SQLConsumer:
         )
 
         prompt = build_sql_prompt(
-            sco, request.question, max_chars=self.max_prompt_chars,
+            sco, request.question,
+            dialect=self.dialect,
+            max_chars=self.max_prompt_chars,
         )
         errors: list[str] = []
         sql = ""

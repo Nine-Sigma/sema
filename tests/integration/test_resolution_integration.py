@@ -81,7 +81,7 @@ class TestFullResolution:
         assert _count_rels(driver, "ENTITY_ON_TABLE") >= 1
         assert _count_rels(driver, "HAS_PROPERTY") == 1
         assert _count_rels(driver, "MEMBER_OF") >= 2
-        assert _count_rels(driver, "STORED_IN") == 1
+        assert _count_rels(driver, "HAS_VALUE_SET") == 1
         assert _count_rels(driver, "REFERS_TO") >= 1
         assert _count_rels(driver, "PARENT_OF") >= 1
 

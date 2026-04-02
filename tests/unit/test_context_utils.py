@@ -3,9 +3,11 @@
 import pytest
 
 from sema.models.context import SemanticCandidateSet
+from sema.pipeline.context import prune_to_sco
 from sema.pipeline.context_utils import (
     _apply_visibility_policy,
     _build_governed_values,
+    _build_metrics,
     _parse_join_predicates,
 )
 
@@ -85,6 +87,42 @@ class TestApplyVisibilityPolicy:
         assert len(result) == 0
 
 
+    def test_low_confidence_semantic_artifact_filtered(self) -> None:
+        candidates = [
+            {"status": "auto", "confidence": 0.3,
+             "confidence_policy": "semantic", "name": "x"},
+        ]
+        result = _apply_visibility_policy(candidates, "nl2sql")
+        assert len(result) == 0
+
+    def test_accepted_artifact_always_included(self) -> None:
+        candidates = [
+            {"status": "accepted", "confidence": 0.1,
+             "confidence_policy": "semantic", "name": "x"},
+        ]
+        result = _apply_visibility_policy(candidates, "nl2sql")
+        assert len(result) == 1
+
+    def test_candidate_without_confidence_policy_uses_fallback(
+        self,
+    ) -> None:
+        candidates = [
+            {"status": "auto", "confidence": 0.6,
+             "source": "structural", "name": "x"},
+        ]
+        result = _apply_visibility_policy(candidates, "nl2sql")
+        # 0.6 >= 0.5 (structural threshold)
+        assert len(result) == 1
+
+    def test_structural_policy_lower_threshold(self) -> None:
+        candidates = [
+            {"status": "auto", "confidence": 0.55,
+             "confidence_policy": "structural", "name": "x"},
+        ]
+        result = _apply_visibility_policy(candidates, "nl2sql")
+        assert len(result) == 1
+
+
 class TestBuildGovernedValues:
     def test_groups_by_property_column_table(self) -> None:
         cs = SemanticCandidateSet(
@@ -103,3 +141,62 @@ class TestBuildGovernedValues:
         assert len(result) == 1
         assert result[0].property_name == "Status"
         assert len(result[0].values) == 2
+
+
+class TestBuildMetrics:
+    def test_metric_candidate_survives_into_sco(self) -> None:
+        cs = SemanticCandidateSet(
+            query="test",
+            candidates=[
+                {"type": "entity", "name": "Hospital",
+                 "table": "hospital", "schema": "s", "catalog": "c",
+                 "confidence": 0.8, "source": "retrieval",
+                 "columns": []},
+                {"type": "metric", "name": "Avg LOS",
+                 "description": "Average length of stay",
+                 "formula": "AVG(los)", "confidence": 0.8,
+                 "source": "retrieval",
+                 "aggregates": ["LOS"], "filters": [],
+                 "grains": ["Department"],
+                 "status": "auto",
+                 "confidence_policy": "semantic"},
+            ],
+        )
+        sco = prune_to_sco(cs, consumer="nl2sql")
+        assert len(sco.metrics) == 1
+        assert sco.metrics[0].name == "Avg LOS"
+        assert sco.metrics[0].aggregates == ["LOS"]
+        assert sco.metrics[0].grains == ["Department"]
+
+    def test_entity_description_preserved(self) -> None:
+        cs = SemanticCandidateSet(
+            query="test",
+            candidates=[
+                {"type": "entity", "name": "Cancer",
+                 "table": "t1", "schema": "s", "catalog": "c",
+                 "description": "Primary cancer records",
+                 "confidence": 0.8, "source": "llm",
+                 "columns": []},
+            ],
+        )
+        sco = prune_to_sco(cs, consumer="nl2sql")
+        assert sco.entities[0].description == "Primary cancer records"
+
+    def test_property_semantic_type_preserved(self) -> None:
+        cs = SemanticCandidateSet(
+            query="test",
+            candidates=[
+                {"type": "entity", "name": "Cancer",
+                 "table": "t1", "schema": "s", "catalog": "c",
+                 "confidence": 0.8, "source": "llm",
+                 "columns": [
+                     {"property": "Stage", "column": "stage_cd",
+                      "semantic_type": "categorical",
+                      "vocabulary": "tnm_staging"},
+                 ]},
+            ],
+        )
+        sco = prune_to_sco(cs, consumer="nl2sql")
+        prop = sco.entities[0].properties[0]
+        assert prop.semantic_type == "categorical"
+        assert prop.vocabulary == "tnm_staging"

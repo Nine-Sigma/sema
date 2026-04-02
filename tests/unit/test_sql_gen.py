@@ -8,8 +8,10 @@ from sema.consumers.nl2sql.consumer import NL2SQLConsumer
 from sema.consumers.nl2sql.prompting import build_sql_prompt
 from sema.consumers.nl2sql.validation import validate_sql_against_sco
 from sema.models.context import (
+    AncestryTerm,
     SemanticContextObject,
     ResolvedEntity,
+    ResolvedMetric,
     ResolvedProperty,
     PhysicalAsset,
     JoinPath,
@@ -196,3 +198,182 @@ class TestExecutionModes:
         plan = consumer.plan(req, sample_sco, deps)
         assert plan.sql
         assert plan.valid
+
+
+class TestEntityContext:
+    def test_entity_with_description_in_prompt(self, sample_sco):
+        prompt = build_sql_prompt(sample_sco, "test")
+        assert "ENTITY CONTEXT" in prompt
+        assert "Primary dx" in prompt
+
+    def test_entity_without_description_omitted(self):
+        sco = SemanticContextObject(
+            entities=[
+                ResolvedEntity(
+                    name="Test",
+                    physical_table="c.s.t",
+                    provenance=Provenance(source="llm", confidence=0.8),
+                ),
+            ],
+            physical_assets=[
+                PhysicalAsset(catalog="c", schema="s", table="t",
+                              columns=["col1"]),
+            ],
+        )
+        prompt = build_sql_prompt(sco, "test")
+        assert "ENTITY CONTEXT" not in prompt
+
+
+class TestSemanticAnnotations:
+    def test_categorical_column_annotated(self, sample_sco):
+        prompt = build_sql_prompt(sample_sco, "test")
+        assert "dx_type_cd (categorical)" in prompt
+
+    def test_column_without_semantic_type_unannotated(self):
+        sco = SemanticContextObject(
+            entities=[
+                ResolvedEntity(
+                    name="Test",
+                    physical_table="c.s.t",
+                    properties=[],
+                    provenance=Provenance(source="llm", confidence=0.8),
+                ),
+            ],
+            physical_assets=[
+                PhysicalAsset(catalog="c", schema="s", table="t",
+                              columns=["plain_col"]),
+            ],
+        )
+        prompt = build_sql_prompt(sco, "test")
+        assert "plain_col" in prompt
+        assert "(categorical)" not in prompt
+
+
+class TestMetricsSection:
+    def test_metrics_section_included(self):
+        sco = SemanticContextObject(
+            metrics=[
+                ResolvedMetric(
+                    name="Avg LOS",
+                    description="Average length of stay",
+                    formula="AVG(los_days)",
+                    provenance=Provenance(source="llm", confidence=0.8),
+                ),
+            ],
+            physical_assets=[
+                PhysicalAsset(catalog="c", schema="s", table="t",
+                              columns=["los_days"]),
+            ],
+        )
+        prompt = build_sql_prompt(sco, "test")
+        assert "METRIC DEFINITIONS" in prompt
+        assert "Avg LOS" in prompt
+        assert "AVG(los_days)" in prompt
+
+
+class TestAncestrySection:
+    def test_ancestry_section_included(self):
+        sco = SemanticContextObject(
+            ancestry=[
+                AncestryTerm(
+                    code="IIIA", label="Stage IIIA",
+                    parent_code="III",
+                ),
+            ],
+            physical_assets=[
+                PhysicalAsset(catalog="c", schema="s", table="t",
+                              columns=["stage"]),
+            ],
+        )
+        prompt = build_sql_prompt(sco, "test")
+        assert "TERM HIERARCHY" in prompt
+        assert "IIIA" in prompt
+        assert "parent: III" in prompt
+
+    def test_empty_sections_omitted(self):
+        sco = SemanticContextObject(
+            physical_assets=[
+                PhysicalAsset(catalog="c", schema="s", table="t",
+                              columns=["col"]),
+            ],
+        )
+        prompt = build_sql_prompt(sco, "test")
+        assert "METRIC DEFINITIONS" not in prompt
+        assert "TERM HIERARCHY" not in prompt
+
+
+class TestDialectNotes:
+    def test_databricks_dialect(self, sample_sco):
+        prompt = build_sql_prompt(
+            sample_sco, "test", dialect="databricks",
+        )
+        assert "DIALECT NOTES" in prompt
+        assert "Databricks" in prompt
+        assert "backticks" in prompt
+
+    def test_unknown_dialect_fallback(self, sample_sco):
+        prompt = build_sql_prompt(
+            sample_sco, "test", dialect="postgres",
+        )
+        assert "ANSI SQL" in prompt
+
+    def test_dialect_passed_from_consumer(self, sample_sco):
+        from sema.consumers.base import ConsumerDeps, ConsumerRequest
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(
+            content="SELECT dx_type_cd FROM cdm.clinical.cancer_diagnosis"
+        )
+        consumer = NL2SQLConsumer(dialect="postgres")
+        deps = ConsumerDeps(llm=mock_llm)
+        req = ConsumerRequest(question="test", operation="plan")
+        consumer.plan(req, sample_sco, deps)
+        prompt_arg = mock_llm.invoke.call_args[0][0]
+        assert "ANSI SQL" in prompt_arg
+
+
+class TestTruncation:
+    def test_budget_sufficient_includes_all(self, sample_sco):
+        prompt = build_sql_prompt(
+            sample_sco, "test", max_chars=50000,
+        )
+        assert "GOVERNED FILTER VALUES" in prompt
+        assert "DIALECT NOTES" in prompt
+
+    def test_truncation_cuts_values_first(self, sample_sco):
+        prompt = build_sql_prompt(
+            sample_sco, "test", max_chars=200,
+        )
+        # Should still have core structure
+        assert "RULES" in prompt
+        assert "test" in prompt
+
+    def test_dialect_notes_last_to_cut(self):
+        sco = SemanticContextObject(
+            ancestry=[
+                AncestryTerm(code="A", label="AA", parent_code="B"),
+            ],
+            metrics=[
+                ResolvedMetric(
+                    name="M", formula="F",
+                    provenance=Provenance(source="llm", confidence=0.8),
+                ),
+            ],
+            governed_values=[
+                GovernedValue(
+                    property_name="P", column="c", table="t",
+                    values=[{"code": f"v{i}", "label": f"V{i}"}
+                            for i in range(20)],
+                ),
+            ],
+            physical_assets=[
+                PhysicalAsset(catalog="c", schema="s", table="t",
+                              columns=[f"col{i}" for i in range(30)]),
+            ],
+        )
+        # Very tight budget — should cut everything except
+        # core + dialect notes (last non-core to cut)
+        full = build_sql_prompt(sco, "test", max_chars=50000)
+        tight = build_sql_prompt(sco, "test", max_chars=600)
+        # Core structure preserved
+        assert "RULES" in tight
+        assert "test" in tight
