@@ -1,0 +1,108 @@
+# Dev Slice Definition v1
+# 13 cBioPortal tables selected for iterative evaluation.
+# Each entry stresses a specific failure mode of the staged L2 pipeline.
+#
+# Selection criteria:
+#   - Cover narrow/easy, wide/batched, ambiguous abbreviations,
+#     encoded categoricals, and mixed-grain tables.
+#   - Include both core clinical and ancillary reference tables.
+#
+# Version log:
+#   v1 (2026-04-13): Initial selection based on known cBioPortal GENIE corpus.
+
+version: 1
+created: "2026-04-13"
+catalog: unity
+schema: cbioportal
+
+tables:
+  - table_name: patient
+    reason: "Core demographics table with encoded categoricals (os_status='0:LIVING'), mixed temporal/categorical columns, and survival data"
+    failure_mode: encoded_categorical
+    expected_stressor: "os_status prefix encoding, smoking_status abbreviations, stage_highest Roman numerals"
+    column_count_estimate: 15
+    tier: sanity
+
+  - table_name: sample
+    reason: "Medium-width biomarker table with multiple categorical columns (cancer_type, sample_type, msi_type) and numeric biomarkers (TMB)"
+    failure_mode: mixed_semantic_types
+    expected_stressor: "msi_type non-obvious encoding, cancer_type_detailed long values, tmb numeric biomarker"
+    column_count_estimate: 20
+    tier: sanity
+
+  - table_name: mutation
+    reason: "Wide table (30+ columns) requiring multi-batch Stage B. Gene/variant nomenclature is abbreviation-heavy."
+    failure_mode: wide_table_batching
+    expected_stressor: "Multi-batch B execution, variant_classification abbreviations, MAF-format column names"
+    column_count_estimate: 35
+    tier: stress
+
+  - table_name: structural_variant
+    reason: "Moderate width with gene fusion nomenclature, technical genomic terms, and relationship columns (site1/site2)"
+    failure_mode: abbreviation_ambiguity
+    expected_stressor: "site1_gene/site2_gene fusion partner encoding, sv_class technical taxonomy"
+    column_count_estimate: 15
+    tier: standard
+
+  - table_name: treatment
+    reason: "Temporal data with treatment classification, encoded dates (days-from-epoch), and categoricals (treatment_subtype)"
+    failure_mode: encoded_categorical
+    expected_stressor: "start_date/stop_date encoded as INT days-from-epoch, treatment_subtype abbreviation categories"
+    column_count_estimate: 10
+    tier: sanity
+
+  - table_name: progression
+    reason: "Narrow table with binary flags ('Y'/'N') and encoded dates. Tests Stage C trigger on low-cardinality columns."
+    failure_mode: encoded_categorical
+    expected_stressor: "progression='Y'/'N' binary flag, start_date encoded as INT"
+    column_count_estimate: 6
+    tier: standard
+
+  - table_name: diagnosis
+    reason: "Cancer staging with Roman numeral categories, hierarchical type system, and temporal encoding"
+    failure_mode: encoded_categorical
+    expected_stressor: "stage Roman numerals (I, IIA, IIIB, IV), cancer type hierarchy"
+    column_count_estimate: 10
+    tier: standard
+
+  - table_name: cna
+    reason: "Copy number alteration data: gene-level with numeric CNA values. Sparse, many NULL columns."
+    failure_mode: mixed_semantic_types
+    expected_stressor: "Numeric CNA values (-2 to 2 scale), hugo_symbol gene identifiers, sparsity"
+    column_count_estimate: 12
+    tier: standard
+
+  - table_name: gene_panel
+    reason: "Reference/metadata table defining sequencing panels. Narrow, few rows. Tests entity identification for non-clinical tables."
+    failure_mode: non_clinical_entity
+    expected_stressor: "Non-patient entity (sequencing panel), metadata-style columns"
+    column_count_estimate: 5
+    tier: edge
+
+  - table_name: clinical_event
+    reason: "Generic timeline table with type-dependent semantics. Event type determines column meaning."
+    failure_mode: mixed_grain
+    expected_stressor: "Mixed granularity: event type determines whether row is per-patient or per-event, polymorphic schema"
+    column_count_estimate: 10
+    tier: stress
+
+  - table_name: resource_definition
+    reason: "System/metadata table with no clinical semantics. Tests domain bias impact on non-clinical table."
+    failure_mode: non_clinical_entity
+    expected_stressor: "Should not get clinical entity framing despite healthcare domain context"
+    column_count_estimate: 5
+    tier: edge
+
+  - table_name: resource_sample
+    reason: "Bridge table linking resources to samples. Minimal columns, identifier-heavy."
+    failure_mode: identifier_only
+    expected_stressor: "Nearly all columns are identifiers/foreign keys, minimal semantic content for Stage B"
+    column_count_estimate: 4
+    tier: edge
+
+  - table_name: gene_panel_matrix
+    reason: "Wide boolean matrix (gene × panel membership). Unusual structure stresses Stage A entity framing."
+    failure_mode: wide_table_batching
+    expected_stressor: "Very wide, boolean columns, atypical table structure for entity/grain hypothesis"
+    column_count_estimate: 50
+    tier: stress
