@@ -31,6 +31,7 @@ from sema.models.config import (
     LLMConfig,
     ProfilingConfig,
 )
+from sema.models.domain import DomainContext
 from sema.pipeline.build_utils import (
     _build_table_metadata,
     _commit_and_materialize,
@@ -162,6 +163,9 @@ def process_table(
     column_batch_size: int = 25,
     vocab_workers: int = 8,
     resume: bool = False,
+    domain_context: DomainContext | None = None,
+    use_staged: bool = False,
+    prompt_layers: Any = None,
 ) -> TableResult:
     """Process a single table through all pipeline stages."""
     if resume:
@@ -174,6 +178,9 @@ def process_table(
             work_item, connector, llm_client, loader,
             run_id, column_batch_size,
             vocab_workers=vocab_workers,
+            domain_context=domain_context,
+            use_staged=use_staged,
+            prompt_layers=prompt_layers,
         )
         if isinstance(result, TableResult):
             return result
