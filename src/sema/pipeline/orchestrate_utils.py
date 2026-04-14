@@ -18,6 +18,7 @@ from sema.models.config import (
     BuildConfig,
     QueryConfig,
 )
+from sema.models.domain import DomainContext
 from sema.pipeline.context import prune_to_sco
 from sema.pipeline.retrieval import RetrievalEngine
 
@@ -63,6 +64,18 @@ def _log_result(result: Any, label: str, verbose: bool) -> None:
         click.echo(f"  {label}: {status}")
 
 
+def _build_prompt_layers(config: BuildConfig) -> Any:
+    """Build PromptLayers from BuildConfig flags."""
+    from sema.engine.stage_utils import PromptLayers
+    return PromptLayers(
+        enable_domain_bias=config.enable_domain_bias,
+        enable_type_inventory=config.enable_type_inventory,
+        enable_vocab_hints=config.enable_vocab_hints,
+        enable_few_shot=config.enable_few_shot,
+        enable_stage_c=config.enable_stage_c,
+    )
+
+
 def _spawn_workers_parallel(
     work_items: list[Any],
     config: BuildConfig,
@@ -70,12 +83,14 @@ def _spawn_workers_parallel(
     llm_factory: Any,
     loader: Any,
     run_id: str,
+    domain_context: DomainContext | None = None,
 ) -> list[Any]:
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     from sema.pipeline.build import process_table
 
     results: list[Any] = []
+    layers = _build_prompt_layers(config)
 
     def _process_worker(work_item: Any) -> Any:
         worker_connector = connector_factory.create()
@@ -86,6 +101,9 @@ def _spawn_workers_parallel(
             column_batch_size=config.column_batch_size,
             vocab_workers=config.vocab_workers,
             resume=config.resume,
+            domain_context=domain_context,
+            use_staged=config.use_staged,
+            prompt_layers=layers,
         )
 
     with ThreadPoolExecutor(
@@ -119,6 +137,7 @@ def _spawn_workers(
     llm_factory: Any,
     loader: Any,
     run_id: str,
+    domain_context: DomainContext | None = None,
 ) -> list[Any]:
     from sema.pipeline.build import process_table
 
@@ -132,11 +151,13 @@ def _spawn_workers(
         return _spawn_workers_parallel(
             work_items, config, connector_factory,
             llm_factory, loader, run_id,
+            domain_context=domain_context,
         )
 
     results: list[Any] = []
     connector = connector_factory.create()
     llm_client = llm_factory.create()
+    layers = _build_prompt_layers(config)
     for i, work_item in enumerate(work_items):
         if config.verbose:
             click.echo(
@@ -148,6 +169,9 @@ def _spawn_workers(
             column_batch_size=config.column_batch_size,
             vocab_workers=config.vocab_workers,
             resume=config.resume,
+            domain_context=domain_context,
+            use_staged=config.use_staged,
+            prompt_layers=layers,
         )
         _log_result(result, f"    ", config.verbose)
         results.append(result)
