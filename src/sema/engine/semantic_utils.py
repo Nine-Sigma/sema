@@ -1,3 +1,9 @@
+"""Legacy helpers for the single-pass and two-pass L2 code paths.
+
+These functions support the old SemanticEngine.interpret_table() pipeline.
+Kept intact through rollout step 6 for comparison, removed in step 7.
+"""
+
 from __future__ import annotations
 
 import logging

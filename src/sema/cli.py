@@ -47,6 +47,7 @@ def _build_config_from_args(
     catalog: str | None,
     schemas: str | None,
     table_pattern: str | None,
+    domain: str | None,
     table_workers: int | None,
     neo4j_uri: str | None,
     neo4j_user: str | None,
@@ -69,6 +70,9 @@ def _build_config_from_args(
         overrides["schemas"] = [s.strip() for s in schemas.split(",")]
     if table_pattern is not None:
         overrides["table_pattern"] = table_pattern
+    if domain is not None:
+        overrides["domain"] = domain
+        overrides["domain_from_cli"] = True
     if table_workers is not None:
         overrides["table_workers"] = table_workers
     if skip_embeddings:
@@ -110,6 +114,7 @@ def _build_config_from_args(
 @click.option("--catalog", default=None, help="Catalog name to extract from")
 @click.option("--schemas", default=None, help="Comma-separated schema names")
 @click.option("--table-pattern", default=None, help="Glob pattern to filter table names")
+@click.option("--domain", default=None, help="Warehouse domain hint (e.g. healthcare, financial)")
 @click.option("--table-workers", default=None, type=int, help="Parallel table workers (default 1)")
 @click.option("--neo4j-uri", default=None, help="Neo4j bolt URI")
 @click.option("--neo4j-user", default=None, help="Neo4j username")
@@ -126,6 +131,7 @@ def build(
     catalog: str | None,
     schemas: str | None,
     table_pattern: str | None,
+    domain: str | None,
     table_workers: int | None,
     neo4j_uri: str | None,
     neo4j_user: str | None,
@@ -141,7 +147,8 @@ def build(
     """Build the knowledge graph from a data source."""
     build_config = _build_config_from_args(
         source=source, catalog=catalog, schemas=schemas,
-        table_pattern=table_pattern, table_workers=table_workers,
+        table_pattern=table_pattern, domain=domain,
+        table_workers=table_workers,
         neo4j_uri=neo4j_uri, neo4j_user=neo4j_user,
         neo4j_password=neo4j_password, llm_provider=llm_provider,
         llm_model=llm_model, llm_timeout=llm_timeout,

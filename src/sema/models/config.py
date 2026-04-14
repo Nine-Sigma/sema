@@ -80,9 +80,18 @@ class BuildConfig(BaseSettings):
     catalog: str = ""
     schemas: list[str] = []
     table_pattern: str | None = None
+    domain: str | None = None
+    domain_from_cli: bool = False
     verbose: bool = False
     skip_embeddings: bool = False
     resume: bool = False
+
+    use_staged: bool = True
+    enable_domain_bias: bool = True
+    enable_type_inventory: bool = True
+    enable_vocab_hints: bool = True
+    enable_few_shot: bool = True
+    enable_stage_c: bool = True
 
     table_workers: int = 4
     vocab_workers: int = 8
