@@ -13,6 +13,8 @@ from sema.models.config import (
     BuildConfig,
     QueryConfig,
 )
+from sema.models.domain import DomainContext, resolve_domain_context
+from sema.models.extraction import ExtractedTable
 from sema.pipeline.orchestrate_utils import (
     _collect_results,
     _compute_embeddings,
@@ -74,9 +76,33 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         circuit_breaker=circuit_breaker,
     )
 
+    from sema.pipeline.profiler import WarehouseProfiler
+
+    extracted_tables = [
+        ExtractedTable(
+            name=wi.table_name, catalog=wi.catalog, schema=wi.schema,
+        )
+        for wi in work_items
+    ]
+    profiler = WarehouseProfiler()
+    datasource_ref, _, _ = discovery_connector.get_datasource_ref()
+    profile = profiler.profile(
+        tables=extracted_tables, columns=[],
+        datasource_id=datasource_ref, run_id=run_id,
+    )
+
+    cli_domain = config.domain if config.domain_from_cli else None
+    config_domain = config.domain if not config.domain_from_cli else None
+    domain_context = resolve_domain_context(
+        cli_domain=cli_domain,
+        config_domain=config_domain,
+        profile=profile,
+    )
+
     results = _spawn_workers(
         work_items, config, connector_factory, llm_factory,
         loader, run_id,
+        domain_context=domain_context,
     )
 
     report = _collect_results(results)
