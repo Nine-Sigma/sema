@@ -1,0 +1,50 @@
+# Dev Slice POC — matches the current Databricks ingest (v0 POC data)
+# Only 6 cBioPortal tables are loaded in workspace.cbioportal; this slice
+# uses the three that overlap with the original dev_slice.yaml definition
+# so diffs against the full dev slice remain comparable once more tables
+# are ingested.
+#
+# Version log:
+#   v0-poc (2026-04-19): 3 overlapping tables + 3 timeline tables.
+
+version: 1
+created: "2026-04-19"
+catalog: workspace
+schema: cbioportal
+
+tables:
+  - table_name: patient
+    reason: "Core demographics with encoded categoricals, survival data"
+    failure_mode: encoded_categorical
+    expected_stressor: "os_status prefix encoding, smoking_status abbreviations"
+    tier: sanity
+
+  - table_name: sample
+    reason: "Biomarker table with multiple categoricals and TMB numeric"
+    failure_mode: mixed_semantic_types
+    expected_stressor: "msi_type non-obvious encoding, tmb numeric biomarker"
+    tier: sanity
+
+  - table_name: mutation
+    reason: "Wide table requiring multi-batch Stage B, variant abbreviations"
+    failure_mode: wide_table_batching
+    expected_stressor: "Multi-batch B, variant_classification abbreviations"
+    tier: stress
+
+  - table_name: timeline_sample_acquisition
+    reason: "Timeline event table — tests encoded dates + event-level grain"
+    failure_mode: encoded_categorical
+    expected_stressor: "days-from-epoch INT columns, event-specific schema"
+    tier: standard
+
+  - table_name: timeline_status
+    reason: "Timeline status changes — binary flags, encoded dates"
+    failure_mode: encoded_categorical
+    expected_stressor: "status abbreviations, temporal encoding"
+    tier: standard
+
+  - table_name: timeline_treatment
+    reason: "Treatment events — drug names, regimens, encoded dates"
+    failure_mode: encoded_categorical
+    expected_stressor: "agent naming, subtype abbreviations, temporal"
+    tier: standard
