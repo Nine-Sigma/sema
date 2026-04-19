@@ -25,6 +25,27 @@ if TYPE_CHECKING:
     from sema.models.domain import DomainContext
 
 
+_COLUMN_TYPE_SUFFIX_RE = re.compile(
+    r"^(?P<name>[^\s(\[:]+)\s*(?:[(\[:].*)?$",
+)
+
+
+def sanitize_column_name(raw: str) -> str:
+    """Strip type suffixes / brackets / colons LLMs occasionally leak.
+
+    Stage B output is occasionally returned as e.g. 'BIOTYPE (STRING)',
+    'age [INT]', or 'patient_id: VARCHAR'. Subject-ref keys must match
+    the extractor's clean column names for the merge step to be stable.
+    """
+    stripped = raw.strip()
+    if not stripped:
+        return ""
+    m = _COLUMN_TYPE_SUFFIX_RE.match(stripped)
+    if m is None:
+        return ""
+    return m.group("name").strip()
+
+
 @dataclass(frozen=True)
 class PromptLayers:
     """Controls which domain-aware prompt layers are active.

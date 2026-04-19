@@ -25,6 +25,7 @@ from sema.engine.stage_utils import (
     determine_b_status,
     identify_critical_columns,
     merge_stage_outputs,
+    sanitize_column_name,
     should_trigger_stage_c,
 )
 from sema.llm_client import LLMStageError
@@ -292,12 +293,15 @@ class SemanticEngine:
             domain_context=self._domain_context,
             layers=self._layers,
         )
-        return self._llm_client.invoke(  # type: ignore[no-any-return]
+        result: StageBBatchResult = self._llm_client.invoke(
             prompt,
             StageBBatchResult,
             table_ref=table_ref,
             stage_name="L2 stage_b",
         )
+        for c in result.columns:
+            c.column = sanitize_column_name(c.column)
+        return result
 
     def _run_batch_with_recovery(
         self,
