@@ -35,12 +35,41 @@ MAF_NUMERIC_COLUMNS: frozenset[str] = frozenset(
     }
 )
 
+SV_NUMERIC_COLUMN_SUFFIXES: tuple[str, ...] = ("_Position", "_Entrez_Gene_Id")
+
+DOWNLOAD_EXACT_FILENAMES: frozenset[str] = frozenset({
+    "meta_study.txt",
+    "data_mutations.txt",
+    "data_mutations_extended.txt",
+    "data_sv.txt",
+    "data_cna.txt",
+    "data_gene_panel_matrix.txt",
+})
+
+DOWNLOAD_PREFIXES: tuple[str, ...] = (
+    "data_clinical_",
+    "data_timeline_",
+    "data_resource_",
+)
+
+EXCLUDED_DOWNLOAD_PREFIXES: tuple[str, ...] = (
+    "data_expression_",
+    "data_methylation_",
+    "data_log2_cna",
+    "data_linear_cna",
+    "data_armlevel_cna",
+    "data_mrna_",
+    "data_rppa",
+)
+
 SKIP_FILENAME_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"^data_CNA.*\.txt$"),
     re.compile(r"^data_expression_.*\.txt$"),
     re.compile(r"^data_methylation_.*\.txt$"),
     re.compile(r"^data_linear_CNA.*\.txt$"),
-    re.compile(r"^data_log2_CNA.*\.txt$"),
+    re.compile(r"^data_log2_CNA.*\.txt$", re.IGNORECASE),
+    re.compile(r"^data_armlevel_cna\.txt$", re.IGNORECASE),
+    re.compile(r"^data_mrna_.*\.txt$"),
+    re.compile(r"^data_rppa.*\.txt$"),
 )
 
 TIMELINE_PATTERN = re.compile(r"^data_timeline_(?P<kind>[a-zA-Z0-9_]+)\.txt$")
@@ -86,6 +115,56 @@ def maf_column_type(name: str) -> str:
     if name in MAF_NUMERIC_COLUMNS:
         return "BIGINT"
     return "VARCHAR"
+
+
+def sv_column_type(name: str) -> str:
+    for suffix in SV_NUMERIC_COLUMN_SUFFIXES:
+        if name.endswith(suffix):
+            return "BIGINT"
+    return "VARCHAR"
+
+
+def cna_long_format_rows(
+    header: list[str], data_rows: list[list[str]],
+) -> tuple[list[str], list[list[str | None]]]:
+    """Pivot a cBioPortal CNA matrix (gene×sample) into long rows.
+
+    Input columns: Hugo_Symbol [, Entrez_Gene_Id], <sample_1>, <sample_2>, ...
+    Output columns: sample_id, hugo_symbol, entrez_gene_id, cna_value
+    Blank cells become None (null) in cna_value.
+    """
+    gene_col_indices = _identify_cna_gene_columns(header)
+    gene_idx_set = set(gene_col_indices.values())
+    sample_indices = [
+        i for i in range(len(header)) if i not in gene_idx_set
+    ]
+    out_header = ["sample_id", "hugo_symbol", "entrez_gene_id", "cna_value"]
+    out_rows: list[list[str | None]] = []
+    for row in data_rows:
+        hugo = row[gene_col_indices["hugo"]]
+        entrez = (
+            row[gene_col_indices["entrez"]]
+            if "entrez" in gene_col_indices else ""
+        )
+        for idx in sample_indices:
+            raw_value = row[idx] if idx < len(row) else ""
+            value: str | None = raw_value.strip() or None
+            out_rows.append([header[idx], hugo, entrez, value])
+    return out_header, out_rows
+
+
+def _identify_cna_gene_columns(header: list[str]) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for i, name in enumerate(header):
+        lowered = name.strip().lower()
+        if lowered in {"hugo_symbol"}:
+            result["hugo"] = i
+        elif lowered in {"entrez_gene_id"}:
+            result["entrez"] = i
+    if "hugo" not in result:
+        msg = f"CNA file header missing Hugo_Symbol column: {header!r}"
+        raise ValueError(msg)
+    return result
 
 
 def open_text_defensive(path: Path) -> IO[str]:

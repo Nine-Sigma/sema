@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 from urllib.request import Request, urlopen
 
 import pyarrow as pa
 
 from sema.ingest.cbioportal_utils import (
+    DOWNLOAD_EXACT_FILENAMES,
+    DOWNLOAD_PREFIXES,
+    EXCLUDED_DOWNLOAD_PREFIXES,
     GITHUB_API_TEMPLATE,
     MEDIA_URL_TEMPLATE,
     RAW_URL_TEMPLATE,
@@ -15,12 +18,14 @@ from sema.ingest.cbioportal_utils import (
     TIMELINE_PATTERN,
     ClinicalHeader,
     cbioportal_type_to_duckdb,
+    cna_long_format_rows,
     maf_column_type,
     parse_clinical_header,
     read_clinical_data_rows,
     read_header_block,
     read_tsv_rows,
     rows_to_arrow,
+    sv_column_type,
 )
 from sema.ingest.duckdb_staging import Staging
 from sema.log import logger
@@ -32,7 +37,11 @@ __all__ = [
     "iter_timeline_files",
     "parse_clinical_file",
     "parse_clinical_header",
+    "parse_cna_file",
+    "parse_gene_panel_matrix",
     "parse_maf",
+    "parse_resource_file",
+    "parse_sv_file",
     "parse_timeline_file",
 ]
 
@@ -82,15 +91,12 @@ def _list_study_entries(study_id: str) -> list[dict[str, str]]:
 
 
 def _should_download(filename: str) -> bool:
-    if filename in {"meta_study.txt"}:
+    lowered = filename.lower()
+    if filename in DOWNLOAD_EXACT_FILENAMES:
         return True
-    if filename.startswith("data_clinical_"):
-        return True
-    if filename in {"data_mutations.txt", "data_mutations_extended.txt"}:
-        return True
-    if filename.startswith("data_timeline_"):
-        return True
-    return False
+    if any(lowered.startswith(p) for p in EXCLUDED_DOWNLOAD_PREFIXES):
+        return False
+    return any(filename.startswith(p) for p in DOWNLOAD_PREFIXES)
 
 
 def _download_url_to(url: str, target: Path) -> None:
@@ -149,6 +155,64 @@ def parse_timeline_file(
     return rows_to_arrow(column_names, data_rows, column_types), column_types, {}
 
 
+def parse_sv_file(
+    path: Path,
+) -> tuple[pa.Table, dict[str, str], dict[str, str]]:
+    column_names, data_rows, _ = read_tsv_rows(path, skip_comment_prefix=True)
+    column_types = {name: sv_column_type(name) for name in column_names}
+    return (
+        rows_to_arrow(column_names, data_rows, column_types),
+        column_types,
+        {},
+    )
+
+
+def parse_cna_file(
+    path: Path,
+) -> tuple[pa.Table, dict[str, str], dict[str, str]]:
+    header, data_rows, _ = read_tsv_rows(path, skip_comment_prefix=True)
+    long_header, long_rows = cna_long_format_rows(header, data_rows)
+    column_types = {
+        "sample_id": "VARCHAR",
+        "hugo_symbol": "VARCHAR",
+        "entrez_gene_id": "BIGINT",
+        "cna_value": "INTEGER",
+    }
+    rows_as_str: list[list[str]] = [
+        ["" if v is None else str(v) for v in row]
+        for row in long_rows
+    ]
+    return (
+        rows_to_arrow(long_header, rows_as_str, column_types),
+        column_types,
+        {},
+    )
+
+
+def parse_gene_panel_matrix(
+    path: Path,
+) -> tuple[pa.Table, dict[str, str], dict[str, str]]:
+    column_names, data_rows, _ = read_tsv_rows(path, skip_comment_prefix=True)
+    column_types = {name: "VARCHAR" for name in column_names}
+    return (
+        rows_to_arrow(column_names, data_rows, column_types),
+        column_types,
+        {},
+    )
+
+
+def parse_resource_file(
+    path: Path,
+) -> tuple[pa.Table, dict[str, str], dict[str, str]]:
+    column_names, data_rows, _ = read_tsv_rows(path, skip_comment_prefix=True)
+    column_types = {name: "VARCHAR" for name in column_names}
+    return (
+        rows_to_arrow(column_names, data_rows, column_types),
+        column_types,
+        {},
+    )
+
+
 def iter_timeline_files(directory: Path) -> Iterator[tuple[str, Path]]:
     for entry in sorted(directory.iterdir()):
         if not entry.is_file():
@@ -189,6 +253,16 @@ def _ingest_study_dir(study_id: str, study_dir: Path, staging: Staging) -> None:
     _try_ingest_clinical(study_dir, staging, "data_clinical_patient.txt", "patient")
     _try_ingest_clinical(study_dir, staging, "data_clinical_sample.txt", "sample")
     _try_ingest_maf(study_dir, staging)
+    _try_ingest_fixed_files(study_dir, staging)
+    _ingest_prefix_matched_files(
+        study_dir, staging,
+        prefix="data_resource_", parser=parse_resource_file,
+    )
+    _ingest_prefix_matched_files(
+        study_dir, staging,
+        prefix="data_clinical_supp_", parser=parse_clinical_file,
+        uses_clinical_comments=True,
+    )
     _ingest_timelines(study_dir, staging)
     logger.info("Finished ingesting cBioPortal study {}", study_id)
 
@@ -209,6 +283,67 @@ def _try_ingest_clinical(
         column_comments=column_comments,
         table_comment=f"cBioPortal clinical {table} from {filename}",
     )
+
+
+_SIMPLE_FIXED_FILES: tuple[tuple[str, str, str], ...] = (
+    ("data_sv.txt", "structural_variant",
+     "cBioPortal structural variants from data_sv.txt"),
+    ("data_cna.txt", "cna",
+     "cBioPortal copy-number alterations from data_cna.txt "
+     "(pivoted to long format: one row per sample×gene)"),
+    ("data_gene_panel_matrix.txt", "gene_panel_matrix",
+     "cBioPortal gene panel matrix from data_gene_panel_matrix.txt"),
+)
+
+_PARSERS_BY_FILENAME = {
+    "data_sv.txt": parse_sv_file,
+    "data_cna.txt": parse_cna_file,
+    "data_gene_panel_matrix.txt": parse_gene_panel_matrix,
+}
+
+
+def _try_ingest_fixed_files(study_dir: Path, staging: Staging) -> None:
+    for filename, table_name, comment in _SIMPLE_FIXED_FILES:
+        path = study_dir / filename
+        if not path.exists():
+            continue
+        parser = _PARSERS_BY_FILENAME[filename]
+        rows, column_types, _ = parser(path)
+        staging.write_table(
+            schema="cbioportal",
+            table=table_name,
+            rows=rows,
+            column_types=column_types,
+            column_comments={},
+            table_comment=comment,
+        )
+
+
+def _ingest_prefix_matched_files(
+    study_dir: Path,
+    staging: Staging,
+    *,
+    prefix: str,
+    parser: Any,
+    uses_clinical_comments: bool = False,
+) -> None:
+    for entry in sorted(study_dir.iterdir()):
+        if not (entry.is_file() and entry.name.startswith(prefix)):
+            continue
+        if not entry.name.endswith(".txt"):
+            continue
+        table_name = entry.stem.removeprefix("data_")
+        result = parser(entry)
+        rows, column_types = result[0], result[1]
+        comments = result[2] if uses_clinical_comments else {}
+        staging.write_table(
+            schema="cbioportal",
+            table=table_name,
+            rows=rows,
+            column_types=column_types,
+            column_comments=comments,
+            table_comment=f"cBioPortal {table_name} from {entry.name}",
+        )
 
 
 def _try_ingest_maf(study_dir: Path, staging: Staging) -> None:

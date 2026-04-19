@@ -169,21 +169,25 @@ class TestTimelineParsing:
 
 @pytest.mark.unit
 class TestIngestStudySkipsMatrixFiles:
-    def test_skips_matrix_and_case_lists(self, tmp_path: Path) -> None:
+    def test_skips_expression_methylation_and_case_lists(
+        self, tmp_path: Path,
+    ) -> None:
         from sema.ingest.cbioportal import _list_skipped_files
 
-        (tmp_path / "data_CNA.txt").write_text("")
         (tmp_path / "data_expression_median.txt").write_text("")
         (tmp_path / "data_methylation_hm27.txt").write_text("")
+        (tmp_path / "data_log2_cna.txt").write_text("")
         (tmp_path / "case_lists").mkdir()
         (tmp_path / "data_clinical_patient.txt").write_text("")
+        (tmp_path / "data_cna.txt").write_text("")
 
         skipped = _list_skipped_files(tmp_path)
         names = {p.name for p in skipped}
-        assert "data_CNA.txt" in names
         assert "data_expression_median.txt" in names
         assert "data_methylation_hm27.txt" in names
+        assert "data_log2_cna.txt" in names
         assert "data_clinical_patient.txt" not in names
+        assert "data_cna.txt" not in names
 
 
 @pytest.mark.unit
