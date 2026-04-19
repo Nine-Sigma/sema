@@ -151,8 +151,8 @@ def _run_semantic_interpretation(
     )
 
     if use_staged:
-        assertions, stage_a, stage_b, c_results = (
-            semantic.interpret_table_staged(table_meta)
+        assertions, stage_a, stage_b, c_results, metrics = (
+            semantic.interpret_table_staged_with_metrics(table_meta)
         )
         status = _build_stage_status(stage_b, c_results)
 
@@ -161,7 +161,12 @@ def _run_semantic_interpretation(
             table_ref=table_meta.get("table_ref", work_item.fqn),
             stage_a=stage_a,
             stage_b=stage_b,
-            stage_c_calls=len(c_results),
+            stage_c_calls=metrics.stage_c_calls,
+            stage_a_latency_ms=metrics.stage_a_latency_ms,
+            stage_b_latency_ms=metrics.stage_b_latency_ms,
+            stage_c_latency_ms=metrics.stage_c_latency_ms,
+            tokens_input=metrics.tokens_input,
+            tokens_output=metrics.tokens_output,
         )
         logger.info(
             f"[{work_item.table_name}] L2 staged produced "

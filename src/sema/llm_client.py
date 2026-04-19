@@ -11,6 +11,7 @@ import json
 import random
 import re
 import time
+from dataclasses import dataclass, field
 from typing import Any, Callable, Final, TypeVar
 
 from pydantic import BaseModel, ConfigDict
@@ -19,6 +20,50 @@ from sema.log import logger
 from sema.models.protocols import JsonValue, LLMProtocol
 
 T = TypeVar("T", bound=BaseModel)
+
+
+@dataclass
+class InvocationStats:
+    """Captured stats from the most recent LLMClient.invoke() call.
+
+    Token counts are estimates derived from char length when the
+    underlying model response does not carry real usage metadata.
+    """
+
+    duration_ns: int = 0
+    prompt_chars: int = 0
+    response_chars: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+
+def _approx_tokens(char_count: int) -> int:
+    """Rough English token estimate at ~4 chars per token."""
+    return max(0, char_count // 4)
+
+
+def _try_usage_tokens(response: Any) -> tuple[int, int] | None:
+    """Extract (prompt, completion) tokens from a langchain response.
+
+    Returns None when usage metadata is not present.
+    """
+    usage = getattr(response, "usage_metadata", None) or getattr(
+        response, "response_metadata", None,
+    )
+    if isinstance(usage, dict):
+        prompt = (
+            usage.get("prompt_tokens")
+            or usage.get("input_tokens")
+            or usage.get("token_usage", {}).get("prompt_tokens")
+        )
+        completion = (
+            usage.get("completion_tokens")
+            or usage.get("output_tokens")
+            or usage.get("token_usage", {}).get("completion_tokens")
+        )
+        if prompt is not None and completion is not None:
+            return int(prompt), int(completion)
+    return None
 
 
 class TableSummary(BaseModel):
@@ -201,6 +246,8 @@ class LLMClient:
         self._supports_structured = _resolve_structured_support(
             llm, use_structured_output,
         )
+        self.last_stats: InvocationStats = InvocationStats()
+        self._last_response: Any = None
 
         if self._supports_structured:
             logger.info("LLMClient: using native structured output")
@@ -224,11 +271,14 @@ class LLMClient:
         2. Plain invoke + universal fallback parser
         3. Simplified prompt + universal fallback parser
 
-        Raises LLMStageError if all steps are exhausted.
+        Raises LLMStageError if all steps are exhausted. Populates
+        `self.last_stats` with duration and estimated token counts.
         """
         if self._circuit_breaker is not None:
             self._circuit_breaker.check()
 
+        start = time.monotonic_ns()
+        self._last_response = None
         try:
             result = self._invoke_fallback_chain(
                 prompt, schema, table_ref, stage_name, simplified_prompt,
@@ -236,11 +286,38 @@ class LLMClient:
         except LLMStageError:
             if self._circuit_breaker is not None:
                 self._circuit_breaker.record_failure()
+            self._record_stats(start, prompt, "")
             raise
 
         if self._circuit_breaker is not None:
             self._circuit_breaker.record_success()
+        response_text = self._response_text_for_stats(result)
+        self._record_stats(start, prompt, response_text)
         return result
+
+    def _response_text_for_stats(self, result: Any) -> str:
+        """Best-effort char-length source for completion token estimate."""
+        if hasattr(result, "model_dump_json"):
+            return str(result.model_dump_json())
+        return str(result)
+
+    def _record_stats(
+        self, start_ns: int, prompt: str, response_text: str,
+    ) -> None:
+        duration = time.monotonic_ns() - start_ns
+        usage = _try_usage_tokens(self._last_response)
+        if usage is not None:
+            prompt_tokens, completion_tokens = usage
+        else:
+            prompt_tokens = _approx_tokens(len(prompt))
+            completion_tokens = _approx_tokens(len(response_text))
+        self.last_stats = InvocationStats(
+            duration_ns=duration,
+            prompt_chars=len(prompt),
+            response_chars=len(response_text),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
 
     def _invoke_fallback_chain(
         self,
@@ -291,6 +368,7 @@ class LLMClient:
 
     def _raw_invoke(self, prompt: str) -> str:
         response = self._llm.invoke(prompt)
+        self._last_response = response
         return response.content if hasattr(response, "content") else str(response)
 
     def _invoke_with_retry(self, fn: Callable[..., Any], step_name: str = "") -> Any:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -223,6 +224,18 @@ Return ONLY valid JSON, no markdown.
 
 class _PropertyBatchResult(BaseModel):
     properties: list[PropertyInterpretation] = []
+
+
+@dataclass
+class StageMetrics:
+    """Per-table timing and token accounting across Stage A/B/C."""
+
+    stage_a_latency_ms: int = 0
+    stage_b_latency_ms: int = 0
+    stage_c_latency_ms: int = 0
+    tokens_input: int = 0
+    tokens_output: int = 0
+    stage_c_calls: int = 0
 
 
 class SemanticEngine:
@@ -564,30 +577,73 @@ class SemanticEngine:
         list[Assertion], StageAResult, StageBResult,
         dict[str, StageCResult],
     ]:
-        """Staged A→B→C→merge pipeline.
+        """Staged A→B→C→merge pipeline (legacy signature).
 
         Returns (assertions, stage_a, stage_b, c_results).
-        LLMStageError propagates on A failure or B_FAILED.
+        Use `interpret_table_staged_with_metrics` for timing/tokens.
         """
-        stage_a = self.run_stage_a(table_metadata)
-
-        stage_b = self.run_stage_b(table_metadata, stage_a)
-        if stage_b.status == "B_FAILED":
-            table_ref = table_metadata.get(
-                "table_ref",
-                f"unity://{table_metadata.get('table_name', 'unknown')}",
-            )
-            raise LLMStageError(
-                table_ref=table_ref,
-                stage_name="L2 stage_b",
-                step_errors=[("stage_b", ValueError(
-                    f"B_FAILED: raw={stage_b.raw_coverage.pct}"
-                ))],
-            )
-
-        c_results = self.run_stage_c(
-            table_metadata, stage_a, stage_b,
+        assertions, a, b, c, _ = (
+            self.interpret_table_staged_with_metrics(table_metadata)
         )
+        return assertions, a, b, c
+
+    def interpret_table_staged_with_metrics(
+        self, table_metadata: dict[str, Any],
+    ) -> tuple[
+        list[Assertion], StageAResult, StageBResult,
+        dict[str, StageCResult], StageMetrics,
+    ]:
+        """Same as `interpret_table_staged` plus per-stage metrics."""
+        import time
+
+        metrics = StageMetrics()
+        original_invoke = self._llm_client.invoke
+
+        def _wrapped_invoke(*args: Any, **kwargs: Any) -> Any:
+            result = original_invoke(*args, **kwargs)
+            stats = getattr(self._llm_client, "last_stats", None)
+            if stats is not None:
+                metrics.tokens_input += int(stats.prompt_tokens)
+                metrics.tokens_output += int(stats.completion_tokens)
+            return result
+
+        self._llm_client.invoke = _wrapped_invoke
+        try:
+            start = time.monotonic_ns()
+            stage_a = self.run_stage_a(table_metadata)
+            metrics.stage_a_latency_ms = (
+                (time.monotonic_ns() - start) // 1_000_000
+            )
+
+            start = time.monotonic_ns()
+            stage_b = self.run_stage_b(table_metadata, stage_a)
+            metrics.stage_b_latency_ms = (
+                (time.monotonic_ns() - start) // 1_000_000
+            )
+
+            if stage_b.status == "B_FAILED":
+                table_ref = table_metadata.get(
+                    "table_ref",
+                    f"unity://{table_metadata.get('table_name', 'unknown')}",
+                )
+                raise LLMStageError(
+                    table_ref=table_ref,
+                    stage_name="L2 stage_b",
+                    step_errors=[("stage_b", ValueError(
+                        f"B_FAILED: raw={stage_b.raw_coverage.pct}"
+                    ))],
+                )
+
+            start = time.monotonic_ns()
+            c_results = self.run_stage_c(
+                table_metadata, stage_a, stage_b,
+            )
+            metrics.stage_c_latency_ms = (
+                (time.monotonic_ns() - start) // 1_000_000
+            )
+            metrics.stage_c_calls = len(c_results)
+        finally:
+            self._llm_client.invoke = original_invoke
 
         table_ref = table_metadata.get(
             "table_ref",
@@ -598,7 +654,7 @@ class SemanticEngine:
             c_results=c_results,
             run_id=self._run_id,
         )
-        return assertions, stage_a, stage_b, c_results
+        return assertions, stage_a, stage_b, c_results, metrics
 
     def _make_assertion(
         self,
