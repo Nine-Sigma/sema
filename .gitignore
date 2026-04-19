@@ -31,6 +31,7 @@ Thumbs.db
 
 # Project tooling
 openspec/
+.wolf/
 .mypy_cache
 .pytest_cache
 htmlcov/
