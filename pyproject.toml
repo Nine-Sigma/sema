@@ -25,6 +25,8 @@ dependencies = [
     "rich>=13.0.0",
     "python-dotenv>=1.0.0",
     "loguru>=0.7.3",
+    "duckdb>=1.0.0",
+    "pyarrow>=14.0.0",
 ]
 
 [project.scripts]
@@ -58,6 +60,9 @@ module = [
     "databricks.*",
     "loguru.*",
     "sqlglot.*",
+    "pyarrow",
+    "pyarrow.*",
+    "duckdb",
 ]
 ignore_missing_imports = true
 

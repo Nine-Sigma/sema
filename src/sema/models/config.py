@@ -117,6 +117,46 @@ class BuildConfig(BaseSettings):
         return cls(**data)
 
 
+class IngestDatabricksTargetConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="INGEST_DATABRICKS_")
+
+    catalog: str = "workspace"
+    schemas: list[str] = Field(
+        default_factory=lambda: ["cbioportal", "ontology_omop", "vocabulary_omop"]
+    )
+
+
+class IngestOmopConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="INGEST_OMOP_")
+
+    cdm_version: str = "5.4"
+    vocab_path: str | None = None
+
+
+class IngestConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="INGEST_")
+
+    duckdb_path: str = "~/.sema/poc.duckdb"
+    cache_dir: str = "~/.sema/cache/cbioportal"
+    cloud_staging_uri: str | None = None
+
+    databricks: IngestDatabricksTargetConfig = Field(
+        default_factory=IngestDatabricksTargetConfig
+    )
+    omop: IngestOmopConfig = Field(default_factory=IngestOmopConfig)
+    databricks_creds: DatabricksConfig = Field(default_factory=DatabricksConfig)
+
+    @classmethod
+    def from_file(
+        cls, path: str, overrides: dict[str, Any] | None = None
+    ) -> IngestConfig:
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        if overrides:
+            data.update({k: v for k, v in overrides.items() if v is not None})
+        return cls(**data)
+
+
 class QueryConfig(BaseSettings):
     question: str
     consumer: str = "nl2sql"

@@ -19,6 +19,7 @@ from sema.pipeline.orchestrate import (
     run_context,
     run_query,
 )
+from sema.cli_ingest import ingest as _ingest_group, push_cmd as _push_cmd
 
 
 @click.group()
@@ -377,3 +378,7 @@ def query(
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+
+
+cli.add_command(_ingest_group, name="ingest")
+cli.add_command(_push_cmd, name="push")
