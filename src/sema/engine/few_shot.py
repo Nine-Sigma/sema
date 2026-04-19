@@ -115,6 +115,7 @@ _HEALTHCARE_STAGE_B: list[dict[str, Any]] = [
         "output": {
             "canonical_property_label": "patient identifier",
             "semantic_type": "patient identifier",
+            "synonyms": ["subject id", "case id", "participant id"],
             "candidate_vocab_families": [],
             "entity_role": "primary_key",
             "needs_stage_c": False,
@@ -130,6 +131,7 @@ _HEALTHCARE_STAGE_B: list[dict[str, Any]] = [
         "output": {
             "canonical_property_label": "sample identifier",
             "semantic_type": "specimen/sample identifier",
+            "synonyms": ["specimen id", "biospecimen id", "tumor sample id"],
             "candidate_vocab_families": [],
             "entity_role": "foreign_key",
             "needs_stage_c": False,
@@ -146,6 +148,7 @@ _HEALTHCARE_STAGE_B: list[dict[str, Any]] = [
         "output": {
             "canonical_property_label": "biological sex",
             "semantic_type": "demographic",
+            "synonyms": ["sex", "biological sex"],
             "candidate_vocab_families": [],
             "entity_role": "attribute",
             "needs_stage_c": True,
@@ -214,6 +217,7 @@ _HEALTHCARE_STAGE_B: list[dict[str, Any]] = [
         "output": {
             "canonical_property_label": "tumor mutational burden",
             "semantic_type": "biomarker/gene/variant",
+            "synonyms": ["tmb", "mutations per megabase", "mutation burden"],
             "candidate_vocab_families": [],
             "entity_role": "attribute",
             "needs_stage_c": False,
@@ -230,6 +234,7 @@ _HEALTHCARE_STAGE_B: list[dict[str, Any]] = [
         "output": {
             "canonical_property_label": "microsatellite instability",
             "semantic_type": "biomarker/gene/variant",
+            "synonyms": ["MSI status", "MSI type", "MSI"],
             "candidate_vocab_families": [],
             "entity_role": "attribute",
             "needs_stage_c": True,
@@ -246,6 +251,7 @@ _HEALTHCARE_STAGE_B: list[dict[str, Any]] = [
         "output": {
             "canonical_property_label": "gene symbol",
             "semantic_type": "biomarker/gene/variant",
+            "synonyms": ["gene name", "HGNC symbol", "gene"],
             "candidate_vocab_families": [
                 "gene symbol namespace",
             ],
@@ -265,6 +271,7 @@ _HEALTHCARE_STAGE_B: list[dict[str, Any]] = [
         "output": {
             "canonical_property_label": "variant effect",
             "semantic_type": "biomarker/gene/variant",
+            "synonyms": ["mutation type", "variant type", "mutation effect"],
             "candidate_vocab_families": [
                 "variant effect classification",
             ],
@@ -283,6 +290,7 @@ _HEALTHCARE_STAGE_B: list[dict[str, Any]] = [
         "output": {
             "canonical_property_label": "drug/agent name",
             "semantic_type": "therapy/drug/regimen",
+            "synonyms": ["drug", "therapeutic agent", "medication"],
             "candidate_vocab_families": [
                 "drug naming system",
             ],
@@ -301,6 +309,7 @@ _HEALTHCARE_STAGE_B: list[dict[str, Any]] = [
         "output": {
             "canonical_property_label": "highest cancer stage",
             "semantic_type": "diagnosis/condition",
+            "synonyms": ["overall stage", "pathologic stage", "tumor stage"],
             "candidate_vocab_families": [
                 "cancer staging system",
             ],
@@ -519,6 +528,8 @@ def format_examples(
     lines = ["Here are examples of correct output:"]
     for i, ex in enumerate(examples, 1):
         lines.append(f"\nExample {i}:")
-        lines.append(f"Input: {json.dumps(ex['input'], indent=2)}")
-        lines.append(f"Output: {json.dumps(ex['output'], indent=2)}")
+        lines.append(f"Input: {json.dumps(ex['input'], separators=(',', ':'))}")
+        lines.append(
+            f"Output: {json.dumps(ex['output'], separators=(',', ':'))}",
+        )
     return "\n".join(lines)
