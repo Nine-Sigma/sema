@@ -1,0 +1,1781 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status",
+  "config_label": "staged+domain+fewshot",
+  "timestamp": "2026-04-19T23:06:52.579703+00:00",
+  "run_id": "9bf71d4b-7e59-4730-9526-1cd6abcc483a",
+  "assertions": [
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status",
+      "predicate": "table_exists",
+      "payload": {
+        "table_type": "TABLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATIENT_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATIENT_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/START_DATE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/START_DATE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/STOP_DATE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/STOP_DATE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/EVENT_TYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/EVENT_TYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/STATUS",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/STATUS",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/SYSTEM_VERSION",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/SYSTEM_VERSION",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_M",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_M",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_N",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_N",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_T",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_T",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/ANATOMIC_SITE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/ANATOMIC_SITE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/TUMOR_STATUS",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/TUMOR_STATUS",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/VITAL_STATUS",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/VITAL_STATUS",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/STOP_DATE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 2294
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/EVENT_TYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "STATUS",
+            "frequency": 2294
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/STATUS",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Initial Diagnosis",
+            "frequency": 1083
+          },
+          {
+            "value": "Last Follow Up",
+            "frequency": 932
+          },
+          {
+            "value": "DECEASED",
+            "frequency": 151
+          },
+          {
+            "value": "Distant Metastasis",
+            "frequency": 80
+          },
+          {
+            "value": "Locoregional Recurrence",
+            "frequency": 19
+          },
+          {
+            "value": "New Primary Tumor",
+            "frequency": 19
+          },
+          {
+            "value": "Locoregional Disease",
+            "frequency": 9
+          },
+          {
+            "value": "Progression Of Disease",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 8
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1219
+          },
+          {
+            "value": "stage IIa",
+            "frequency": 355
+          },
+          {
+            "value": "stage IIb",
+            "frequency": 254
+          },
+          {
+            "value": "stage IIIa",
+            "frequency": 155
+          },
+          {
+            "value": "stage I",
+            "frequency": 88
+          },
+          {
+            "value": "stage Ia",
+            "frequency": 86
+          },
+          {
+            "value": "stage IIIc",
+            "frequency": 64
+          },
+          {
+            "value": "stage IIIb",
+            "frequency": 26
+          },
+          {
+            "value": "stage IV",
+            "frequency": 19
+          },
+          {
+            "value": "stage X",
+            "frequency": 14
+          },
+          {
+            "value": "stage II",
+            "frequency": 6
+          },
+          {
+            "value": "stage Ib",
+            "frequency": 6
+          },
+          {
+            "value": "stage III",
+            "frequency": 2
+          }
+        ],
+        "approx_distinct": 13
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/SYSTEM_VERSION",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1351
+          },
+          {
+            "value": "6th",
+            "frequency": 437
+          },
+          {
+            "value": "7th",
+            "frequency": 413
+          },
+          {
+            "value": "5th",
+            "frequency": 56
+          },
+          {
+            "value": "4th",
+            "frequency": 29
+          },
+          {
+            "value": "3rd",
+            "frequency": 8
+          }
+        ],
+        "approx_distinct": 5
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_M",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1211
+          },
+          {
+            "value": "m0",
+            "frequency": 894
+          },
+          {
+            "value": "mx",
+            "frequency": 162
+          },
+          {
+            "value": "m1",
+            "frequency": 21
+          },
+          {
+            "value": "cm0 (i+)",
+            "frequency": 6
+          }
+        ],
+        "approx_distinct": 5
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_N",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1211
+          },
+          {
+            "value": "n0",
+            "frequency": 328
+          },
+          {
+            "value": "n1a",
+            "frequency": 164
+          },
+          {
+            "value": "n0 (i-)",
+            "frequency": 154
+          },
+          {
+            "value": "n1",
+            "frequency": 123
+          },
+          {
+            "value": "n2a",
+            "frequency": 64
+          },
+          {
+            "value": "n2",
+            "frequency": 55
+          },
+          {
+            "value": "n3a",
+            "frequency": 46
+          },
+          {
+            "value": "n1mi",
+            "frequency": 36
+          },
+          {
+            "value": "n1b",
+            "frequency": 32
+          },
+          {
+            "value": "n0 (i+)",
+            "frequency": 28
+          },
+          {
+            "value": "n3",
+            "frequency": 26
+          },
+          {
+            "value": "nx",
+            "frequency": 20
+          },
+          {
+            "value": "n3b",
+            "frequency": 3
+          },
+          {
+            "value": "n1c",
+            "frequency": 2
+          },
+          {
+            "value": "n0 (mol+)",
+            "frequency": 1
+          },
+          {
+            "value": "n3c",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 17
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_T",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1211
+          },
+          {
+            "value": "t2",
+            "frequency": 626
+          },
+          {
+            "value": "t1c",
+            "frequency": 219
+          },
+          {
+            "value": "t3",
+            "frequency": 136
+          },
+          {
+            "value": "t1",
+            "frequency": 40
+          },
+          {
+            "value": "t4b",
+            "frequency": 27
+          },
+          {
+            "value": "t1b",
+            "frequency": 16
+          },
+          {
+            "value": "t4",
+            "frequency": 9
+          },
+          {
+            "value": "t4d",
+            "frequency": 3
+          },
+          {
+            "value": "tx",
+            "frequency": 3
+          },
+          {
+            "value": "t2a",
+            "frequency": 1
+          },
+          {
+            "value": "t1a",
+            "frequency": 1
+          },
+          {
+            "value": "t3a",
+            "frequency": 1
+          },
+          {
+            "value": "t2b",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 14
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1304
+          },
+          {
+            "value": "Core Needle Biopsy",
+            "frequency": 599
+          },
+          {
+            "value": "Tumor Resection",
+            "frequency": 163
+          },
+          {
+            "value": "Fine Needle Aspiration Biopsy",
+            "frequency": 95
+          },
+          {
+            "value": "Other Method, Specify:",
+            "frequency": 66
+          },
+          {
+            "value": "Excisional Biopsy",
+            "frequency": 29
+          },
+          {
+            "value": "Cytology (E.G. Peritoneal Or Pleural Fluid)",
+            "frequency": 22
+          },
+          {
+            "value": "Incisional Biopsy",
+            "frequency": 16
+          }
+        ],
+        "approx_distinct": 8
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/ANATOMIC_SITE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 2176
+          },
+          {
+            "value": "Bone",
+            "frequency": 37
+          },
+          {
+            "value": "Lung",
+            "frequency": 18
+          },
+          {
+            "value": "Liver",
+            "frequency": 13
+          },
+          {
+            "value": "Brain",
+            "frequency": 5
+          },
+          {
+            "value": "Breast",
+            "frequency": 5
+          },
+          {
+            "value": "Left Breast",
+            "frequency": 3
+          },
+          {
+            "value": "Chest Wall",
+            "frequency": 3
+          },
+          {
+            "value": "Intrathoracic Lymph Node",
+            "frequency": 2
+          },
+          {
+            "value": "Bone, Brain",
+            "frequency": 1
+          },
+          {
+            "value": "Liver And Pleura And Bone",
+            "frequency": 1
+          },
+          {
+            "value": "Endometrial",
+            "frequency": 1
+          },
+          {
+            "value": "Bone Marrow",
+            "frequency": 1
+          },
+          {
+            "value": "Malignant Melanoma",
+            "frequency": 1
+          },
+          {
+            "value": "Contralateral Breast",
+            "frequency": 1
+          },
+          {
+            "value": "Left Axilla",
+            "frequency": 1
+          },
+          {
+            "value": "Skin Left Chest Wall",
+            "frequency": 1
+          },
+          {
+            "value": "Dermis And Epidermis",
+            "frequency": 1
+          },
+          {
+            "value": "Lung, Bone, Liver",
+            "frequency": 1
+          },
+          {
+            "value": "Right Breast Cancer Contralateral",
+            "frequency": 1
+          },
+          {
+            "value": "Lung, Bone, Liver, Brain And Skin Nodules",
+            "frequency": 1
+          },
+          {
+            "value": "Skin And Bone",
+            "frequency": 1
+          },
+          {
+            "value": "Right Breast",
+            "frequency": 1
+          },
+          {
+            "value": "Left Chest Wall",
+            "frequency": 1
+          },
+          {
+            "value": "Lymph Node",
+            "frequency": 1
+          },
+          {
+            "value": "Omentum",
+            "frequency": 1
+          },
+          {
+            "value": "Renal",
+            "frequency": 1
+          },
+          {
+            "value": "Axilla",
+            "frequency": 1
+          },
+          {
+            "value": "Chest Wall, Breast Recurrence",
+            "frequency": 1
+          },
+          {
+            "value": "Mediastinal And Supraclavicular Lymph Nodes",
+            "frequency": 1
+          },
+          {
+            "value": "Skin Lesion-Basal Cell Left Lower Lateral Back",
+            "frequency": 1
+          },
+          {
+            "value": "Rectum",
+            "frequency": 1
+          },
+          {
+            "value": "Colon",
+            "frequency": 1
+          },
+          {
+            "value": "Left Cervical Lymph Node",
+            "frequency": 1
+          },
+          {
+            "value": "Mediastinal Lymph Node",
+            "frequency": 1
+          },
+          {
+            "value": "Skin, Right Leg",
+            "frequency": 1
+          },
+          {
+            "value": "Endometrium",
+            "frequency": 1
+          },
+          {
+            "value": "Chestwall",
+            "frequency": 1
+          },
+          {
+            "value": "Pectoral Muscle",
+            "frequency": 1
+          },
+          {
+            "value": "Adrenal Glands",
+            "frequency": 1
+          },
+          {
+            "value": "Mediastinal Lymph Nodes",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 42
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/TUMOR_STATUS",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1451
+          },
+          {
+            "value": "Tumor Free",
+            "frequency": 807
+          },
+          {
+            "value": "With Tumor",
+            "frequency": 36
+          }
+        ],
+        "approx_distinct": 3
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/VITAL_STATUS",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1416
+          },
+          {
+            "value": "Alive",
+            "frequency": 878
+          }
+        ],
+        "approx_distinct": 2
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status",
+      "predicate": "has_sample_rows",
+      "payload": {
+        "rows": [
+          {
+            "PATIENT_ID": "TCGA-A7-A26E",
+            "START_DATE": "954",
+            "STOP_DATE": "",
+            "EVENT_TYPE": "STATUS",
+            "STATUS": "Last Follow Up",
+            "PATHOLOGIC_STAGE": "",
+            "SYSTEM_VERSION": "",
+            "PATHOLOGIC_M": "",
+            "PATHOLOGIC_N": "",
+            "PATHOLOGIC_T": "",
+            "INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD": "",
+            "ANATOMIC_SITE": "",
+            "TUMOR_STATUS": "Tumor Free",
+            "VITAL_STATUS": "Alive"
+          },
+          {
+            "PATIENT_ID": "TCGA-A7-A26F",
+            "START_DATE": "738",
+            "STOP_DATE": "",
+            "EVENT_TYPE": "STATUS",
+            "STATUS": "Last Follow Up",
+            "PATHOLOGIC_STAGE": "",
+            "SYSTEM_VERSION": "",
+            "PATHOLOGIC_M": "",
+            "PATHOLOGIC_N": "",
+            "PATHOLOGIC_T": "",
+            "INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD": "",
+            "ANATOMIC_SITE": "",
+            "TUMOR_STATUS": "Tumor Free",
+            "VITAL_STATUS": "Alive"
+          },
+          {
+            "PATIENT_ID": "TCGA-A7-A26G",
+            "START_DATE": "722",
+            "STOP_DATE": "",
+            "EVENT_TYPE": "STATUS",
+            "STATUS": "Last Follow Up",
+            "PATHOLOGIC_STAGE": "",
+            "SYSTEM_VERSION": "",
+            "PATHOLOGIC_M": "",
+            "PATHOLOGIC_N": "",
+            "PATHOLOGIC_T": "",
+            "INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD": "",
+            "ANATOMIC_SITE": "",
+            "TUMOR_STATUS": "Tumor Free",
+            "VITAL_STATUS": "Alive"
+          },
+          {
+            "PATIENT_ID": "TCGA-A7-A26H",
+            "START_DATE": "724",
+            "STOP_DATE": "",
+            "EVENT_TYPE": "STATUS",
+            "STATUS": "Last Follow Up",
+            "PATHOLOGIC_STAGE": "",
+            "SYSTEM_VERSION": "",
+            "PATHOLOGIC_M": "",
+            "PATHOLOGIC_N": "",
+            "PATHOLOGIC_T": "",
+            "INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD": "",
+            "ANATOMIC_SITE": "",
+            "TUMOR_STATUS": "With Tumor",
+            "VITAL_STATUS": "Alive"
+          },
+          {
+            "PATIENT_ID": "TCGA-A7-A26I",
+            "START_DATE": "661",
+            "STOP_DATE": "",
+            "EVENT_TYPE": "STATUS",
+            "STATUS": "Last Follow Up",
+            "PATHOLOGIC_STAGE": "",
+            "SYSTEM_VERSION": "",
+            "PATHOLOGIC_M": "",
+            "PATHOLOGIC_N": "",
+            "PATHOLOGIC_T": "",
+            "INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD": "",
+            "ANATOMIC_SITE": "",
+            "TUMOR_STATUS": "Tumor Free",
+            "VITAL_STATUS": "Alive"
+          }
+        ],
+        "columns": [
+          "PATIENT_ID",
+          "START_DATE",
+          "STOP_DATE",
+          "EVENT_TYPE",
+          "STATUS",
+          "PATHOLOGIC_STAGE",
+          "SYSTEM_VERSION",
+          "PATHOLOGIC_M",
+          "PATHOLOGIC_N",
+          "PATHOLOGIC_T",
+          "INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD",
+          "ANATOMIC_SITE",
+          "TUMOR_STATUS",
+          "VITAL_STATUS"
+        ]
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status",
+      "predicate": "has_entity_name",
+      "payload": {
+        "value": "Patient Status Event",
+        "grain": "one row per clinical status or staging event per patient"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "clinical follow-up",
+        "is_preferred": true
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "disease status timeline",
+        "is_preferred": false
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor staging event",
+        "is_preferred": false
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "vital status update",
+        "is_preferred": false
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATIENT_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATIENT_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "subject id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "case id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.START_DATE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "event start date"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.START_DATE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "temporal field"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.START_DATE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "date of onset",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.STOP_DATE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "event end date"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.STOP_DATE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "temporal field"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.STOP_DATE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "date of resolution",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.EVENT_TYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "clinical event type"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.EVENT_TYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.EVENT_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "category",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.EVENT_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "event class",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.STATUS",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "clinical status"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.STATUS",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "outcome/survival"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.STATUS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "disease status",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.STATUS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "progression status",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_STAGE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "pathologic stage"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_STAGE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_STAGE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "ajcc stage",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_STAGE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor stage",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.SYSTEM_VERSION",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "staging system version"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.SYSTEM_VERSION",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.SYSTEM_VERSION",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "ajcc edition",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.SYSTEM_VERSION",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tnm version",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_M",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "pathologic metastasis (M) stage"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_M",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_M",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "m stage",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_M",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "metastatic category",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_N",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "pathologic node (N) stage"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_N",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_N",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "n stage",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_N",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "nodal involvement",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_T",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "pathologic tumor (T) stage"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_T",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_T",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "t stage",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.PATHOLOGIC_T",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor size category",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "diagnostic method"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biopsy method",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "diagnosis procedure",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.ANATOMIC_SITE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "anatomic site"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.ANATOMIC_SITE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.ANATOMIC_SITE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "body site",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.ANATOMIC_SITE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "location",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.TUMOR_STATUS",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "tumor presence status"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.TUMOR_STATUS",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "outcome/survival"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.TUMOR_STATUS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor indicator",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.TUMOR_STATUS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "disease presence",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.VITAL_STATUS",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "vital status"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.VITAL_STATUS",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "outcome/survival"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.VITAL_STATUS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "survival status",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status.VITAL_STATUS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "is alive",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "AJCC Staging"
+      },
+      "confidence": 0.9615384615384616,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "stage I",
+        "child": "stage Ia"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "stage I",
+        "child": "stage IV"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "stage I",
+        "child": "stage II"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "stage I",
+        "child": "stage Ib"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "stage II",
+        "child": "stage III"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "stage II",
+        "child": "stage IIb"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "stage II",
+        "child": "stage IIa"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "stage III",
+        "child": "stage IIIa"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "stage III",
+        "child": "stage IIIc"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_STAGE",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "stage III",
+        "child": "stage IIIb"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/STOP_DATE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "none"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/INITIAL_PATHOLOGIC_DIAGNOSIS_METHOD",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NCI Thesaurus"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_M",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "AJCC TNM Staging System"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/SYSTEM_VERSION",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "AJCC Cancer Staging System"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_T",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "AJCC TNM Staging System"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/STATUS",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NCI Thesaurus (NCIt)"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/PATHOLOGIC_N",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "AJCC TNM Staging System"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/ANATOMIC_SITE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "SNOMED CT"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/VITAL_STATUS",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 Personal Status"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/TUMOR_STATUS",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "TCGA"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_status/EVENT_TYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 v2 Table 0119"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    }
+  ]
+}

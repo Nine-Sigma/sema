@@ -41,3 +41,6 @@ coverage.xml
 # Docs (generated, source lives elsewhere)
 docs/
 backups/
+
+# Eval run logs (artifacts kept, logs are transient)
+eval-runs/*.log

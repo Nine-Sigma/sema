@@ -1,0 +1,32 @@
+{
+  "label": "staged+domain+fewshot+c",
+  "telemetry": {
+    "table_count": 6,
+    "b_outcome_distribution": {
+      "success": 6,
+      "partial": 0,
+      "failed": 0
+    },
+    "avg_raw_coverage_pct": 1.0,
+    "avg_critical_coverage_pct": 1.0,
+    "avg_c_trigger_rate": 0.4457,
+    "avg_total_latency_ms": 40433.5,
+    "recovery": {
+      "total_retries": 0,
+      "total_splits": 0,
+      "total_rescues": 0
+    },
+    "tokens": {
+      "input": 52224,
+      "output": 31504
+    }
+  },
+  "semantic_churn": {
+    "tables_compared": 6,
+    "total_added": 87,
+    "total_removed": 4,
+    "total_changed": 545,
+    "only_in_baseline": [],
+    "only_in_current": []
+  }
+}
