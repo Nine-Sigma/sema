@@ -166,6 +166,8 @@ def process_table(
     domain_context: DomainContext | None = None,
     use_staged: bool = False,
     prompt_layers: Any = None,
+    eval_dump_dir: str | None = None,
+    eval_config_label: str = "run",
 ) -> TableResult:
     """Process a single table through all pipeline stages."""
     if resume:
@@ -184,7 +186,7 @@ def process_table(
         )
         if isinstance(result, TableResult):
             return result
-        all_assertions = result
+        all_assertions, staged_output = result
     except CircuitOpenError as e:
         logger.warning(f"Table {work_item.fqn} skipped (circuit open): {e}")
         return TableResult.failed(work_item.fqn, "circuit_breaker", str(e))
@@ -195,6 +197,12 @@ def process_table(
         logger.warning(f"Table {work_item.fqn} failed: {e}")
         return TableResult.failed(work_item.fqn, "unknown", str(e))
 
+    if eval_dump_dir:
+        _dump_for_eval(
+            all_assertions, staged_output, work_item.fqn,
+            eval_config_label, eval_dump_dir, run_id,
+        )
+
     entity_count, prop_count, term_count = _count_results(all_assertions)
     return TableResult.success(
         work_item.fqn,
@@ -202,6 +210,41 @@ def process_table(
         properties=prop_count,
         terms=term_count,
     )
+
+
+def _dump_for_eval(
+    assertions: list[Assertion],
+    staged_output: Any,
+    table_ref: str,
+    label: str,
+    dump_dir: str,
+    run_id: str,
+) -> None:
+    """Write eval dumps for a table. Failures are logged, not raised."""
+    from pathlib import Path
+
+    from sema.eval.pipeline_hook import (
+        dump_table_eval_outputs,
+        telemetry_to_dict,
+    )
+
+    try:
+        telemetry = (
+            telemetry_to_dict(staged_output.telemetry)
+            if staged_output is not None else None
+        )
+        dump_table_eval_outputs(
+            assertions=assertions,
+            telemetry=telemetry,
+            table_ref=table_ref,
+            label=label,
+            output_dir=Path(dump_dir),
+            run_id=run_id,
+        )
+    except Exception as e:
+        logger.warning(
+            f"Eval dump failed for {table_ref}: {e}"
+        )
 
 
 def aggregate_report(

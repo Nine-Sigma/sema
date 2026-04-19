@@ -468,11 +468,12 @@ def _run_pipeline_stages(
     domain_context: DomainContext | None = None,
     use_staged: bool = False,
     prompt_layers: Any = None,
-) -> list[Assertion] | Any:
+) -> tuple[list[Assertion], _StagedOutput | None] | Any:
     """Run all pipeline stages for a single table.
 
-    Returns either a list of assertions on success or a TableResult
-    if the table should be skipped.
+    Returns either (assertions, staged_output) on success or a TableResult
+    if the table should be skipped. staged_output is None when
+    use_staged=False.
     """
     from sema.pipeline.build import TableResult
 
@@ -511,4 +512,4 @@ def _run_pipeline_stages(
 
     _commit_and_materialize(all_assertions, work_item, loader)
 
-    return all_assertions
+    return all_assertions, staged_output

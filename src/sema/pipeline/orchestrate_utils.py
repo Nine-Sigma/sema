@@ -46,9 +46,22 @@ def _discover_tables(
         schemas=config.schemas or None,
         table_pattern=config.table_pattern,
     )
+    if config.slice_tables:
+        work_items = _filter_work_items_to_slice(
+            work_items, config.slice_tables,
+        )
     if config.verbose:
         click.echo(f"  Found {len(work_items)} tables")
     return work_items  # type: ignore[no-any-return]
+
+
+def _filter_work_items_to_slice(
+    work_items: list[Any], slice_tables: list[str],
+) -> list[Any]:
+    if not slice_tables:
+        return work_items
+    allowed = set(slice_tables)
+    return [w for w in work_items if w.table_name in allowed]
 
 
 def _log_result(result: Any, label: str, verbose: bool) -> None:
@@ -104,6 +117,8 @@ def _spawn_workers_parallel(
             domain_context=domain_context,
             use_staged=config.use_staged,
             prompt_layers=layers,
+            eval_dump_dir=config.eval_dump_dir,
+            eval_config_label=config.eval_config_label,
         )
 
     with ThreadPoolExecutor(
@@ -172,6 +187,8 @@ def _spawn_workers(
             domain_context=domain_context,
             use_staged=config.use_staged,
             prompt_layers=layers,
+            eval_dump_dir=config.eval_dump_dir,
+            eval_config_label=config.eval_config_label,
         )
         _log_result(result, f"    ", config.verbose)
         results.append(result)

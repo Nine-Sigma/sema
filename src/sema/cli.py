@@ -20,6 +20,7 @@ from sema.pipeline.orchestrate import (
     run_query,
 )
 from sema.cli_ingest import ingest as _ingest_group, push_cmd as _push_cmd
+from sema.cli_eval import eval_group as _eval_group
 
 
 @click.group()
@@ -382,3 +383,4 @@ def query(
 
 cli.add_command(_ingest_group, name="ingest")
 cli.add_command(_push_cmd, name="push")
+cli.add_command(_eval_group, name="eval")

@@ -93,6 +93,10 @@ class BuildConfig(BaseSettings):
     enable_few_shot: bool = True
     enable_stage_c: bool = True
 
+    eval_dump_dir: str | None = None
+    eval_config_label: str = "run"
+    slice_tables: list[str] = []
+
     table_workers: int = 4
     vocab_workers: int = 8
     column_batch_size: int = 25
