@@ -1,0 +1,5825 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment",
+  "config_label": "staged+domain+fewshot+c-v2",
+  "timestamp": "2026-04-20T20:36:21.438636+00:00",
+  "run_id": "57c5ba82-5b47-4f11-bc74-b94605dac151",
+  "assertions": [
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment",
+      "predicate": "table_exists",
+      "payload": {
+        "table_type": "TABLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PATIENT_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PATIENT_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/START_DATE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/START_DATE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/STOP_DATE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/STOP_DATE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/EVENT_TYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/EVENT_TYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TREATMENT_TYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TREATMENT_TYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TREATMENT_SUBTYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TREATMENT_SUBTYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/AGENT",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/AGENT",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/NUMBER_OF_CYCLES",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/NUMBER_OF_CYCLES",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PRESCRIBED_DOSE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PRESCRIBED_DOSE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PRESCRIBED_DOSE_UNITS",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_NUMBER",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_NUMBER",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_INDICATION",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_INDICATION",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_INDICATION_NOTES",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_INDICATION_NOTES",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/MEASURE_OF_RESPONSE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/MEASURE_OF_RESPONSE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/CLINICAL_TRIAL_DRUG_CLASSIFICATION",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/CLINICAL_TRIAL_DRUG_CLASSIFICATION",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ROUTE_OF_ADMINISTRATION",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ROUTE_OF_ADMINISTRATION-2",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ROUTE_OF_ADMINISTRATION-2",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/THERAPY_ONGOING",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/THERAPY_ONGOING",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TOTAL_DOSE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TOTAL_DOSE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TOTAL_DOSE_UNITS",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TOTAL_DOSE_UNITS",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TX_ON_CLINICAL_TRIAL",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TX_ON_CLINICAL_TRIAL",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ANATOMIC_TREATMENT_SITE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/COURSE_NUMBER",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/COURSE_NUMBER",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/NUMBER_OF_FRACTIONS",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/NUMBER_OF_FRACTIONS",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_DOSAGE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_DOSAGE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_TREATMENT_ONGOING",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_TREATMENT_ONGOING",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_TYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_TYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_UNITS",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_UNITS",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PHARM_REGIMEN",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PHARM_REGIMEN",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/STEM_CELL_TRANSPLANTATION",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/STEM_CELL_TRANSPLANTATION",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/STEM_CELL_TRANSPLANTATION_TYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/STEM_CELL_TRANSPLANTATION_TYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PATIENT_ID",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "TCGA-12-3644",
+            "frequency": 30
+          },
+          {
+            "value": "TCGA-12-0670",
+            "frequency": 22
+          },
+          {
+            "value": "TCGA-12-0662",
+            "frequency": 18
+          },
+          {
+            "value": "TCGA-12-0773",
+            "frequency": 17
+          },
+          {
+            "value": "TCGA-08-0357",
+            "frequency": 16
+          },
+          {
+            "value": "TCGA-12-1091",
+            "frequency": 15
+          },
+          {
+            "value": "TCGA-12-0772",
+            "frequency": 15
+          },
+          {
+            "value": "TCGA-12-0778",
+            "frequency": 14
+          },
+          {
+            "value": "TCGA-06-0879",
+            "frequency": 14
+          },
+          {
+            "value": "TCGA-12-1599",
+            "frequency": 14
+          },
+          {
+            "value": "TCGA-14-0786",
+            "frequency": 14
+          },
+          {
+            "value": "TCGA-12-3650",
+            "frequency": 13
+          },
+          {
+            "value": "TCGA-28-5208",
+            "frequency": 12
+          },
+          {
+            "value": "TCGA-28-5214",
+            "frequency": 12
+          },
+          {
+            "value": "TCGA-12-3652",
+            "frequency": 11
+          },
+          {
+            "value": "TCGA-06-0650",
+            "frequency": 11
+          },
+          {
+            "value": "TCGA-06-0882",
+            "frequency": 11
+          },
+          {
+            "value": "TCGA-06-2565",
+            "frequency": 11
+          },
+          {
+            "value": "TCGA-06-0409",
+            "frequency": 11
+          },
+          {
+            "value": "TCGA-14-1451",
+            "frequency": 11
+          },
+          {
+            "value": "TCGA-32-2494",
+            "frequency": 10
+          },
+          {
+            "value": "TCGA-06-0185",
+            "frequency": 10
+          },
+          {
+            "value": "TCGA-12-1092",
+            "frequency": 10
+          },
+          {
+            "value": "TCGA-27-1836",
+            "frequency": 10
+          },
+          {
+            "value": "TCGA-12-0827",
+            "frequency": 10
+          },
+          {
+            "value": "TCGA-06-0241",
+            "frequency": 10
+          },
+          {
+            "value": "TCGA-12-0656",
+            "frequency": 10
+          },
+          {
+            "value": "TCGA-12-0820",
+            "frequency": 10
+          },
+          {
+            "value": "TCGA-06-2561",
+            "frequency": 10
+          },
+          {
+            "value": "TCGA-06-0188",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-32-2615",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-06-0240",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-12-0616",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-14-1402",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-12-3648",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-12-3646",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-12-0822",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-06-0686",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-06-0221",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-19-0957",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-06-0192",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-12-0619",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-08-0355",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-27-2523",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-28-5211",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-12-0829",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-06-1084",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-32-1973",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-12-0780",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-12-0688",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-08-0358",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-27-1835",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-12-0819",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-27-1834",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-14-1454",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-41-5651",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-32-2495",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-08-0245",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-12-0818",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-06-0876",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-32-1991",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-32-4209",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-14-1823",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-12-3651",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-12-1094",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-12-3653",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-27-2518",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-12-1095",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-06-0128",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-14-1456",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-08-0347",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-28-5213",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-0644",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-14-1037",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-28-5216",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-0154",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-27-2519",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-12-1597",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-0743",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-08-0386",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-A7TL",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-14-1450",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-08-0348",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-08-0524",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-12-3649",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-08-0354",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-12-1097",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-12-1093",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-14-1458",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-32-4213",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-0125",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-27-1833",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-19-1386",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-27-1837",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-28-1752",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-27-2524",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-0147",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-32-2616",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-0195",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-27-2528",
+            "frequency": 6
+          }
+        ],
+        "approx_distinct": 430
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/EVENT_TYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Treatment",
+            "frequency": 1883
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TREATMENT_TYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Chemotherapy",
+            "frequency": 1026
+          },
+          {
+            "value": "Radiation Therapy",
+            "frequency": 507
+          },
+          {
+            "value": "Targeted Molecular Therapy",
+            "frequency": 217
+          },
+          {
+            "value": "Hormone Therapy",
+            "frequency": 99
+          },
+          {
+            "value": "Immunotherapy",
+            "frequency": 29
+          },
+          {
+            "value": "Not Specified",
+            "frequency": 5
+          }
+        ],
+        "approx_distinct": 6
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TREATMENT_SUBTYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1882
+          },
+          {
+            "value": "Daily for 42 Days",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 2
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/AGENT",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Temozolomide",
+            "frequency": 577
+          },
+          {
+            "value": "Radiation 1",
+            "frequency": 412
+          },
+          {
+            "value": "Bevacizumab",
+            "frequency": 134
+          },
+          {
+            "value": "Carmustine",
+            "frequency": 81
+          },
+          {
+            "value": "Radiation 2",
+            "frequency": 74
+          },
+          {
+            "value": "Dexamethasone",
+            "frequency": 71
+          },
+          {
+            "value": "Irinotecan",
+            "frequency": 69
+          },
+          {
+            "value": "Lomustine",
+            "frequency": 66
+          },
+          {
+            "value": "Etoposide",
+            "frequency": 37
+          },
+          {
+            "value": "Erlotinib",
+            "frequency": 28
+          },
+          {
+            "value": "Procarbazine",
+            "frequency": 24
+          },
+          {
+            "value": "Tamoxifen",
+            "frequency": 22
+          },
+          {
+            "value": "Cisplatin",
+            "frequency": 16
+          },
+          {
+            "value": "Radiation 3",
+            "frequency": 15
+          },
+          {
+            "value": "Tetrathiomolybdate",
+            "frequency": 13
+          },
+          {
+            "value": "Hydroxyurea",
+            "frequency": 12
+          },
+          {
+            "value": "Vincristine",
+            "frequency": 12
+          },
+          {
+            "value": "Carboplatin",
+            "frequency": 11
+          },
+          {
+            "value": "Sirolimus",
+            "frequency": 10
+          },
+          {
+            "value": "Celecoxib",
+            "frequency": 9
+          },
+          {
+            "value": "Imatinib",
+            "frequency": 9
+          },
+          {
+            "value": "Mab I-131",
+            "frequency": 8
+          },
+          {
+            "value": "6-O-Benzylguanine",
+            "frequency": 8
+          },
+          {
+            "value": "81C6",
+            "frequency": 8
+          },
+          {
+            "value": "Cilengitide",
+            "frequency": 7
+          },
+          {
+            "value": "Isotretinoin",
+            "frequency": 7
+          },
+          {
+            "value": "Ci-980",
+            "frequency": 6
+          },
+          {
+            "value": "Radiation 4",
+            "frequency": 5
+          },
+          {
+            "value": "Dc Vax (Dendritic Cell Vaccine)",
+            "frequency": 5
+          },
+          {
+            "value": "Oxaliplatin",
+            "frequency": 5
+          },
+          {
+            "value": "Cyclophosphamide",
+            "frequency": 5
+          },
+          {
+            "value": "Fotemustine",
+            "frequency": 5
+          },
+          {
+            "value": "Levetiracetam",
+            "frequency": 5
+          },
+          {
+            "value": "Motexafin Gadolinium",
+            "frequency": 4
+          },
+          {
+            "value": "Cabozantinib",
+            "frequency": 4
+          },
+          {
+            "value": "Attac",
+            "frequency": 4
+          },
+          {
+            "value": "Interleukin-13 + Pseudomonas Exotoxin",
+            "frequency": 4
+          },
+          {
+            "value": "Oxcarbazepine",
+            "frequency": 3
+          },
+          {
+            "value": "Arsenic Trioxide",
+            "frequency": 3
+          },
+          {
+            "value": "Cai Nabit 9712",
+            "frequency": 3
+          },
+          {
+            "value": "Sorafenib",
+            "frequency": 3
+          },
+          {
+            "value": "Cediranib",
+            "frequency": 3
+          },
+          {
+            "value": "Tipifarnib",
+            "frequency": 2
+          },
+          {
+            "value": "Iniparib",
+            "frequency": 2
+          },
+          {
+            "value": "Antineoplastons",
+            "frequency": 2
+          },
+          {
+            "value": "Afatinib",
+            "frequency": 2
+          },
+          {
+            "value": "Veliparib",
+            "frequency": 2
+          },
+          {
+            "value": "Lonafarnib",
+            "frequency": 2
+          },
+          {
+            "value": "",
+            "frequency": 2
+          },
+          {
+            "value": "Tioguanine",
+            "frequency": 2
+          },
+          {
+            "value": "9-Aminocamptothecin",
+            "frequency": 2
+          },
+          {
+            "value": "Topotecan",
+            "frequency": 2
+          },
+          {
+            "value": "Bortezomib",
+            "frequency": 2
+          },
+          {
+            "value": "Hydroxychloroquine",
+            "frequency": 2
+          },
+          {
+            "value": "Nos",
+            "frequency": 2
+          },
+          {
+            "value": "Hsppc-96 Vaccine",
+            "frequency": 2
+          },
+          {
+            "value": "5,8-Di-Amino-1,4-Dihydroxy-Anthraquinone",
+            "frequency": 2
+          },
+          {
+            "value": "Valproic Acid",
+            "frequency": 2
+          },
+          {
+            "value": "Potassium Chloride",
+            "frequency": 2
+          },
+          {
+            "value": "Doxorubicin",
+            "frequency": 2
+          },
+          {
+            "value": "Phenytoin",
+            "frequency": 1
+          },
+          {
+            "value": "Pyrazinamide",
+            "frequency": 1
+          },
+          {
+            "value": "Radiation 5",
+            "frequency": 1
+          },
+          {
+            "value": "Azd",
+            "frequency": 1
+          },
+          {
+            "value": "Vatalanib",
+            "frequency": 1
+          },
+          {
+            "value": "Ch81C6",
+            "frequency": 1
+          },
+          {
+            "value": "Ict-107",
+            "frequency": 1
+          },
+          {
+            "value": "Enzastaurin",
+            "frequency": 1
+          },
+          {
+            "value": "Everolimus",
+            "frequency": 1
+          },
+          {
+            "value": "O6-Benzylguanine",
+            "frequency": 1
+          },
+          {
+            "value": "Ridaforolimus",
+            "frequency": 1
+          },
+          {
+            "value": "Fenretinide",
+            "frequency": 1
+          },
+          {
+            "value": "Pexidartinib",
+            "frequency": 1
+          },
+          {
+            "value": "Poly-Iclc",
+            "frequency": 1
+          },
+          {
+            "value": "Sch-63666",
+            "frequency": 1
+          },
+          {
+            "value": "13-Cis-12-(3-Carboxyphenyl)Retinoic\u00a0Acid",
+            "frequency": 1
+          },
+          {
+            "value": "Vismodegib",
+            "frequency": 1
+          },
+          {
+            "value": "Irofulven",
+            "frequency": 1
+          },
+          {
+            "value": "Metformin",
+            "frequency": 1
+          },
+          {
+            "value": "Pegdinetanib",
+            "frequency": 1
+          },
+          {
+            "value": "Interferon Alfa",
+            "frequency": 1
+          },
+          {
+            "value": "Prednisone",
+            "frequency": 1
+          },
+          {
+            "value": "Daclizumab",
+            "frequency": 1
+          },
+          {
+            "value": "Paclitaxel",
+            "frequency": 1
+          },
+          {
+            "value": "Carboxyamidotriazole",
+            "frequency": 1
+          },
+          {
+            "value": "Vorinostat",
+            "frequency": 1
+          },
+          {
+            "value": "Pep-3-Klh",
+            "frequency": 1
+          },
+          {
+            "value": "Chloroquine",
+            "frequency": 1
+          },
+          {
+            "value": "R04929097",
+            "frequency": 1
+          },
+          {
+            "value": "Dactinomycin",
+            "frequency": 1
+          },
+          {
+            "value": "Streptozocin",
+            "frequency": 1
+          },
+          {
+            "value": "Estramustine",
+            "frequency": 1
+          },
+          {
+            "value": "Suramin",
+            "frequency": 1
+          },
+          {
+            "value": "Polychlorinated Biphenyl",
+            "frequency": 1
+          },
+          {
+            "value": "Gossypol",
+            "frequency": 1
+          },
+          {
+            "value": "Tumor Vaccine Nos",
+            "frequency": 1
+          },
+          {
+            "value": "Rilotumumab",
+            "frequency": 1
+          },
+          {
+            "value": "Fluorouracil + Tegafur",
+            "frequency": 1
+          },
+          {
+            "value": "2-Methoxyestradiol",
+            "frequency": 1
+          },
+          {
+            "value": "Vandetanib",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 101
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/NUMBER_OF_CYCLES",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1015
+          },
+          {
+            "value": "01",
+            "frequency": 203
+          },
+          {
+            "value": "1",
+            "frequency": 152
+          },
+          {
+            "value": "02",
+            "frequency": 96
+          },
+          {
+            "value": "2",
+            "frequency": 63
+          },
+          {
+            "value": "03",
+            "frequency": 49
+          },
+          {
+            "value": "04",
+            "frequency": 48
+          },
+          {
+            "value": "3",
+            "frequency": 29
+          },
+          {
+            "value": "05",
+            "frequency": 29
+          },
+          {
+            "value": "5",
+            "frequency": 28
+          },
+          {
+            "value": "06",
+            "frequency": 27
+          },
+          {
+            "value": "4",
+            "frequency": 23
+          },
+          {
+            "value": "12",
+            "frequency": 19
+          },
+          {
+            "value": "10",
+            "frequency": 15
+          },
+          {
+            "value": "6",
+            "frequency": 14
+          },
+          {
+            "value": "11",
+            "frequency": 9
+          },
+          {
+            "value": "07",
+            "frequency": 7
+          },
+          {
+            "value": "08",
+            "frequency": 6
+          },
+          {
+            "value": "7",
+            "frequency": 6
+          },
+          {
+            "value": "24",
+            "frequency": 6
+          },
+          {
+            "value": "8",
+            "frequency": 5
+          },
+          {
+            "value": "22",
+            "frequency": 4
+          },
+          {
+            "value": "09",
+            "frequency": 4
+          },
+          {
+            "value": "18",
+            "frequency": 4
+          },
+          {
+            "value": "13",
+            "frequency": 3
+          },
+          {
+            "value": "14",
+            "frequency": 3
+          },
+          {
+            "value": "9",
+            "frequency": 2
+          },
+          {
+            "value": ".5",
+            "frequency": 2
+          },
+          {
+            "value": "16",
+            "frequency": 2
+          },
+          {
+            "value": "15",
+            "frequency": 2
+          },
+          {
+            "value": "30",
+            "frequency": 2
+          },
+          {
+            "value": "17",
+            "frequency": 1
+          },
+          {
+            "value": "20",
+            "frequency": 1
+          },
+          {
+            "value": "19",
+            "frequency": 1
+          },
+          {
+            "value": "1.5",
+            "frequency": 1
+          },
+          {
+            "value": "27",
+            "frequency": 1
+          },
+          {
+            "value": "75",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 36
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PRESCRIBED_DOSE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1372
+          },
+          {
+            "value": "10",
+            "frequency": 64
+          },
+          {
+            "value": "75",
+            "frequency": 60
+          },
+          {
+            "value": "200",
+            "frequency": 51
+          },
+          {
+            "value": "150",
+            "frequency": 42
+          },
+          {
+            "value": "140",
+            "frequency": 32
+          },
+          {
+            "value": "125",
+            "frequency": 24
+          },
+          {
+            "value": "160",
+            "frequency": 20
+          },
+          {
+            "value": "300",
+            "frequency": 13
+          },
+          {
+            "value": "100",
+            "frequency": 11
+          },
+          {
+            "value": "8",
+            "frequency": 11
+          },
+          {
+            "value": "5",
+            "frequency": 9
+          },
+          {
+            "value": "50",
+            "frequency": 9
+          },
+          {
+            "value": "110",
+            "frequency": 8
+          },
+          {
+            "value": "500",
+            "frequency": 8
+          },
+          {
+            "value": "4",
+            "frequency": 6
+          },
+          {
+            "value": "250",
+            "frequency": 6
+          },
+          {
+            "value": "350",
+            "frequency": 6
+          },
+          {
+            "value": "20",
+            "frequency": 5
+          },
+          {
+            "value": "80",
+            "frequency": 5
+          },
+          {
+            "value": "600",
+            "frequency": 5
+          },
+          {
+            "value": "180",
+            "frequency": 5
+          },
+          {
+            "value": "120",
+            "frequency": 5
+          },
+          {
+            "value": "270",
+            "frequency": 4
+          },
+          {
+            "value": "1000",
+            "frequency": 4
+          },
+          {
+            "value": "280",
+            "frequency": 4
+          },
+          {
+            "value": "390",
+            "frequency": 4
+          },
+          {
+            "value": "340",
+            "frequency": 4
+          },
+          {
+            "value": "330",
+            "frequency": 4
+          },
+          {
+            "value": "2000",
+            "frequency": 3
+          },
+          {
+            "value": "800",
+            "frequency": 3
+          },
+          {
+            "value": "40",
+            "frequency": 3
+          },
+          {
+            "value": "380",
+            "frequency": 3
+          },
+          {
+            "value": "320",
+            "frequency": 3
+          },
+          {
+            "value": "360",
+            "frequency": 3
+          },
+          {
+            "value": "6",
+            "frequency": 3
+          },
+          {
+            "value": "400",
+            "frequency": 2
+          },
+          {
+            "value": "1500",
+            "frequency": 2
+          },
+          {
+            "value": "30",
+            "frequency": 2
+          },
+          {
+            "value": "1750",
+            "frequency": 2
+          },
+          {
+            "value": "2",
+            "frequency": 2
+          },
+          {
+            "value": "25",
+            "frequency": 2
+          },
+          {
+            "value": "105",
+            "frequency": 2
+          },
+          {
+            "value": "135",
+            "frequency": 2
+          },
+          {
+            "value": "170",
+            "frequency": 2
+          },
+          {
+            "value": "165",
+            "frequency": 2
+          },
+          {
+            "value": "440",
+            "frequency": 2
+          },
+          {
+            "value": "12",
+            "frequency": 1
+          },
+          {
+            "value": "0.25",
+            "frequency": 1
+          },
+          {
+            "value": "175",
+            "frequency": 1
+          },
+          {
+            "value": "944",
+            "frequency": 1
+          },
+          {
+            "value": "24",
+            "frequency": 1
+          },
+          {
+            "value": "290",
+            "frequency": 1
+          },
+          {
+            "value": "1.1",
+            "frequency": 1
+          },
+          {
+            "value": "1800",
+            "frequency": 1
+          },
+          {
+            "value": "510",
+            "frequency": 1
+          },
+          {
+            "value": "4.0",
+            "frequency": 1
+          },
+          {
+            "value": "16",
+            "frequency": 1
+          },
+          {
+            "value": "05",
+            "frequency": 1
+          },
+          {
+            "value": "900",
+            "frequency": 1
+          },
+          {
+            "value": "82.5",
+            "frequency": 1
+          },
+          {
+            "value": "300-400",
+            "frequency": 1
+          },
+          {
+            "value": "949",
+            "frequency": 1
+          },
+          {
+            "value": "240",
+            "frequency": 1
+          },
+          {
+            "value": "745-835",
+            "frequency": 1
+          },
+          {
+            "value": "260",
+            "frequency": 1
+          },
+          {
+            "value": "3",
+            "frequency": 1
+          },
+          {
+            "value": "123",
+            "frequency": 1
+          },
+          {
+            "value": "4000",
+            "frequency": 1
+          },
+          {
+            "value": "425",
+            "frequency": 1
+          },
+          {
+            "value": "1200",
+            "frequency": 1
+          },
+          {
+            "value": "990",
+            "frequency": 1
+          },
+          {
+            "value": "850",
+            "frequency": 1
+          },
+          {
+            "value": "1",
+            "frequency": 1
+          },
+          {
+            "value": "750",
+            "frequency": 1
+          },
+          {
+            "value": "85",
+            "frequency": 1
+          },
+          {
+            "value": "890",
+            "frequency": 1
+          },
+          {
+            "value": "9.5",
+            "frequency": 1
+          },
+          {
+            "value": "130",
+            "frequency": 1
+          },
+          {
+            "value": "90",
+            "frequency": 1
+          },
+          {
+            "value": "210",
+            "frequency": 1
+          },
+          {
+            "value": "871",
+            "frequency": 1
+          },
+          {
+            "value": "60",
+            "frequency": 1
+          },
+          {
+            "value": "145",
+            "frequency": 1
+          },
+          {
+            "value": "480",
+            "frequency": 1
+          },
+          {
+            "value": "630",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 86
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 742
+          },
+          {
+            "value": "mg",
+            "frequency": 604
+          },
+          {
+            "value": "mg/m2",
+            "frequency": 300
+          },
+          {
+            "value": "mg/day",
+            "frequency": 87
+          },
+          {
+            "value": "mg/kg",
+            "frequency": 51
+          },
+          {
+            "value": "mg/m2/day",
+            "frequency": 47
+          },
+          {
+            "value": "{wafer}",
+            "frequency": 32
+          },
+          {
+            "value": "mci",
+            "frequency": 8
+          },
+          {
+            "value": "ml",
+            "frequency": 6
+          },
+          {
+            "value": "ug/m2",
+            "frequency": 2
+          },
+          {
+            "value": "mg/dl",
+            "frequency": 1
+          },
+          {
+            "value": "meq",
+            "frequency": 1
+          },
+          {
+            "value": "auc",
+            "frequency": 1
+          },
+          {
+            "value": "ug",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 14
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_NUMBER",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1770
+          },
+          {
+            "value": "01",
+            "frequency": 30
+          },
+          {
+            "value": "02",
+            "frequency": 29
+          },
+          {
+            "value": "03",
+            "frequency": 17
+          },
+          {
+            "value": "1",
+            "frequency": 11
+          },
+          {
+            "value": "2",
+            "frequency": 8
+          },
+          {
+            "value": "04",
+            "frequency": 8
+          },
+          {
+            "value": "05",
+            "frequency": 4
+          },
+          {
+            "value": "3",
+            "frequency": 3
+          },
+          {
+            "value": "4",
+            "frequency": 2
+          },
+          {
+            "value": "06",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 11
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_INDICATION",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Adjuvant",
+            "frequency": 1189
+          },
+          {
+            "value": "Progression",
+            "frequency": 452
+          },
+          {
+            "value": "",
+            "frequency": 118
+          },
+          {
+            "value": "Recurrence",
+            "frequency": 93
+          },
+          {
+            "value": "Other, Specify In Notes",
+            "frequency": 27
+          },
+          {
+            "value": "Palliative",
+            "frequency": 4
+          }
+        ],
+        "approx_distinct": 6
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_INDICATION_NOTES",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1859
+          },
+          {
+            "value": "Concurrent Chemoradiation",
+            "frequency": 3
+          },
+          {
+            "value": "Concurrent",
+            "frequency": 2
+          },
+          {
+            "value": "To 50% Isodoc Line Which Encompassed The Tumor",
+            "frequency": 1
+          },
+          {
+            "value": "To The 50/ Isdose Line",
+            "frequency": 1
+          },
+          {
+            "value": "Patient Moved Back To Mexico",
+            "frequency": 1
+          },
+          {
+            "value": "To The 50% Is Dose Line, The Patient Will Recieve Further Treatment In Puerto Rico, External Beam Radiation And Temodar Is Planned.",
+            "frequency": 1
+          },
+          {
+            "value": "Pt Treated With Concurrent Chemo Temozolomide And Radiation Therapy",
+            "frequency": 1
+          },
+          {
+            "value": "0.71 Cc",
+            "frequency": 1
+          },
+          {
+            "value": "2.54 Cc",
+            "frequency": 1
+          },
+          {
+            "value": "Stereotactic Radiosurgery 3.12 Ccs 18 Gy",
+            "frequency": 1
+          },
+          {
+            "value": "T Spine",
+            "frequency": 1
+          },
+          {
+            "value": "Patient Did Not Recieve Treatment At Site, Unable To Obtain All Radiation Details",
+            "frequency": 1
+          },
+          {
+            "value": "Fu Interval -Monthly",
+            "frequency": 1
+          },
+          {
+            "value": "Boos",
+            "frequency": 1
+          },
+          {
+            "value": "Site Of Treatment Was Regional",
+            "frequency": 1
+          },
+          {
+            "value": "Other Information Not Documented In Medical Records",
+            "frequency": 1
+          },
+          {
+            "value": "Per Site No Other Information Available In Medical Records",
+            "frequency": 1
+          },
+          {
+            "value": "No Other Information Available In Medical Record",
+            "frequency": 1
+          },
+          {
+            "value": "Per Site No Other Documentation Available",
+            "frequency": 1
+          },
+          {
+            "value": "Patient Stopped Radiation And Enrolled In Hospice",
+            "frequency": 1
+          },
+          {
+            "value": "Only 5 Fractions Of Radiation Before Treatment Ended",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 21
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/MEASURE_OF_RESPONSE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1845
+          },
+          {
+            "value": "stable disease",
+            "frequency": 20
+          },
+          {
+            "value": "clinical progressive disease",
+            "frequency": 10
+          },
+          {
+            "value": "complete response",
+            "frequency": 6
+          },
+          {
+            "value": "radiographic progressive disease",
+            "frequency": 2
+          }
+        ],
+        "approx_distinct": 5
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/CLINICAL_TRIAL_DRUG_CLASSIFICATION",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1880
+          },
+          {
+            "value": "chemotherapy",
+            "frequency": 2
+          },
+          {
+            "value": "targeted molecular therapy",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 3
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 790
+          },
+          {
+            "value": "PO",
+            "frequency": 762
+          },
+          {
+            "value": "IV",
+            "frequency": 265
+          },
+          {
+            "value": "OTHER",
+            "frequency": 50
+          },
+          {
+            "value": "INTUM",
+            "frequency": 12
+          },
+          {
+            "value": "IP",
+            "frequency": 3
+          },
+          {
+            "value": "INTRAVESICAL",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 7
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ROUTE_OF_ADMINISTRATION-2",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1880
+          },
+          {
+            "value": "IV",
+            "frequency": 3
+          }
+        ],
+        "approx_distinct": 2
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/THERAPY_ONGOING",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "No",
+            "frequency": 1150
+          },
+          {
+            "value": "",
+            "frequency": 644
+          },
+          {
+            "value": "Yes",
+            "frequency": 89
+          }
+        ],
+        "approx_distinct": 3
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TOTAL_DOSE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 863
+          },
+          {
+            "value": "200",
+            "frequency": 74
+          },
+          {
+            "value": "75",
+            "frequency": 50
+          },
+          {
+            "value": "150",
+            "frequency": 49
+          },
+          {
+            "value": "10",
+            "frequency": 31
+          },
+          {
+            "value": "110",
+            "frequency": 30
+          },
+          {
+            "value": "100",
+            "frequency": 25
+          },
+          {
+            "value": "50",
+            "frequency": 25
+          },
+          {
+            "value": "8",
+            "frequency": 23
+          },
+          {
+            "value": "125",
+            "frequency": 20
+          },
+          {
+            "value": "140",
+            "frequency": 19
+          },
+          {
+            "value": "300",
+            "frequency": 18
+          },
+          {
+            "value": "400",
+            "frequency": 17
+          },
+          {
+            "value": "160",
+            "frequency": 16
+          },
+          {
+            "value": "5880",
+            "frequency": 15
+          },
+          {
+            "value": "120",
+            "frequency": 11
+          },
+          {
+            "value": "20",
+            "frequency": 10
+          },
+          {
+            "value": "380",
+            "frequency": 8
+          },
+          {
+            "value": "60",
+            "frequency": 8
+          },
+          {
+            "value": "6000",
+            "frequency": 8
+          },
+          {
+            "value": "82.5",
+            "frequency": 8
+          },
+          {
+            "value": "1200",
+            "frequency": 7
+          },
+          {
+            "value": "1000",
+            "frequency": 7
+          },
+          {
+            "value": "1.4",
+            "frequency": 7
+          },
+          {
+            "value": "8400",
+            "frequency": 7
+          },
+          {
+            "value": "1400",
+            "frequency": 6
+          },
+          {
+            "value": "14000",
+            "frequency": 6
+          },
+          {
+            "value": "3600",
+            "frequency": 6
+          },
+          {
+            "value": "250",
+            "frequency": 6
+          },
+          {
+            "value": "6300",
+            "frequency": 5
+          },
+          {
+            "value": "37.5",
+            "frequency": 5
+          },
+          {
+            "value": "350",
+            "frequency": 5
+          },
+          {
+            "value": "280",
+            "frequency": 5
+          },
+          {
+            "value": "1",
+            "frequency": 5
+          },
+          {
+            "value": "500",
+            "frequency": 5
+          },
+          {
+            "value": "6720",
+            "frequency": 5
+          },
+          {
+            "value": "80",
+            "frequency": 5
+          },
+          {
+            "value": "2000",
+            "frequency": 5
+          },
+          {
+            "value": "190",
+            "frequency": 5
+          },
+          {
+            "value": "340",
+            "frequency": 5
+          },
+          {
+            "value": "1500",
+            "frequency": 5
+          },
+          {
+            "value": "4200",
+            "frequency": 4
+          },
+          {
+            "value": "5600",
+            "frequency": 4
+          },
+          {
+            "value": "3500",
+            "frequency": 4
+          },
+          {
+            "value": "1440",
+            "frequency": 4
+          },
+          {
+            "value": "180",
+            "frequency": 4
+          },
+          {
+            "value": "600",
+            "frequency": 4
+          },
+          {
+            "value": "3000",
+            "frequency": 4
+          },
+          {
+            "value": "800",
+            "frequency": 4
+          },
+          {
+            "value": "320",
+            "frequency": 4
+          },
+          {
+            "value": "9000",
+            "frequency": 4
+          },
+          {
+            "value": "5400",
+            "frequency": 4
+          },
+          {
+            "value": "8750",
+            "frequency": 3
+          },
+          {
+            "value": "6020",
+            "frequency": 3
+          },
+          {
+            "value": "1350",
+            "frequency": 3
+          },
+          {
+            "value": "420",
+            "frequency": 3
+          },
+          {
+            "value": "2100",
+            "frequency": 3
+          },
+          {
+            "value": "1600",
+            "frequency": 3
+          },
+          {
+            "value": "2125",
+            "frequency": 3
+          },
+          {
+            "value": "1680",
+            "frequency": 3
+          },
+          {
+            "value": "220",
+            "frequency": 3
+          },
+          {
+            "value": "5670",
+            "frequency": 3
+          },
+          {
+            "value": "750",
+            "frequency": 3
+          },
+          {
+            "value": "360",
+            "frequency": 3
+          },
+          {
+            "value": "1800",
+            "frequency": 3
+          },
+          {
+            "value": "12600",
+            "frequency": 3
+          },
+          {
+            "value": "5040",
+            "frequency": 3
+          },
+          {
+            "value": "1660",
+            "frequency": 3
+          },
+          {
+            "value": "5",
+            "frequency": 3
+          },
+          {
+            "value": "4000",
+            "frequency": 3
+          },
+          {
+            "value": "36",
+            "frequency": 3
+          },
+          {
+            "value": "390",
+            "frequency": 3
+          },
+          {
+            "value": "7560",
+            "frequency": 2
+          },
+          {
+            "value": "3400",
+            "frequency": 2
+          },
+          {
+            "value": "2880",
+            "frequency": 2
+          },
+          {
+            "value": "1575",
+            "frequency": 2
+          },
+          {
+            "value": "61.6",
+            "frequency": 2
+          },
+          {
+            "value": "773",
+            "frequency": 2
+          },
+          {
+            "value": "30000",
+            "frequency": 2
+          },
+          {
+            "value": "1650",
+            "frequency": 2
+          },
+          {
+            "value": "11000",
+            "frequency": 2
+          },
+          {
+            "value": "4500",
+            "frequency": 2
+          },
+          {
+            "value": "1250",
+            "frequency": 2
+          },
+          {
+            "value": "780",
+            "frequency": 2
+          },
+          {
+            "value": "21000",
+            "frequency": 2
+          },
+          {
+            "value": "16",
+            "frequency": 2
+          },
+          {
+            "value": "9500",
+            "frequency": 2
+          },
+          {
+            "value": "5520",
+            "frequency": 2
+          },
+          {
+            "value": "6500",
+            "frequency": 2
+          },
+          {
+            "value": "210",
+            "frequency": 2
+          },
+          {
+            "value": "170",
+            "frequency": 2
+          },
+          {
+            "value": "370",
+            "frequency": 2
+          },
+          {
+            "value": "201.25",
+            "frequency": 2
+          },
+          {
+            "value": "470",
+            "frequency": 2
+          },
+          {
+            "value": "1700",
+            "frequency": 2
+          },
+          {
+            "value": "900",
+            "frequency": 2
+          },
+          {
+            "value": "5160",
+            "frequency": 2
+          },
+          {
+            "value": "1455",
+            "frequency": 2
+          },
+          {
+            "value": "4",
+            "frequency": 2
+          },
+          {
+            "value": "6450",
+            "frequency": 2
+          }
+        ],
+        "approx_distinct": 367
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TOTAL_DOSE_UNITS",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 747
+          },
+          {
+            "value": "mg",
+            "frequency": 676
+          },
+          {
+            "value": "mg/m2",
+            "frequency": 256
+          },
+          {
+            "value": "mg/day",
+            "frequency": 77
+          },
+          {
+            "value": "mg/m2/day",
+            "frequency": 45
+          },
+          {
+            "value": "{wafer}",
+            "frequency": 32
+          },
+          {
+            "value": "mg/kg",
+            "frequency": 30
+          },
+          {
+            "value": "mci",
+            "frequency": 8
+          },
+          {
+            "value": "ml",
+            "frequency": 6
+          },
+          {
+            "value": "ug/m2",
+            "frequency": 2
+          },
+          {
+            "value": "mg/dl",
+            "frequency": 1
+          },
+          {
+            "value": "mg/kg/day",
+            "frequency": 1
+          },
+          {
+            "value": "ug",
+            "frequency": 1
+          },
+          {
+            "value": "meq",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 13
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TX_ON_CLINICAL_TRIAL",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1818
+          },
+          {
+            "value": "No",
+            "frequency": 54
+          },
+          {
+            "value": "Yes",
+            "frequency": 11
+          }
+        ],
+        "approx_distinct": 3
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1383
+          },
+          {
+            "value": "Primary Tumor Field",
+            "frequency": 448
+          },
+          {
+            "value": "Local Recurrence",
+            "frequency": 44
+          },
+          {
+            "value": "Regional Site",
+            "frequency": 5
+          },
+          {
+            "value": "Distant Recurrence",
+            "frequency": 2
+          },
+          {
+            "value": "Distant Site",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 6
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/COURSE_NUMBER",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1834
+          },
+          {
+            "value": "1",
+            "frequency": 27
+          },
+          {
+            "value": "2",
+            "frequency": 20
+          },
+          {
+            "value": "4",
+            "frequency": 1
+          },
+          {
+            "value": "3",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 5
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/NUMBER_OF_FRACTIONS",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1435
+          },
+          {
+            "value": "30",
+            "frequency": 256
+          },
+          {
+            "value": "33",
+            "frequency": 39
+          },
+          {
+            "value": "1",
+            "frequency": 36
+          },
+          {
+            "value": "4",
+            "frequency": 13
+          },
+          {
+            "value": "15",
+            "frequency": 13
+          },
+          {
+            "value": "32",
+            "frequency": 8
+          },
+          {
+            "value": "34",
+            "frequency": 6
+          },
+          {
+            "value": "10",
+            "frequency": 5
+          },
+          {
+            "value": "25",
+            "frequency": 5
+          },
+          {
+            "value": "5",
+            "frequency": 5
+          },
+          {
+            "value": "23",
+            "frequency": 5
+          },
+          {
+            "value": "28",
+            "frequency": 5
+          },
+          {
+            "value": "35",
+            "frequency": 4
+          },
+          {
+            "value": "6",
+            "frequency": 4
+          },
+          {
+            "value": "20",
+            "frequency": 4
+          },
+          {
+            "value": "3",
+            "frequency": 4
+          },
+          {
+            "value": "60",
+            "frequency": 4
+          },
+          {
+            "value": "31",
+            "frequency": 4
+          },
+          {
+            "value": "12",
+            "frequency": 3
+          },
+          {
+            "value": "29",
+            "frequency": 3
+          },
+          {
+            "value": "8",
+            "frequency": 3
+          },
+          {
+            "value": "7",
+            "frequency": 3
+          },
+          {
+            "value": "26",
+            "frequency": 3
+          },
+          {
+            "value": "50",
+            "frequency": 2
+          },
+          {
+            "value": "18",
+            "frequency": 2
+          },
+          {
+            "value": "22",
+            "frequency": 2
+          },
+          {
+            "value": "9",
+            "frequency": 2
+          },
+          {
+            "value": "19",
+            "frequency": 1
+          },
+          {
+            "value": "24",
+            "frequency": 1
+          },
+          {
+            "value": "21",
+            "frequency": 1
+          },
+          {
+            "value": "3.5",
+            "frequency": 1
+          },
+          {
+            "value": "13",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 33
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_DOSAGE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1409
+          },
+          {
+            "value": "6000",
+            "frequency": 252
+          },
+          {
+            "value": "5940",
+            "frequency": 31
+          },
+          {
+            "value": "60",
+            "frequency": 19
+          },
+          {
+            "value": "3000",
+            "frequency": 13
+          },
+          {
+            "value": "1800",
+            "frequency": 10
+          },
+          {
+            "value": "3200",
+            "frequency": 9
+          },
+          {
+            "value": "6120",
+            "frequency": 5
+          },
+          {
+            "value": "1500",
+            "frequency": 5
+          },
+          {
+            "value": "5400",
+            "frequency": 5
+          },
+          {
+            "value": "5800",
+            "frequency": 5
+          },
+          {
+            "value": "3600",
+            "frequency": 5
+          },
+          {
+            "value": "4500",
+            "frequency": 4
+          },
+          {
+            "value": "1200",
+            "frequency": 4
+          },
+          {
+            "value": "4000",
+            "frequency": 4
+          },
+          {
+            "value": "1400",
+            "frequency": 3
+          },
+          {
+            "value": "6600",
+            "frequency": 3
+          },
+          {
+            "value": "800",
+            "frequency": 3
+          },
+          {
+            "value": "2000",
+            "frequency": 3
+          },
+          {
+            "value": "3900",
+            "frequency": 3
+          },
+          {
+            "value": "18",
+            "frequency": 3
+          },
+          {
+            "value": "600",
+            "frequency": 3
+          },
+          {
+            "value": "20",
+            "frequency": 3
+          },
+          {
+            "value": "5700",
+            "frequency": 3
+          },
+          {
+            "value": "6100",
+            "frequency": 3
+          },
+          {
+            "value": "1600",
+            "frequency": 3
+          },
+          {
+            "value": "46",
+            "frequency": 2
+          },
+          {
+            "value": "8000",
+            "frequency": 2
+          },
+          {
+            "value": "35",
+            "frequency": 2
+          },
+          {
+            "value": "6020",
+            "frequency": 2
+          },
+          {
+            "value": "3500",
+            "frequency": 2
+          },
+          {
+            "value": "2800",
+            "frequency": 2
+          },
+          {
+            "value": "6400",
+            "frequency": 2
+          },
+          {
+            "value": "1550",
+            "frequency": 2
+          },
+          {
+            "value": "4600",
+            "frequency": 2
+          },
+          {
+            "value": "2400",
+            "frequency": 2
+          },
+          {
+            "value": "2250",
+            "frequency": 2
+          },
+          {
+            "value": "9700",
+            "frequency": 1
+          },
+          {
+            "value": "5040",
+            "frequency": 1
+          },
+          {
+            "value": "5945",
+            "frequency": 1
+          },
+          {
+            "value": "5944",
+            "frequency": 1
+          },
+          {
+            "value": "6480",
+            "frequency": 1
+          },
+          {
+            "value": "1260",
+            "frequency": 1
+          },
+          {
+            "value": "460",
+            "frequency": 1
+          },
+          {
+            "value": "71",
+            "frequency": 1
+          },
+          {
+            "value": "52.0",
+            "frequency": 1
+          },
+          {
+            "value": "2500",
+            "frequency": 1
+          },
+          {
+            "value": "59",
+            "frequency": 1
+          },
+          {
+            "value": "0951",
+            "frequency": 1
+          },
+          {
+            "value": "4400",
+            "frequency": 1
+          },
+          {
+            "value": "6300",
+            "frequency": 1
+          },
+          {
+            "value": "55",
+            "frequency": 1
+          },
+          {
+            "value": "1700",
+            "frequency": 1
+          },
+          {
+            "value": "354",
+            "frequency": 1
+          },
+          {
+            "value": "30",
+            "frequency": 1
+          },
+          {
+            "value": "41.1",
+            "frequency": 1
+          },
+          {
+            "value": "4545",
+            "frequency": 1
+          },
+          {
+            "value": "5760",
+            "frequency": 1
+          },
+          {
+            "value": "146",
+            "frequency": 1
+          },
+          {
+            "value": "45",
+            "frequency": 1
+          },
+          {
+            "value": "5900",
+            "frequency": 1
+          },
+          {
+            "value": "021",
+            "frequency": 1
+          },
+          {
+            "value": "6005",
+            "frequency": 1
+          },
+          {
+            "value": "4005",
+            "frequency": 1
+          },
+          {
+            "value": "5976",
+            "frequency": 1
+          },
+          {
+            "value": "7000",
+            "frequency": 1
+          },
+          {
+            "value": "100",
+            "frequency": 1
+          },
+          {
+            "value": "3780",
+            "frequency": 1
+          },
+          {
+            "value": "6660",
+            "frequency": 1
+          },
+          {
+            "value": "5280",
+            "frequency": 1
+          },
+          {
+            "value": "1440",
+            "frequency": 1
+          },
+          {
+            "value": "3270",
+            "frequency": 1
+          },
+          {
+            "value": "4680",
+            "frequency": 1
+          },
+          {
+            "value": "140",
+            "frequency": 1
+          },
+          {
+            "value": "80",
+            "frequency": 1
+          },
+          {
+            "value": "5600",
+            "frequency": 1
+          },
+          {
+            "value": "6040",
+            "frequency": 1
+          },
+          {
+            "value": "4800",
+            "frequency": 1
+          },
+          {
+            "value": "5000",
+            "frequency": 1
+          },
+          {
+            "value": "1000",
+            "frequency": 1
+          },
+          {
+            "value": "1750",
+            "frequency": 1
+          },
+          {
+            "value": "6540",
+            "frequency": 1
+          },
+          {
+            "value": "32",
+            "frequency": 1
+          },
+          {
+            "value": "6180",
+            "frequency": 1
+          },
+          {
+            "value": "0900",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 88
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_TREATMENT_ONGOING",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1416
+          },
+          {
+            "value": "No",
+            "frequency": 464
+          },
+          {
+            "value": "Yes",
+            "frequency": 3
+          }
+        ],
+        "approx_distinct": 3
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_TYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1379
+          },
+          {
+            "value": "External Beam",
+            "frequency": 418
+          },
+          {
+            "value": "Other",
+            "frequency": 56
+          },
+          {
+            "value": "External",
+            "frequency": 22
+          },
+          {
+            "value": "Radioisotope",
+            "frequency": 4
+          },
+          {
+            "value": "Implants",
+            "frequency": 3
+          },
+          {
+            "value": "Combination",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 7
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_UNITS",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1418
+          },
+          {
+            "value": "cgy",
+            "frequency": 454
+          },
+          {
+            "value": "gy",
+            "frequency": 7
+          },
+          {
+            "value": "mci",
+            "frequency": 4
+          }
+        ],
+        "approx_distinct": 4
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PHARM_REGIMEN",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1883
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/STEM_CELL_TRANSPLANTATION",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1883
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/STEM_CELL_TRANSPLANTATION_TYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1883
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment",
+      "predicate": "has_sample_rows",
+      "payload": {
+        "rows": [
+          {
+            "PATIENT_ID": "TCGA-27-1832",
+            "START_DATE": "207",
+            "STOP_DATE": "207",
+            "EVENT_TYPE": "Treatment",
+            "TREATMENT_TYPE": "Chemotherapy",
+            "TREATMENT_SUBTYPE": "",
+            "AGENT": "Temozolomide",
+            "NUMBER_OF_CYCLES": "01",
+            "PRESCRIBED_DOSE": "",
+            "PRESCRIBED_DOSE_UNITS": "mg",
+            "REGIMEN_NUMBER": "",
+            "REGIMEN_INDICATION": "Adjuvant",
+            "REGIMEN_INDICATION_NOTES": "",
+            "MEASURE_OF_RESPONSE": "",
+            "CLINICAL_TRIAL_DRUG_CLASSIFICATION": "",
+            "ROUTE_OF_ADMINISTRATION": "PO",
+            "ROUTE_OF_ADMINISTRATION-2": "",
+            "THERAPY_ONGOING": "No",
+            "TOTAL_DOSE": "1200",
+            "TOTAL_DOSE_UNITS": "mg",
+            "TX_ON_CLINICAL_TRIAL": "",
+            "ANATOMIC_TREATMENT_SITE": "",
+            "COURSE_NUMBER": "",
+            "NUMBER_OF_FRACTIONS": "",
+            "RADIATION_DOSAGE": "",
+            "RADIATION_TREATMENT_ONGOING": "",
+            "RADIATION_TYPE": "",
+            "RADIATION_UNITS": "",
+            "PHARM_REGIMEN": "",
+            "STEM_CELL_TRANSPLANTATION": "",
+            "STEM_CELL_TRANSPLANTATION_TYPE": ""
+          },
+          {
+            "PATIENT_ID": "TCGA-27-1832",
+            "START_DATE": "23",
+            "STOP_DATE": "207",
+            "EVENT_TYPE": "Treatment",
+            "TREATMENT_TYPE": "Chemotherapy",
+            "TREATMENT_SUBTYPE": "",
+            "AGENT": "Temozolomide",
+            "NUMBER_OF_CYCLES": "3",
+            "PRESCRIBED_DOSE": "",
+            "PRESCRIBED_DOSE_UNITS": "mg",
+            "REGIMEN_NUMBER": "",
+            "REGIMEN_INDICATION": "Adjuvant",
+            "REGIMEN_INDICATION_NOTES": "",
+            "MEASURE_OF_RESPONSE": "",
+            "CLINICAL_TRIAL_DRUG_CLASSIFICATION": "",
+            "ROUTE_OF_ADMINISTRATION": "PO",
+            "ROUTE_OF_ADMINISTRATION-2": "",
+            "THERAPY_ONGOING": "No",
+            "TOTAL_DOSE": "3600",
+            "TOTAL_DOSE_UNITS": "mg",
+            "TX_ON_CLINICAL_TRIAL": "",
+            "ANATOMIC_TREATMENT_SITE": "",
+            "COURSE_NUMBER": "",
+            "NUMBER_OF_FRACTIONS": "",
+            "RADIATION_DOSAGE": "",
+            "RADIATION_TREATMENT_ONGOING": "",
+            "RADIATION_TYPE": "",
+            "RADIATION_UNITS": "",
+            "PHARM_REGIMEN": "",
+            "STEM_CELL_TRANSPLANTATION": "",
+            "STEM_CELL_TRANSPLANTATION_TYPE": ""
+          },
+          {
+            "PATIENT_ID": "TCGA-27-1832",
+            "START_DATE": "54",
+            "STOP_DATE": "54",
+            "EVENT_TYPE": "Treatment",
+            "TREATMENT_TYPE": "Radiation Therapy",
+            "TREATMENT_SUBTYPE": "",
+            "AGENT": "Radiation 1",
+            "NUMBER_OF_CYCLES": "",
+            "PRESCRIBED_DOSE": "",
+            "PRESCRIBED_DOSE_UNITS": "",
+            "REGIMEN_NUMBER": "",
+            "REGIMEN_INDICATION": "Adjuvant",
+            "REGIMEN_INDICATION_NOTES": "",
+            "MEASURE_OF_RESPONSE": "",
+            "CLINICAL_TRIAL_DRUG_CLASSIFICATION": "",
+            "ROUTE_OF_ADMINISTRATION": "",
+            "ROUTE_OF_ADMINISTRATION-2": "",
+            "THERAPY_ONGOING": "",
+            "TOTAL_DOSE": "",
+            "TOTAL_DOSE_UNITS": "",
+            "TX_ON_CLINICAL_TRIAL": "",
+            "ANATOMIC_TREATMENT_SITE": "",
+            "COURSE_NUMBER": "",
+            "NUMBER_OF_FRACTIONS": "",
+            "RADIATION_DOSAGE": "",
+            "RADIATION_TREATMENT_ONGOING": "No",
+            "RADIATION_TYPE": "External Beam",
+            "RADIATION_UNITS": "",
+            "PHARM_REGIMEN": "",
+            "STEM_CELL_TRANSPLANTATION": "",
+            "STEM_CELL_TRANSPLANTATION_TYPE": ""
+          },
+          {
+            "PATIENT_ID": "TCGA-27-1833",
+            "START_DATE": "171",
+            "STOP_DATE": "725",
+            "EVENT_TYPE": "Treatment",
+            "TREATMENT_TYPE": "Chemotherapy",
+            "TREATMENT_SUBTYPE": "",
+            "AGENT": "Procarbazine",
+            "NUMBER_OF_CYCLES": "06",
+            "PRESCRIBED_DOSE": "",
+            "PRESCRIBED_DOSE_UNITS": "mg",
+            "REGIMEN_NUMBER": "",
+            "REGIMEN_INDICATION": "Adjuvant",
+            "REGIMEN_INDICATION_NOTES": "",
+            "MEASURE_OF_RESPONSE": "",
+            "CLINICAL_TRIAL_DRUG_CLASSIFICATION": "",
+            "ROUTE_OF_ADMINISTRATION": "OTHER",
+            "ROUTE_OF_ADMINISTRATION-2": "",
+            "THERAPY_ONGOING": "No",
+            "TOTAL_DOSE": "1300",
+            "TOTAL_DOSE_UNITS": "mg",
+            "TX_ON_CLINICAL_TRIAL": "",
+            "ANATOMIC_TREATMENT_SITE": "",
+            "COURSE_NUMBER": "",
+            "NUMBER_OF_FRACTIONS": "",
+            "RADIATION_DOSAGE": "",
+            "RADIATION_TREATMENT_ONGOING": "",
+            "RADIATION_TYPE": "",
+            "RADIATION_UNITS": "",
+            "PHARM_REGIMEN": "",
+            "STEM_CELL_TRANSPLANTATION": "",
+            "STEM_CELL_TRANSPLANTATION_TYPE": ""
+          },
+          {
+            "PATIENT_ID": "TCGA-27-1833",
+            "START_DATE": "171",
+            "STOP_DATE": "596",
+            "EVENT_TYPE": "Treatment",
+            "TREATMENT_TYPE": "Chemotherapy",
+            "TREATMENT_SUBTYPE": "",
+            "AGENT": "Cisplatin",
+            "NUMBER_OF_CYCLES": "04",
+            "PRESCRIBED_DOSE": "",
+            "PRESCRIBED_DOSE_UNITS": "mg",
+            "REGIMEN_NUMBER": "",
+            "REGIMEN_INDICATION": "Adjuvant",
+            "REGIMEN_INDICATION_NOTES": "",
+            "MEASURE_OF_RESPONSE": "",
+            "CLINICAL_TRIAL_DRUG_CLASSIFICATION": "",
+            "ROUTE_OF_ADMINISTRATION": "OTHER",
+            "ROUTE_OF_ADMINISTRATION-2": "",
+            "THERAPY_ONGOING": "No",
+            "TOTAL_DOSE": "320",
+            "TOTAL_DOSE_UNITS": "mg",
+            "TX_ON_CLINICAL_TRIAL": "",
+            "ANATOMIC_TREATMENT_SITE": "",
+            "COURSE_NUMBER": "",
+            "NUMBER_OF_FRACTIONS": "",
+            "RADIATION_DOSAGE": "",
+            "RADIATION_TREATMENT_ONGOING": "",
+            "RADIATION_TYPE": "",
+            "RADIATION_UNITS": "",
+            "PHARM_REGIMEN": "",
+            "STEM_CELL_TRANSPLANTATION": "",
+            "STEM_CELL_TRANSPLANTATION_TYPE": ""
+          }
+        ],
+        "columns": [
+          "PATIENT_ID",
+          "START_DATE",
+          "STOP_DATE",
+          "EVENT_TYPE",
+          "TREATMENT_TYPE",
+          "TREATMENT_SUBTYPE",
+          "AGENT",
+          "NUMBER_OF_CYCLES",
+          "PRESCRIBED_DOSE",
+          "PRESCRIBED_DOSE_UNITS",
+          "REGIMEN_NUMBER",
+          "REGIMEN_INDICATION",
+          "REGIMEN_INDICATION_NOTES",
+          "MEASURE_OF_RESPONSE",
+          "CLINICAL_TRIAL_DRUG_CLASSIFICATION",
+          "ROUTE_OF_ADMINISTRATION",
+          "ROUTE_OF_ADMINISTRATION-2",
+          "THERAPY_ONGOING",
+          "TOTAL_DOSE",
+          "TOTAL_DOSE_UNITS",
+          "TX_ON_CLINICAL_TRIAL",
+          "ANATOMIC_TREATMENT_SITE",
+          "COURSE_NUMBER",
+          "NUMBER_OF_FRACTIONS",
+          "RADIATION_DOSAGE",
+          "RADIATION_TREATMENT_ONGOING",
+          "RADIATION_TYPE",
+          "RADIATION_UNITS",
+          "PHARM_REGIMEN",
+          "STEM_CELL_TRANSPLANTATION",
+          "STEM_CELL_TRANSPLANTATION_TYPE"
+        ]
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment",
+      "predicate": "has_entity_name",
+      "payload": {
+        "value": "Treatment Event",
+        "grain": "one row per treatment modality or administration instance per patient"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "clinical intervention",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "therapy session",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "medication episode",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "radiation course",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PATIENT_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PATIENT_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "subject id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "case id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "participant id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.START_DATE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "treatment start date"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.START_DATE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "temporal field"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.START_DATE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "therapy start date",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.START_DATE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "administration date",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STOP_DATE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "treatment end date"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STOP_DATE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "temporal field"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STOP_DATE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "therapy stop date",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STOP_DATE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "completion date",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.EVENT_TYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "clinical event type"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.EVENT_TYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.EVENT_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "event class",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_TYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "treatment modality"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_TYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "therapy class",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "modality",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_SUBTYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "treatment schedule or subtype"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_SUBTYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_SUBTYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "therapy detail",
+        "is_preferred": true
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.AGENT",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "therapeutic agent name"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.AGENT",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.AGENT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "drug name",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.AGENT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "medication",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.AGENT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "intervention",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.NUMBER_OF_CYCLES",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "treatment cycle count"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.NUMBER_OF_CYCLES",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.NUMBER_OF_CYCLES",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "cycles",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.NUMBER_OF_CYCLES",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "admin cycles",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "prescribed dosage amount"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "dosage",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "prescribed dosage units"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "dose units",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_NUMBER",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "treatment line/regimen number"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_NUMBER",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_NUMBER",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "treatment line",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_NUMBER",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "sequence number",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "treatment indication"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "reason for treatment",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "indication",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION_NOTES",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "treatment indication notes"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION_NOTES",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "free text"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.MEASURE_OF_RESPONSE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "treatment response"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.MEASURE_OF_RESPONSE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "outcome/survival"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.MEASURE_OF_RESPONSE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "clinical response",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.MEASURE_OF_RESPONSE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "RECIST criteria",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.CLINICAL_TRIAL_DRUG_CLASSIFICATION",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "clinical trial agent class"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.CLINICAL_TRIAL_DRUG_CLASSIFICATION",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.CLINICAL_TRIAL_DRUG_CLASSIFICATION",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "trial drug category",
+        "is_preferred": true
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "administration route"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "route",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION-2",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "secondary administration route"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION-2",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.THERAPY_ONGOING",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "therapy status ongoing"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.THERAPY_ONGOING",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.THERAPY_ONGOING",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "is ongoing",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "cumulative dose amount"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "cumulative dose units"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TX_ON_CLINICAL_TRIAL",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "clinical trial enrollment status"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TX_ON_CLINICAL_TRIAL",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TX_ON_CLINICAL_TRIAL",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "trial indicator",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "anatomic treatment location"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "radiation site",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "target site",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.COURSE_NUMBER",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "treatment course count"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.COURSE_NUMBER",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.COURSE_NUMBER",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "course",
+        "is_preferred": true
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.NUMBER_OF_FRACTIONS",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "radiation fractions"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.NUMBER_OF_FRACTIONS",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.NUMBER_OF_FRACTIONS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "rt fractions",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_DOSAGE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "radiation dose (cGy/Gy)"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_DOSAGE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_DOSAGE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "radiation dose",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_TREATMENT_ONGOING",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "radiation treatment ongoing status"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_TREATMENT_ONGOING",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_TREATMENT_ONGOING",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "is radiation ongoing",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_TREATMENT_ONGOING",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "ongoing radiation flag",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_TYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "radiation therapy type"
+      },
+      "confidence": 0.98,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_TYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.98,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "modality",
+        "is_preferred": true
+      },
+      "confidence": 0.98,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "radiation modality",
+        "is_preferred": false
+      },
+      "confidence": 0.98,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_UNITS",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "radiation dose units"
+      },
+      "confidence": 0.99,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_UNITS",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.99,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_UNITS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "radiation dosage unit",
+        "is_preferred": true
+      },
+      "confidence": 0.99,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_UNITS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "dose unit",
+        "is_preferred": false
+      },
+      "confidence": 0.99,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PHARM_REGIMEN",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "pharmacological regimen"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PHARM_REGIMEN",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PHARM_REGIMEN",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "chemotherapy regimen",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PHARM_REGIMEN",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "drug protocol",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STEM_CELL_TRANSPLANTATION",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "stem cell transplantation status"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STEM_CELL_TRANSPLANTATION",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STEM_CELL_TRANSPLANTATION",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "bone marrow transplant status",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STEM_CELL_TRANSPLANTATION",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "sct receipt",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STEM_CELL_TRANSPLANTATION_TYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "stem cell transplantation type"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STEM_CELL_TRANSPLANTATION_TYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STEM_CELL_TRANSPLANTATION_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "sct type",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.STEM_CELL_TRANSPLANTATION_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "transplant donor type",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_TYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Chemotherapy",
+        "label": "chemotherapy"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_TYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Radiation Therapy",
+        "label": "radiation therapy"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_TYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Targeted Molecular Therapy",
+        "label": "targeted molecular therapy"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_TYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Hormone Therapy",
+        "label": "hormone therapy"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_TYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Immunotherapy",
+        "label": "immunotherapy"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_TYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Not Specified",
+        "label": "treatment type not specified"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_SUBTYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "",
+        "label": "missing value"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TREATMENT_SUBTYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Daily for 42 Days",
+        "label": "daily treatment over a 42 day duration"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg",
+        "label": "milligrams"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/m2",
+        "label": "milligrams per square meter"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/day",
+        "label": "milligrams per day"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/kg",
+        "label": "milligrams per kilogram body weight"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/m2/day",
+        "label": "milligrams per square meter per day"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "{wafer}",
+        "label": "wafer drug formulation"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mci",
+        "label": "millicuries"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "ml",
+        "label": "milliliters"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "ug/m2",
+        "label": "micrograms per square meter"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/dl",
+        "label": "milligrams per deciliter"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "meq",
+        "label": "milliequivalents"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "auc",
+        "label": "area under the curve"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.PRESCRIBED_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "ug",
+        "label": "micrograms"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Adjuvant",
+        "label": "adjuvant therapy following primary treatment"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Progression",
+        "label": "treatment initiated due to disease progression"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Recurrence",
+        "label": "treatment initiated due to disease recurrence"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Other",
+        "label": "other reason for treatment"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Specify In Notes",
+        "label": "reason for treatment documented in notes"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.REGIMEN_INDICATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Palliative",
+        "label": "palliative intent to relieve symptoms"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.MEASURE_OF_RESPONSE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "stable disease",
+        "label": "stable disease (SD)"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.MEASURE_OF_RESPONSE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "clinical progressive disease",
+        "label": "disease progression based on clinical evaluation"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.MEASURE_OF_RESPONSE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "complete response",
+        "label": "complete response (CR)"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.MEASURE_OF_RESPONSE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "radiographic progressive disease",
+        "label": "disease progression based on imaging studies"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.CLINICAL_TRIAL_DRUG_CLASSIFICATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "chemotherapy",
+        "label": "investigational chemotherapy agent"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.CLINICAL_TRIAL_DRUG_CLASSIFICATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "targeted molecular therapy",
+        "label": "investigational targeted molecular therapy agent"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "PO",
+        "label": "per os (oral administration)"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "IV",
+        "label": "intravenous administration"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "OTHER",
+        "label": "other route of administration"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "INTUM",
+        "label": "intratumoral administration"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "IP",
+        "label": "intraperitoneal administration"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "INTRAVESICAL",
+        "label": "intravesical administration (e.g., into bladder)"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ROUTE_OF_ADMINISTRATION-2",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "IV",
+        "label": "intravenous administration"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.THERAPY_ONGOING",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "No",
+        "label": "therapy has concluded"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.THERAPY_ONGOING",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Yes",
+        "label": "therapy is currently ongoing"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg",
+        "label": "milligrams"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/m2",
+        "label": "milligrams per square meter"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/day",
+        "label": "milligrams per day"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/m2/day",
+        "label": "milligrams per square meter per day"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "{wafer}",
+        "label": "wafer drug formulation"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/kg",
+        "label": "milligrams per kilogram body weight"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mci",
+        "label": "millicuries"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "ml",
+        "label": "milliliters"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "ug/m2",
+        "label": "micrograms per square meter"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/dl",
+        "label": "milligrams per deciliter"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mg/kg/day",
+        "label": "milligrams per kilogram per day"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "ug",
+        "label": "micrograms"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TOTAL_DOSE_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "meq",
+        "label": "milliequivalents"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TX_ON_CLINICAL_TRIAL",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "No",
+        "label": "treatment not part of a clinical trial"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.TX_ON_CLINICAL_TRIAL",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Yes",
+        "label": "treatment was part of a clinical trial"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Primary Tumor Field",
+        "label": "anatomical site of the primary tumor"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Local Recurrence",
+        "label": "anatomical site of a local recurrence"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Regional Site",
+        "label": "regional anatomical site (e.g., regional lymph nodes)"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Distant Recurrence",
+        "label": "anatomical site of a distant recurrence/metastasis"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.ANATOMIC_TREATMENT_SITE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Distant Site",
+        "label": "distant metastatic anatomical site"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_TREATMENT_ONGOING",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "No",
+        "label": "radiation therapy has concluded"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_TREATMENT_ONGOING",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Yes",
+        "label": "radiation therapy is currently ongoing"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "cgy",
+        "label": "centigray"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "gy",
+        "label": "gray"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment.RADIATION_UNITS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "mci",
+        "label": "millicuries (radionuclide therapy)"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PRESCRIBED_DOSE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "UCUM"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PRESCRIBED_DOSE_UNITS",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "UCUM"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TREATMENT_TYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "SNOMED CT"
+      },
+      "confidence": 0.65,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PATIENT_ID",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "TCGA barcode"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TREATMENT_SUBTYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "RxNorm"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/AGENT",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "RxNorm"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/NUMBER_OF_CYCLES",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Custom/Local Numeric Codes"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/EVENT_TYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 v3 ActCode"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ROUTE_OF_ADMINISTRATION",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 RouteOfAdministration"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_INDICATION_NOTES",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "N/A - Free text"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/CLINICAL_TRIAL_DRUG_CLASSIFICATION",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NCI Thesaurus"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/MEASURE_OF_RESPONSE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "RECIST (Response Evaluation Criteria in Solid Tumors)"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_INDICATION",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "mCODE (Minimal Common Oncology Data Elements)"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/REGIMEN_NUMBER",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Custom/Internal sequence numbering"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ROUTE_OF_ADMINISTRATION-2",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 RouteOfAdministration"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/THERAPY_ONGOING",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 V2 Yes/No Indicator"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TOTAL_DOSE_UNITS",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "UCUM"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/ANATOMIC_TREATMENT_SITE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NAACCR"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TOTAL_DOSE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "UCUM"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/TX_ON_CLINICAL_TRIAL",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 V2 Table 0136 (Yes/No Indicator)"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/NUMBER_OF_FRACTIONS",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "UCUM"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/COURSE_NUMBER",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Custom/Internal sequence numbering"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_DOSAGE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "UCUM"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_TREATMENT_ONGOING",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 User-defined Table 0136 (Yes/No Indicator)"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_UNITS",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "UCUM"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/PHARM_REGIMEN",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Unknown"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/STEM_CELL_TRANSPLANTATION",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "None"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/RADIATION_TYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NAACCR"
+      },
+      "confidence": 0.65,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment/STEM_CELL_TRANSPLANTATION_TYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "unclassifiable"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_treatment",
+  "stage_a_calls": 1,
+  "stage_b_batches_attempted": 2,
+  "stage_b_batches_succeeded": 2,
+  "stage_c_calls": 16,
+  "b_outcome": "B_SUCCESS",
+  "retries_used": 0,
+  "splits_used": 0,
+  "rescues_used": 0,
+  "raw_coverage_pct": 1.0,
+  "critical_coverage_pct": 1.0,
+  "c_columns_flagged": 16,
+  "total_columns": 31,
+  "c_trigger_rate": 0.5161290322580645,
+  "stage_a_latency_ms": 1637,
+  "stage_b_latency_ms": 25107,
+  "stage_c_latency_ms": 15651,
+  "total_latency_ms": 42395,
+  "tokens_input": 7602,
+  "tokens_output": 5131
+}

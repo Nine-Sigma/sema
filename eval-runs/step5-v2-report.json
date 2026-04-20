@@ -1,0 +1,24 @@
+{
+  "label": "staged+domain+fewshot+c-v2",
+  "telemetry": {
+    "table_count": 12,
+    "b_outcome_distribution": {
+      "success": 12,
+      "partial": 0,
+      "failed": 0
+    },
+    "avg_raw_coverage_pct": 1.0,
+    "avg_critical_coverage_pct": 1.0,
+    "avg_c_trigger_rate": 0.3551,
+    "avg_total_latency_ms": 25209.6,
+    "recovery": {
+      "total_retries": 0,
+      "total_splits": 0,
+      "total_rescues": 0
+    },
+    "tokens": {
+      "input": 74721,
+      "output": 34669
+    }
+  }
+}

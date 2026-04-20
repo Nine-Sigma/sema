@@ -1,50 +1,78 @@
-# Dev Slice POC — matches the current Databricks ingest (v0 POC data)
-# Only 6 cBioPortal tables are loaded in workspace.cbioportal; this slice
-# uses the three that overlap with the original dev_slice.yaml definition
-# so diffs against the full dev slice remain comparable once more tables
-# are ingested.
+# Dev Slice POC — matches current Databricks ingest from
+# gbm_tcga_pan_can_atlas_2018 (12 tables in workspace.cbioportal).
+#
+# Covers 9 of the 13 tables in the original eval/dev_slice.yaml spec
+# plus 3 extras (timeline_*, clinical_supp_hypoxia, resource_patient
+# which is a holdout sanity hit but the only one we can run today).
 #
 # Version log:
-#   v0-poc (2026-04-19): 3 overlapping tables + 3 timeline tables.
+#   v1-gbm (2026-04-19): switched from gist_msk_2023 POC ingest
+#     (patient/sample/mutation/3 timelines) to gbm_tcga_pan_can_atlas_2018
+#     (adds structural_variant, cna, gene_panel_matrix,
+#     resource_definition, resource_patient, clinical_supp_hypoxia).
 
-version: 1
+version: 2
 created: "2026-04-19"
 catalog: workspace
 schema: cbioportal
 
 tables:
   - table_name: patient
-    reason: "Core demographics with encoded categoricals, survival data"
+    reason: "Core demographics with encoded categoricals + survival"
     failure_mode: encoded_categorical
-    expected_stressor: "os_status prefix encoding, smoking_status abbreviations"
     tier: sanity
 
   - table_name: sample
-    reason: "Biomarker table with multiple categoricals and TMB numeric"
+    reason: "Biomarker table with multiple categoricals, TMB, MSI"
     failure_mode: mixed_semantic_types
-    expected_stressor: "msi_type non-obvious encoding, tmb numeric biomarker"
     tier: sanity
 
   - table_name: mutation
-    reason: "Wide table requiring multi-batch Stage B, variant abbreviations"
+    reason: "Wide table, multi-batch Stage B, variant abbreviations"
     failure_mode: wide_table_batching
-    expected_stressor: "Multi-batch B, variant_classification abbreviations"
     tier: stress
 
+  - table_name: structural_variant
+    reason: "Fusion/SV nomenclature, site1/site2 relationships"
+    failure_mode: abbreviation_ambiguity
+    tier: standard
+
+  - table_name: cna
+    reason: "Copy-number alterations in long format — numeric categorical"
+    failure_mode: mixed_semantic_types
+    tier: standard
+
+  - table_name: gene_panel_matrix
+    reason: "Sample-panel assignment bridge table"
+    failure_mode: identifier_only
+    tier: edge
+
+  - table_name: resource_definition
+    reason: "System metadata — non-clinical entity under healthcare domain"
+    failure_mode: non_clinical_entity
+    tier: edge
+
+  - table_name: resource_patient
+    reason: "Bridge table linking resources to patients"
+    failure_mode: identifier_only
+    tier: edge
+
+  - table_name: clinical_supp_hypoxia
+    reason: "Supplemental clinical attributes with domain-specific metrics"
+    failure_mode: mixed_semantic_types
+    tier: standard
+
   - table_name: timeline_sample_acquisition
-    reason: "Timeline event table — tests encoded dates + event-level grain"
+    reason: "Timeline event table — encoded dates, event schema"
     failure_mode: encoded_categorical
-    expected_stressor: "days-from-epoch INT columns, event-specific schema"
     tier: standard
 
   - table_name: timeline_status
     reason: "Timeline status changes — binary flags, encoded dates"
     failure_mode: encoded_categorical
-    expected_stressor: "status abbreviations, temporal encoding"
     tier: standard
 
   - table_name: timeline_treatment
     reason: "Treatment events — drug names, regimens, encoded dates"
     failure_mode: encoded_categorical
-    expected_stressor: "agent naming, subtype abbreviations, temporal"
     tier: standard

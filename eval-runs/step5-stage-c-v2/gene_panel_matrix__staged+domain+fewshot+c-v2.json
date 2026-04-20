@@ -1,0 +1,499 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix",
+  "config_label": "staged+domain+fewshot+c-v2",
+  "timestamp": "2026-04-20T20:33:34.819249+00:00",
+  "run_id": "57c5ba82-5b47-4f11-bc74-b94605dac151",
+  "assertions": [
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix",
+      "predicate": "table_exists",
+      "payload": {
+        "table_type": "TABLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/SAMPLE_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/SAMPLE_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/mutations",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/mutations",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/gistic",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/gistic",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/structural_variants",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/structural_variants",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/mutations",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "WXS",
+            "frequency": 397
+          },
+          {
+            "value": "NA",
+            "frequency": 195
+          }
+        ],
+        "approx_distinct": 2
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/gistic",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "WXS",
+            "frequency": 575
+          },
+          {
+            "value": "NA",
+            "frequency": 17
+          }
+        ],
+        "approx_distinct": 2
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/structural_variants",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "WXS",
+            "frequency": 397
+          },
+          {
+            "value": "NA",
+            "frequency": 195
+          }
+        ],
+        "approx_distinct": 2
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix",
+      "predicate": "has_sample_rows",
+      "payload": {
+        "rows": [
+          {
+            "SAMPLE_ID": "TCGA-16-0850-01",
+            "mutations": "WXS",
+            "gistic": "WXS",
+            "structural_variants": "WXS"
+          },
+          {
+            "SAMPLE_ID": "TCGA-06-0185-01",
+            "mutations": "WXS",
+            "gistic": "WXS",
+            "structural_variants": "WXS"
+          },
+          {
+            "SAMPLE_ID": "TCGA-08-0518-01",
+            "mutations": "NA",
+            "gistic": "WXS",
+            "structural_variants": "NA"
+          },
+          {
+            "SAMPLE_ID": "TCGA-06-0743-01",
+            "mutations": "WXS",
+            "gistic": "WXS",
+            "structural_variants": "WXS"
+          },
+          {
+            "SAMPLE_ID": "TCGA-02-0003-01",
+            "mutations": "WXS",
+            "gistic": "WXS",
+            "structural_variants": "WXS"
+          }
+        ],
+        "columns": [
+          "SAMPLE_ID",
+          "mutations",
+          "gistic",
+          "structural_variants"
+        ]
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix",
+      "predicate": "has_entity_name",
+      "payload": {
+        "value": "Sample Genomic Profile Availability",
+        "grain": "one row per biospecimen sample"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "sequencing availability",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "data availability matrix",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "sample coverage",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "TCGA biospecimen summary",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.SAMPLE_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.SAMPLE_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "specimen/sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.SAMPLE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "specimen id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.SAMPLE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biospecimen id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.SAMPLE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor sample id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.mutations",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "mutation data availability"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.mutations",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.mutations",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "mutation profile status",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.mutations",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "sequencing status",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.gistic",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "copy number profile availability"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.gistic",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.gistic",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "cna data status",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.gistic",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "copy number availability",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.structural_variants",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "structural variant availability"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.structural_variants",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.structural_variants",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "sv status",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.structural_variants",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "rearrangement data status",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.mutations",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "WXS",
+        "label": "whole exome sequencing data available"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.mutations",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "NA",
+        "label": "not available or not sequenced"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.gistic",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "WXS",
+        "label": "copy number alterations derived from whole exome sequencing"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.gistic",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "NA",
+        "label": "not available or no copy number analysis"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.structural_variants",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "WXS",
+        "label": "structural variants identified via whole exome sequencing"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix.structural_variants",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "NA",
+        "label": "not available or no structural variant analysis"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/structural_variants",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NCIt (National Cancer Institute Thesaurus)"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/mutations",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "GDC (Genomic Data Commons) Experimental Strategy"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/gene_panel_matrix/gistic",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "TCGA Data Level/Terminology"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    }
+  ]
+}
