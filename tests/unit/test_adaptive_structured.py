@@ -75,21 +75,3 @@ class TestUserOverrideAuto:
         llm.with_structured_output.assert_called_once()
 
 
-class TestSimplifiedPromptRequestsTableInterpretation:
-    def test_simplified_prompt_requests_table_interpretation_not_summary(self) -> None:
-        from sema.engine.semantic import (
-            build_simplified_interpretation_prompt,
-        )
-
-        table_metadata: dict[str, object] = {
-            "table_name": "patients",
-            "columns": [
-                {"name": "id", "data_type": "INT"},
-                {"name": "name", "data_type": "VARCHAR"},
-            ],
-        }
-        prompt = build_simplified_interpretation_prompt(table_metadata)
-        assert "entity_name" in prompt
-        assert "properties" in prompt
-        assert "column" in prompt
-        assert "semantic_type" in prompt

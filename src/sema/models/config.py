@@ -86,7 +86,6 @@ class BuildConfig(BaseSettings):
     skip_embeddings: bool = False
     resume: bool = False
 
-    use_staged: bool = True
     enable_domain_bias: bool = True
     enable_type_inventory: bool = True
     enable_vocab_hints: bool = True

@@ -6,9 +6,10 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from sema.connectors.databricks import TableWorkItem
-from sema.engine.semantic import (
-    PropertyInterpretation,
-    TableInterpretation,
+from sema.models.stages import (
+    StageAResult,
+    StageBBatchResult,
+    StageBColumnResult,
 )
 from sema.llm_client import LLMClient
 from sema.models.assertions import (
@@ -113,15 +114,22 @@ class TestResumeBuild:
         connector = MagicMock()
         connector.extract_table.return_value = _make_extraction_assertions()
         llm_client = MagicMock(spec=LLMClient)
-        llm_client.invoke.return_value = TableInterpretation(
-            entity_name="Entity",
-            properties=[
-                PropertyInterpretation(
-                    column="col1", name="Column 1",
+        llm_client.invoke.side_effect = [
+            StageAResult(
+                primary_entity="Entity",
+                grain_hypothesis="one row per row",
+                confidence=0.9,
+            ),
+            StageBBatchResult(columns=[
+                StageBColumnResult(
+                    column="col1",
+                    canonical_property_label="Column 1",
                     semantic_type="free_text",
+                    entity_role="attribute",
+                    needs_stage_c=False,
                 ),
-            ],
-        )
+            ]),
+        ]
         loader = MagicMock()
         loader.has_assertions.return_value = False
 
@@ -139,15 +147,22 @@ class TestResumeBuild:
         connector = MagicMock()
         connector.extract_table.return_value = _make_extraction_assertions()
         llm_client = MagicMock(spec=LLMClient)
-        llm_client.invoke.return_value = TableInterpretation(
-            entity_name="Entity",
-            properties=[
-                PropertyInterpretation(
-                    column="col1", name="Column 1",
+        llm_client.invoke.side_effect = [
+            StageAResult(
+                primary_entity="Entity",
+                grain_hypothesis="one row per row",
+                confidence=0.9,
+            ),
+            StageBBatchResult(columns=[
+                StageBColumnResult(
+                    column="col1",
+                    canonical_property_label="Column 1",
                     semantic_type="free_text",
+                    entity_role="attribute",
+                    needs_stage_c=False,
                 ),
-            ],
-        )
+            ]),
+        ]
         loader = MagicMock()
 
         result = process_table(

@@ -132,9 +132,8 @@ def _run_semantic_interpretation(
     run_id: str,
     column_batch_size: int,
     domain_context: DomainContext | None = None,
-    use_staged: bool = False,
     prompt_layers: Any = None,
-) -> tuple[list[Assertion], _StagedOutput | None]:
+) -> tuple[list[Assertion], _StagedOutput]:
     from sema.engine.semantic import SemanticEngine
 
     col_count = len(table_meta.get("columns", []))
@@ -150,41 +149,33 @@ def _run_semantic_interpretation(
         prompt_layers=prompt_layers,
     )
 
-    if use_staged:
-        assertions, stage_a, stage_b, c_results, metrics = (
-            semantic.interpret_table_staged_with_metrics(table_meta)
-        )
-        status = _build_stage_status(stage_b, c_results)
-
-        from sema.eval.telemetry import TableTelemetry
-        tel = TableTelemetry.from_stages(
-            table_ref=table_meta.get("table_ref", work_item.fqn),
-            stage_a=stage_a,
-            stage_b=stage_b,
-            stage_c_calls=metrics.stage_c_calls,
-            stage_a_latency_ms=metrics.stage_a_latency_ms,
-            stage_b_latency_ms=metrics.stage_b_latency_ms,
-            stage_c_latency_ms=metrics.stage_c_latency_ms,
-            tokens_input=metrics.tokens_input,
-            tokens_output=metrics.tokens_output,
-        )
-        logger.info(
-            f"[{work_item.table_name}] L2 staged produced "
-            f"{len(assertions)} assertions "
-            f"(B: {stage_b.status}, "
-            f"C: {len(c_results)} cols decoded, "
-            f"coverage: {tel.raw_coverage_pct:.0%})"
-        )
-        return assertions, _StagedOutput(
-            stage_a, stage_b, status, telemetry=tel,
-        )
-
-    semantic_assertions = semantic.interpret_table(table_meta)
-    logger.info(
-        f"[{work_item.table_name}] L2 produced "
-        f"{len(semantic_assertions)} assertions"
+    assertions, stage_a, stage_b, c_results, metrics = (
+        semantic.interpret_table_staged_with_metrics(table_meta)
     )
-    return semantic_assertions, None
+    status = _build_stage_status(stage_b, c_results)
+
+    from sema.eval.telemetry import TableTelemetry
+    tel = TableTelemetry.from_stages(
+        table_ref=table_meta.get("table_ref", work_item.fqn),
+        stage_a=stage_a,
+        stage_b=stage_b,
+        stage_c_calls=metrics.stage_c_calls,
+        stage_a_latency_ms=metrics.stage_a_latency_ms,
+        stage_b_latency_ms=metrics.stage_b_latency_ms,
+        stage_c_latency_ms=metrics.stage_c_latency_ms,
+        tokens_input=metrics.tokens_input,
+        tokens_output=metrics.tokens_output,
+    )
+    logger.info(
+        f"[{work_item.table_name}] L2 staged produced "
+        f"{len(assertions)} assertions "
+        f"(B: {stage_b.status}, "
+        f"C: {len(c_results)} cols decoded, "
+        f"coverage: {tel.raw_coverage_pct:.0%})"
+    )
+    return assertions, _StagedOutput(
+        stage_a, stage_b, status, telemetry=tel,
+    )
 
 
 _B_STATUS_MAP: dict[str, str] = {
@@ -471,14 +462,12 @@ def _run_pipeline_stages(
     column_batch_size: int,
     vocab_workers: int = 8,
     domain_context: DomainContext | None = None,
-    use_staged: bool = False,
     prompt_layers: Any = None,
-) -> tuple[list[Assertion], _StagedOutput | None] | Any:
+) -> tuple[list[Assertion], _StagedOutput] | Any:
     """Run all pipeline stages for a single table.
 
-    Returns either (assertions, staged_output) on success or a TableResult
-    if the table should be skipped. staged_output is None when
-    use_staged=False.
+    Returns (assertions, staged_output) on success or a TableResult
+    if the table should be skipped.
     """
     from sema.pipeline.build import TableResult
 
@@ -501,7 +490,6 @@ def _run_pipeline_stages(
         table_meta, work_item, llm_client, run_id,
         column_batch_size,
         domain_context=domain_context,
-        use_staged=use_staged,
         prompt_layers=prompt_layers,
     )
     all_assertions.extend(semantic_assertions)

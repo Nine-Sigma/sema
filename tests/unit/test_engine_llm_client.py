@@ -1,15 +1,9 @@
-"""Tests for engines using LLMClient (tasks 4.1, 4.2, 4.3)."""
-import json
+"""Tests for VocabularyEngine + LLMClient integration."""
 import pytest
 from unittest.mock import MagicMock
 
 pytestmark = pytest.mark.unit
 
-from sema.engine.semantic import (
-    SemanticEngine,
-    TableInterpretation,
-    PropertyInterpretation,
-)
 from sema.engine.vocabulary import VocabularyEngine
 from sema.llm_client import (
     LLMClient,
@@ -18,79 +12,6 @@ from sema.llm_client import (
     SynonymExpansion,
 )
 from sema.models.assertions import AssertionPredicate
-
-
-# ---------------------------------------------------------------------------
-# SemanticEngine with LLMClient (Task 4.1)
-# ---------------------------------------------------------------------------
-
-class TestSemanticEngineWithLLMClient:
-    def test_produces_correct_assertions(self):
-        mock_client = MagicMock(spec=LLMClient)
-        mock_client.invoke.return_value = TableInterpretation(
-            entity_name="Cancer Diagnosis",
-            entity_description="Diagnosis records",
-            synonyms=["dx"],
-            properties=[
-                PropertyInterpretation(
-                    column="dx_type_cd",
-                    name="Diagnosis Type",
-                    semantic_type="categorical",
-                    confidence=0.9,
-                    synonyms=["cancer type"],
-                    decoded_values=[{"raw": "CRC", "label": "Colorectal Cancer"}],
-                    vocabulary_guess="OncoTree",
-                ),
-            ],
-        )
-
-        engine = SemanticEngine(llm_client=mock_client, run_id="test-run")
-        sample = {
-            "table_ref": "unity://cdm.clinical.tbl",
-            "table_name": "tbl",
-            "columns": [{"name": "dx_type_cd", "data_type": "STRING"}],
-            "sample_rows": [],
-            "comment": None,
-        }
-
-        assertions = engine.interpret_table(sample)
-
-        entity = [a for a in assertions if a.predicate == AssertionPredicate.HAS_ENTITY_NAME]
-        assert len(entity) == 1
-        assert entity[0].payload["value"] == "Cancer Diagnosis"
-
-        props = [a for a in assertions if a.predicate == AssertionPredicate.HAS_PROPERTY_NAME]
-        assert len(props) == 1
-        assert props[0].payload["value"] == "Diagnosis Type"
-
-        decoded = [a for a in assertions if a.predicate == AssertionPredicate.HAS_DECODED_VALUE]
-        assert len(decoded) == 1
-        assert decoded[0].payload["raw"] == "CRC"
-
-        vocab = [a for a in assertions if a.predicate == AssertionPredicate.VOCABULARY_MATCH]
-        assert len(vocab) == 1
-        assert vocab[0].payload["value"] == "OncoTree"
-
-    def test_llm_stage_error_propagates(self):
-        mock_client = MagicMock(spec=LLMClient)
-        mock_client.invoke.side_effect = LLMStageError(
-            table_ref="unity://cdm.clinical.tbl",
-            stage_name="L2 semantic",
-            step_errors=[("structured_output", ValueError("fail"))],
-        )
-
-        engine = SemanticEngine(llm_client=mock_client, run_id="test-run")
-        sample = {
-            "table_ref": "unity://cdm.clinical.tbl",
-            "table_name": "tbl",
-            "columns": [],
-            "sample_rows": [],
-            "comment": None,
-        }
-
-        with pytest.raises(LLMStageError) as exc_info:
-            engine.interpret_table(sample)
-        assert exc_info.value.stage_name == "L2 semantic"
 
 
 # ---------------------------------------------------------------------------

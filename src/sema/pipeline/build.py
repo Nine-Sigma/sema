@@ -164,7 +164,6 @@ def process_table(
     vocab_workers: int = 8,
     resume: bool = False,
     domain_context: DomainContext | None = None,
-    use_staged: bool = False,
     prompt_layers: Any = None,
     eval_dump_dir: str | None = None,
     eval_config_label: str = "run",
@@ -181,7 +180,6 @@ def process_table(
             run_id, column_batch_size,
             vocab_workers=vocab_workers,
             domain_context=domain_context,
-            use_staged=use_staged,
             prompt_layers=prompt_layers,
         )
         if isinstance(result, TableResult):

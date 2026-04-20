@@ -295,41 +295,62 @@ class TestProfilerIntegration:
 
 class TestIsolation:
     def test_domain_context_none_produces_identical_output(self) -> None:
-        """Step 1 isolation: domain_context=None must not change L2 output.
+        """Explicit domain_context=None must match the default (not passed).
 
-        Both engines with and without domain_context=None should produce
-        identical assertions from the same mock LLM response.
+        Both engines should produce identical assertions from the same
+        mocked staged responses.
         """
-        import json
-        from pathlib import Path
         from unittest.mock import MagicMock
 
         from sema.engine.semantic import SemanticEngine
-
-        fixtures = Path(__file__).parent.parent / "fixtures"
-        with open(fixtures / "sample_table_metadata.json") as f:
-            metadata = json.load(f)
-        with open(fixtures / "expected_llm_response.json") as f:
-            response = json.load(f)
-
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = MagicMock(
-            content=json.dumps(response),
+        from sema.llm_client import LLMClient
+        from sema.models.stages import (
+            StageAResult,
+            StageBBatchResult,
+            StageBColumnResult,
         )
 
-        engine_without = SemanticEngine(
-            llm=mock_llm, run_id="isolation-test",
+        metadata = {
+            "table_ref": "unity://cat.sch.patient",
+            "table_name": "patient",
+            "columns": [{"name": "id", "data_type": "STRING"}],
+            "sample_rows": [],
+            "comment": None,
+        }
+
+        def _make_client() -> MagicMock:
+            client = MagicMock(spec=LLMClient)
+            client.invoke.side_effect = [
+                StageAResult(
+                    primary_entity="Patient",
+                    grain_hypothesis="one row per patient",
+                    confidence=0.9,
+                ),
+                StageBBatchResult(columns=[
+                    StageBColumnResult(
+                        column="id",
+                        canonical_property_label="patient id",
+                        semantic_type="identifier",
+                        entity_role="primary_key",
+                        needs_stage_c=False,
+                    ),
+                ]),
+            ]
+            return client
+
+        engine_default = SemanticEngine(
+            llm_client=_make_client(), run_id="isolation-test",
         )
-        engine_with = SemanticEngine(
-            llm=mock_llm, run_id="isolation-test",
+        engine_explicit_none = SemanticEngine(
+            llm_client=_make_client(), run_id="isolation-test",
             domain_context=None,
         )
 
-        assertions_without = engine_without.interpret_table(metadata)
-        assertions_with = engine_with.interpret_table(metadata)
+        a_default = engine_default.interpret_table(metadata)
+        a_explicit = engine_explicit_none.interpret_table(metadata)
 
-        assert len(assertions_without) == len(assertions_with)
-        for a1, a2 in zip(assertions_without, assertions_with):
+        assert len(a_default) == len(a_explicit)
+        for a1, a2 in zip(a_default, a_explicit):
             assert a1.predicate == a2.predicate
             assert a1.subject_ref == a2.subject_ref
             assert a1.payload == a2.payload

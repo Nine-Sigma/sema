@@ -37,7 +37,6 @@ def eval_group() -> None:
     "--config", "config_path", default=None, type=click.Path(),
     help="Optional BuildConfig YAML with overrides.",
 )
-@click.option("--use-staged/--no-use-staged", default=True)
 @click.option("--enable-domain-bias/--no-enable-domain-bias", default=True)
 @click.option(
     "--enable-type-inventory/--no-enable-type-inventory", default=True,
@@ -53,7 +52,6 @@ def run_slice_cmd(
     label: str,
     output_dir: str,
     config_path: str | None,
-    use_staged: bool,
     enable_domain_bias: bool,
     enable_type_inventory: bool,
     enable_vocab_hints: bool,
@@ -66,7 +64,6 @@ def run_slice_cmd(
         slice_path=slice_path, label=label, output_dir=output_dir,
         config_path=config_path,
         flags={
-            "use_staged": use_staged,
             "enable_domain_bias": enable_domain_bias,
             "enable_type_inventory": enable_type_inventory,
             "enable_vocab_hints": enable_vocab_hints,
