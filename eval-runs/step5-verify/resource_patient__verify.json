@@ -1,0 +1,345 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient",
+  "config_label": "verify",
+  "timestamp": "2026-04-20T21:30:28.770400+00:00",
+  "run_id": "e32bf181-7eb7-4a74-9e72-87904bc07781",
+  "assertions": [
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient",
+      "predicate": "table_exists",
+      "payload": {
+        "table_type": "TABLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient/PATIENT_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient/PATIENT_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient/RESOURCE_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient/RESOURCE_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient/URL",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient/URL",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient/RESOURCE_ID",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "IDC_OHIF_V2",
+            "frequency": 607
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient",
+      "predicate": "has_sample_rows",
+      "payload": {
+        "rows": [
+          {
+            "PATIENT_ID": "TCGA-02-0001",
+            "RESOURCE_ID": "IDC_OHIF_V2",
+            "URL": "https://viewer.imaging.datacommons.cancer.gov/viewer/2.25.68803095896966276583382138924964839274"
+          },
+          {
+            "PATIENT_ID": "TCGA-02-0003",
+            "RESOURCE_ID": "IDC_OHIF_V2",
+            "URL": "https://viewer.imaging.datacommons.cancer.gov/viewer/2.25.147822060035127634904914236822666619190"
+          },
+          {
+            "PATIENT_ID": "TCGA-02-0004",
+            "RESOURCE_ID": "IDC_OHIF_V2",
+            "URL": "https://viewer.imaging.datacommons.cancer.gov/viewer/2.25.289961451152621554336891097464061981156"
+          },
+          {
+            "PATIENT_ID": "TCGA-02-0006",
+            "RESOURCE_ID": "IDC_OHIF_V2",
+            "URL": "https://viewer.imaging.datacommons.cancer.gov/viewer/2.25.103659964951665749659160840573802789777"
+          },
+          {
+            "PATIENT_ID": "TCGA-02-0007",
+            "RESOURCE_ID": "IDC_OHIF_V2",
+            "URL": "https://viewer.imaging.datacommons.cancer.gov/viewer/2.25.38888713203786659096841588961866180815"
+          }
+        ],
+        "columns": [
+          "PATIENT_ID",
+          "RESOURCE_ID",
+          "URL"
+        ]
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient",
+      "predicate": "has_entity_name",
+      "payload": {
+        "value": "Patient Imaging Resource",
+        "grain": "one row per external resource link (URL) per patient"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "imaging study link",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "DICOM viewer link",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "IDC resource",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "patient external link",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.PATIENT_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.PATIENT_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "subject identifier",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "case id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "participant id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.RESOURCE_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "imaging resource identifier"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.RESOURCE_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.RESOURCE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "platform identifier",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.RESOURCE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "resource type",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.RESOURCE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "viewer id",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.URL",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "resource uniform resource locator"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.URL",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.URL",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "resource link",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.URL",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "web address",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.URL",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "endpoint url",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient.RESOURCE_ID",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "IDC_OHIF_V2",
+        "label": "Imaging Data Commons (IDC) Open Health Imaging Foundation (OHIF) Viewer Version 2"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_patient/RESOURCE_ID",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Imaging Data Commons (IDC)"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    }
+  ]
+}
