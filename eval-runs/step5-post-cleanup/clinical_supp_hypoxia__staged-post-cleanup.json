@@ -1,0 +1,1263 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia",
+  "config_label": "staged-post-cleanup",
+  "timestamp": "2026-04-20T20:51:28.795082+00:00",
+  "run_id": "87a7e876-1df5-4809-8a09-b2b7e84a8f8e",
+  "assertions": [
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia",
+      "predicate": "table_exists",
+      "payload": {
+        "table_type": "TABLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/PATIENT_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Identifier to uniquely specify a patient."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/PATIENT_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/PATIENT_ID",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Identifier to uniquely specify a patient."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/BUFFA_HYPOXIA_SCORE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "DOUBLE",
+        "nullable": true,
+        "comment": "mRNA based Buffa Hypoxia Score"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/BUFFA_HYPOXIA_SCORE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "DOUBLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/BUFFA_HYPOXIA_SCORE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "mRNA based Buffa Hypoxia Score"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/WINTER_HYPOXIA_SCORE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "DOUBLE",
+        "nullable": true,
+        "comment": "mRNA based Winter Hypoxia Score"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/WINTER_HYPOXIA_SCORE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "DOUBLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/WINTER_HYPOXIA_SCORE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "mRNA based Winter Hypoxia Score"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/RAGNUM_HYPOXIA_SCORE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "DOUBLE",
+        "nullable": true,
+        "comment": "mRNA based Ragnum Hypoxia Score"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/RAGNUM_HYPOXIA_SCORE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "DOUBLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/RAGNUM_HYPOXIA_SCORE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "mRNA based Ragnum Hypoxia Score"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/PATIENT_ID",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "TCGA-27-2521",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-19-1787",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-2558",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-15-0742",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-5858",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-2567",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0646",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-26-5139",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-27-2519",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0187",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-12-5295",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-5414",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-32-1980",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-76-4927",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-16-1045",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-5411",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-2562",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-41-4097",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0178",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-2499",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-27-2526",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0238",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-08-0386",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0130",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-2563",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0125",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-5417",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-5204",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-76-4929",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-19-2619",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-1753",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0152",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0132",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-32-2634",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0743",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-2513",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-5218",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-14-1034",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-26-5136",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-5408",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-2514",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-76-4931",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0744",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0750",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0878",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-27-2528",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-32-2632",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-27-1830",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-5220",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-2564",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-19-5960",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-27-1837",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-2561",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-76-4926",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-19-2629",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-32-2638",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0171",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0749",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-1747",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-12-3653",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0158",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-14-0789",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-27-1834",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0747",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0129",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-02-2485",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-26-1442",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-19-2620",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-2569",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-19-2624",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-15-1444",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0211",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0882",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0168",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-27-1835",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-2570",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-2510",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-19-0957",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0221",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-2557",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-32-1970",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-5415",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-2565",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-5208",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-26-5134",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-27-2523",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-5207",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-28-5215",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-5859",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-14-1825",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-16-0846",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-26-5133",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-02-0047",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-5413",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-1804",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0157",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-14-0790",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-14-0787",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-06-0649",
+            "frequency": 1
+          },
+          {
+            "value": "TCGA-12-0616",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 154
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/BUFFA_HYPOXIA_SCORE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "13.0",
+            "frequency": 13
+          },
+          {
+            "value": "25.0",
+            "frequency": 8
+          },
+          {
+            "value": "17.0",
+            "frequency": 8
+          },
+          {
+            "value": "21.0",
+            "frequency": 8
+          },
+          {
+            "value": "-17.0",
+            "frequency": 8
+          },
+          {
+            "value": "-3.0",
+            "frequency": 7
+          },
+          {
+            "value": "3.0",
+            "frequency": 7
+          },
+          {
+            "value": "27.0",
+            "frequency": 6
+          },
+          {
+            "value": "11.0",
+            "frequency": 6
+          },
+          {
+            "value": "5.0",
+            "frequency": 6
+          },
+          {
+            "value": "-7.0",
+            "frequency": 5
+          },
+          {
+            "value": "19.0",
+            "frequency": 5
+          },
+          {
+            "value": "15.0",
+            "frequency": 5
+          },
+          {
+            "value": "9.0",
+            "frequency": 5
+          },
+          {
+            "value": "7.0",
+            "frequency": 5
+          },
+          {
+            "value": "31.0",
+            "frequency": 5
+          },
+          {
+            "value": "23.0",
+            "frequency": 5
+          },
+          {
+            "value": "29.0",
+            "frequency": 4
+          },
+          {
+            "value": "-21.0",
+            "frequency": 4
+          },
+          {
+            "value": "1.0",
+            "frequency": 4
+          },
+          {
+            "value": "-9.0",
+            "frequency": 4
+          },
+          {
+            "value": "-11.0",
+            "frequency": 4
+          },
+          {
+            "value": "-13.0",
+            "frequency": 4
+          },
+          {
+            "value": "-1.0",
+            "frequency": 3
+          },
+          {
+            "value": "-5.0",
+            "frequency": 3
+          },
+          {
+            "value": "33.0",
+            "frequency": 3
+          },
+          {
+            "value": "37.0",
+            "frequency": 2
+          },
+          {
+            "value": "-15.0",
+            "frequency": 2
+          },
+          {
+            "value": "39.0",
+            "frequency": 2
+          },
+          {
+            "value": "35.0",
+            "frequency": 2
+          },
+          {
+            "value": "-29.0",
+            "frequency": 1
+          },
+          {
+            "value": "-27.0",
+            "frequency": 1
+          },
+          {
+            "value": "-31.0",
+            "frequency": 1
+          },
+          {
+            "value": "-25.0",
+            "frequency": 1
+          },
+          {
+            "value": "-23.0",
+            "frequency": 1
+          },
+          {
+            "value": "43.0",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 35
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/WINTER_HYPOXIA_SCORE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "12.0",
+            "frequency": 12
+          },
+          {
+            "value": "6.0",
+            "frequency": 11
+          },
+          {
+            "value": "20.0",
+            "frequency": 10
+          },
+          {
+            "value": "24.0",
+            "frequency": 8
+          },
+          {
+            "value": "-6.0",
+            "frequency": 7
+          },
+          {
+            "value": "-4.0",
+            "frequency": 7
+          },
+          {
+            "value": "-26.0",
+            "frequency": 6
+          },
+          {
+            "value": "16.0",
+            "frequency": 6
+          },
+          {
+            "value": "-10.0",
+            "frequency": 6
+          },
+          {
+            "value": "14.0",
+            "frequency": 6
+          },
+          {
+            "value": "0.0",
+            "frequency": 6
+          },
+          {
+            "value": "8.0",
+            "frequency": 6
+          },
+          {
+            "value": "22.0",
+            "frequency": 5
+          },
+          {
+            "value": "10.0",
+            "frequency": 5
+          },
+          {
+            "value": "4.0",
+            "frequency": 5
+          },
+          {
+            "value": "2.0",
+            "frequency": 5
+          },
+          {
+            "value": "-8.0",
+            "frequency": 5
+          },
+          {
+            "value": "-2.0",
+            "frequency": 4
+          },
+          {
+            "value": "-12.0",
+            "frequency": 4
+          },
+          {
+            "value": "-30.0",
+            "frequency": 3
+          },
+          {
+            "value": "30.0",
+            "frequency": 3
+          },
+          {
+            "value": "-14.0",
+            "frequency": 2
+          },
+          {
+            "value": "18.0",
+            "frequency": 2
+          },
+          {
+            "value": "-22.0",
+            "frequency": 2
+          },
+          {
+            "value": "-28.0",
+            "frequency": 2
+          },
+          {
+            "value": "-36.0",
+            "frequency": 2
+          },
+          {
+            "value": "-32.0",
+            "frequency": 2
+          },
+          {
+            "value": "34.0",
+            "frequency": 2
+          },
+          {
+            "value": "28.0",
+            "frequency": 2
+          },
+          {
+            "value": "-16.0",
+            "frequency": 2
+          },
+          {
+            "value": "26.0",
+            "frequency": 2
+          },
+          {
+            "value": "-38.0",
+            "frequency": 1
+          },
+          {
+            "value": "-34.0",
+            "frequency": 1
+          },
+          {
+            "value": "-44.0",
+            "frequency": 1
+          },
+          {
+            "value": "36.0",
+            "frequency": 1
+          },
+          {
+            "value": "-20.0",
+            "frequency": 1
+          },
+          {
+            "value": "-18.0",
+            "frequency": 1
+          },
+          {
+            "value": "38.0",
+            "frequency": 1
+          },
+          {
+            "value": "46.0",
+            "frequency": 1
+          },
+          {
+            "value": "32.0",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 38
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/RAGNUM_HYPOXIA_SCORE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "6.0",
+            "frequency": 17
+          },
+          {
+            "value": "10.0",
+            "frequency": 14
+          },
+          {
+            "value": "-2.0",
+            "frequency": 13
+          },
+          {
+            "value": "8.0",
+            "frequency": 13
+          },
+          {
+            "value": "-4.0",
+            "frequency": 11
+          },
+          {
+            "value": "0.0",
+            "frequency": 10
+          },
+          {
+            "value": "4.0",
+            "frequency": 9
+          },
+          {
+            "value": "12.0",
+            "frequency": 9
+          },
+          {
+            "value": "-10.0",
+            "frequency": 8
+          },
+          {
+            "value": "-8.0",
+            "frequency": 8
+          },
+          {
+            "value": "18.0",
+            "frequency": 8
+          },
+          {
+            "value": "-6.0",
+            "frequency": 8
+          },
+          {
+            "value": "14.0",
+            "frequency": 7
+          },
+          {
+            "value": "2.0",
+            "frequency": 6
+          },
+          {
+            "value": "-16.0",
+            "frequency": 4
+          },
+          {
+            "value": "-14.0",
+            "frequency": 4
+          },
+          {
+            "value": "-12.0",
+            "frequency": 3
+          },
+          {
+            "value": "-18.0",
+            "frequency": 3
+          },
+          {
+            "value": "-22.0",
+            "frequency": 1
+          },
+          {
+            "value": "20.0",
+            "frequency": 1
+          },
+          {
+            "value": "16.0",
+            "frequency": 1
+          },
+          {
+            "value": "22.0",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 22
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia",
+      "predicate": "has_sample_rows",
+      "payload": {
+        "rows": [
+          {
+            "PATIENT_ID": "TCGA-27-1834",
+            "BUFFA_HYPOXIA_SCORE": "-31.0",
+            "WINTER_HYPOXIA_SCORE": "-38.0",
+            "RAGNUM_HYPOXIA_SCORE": "-16.0"
+          },
+          {
+            "PATIENT_ID": "TCGA-06-1804",
+            "BUFFA_HYPOXIA_SCORE": "-29.0",
+            "WINTER_HYPOXIA_SCORE": "-32.0",
+            "RAGNUM_HYPOXIA_SCORE": "-12.0"
+          },
+          {
+            "PATIENT_ID": "TCGA-06-0221",
+            "BUFFA_HYPOXIA_SCORE": "-27.0",
+            "WINTER_HYPOXIA_SCORE": "-34.0",
+            "RAGNUM_HYPOXIA_SCORE": "-2.0"
+          },
+          {
+            "PATIENT_ID": "TCGA-15-1444",
+            "BUFFA_HYPOXIA_SCORE": "-25.0",
+            "WINTER_HYPOXIA_SCORE": "-36.0",
+            "RAGNUM_HYPOXIA_SCORE": "-6.0"
+          },
+          {
+            "PATIENT_ID": "TCGA-19-2629",
+            "BUFFA_HYPOXIA_SCORE": "-23.0",
+            "WINTER_HYPOXIA_SCORE": "-30.0",
+            "RAGNUM_HYPOXIA_SCORE": "-6.0"
+          }
+        ],
+        "columns": [
+          "PATIENT_ID",
+          "BUFFA_HYPOXIA_SCORE",
+          "WINTER_HYPOXIA_SCORE",
+          "RAGNUM_HYPOXIA_SCORE"
+        ]
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia",
+      "predicate": "has_entity_name",
+      "payload": {
+        "value": "Patient Hypoxia Assessment",
+        "grain": "one row per patient"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "hypoxia signatures",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "transcriptomic hypoxia scores",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor hypoxia profile",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.PATIENT_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.PATIENT_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "subject id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "case id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "participant id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "TCGA barcode",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.BUFFA_HYPOXIA_SCORE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "Buffa hypoxia score"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.BUFFA_HYPOXIA_SCORE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.BUFFA_HYPOXIA_SCORE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Buffa signature",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.BUFFA_HYPOXIA_SCORE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Buffa gene expression score",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.WINTER_HYPOXIA_SCORE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "Winter hypoxia score"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.WINTER_HYPOXIA_SCORE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.WINTER_HYPOXIA_SCORE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Winter signature",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.WINTER_HYPOXIA_SCORE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Winter gene expression score",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.RAGNUM_HYPOXIA_SCORE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "Ragnum hypoxia score"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.RAGNUM_HYPOXIA_SCORE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.RAGNUM_HYPOXIA_SCORE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Ragnum signature",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia.RAGNUM_HYPOXIA_SCORE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Ragnum gene expression score",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/RAGNUM_HYPOXIA_SCORE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Custom Score"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/WINTER_HYPOXIA_SCORE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Custom Score/Scale"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/PATIENT_ID",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "The Cancer Genome Atlas (TCGA) Barcode"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/clinical_supp_hypoxia/BUFFA_HYPOXIA_SCORE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "BUFFA_HYPOXIA_SIGNATURE"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    }
+  ]
+}
