@@ -17,7 +17,6 @@ from sema.llm_client import (
     parse_llm_response,
     _is_transient_error,
 )
-from sema.engine.semantic import TableInterpretation
 
 
 # ---------------------------------------------------------------------------
@@ -27,48 +26,48 @@ from sema.engine.semantic import TableInterpretation
 class TestParseResponse:
     def test_clean_json(self):
         raw = '{"entity_name": "Patient", "entity_description": "A patient record"}'
-        result = parse_llm_response(raw, TableInterpretation)
+        result = parse_llm_response(raw, TableSummary)
         assert result.entity_name == "Patient"
 
     def test_markdown_fenced_json(self):
         raw = '```json\n{"entity_name": "Patient"}\n```'
-        result = parse_llm_response(raw, TableInterpretation)
+        result = parse_llm_response(raw, TableSummary)
         assert result.entity_name == "Patient"
 
     def test_markdown_fenced_no_language(self):
         raw = '```\n{"entity_name": "Patient"}\n```'
-        result = parse_llm_response(raw, TableInterpretation)
+        result = parse_llm_response(raw, TableSummary)
         assert result.entity_name == "Patient"
 
     def test_json_embedded_in_prose(self):
         raw = 'Here is the result:\n{"entity_name": "Patient", "entity_description": "desc"}\nLet me know if you need more.'
-        result = parse_llm_response(raw, TableInterpretation)
+        result = parse_llm_response(raw, TableSummary)
         assert result.entity_name == "Patient"
 
     def test_key_normalization_to_lowercase(self):
         raw = '{"Entity_Name": "Patient", "Entity_Description": "desc"}'
-        result = parse_llm_response(raw, TableInterpretation)
+        result = parse_llm_response(raw, TableSummary)
         assert result.entity_name == "Patient"
 
     def test_wrapper_key_unwrapping_result(self):
         raw = '{"result": {"entity_name": "Patient"}}'
-        result = parse_llm_response(raw, TableInterpretation)
+        result = parse_llm_response(raw, TableSummary)
         assert result.entity_name == "Patient"
 
     def test_wrapper_key_unwrapping_data(self):
         raw = '{"data": {"entity_name": "Patient"}}'
-        result = parse_llm_response(raw, TableInterpretation)
+        result = parse_llm_response(raw, TableSummary)
         assert result.entity_name == "Patient"
 
     def test_wrapper_key_unwrapping_response(self):
         raw = '{"response": {"entity_name": "Patient"}}'
-        result = parse_llm_response(raw, TableInterpretation)
+        result = parse_llm_response(raw, TableSummary)
         assert result.entity_name == "Patient"
 
     def test_no_json_raises_error(self):
         raw = "I cannot help with that request."
         with pytest.raises(ValueError, match="No JSON found"):
-            parse_llm_response(raw, TableInterpretation)
+            parse_llm_response(raw, TableSummary)
 
     def test_vocabulary_detection_schema(self):
         raw = '{"vocabulary": "ICD-10", "confidence": 0.95}'
@@ -88,12 +87,11 @@ class TestParseResponse:
 # ---------------------------------------------------------------------------
 
 class TestSchemaKeyNormalization:
-    def test_table_interpretation_mixed_casing(self):
-        raw = '{"Entity_Name": "Patient", "Properties": [{"Column": "id", "Name": "ID", "Semantic_Type": "identifier"}]}'
-        result = parse_llm_response(raw, TableInterpretation)
+    def test_table_summary_mixed_casing(self):
+        raw = '{"Entity_Name": "Patient", "Entity_Description": "A patient"}'
+        result = parse_llm_response(raw, TableSummary)
         assert result.entity_name == "Patient"
-        assert len(result.properties) == 1
-        assert result.properties[0].column == "id"
+        assert result.entity_description == "A patient"
 
     def test_vocabulary_detection_mixed_casing(self):
         raw = '{"Vocabulary": "AJCC Staging", "Confidence": 0.85}'
@@ -118,12 +116,12 @@ class TestLLMClientFallbackChain:
     def test_structured_output_success(self):
         llm = MagicMock()
         structured_llm = MagicMock()
-        expected = TableInterpretation(entity_name="Patient")
+        expected = TableSummary(entity_name="Patient")
         structured_llm.invoke.return_value = expected
         llm.with_structured_output.return_value = structured_llm
 
         client = self._make_client(llm, use_structured_output="true")
-        result = client.invoke("test prompt", TableInterpretation)
+        result = client.invoke("test prompt", TableSummary)
         assert result.entity_name == "Patient"
 
     def test_structured_output_fail_fallback_parser_success(self):
@@ -137,7 +135,7 @@ class TestLLMClientFallbackChain:
         llm.invoke.return_value = response
 
         client = self._make_client(llm, use_structured_output="true")
-        result = client.invoke("test prompt", TableInterpretation)
+        result = client.invoke("test prompt", TableSummary)
         assert result.entity_name == "Patient"
 
     def test_all_steps_fail_raises_llm_stage_error(self):
@@ -154,7 +152,7 @@ class TestLLMClientFallbackChain:
         with pytest.raises(LLMStageError) as exc_info:
             client.invoke(
                 "test prompt",
-                TableInterpretation,
+                TableSummary,
                 table_ref="unity://cdm.clinical.tbl",
                 stage_name="L2 semantic",
             )
@@ -176,7 +174,7 @@ class TestLLMClientFallbackChain:
         with pytest.raises(LLMStageError) as exc_info:
             client.invoke(
                 "test prompt",
-                TableInterpretation,
+                TableSummary,
                 simplified_prompt="simple prompt",
                 table_ref="ref",
                 stage_name="test",
@@ -204,7 +202,7 @@ class TestLLMClientFallbackChain:
         client = self._make_client(llm, use_structured_output="true")
         result = client.invoke(
             "complex prompt",
-            TableInterpretation,
+            TableSummary,
             simplified_prompt="simple prompt",
         )
         assert result.entity_name == "Patient"
@@ -233,7 +231,7 @@ class TestProviderDetection:
         llm.invoke.return_value = response
 
         client = LLMClient(llm, retry_max_attempts=1)
-        result = client.invoke("prompt", TableInterpretation)
+        result = client.invoke("prompt", TableSummary)
         assert result.entity_name == "Patient"
         # with_structured_output was never called
         assert not hasattr(llm, "with_structured_output") or not llm.with_structured_output.called
@@ -261,7 +259,7 @@ class TestRetryLogic:
         llm.invoke.side_effect = invoke_side_effect
 
         client = LLMClient(llm, retry_max_attempts=3, retry_base_delay=0.01)
-        result = client.invoke("prompt", TableInterpretation)
+        result = client.invoke("prompt", TableSummary)
         assert result.entity_name == "Patient"
         assert call_count[0] == 2
 
@@ -273,7 +271,7 @@ class TestRetryLogic:
 
         client = LLMClient(llm, retry_max_attempts=3, retry_base_delay=0.01)
         with pytest.raises(LLMStageError):
-            client.invoke("prompt", TableInterpretation, table_ref="ref", stage_name="test")
+            client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
         # Only called once (no retry)
         assert llm.invoke.call_count == 1
 
@@ -285,7 +283,7 @@ class TestRetryLogic:
 
         client = LLMClient(llm, retry_max_attempts=3, retry_base_delay=0.01)
         with pytest.raises(LLMStageError):
-            client.invoke("prompt", TableInterpretation, table_ref="ref", stage_name="test")
+            client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
         assert llm.invoke.call_count == 1
 
     def test_parse_failure_falls_to_simplified_prompt(self):
@@ -306,7 +304,7 @@ class TestRetryLogic:
         client = LLMClient(llm, retry_max_attempts=1, retry_base_delay=0.01)
         result = client.invoke(
             "complex prompt",
-            TableInterpretation,
+            TableSummary,
             simplified_prompt="simple prompt",
         )
         assert result.entity_name == "Patient"
@@ -320,7 +318,7 @@ class TestRetryLogic:
 
         client = LLMClient(llm, retry_max_attempts=3, retry_base_delay=0.01)
         with pytest.raises(LLMStageError):
-            client.invoke("prompt", TableInterpretation, table_ref="ref", stage_name="test")
+            client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
         assert llm.invoke.call_count == 3  # 3 attempts in step 2 (no structured output)
 
 
@@ -344,7 +342,7 @@ class TestBackoffTiming:
                 retry_multiplier=2.0, retry_jitter=0.0,
             )
             with pytest.raises(LLMStageError):
-                client.invoke("prompt", TableInterpretation, table_ref="ref", stage_name="test")
+                client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
 
         # 2 sleeps (between attempt 1→2 and 2→3)
         assert len(sleep_times) == 2
@@ -365,7 +363,7 @@ class TestBackoffTiming:
                 retry_multiplier=2.0, retry_jitter=0.5,
             )
             with pytest.raises(LLMStageError):
-                client.invoke("prompt", TableInterpretation, table_ref="ref", stage_name="test")
+                client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
 
         assert len(sleep_times) == 2
         # First delay: 2.0 ± 0.5 → [1.5, 2.5]
@@ -387,7 +385,7 @@ class TestConfigurableRetry:
 
         client = LLMClient(llm, retry_max_attempts=5, retry_base_delay=0.01)
         with pytest.raises(LLMStageError):
-            client.invoke("prompt", TableInterpretation, table_ref="ref", stage_name="test")
+            client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
         assert llm.invoke.call_count == 5
 
     def test_retries_disabled(self):
@@ -398,7 +396,7 @@ class TestConfigurableRetry:
 
         client = LLMClient(llm, retry_max_attempts=1, retry_base_delay=0.01)
         with pytest.raises(LLMStageError):
-            client.invoke("prompt", TableInterpretation, table_ref="ref", stage_name="test")
+            client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
         assert llm.invoke.call_count == 1
 
 

@@ -20,11 +20,17 @@ from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
 )
+from sema.models.domain import DomainContext
 
 
 @dataclass(frozen=True)
 class VocabColumnContext:
-    """L2-derived context passed to L3 for a single column."""
+    """L2-derived context passed to L3 for a single column.
+
+    New enrichment fields (prefixed with _) are guarded by
+    _enrichment_version. Access via properties; they raise
+    AttributeError when version is 0 (pre-decomposition).
+    """
 
     column_name: str | None = None
     table_name: str | None = None
@@ -33,6 +39,46 @@ class VocabColumnContext:
     property_name: str | None = None
     vocabulary_guess: str | None = None
     vocabulary_guess_confidence: float = 0.0
+
+    _enrichment_version: int = 0
+    _candidate_vocab_families: tuple[str, ...] = ()
+    _grain_hypothesis: str | None = None
+    _ambiguity_notes: tuple[str, ...] = ()
+    _entity_role: str | None = None
+    _domain_context: Any = None
+
+    def _require_enriched(self, field: str) -> None:
+        if self._enrichment_version < 1:
+            msg = (
+                f"'{field}' requires _enrichment_version >= 1 "
+                f"(current: {self._enrichment_version})"
+            )
+            raise AttributeError(msg)
+
+    @property
+    def candidate_vocab_families(self) -> list[str]:
+        self._require_enriched("candidate_vocab_families")
+        return list(self._candidate_vocab_families)
+
+    @property
+    def grain_hypothesis(self) -> str | None:
+        self._require_enriched("grain_hypothesis")
+        return self._grain_hypothesis
+
+    @property
+    def ambiguity_notes(self) -> list[str]:
+        self._require_enriched("ambiguity_notes")
+        return list(self._ambiguity_notes)
+
+    @property
+    def entity_role(self) -> str | None:
+        self._require_enriched("entity_role")
+        return self._entity_role
+
+    @property
+    def domain_context(self) -> Any:
+        self._require_enriched("domain_context")
+        return self._domain_context
 
 logger = logging.getLogger(__name__)
 
@@ -209,10 +255,17 @@ def infer_hierarchy(values: list[str]) -> list[tuple[str, str]]:
 class VocabularyEngine:
     """L3: Vocabulary detection, hierarchy inference, and synonym expansion."""
 
-    def __init__(self, llm: Any = None, run_id: str | None = None, llm_client: Any = None) -> None:
+    def __init__(
+        self,
+        llm: Any = None,
+        run_id: str | None = None,
+        llm_client: Any = None,
+        domain_context: DomainContext | None = None,
+    ) -> None:
         self._llm = llm
         self._llm_client = llm_client
         self._run_id = run_id or str(uuid.uuid4())
+        self._domain_context = domain_context
 
     def _make_assertion(
         self,

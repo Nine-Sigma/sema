@@ -1,0 +1,3832 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample",
+  "config_label": "staged+domain+fewshot+c-v2",
+  "timestamp": "2026-04-20T20:34:37.611535+00:00",
+  "run_id": "57c5ba82-5b47-4f11-bc74-b94605dac151",
+  "assertions": [
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample",
+      "predicate": "table_exists",
+      "payload": {
+        "table_type": "TABLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/PATIENT_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Identifier to uniquely specify a patient."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/PATIENT_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/PATIENT_ID",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Identifier to uniquely specify a patient."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SAMPLE_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "A unique sample identifier."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SAMPLE_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SAMPLE_ID",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "A unique sample identifier."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/ONCOTREE_CODE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Oncotree Code"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/ONCOTREE_CODE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/ONCOTREE_CODE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Oncotree Code"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/CANCER_TYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Cancer Type"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/CANCER_TYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/CANCER_TYPE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Cancer Type"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/CANCER_TYPE_DETAILED",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Cancer Type Detailed"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/CANCER_TYPE_DETAILED",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/CANCER_TYPE_DETAILED",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Cancer Type Detailed"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TUMOR_TYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Tumor Type"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TUMOR_TYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TUMOR_TYPE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Tumor Type"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/GRADE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Numeric value to express the degree of abnormality of cancer cells, a measure of differentiation and aggressiveness."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/GRADE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/GRADE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Numeric value to express the degree of abnormality of cancer cells, a measure of differentiation and aggressiveness."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Tissue prospective collection indicator."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Tissue prospective collection indicator."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Tissue retrospective collection indicator."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Tissue retrospective collection indicator."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_SOURCE_SITE_CODE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Tissue Source Site Code"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Tissue Source Site Code"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TUMOR_TISSUE_SITE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Text term that describes the anatomic site of the tumor or disease."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TUMOR_TISSUE_SITE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TUMOR_TISSUE_SITE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Text term that describes the anatomic site of the tumor or disease."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/ANEUPLOIDY_SCORE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "DOUBLE",
+        "nullable": true,
+        "comment": "Aneuploidy Score"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/ANEUPLOIDY_SCORE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "DOUBLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/ANEUPLOIDY_SCORE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Aneuploidy Score"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SAMPLE_TYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "The type of sample (i.e., normal, primary, met, recurrence)."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SAMPLE_TYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SAMPLE_TYPE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "The type of sample (i.e., normal, primary, met, recurrence)."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/MSI_SCORE_MANTIS",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "DOUBLE",
+        "nullable": true,
+        "comment": "MSI Score reported by MANTIS. The suggested thresholds are MSI: >0.6, Indeterminate: 0.4-0.6 and MSS: <0.4."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/MSI_SCORE_MANTIS",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "DOUBLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/MSI_SCORE_MANTIS",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "MSI Score reported by MANTIS. The suggested thresholds are MSI: >0.6, Indeterminate: 0.4-0.6 and MSS: <0.4."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/MSI_SENSOR_SCORE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "DOUBLE",
+        "nullable": true,
+        "comment": "MSI Score reported by MSIsensor. The suggested thresholds are MSI: >10, Indeterminate: 4-10 and MSS: <10."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/MSI_SENSOR_SCORE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "DOUBLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/MSI_SENSOR_SCORE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "MSI Score reported by MSIsensor. The suggested thresholds are MSI: >10, Indeterminate: 4-10 and MSS: <10."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SOMATIC_STATUS",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "Somatic Status"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SOMATIC_STATUS",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SOMATIC_STATUS",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "Somatic Status"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TMB_NONSYNONYMOUS",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "DOUBLE",
+        "nullable": true,
+        "comment": "TMB (nonsynonymous)"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TMB_NONSYNONYMOUS",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "DOUBLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TMB_NONSYNONYMOUS",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "TMB (nonsynonymous)"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_SOURCE_SITE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": "A Tissue Source Site collects samples (tissue, cell, or blood) and cliincal metadata which are then sent to tha Biospecimen Core Resource."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_SOURCE_SITE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_SOURCE_SITE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "A Tissue Source Site collects samples (tissue, cell, or blood) and cliincal metadata which are then sent to tha Biospecimen Core Resource."
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TBL_SCORE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "DOUBLE",
+        "nullable": true,
+        "comment": "The sum of unbalanced somatic chromosomal breaks per tumor sample (Lakbir et al., Eur J Cancer 2022; Data from new manuscript in progress)"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TBL_SCORE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "DOUBLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TBL_SCORE",
+      "predicate": "has_comment",
+      "payload": {
+        "value": "The sum of unbalanced somatic chromosomal breaks per tumor sample (Lakbir et al., Eur J Cancer 2022; Data from new manuscript in progress)"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/ONCOTREE_CODE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "GBM",
+            "frequency": 592
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/CANCER_TYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Glioblastoma",
+            "frequency": 592
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/CANCER_TYPE_DETAILED",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Glioblastoma Multiforme",
+            "frequency": 592
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TUMOR_TYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Glioblastoma Multiforme (GBM)",
+            "frequency": 315
+          },
+          {
+            "value": "Glioblastoma Multiforme (GBM), Untreated",
+            "frequency": 272
+          },
+          {
+            "value": "Glioblastoma Multiforme (GBM), Treated",
+            "frequency": 5
+          }
+        ],
+        "approx_distinct": 3
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/GRADE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "NA",
+            "frequency": 592
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "NA",
+            "frequency": 571
+          },
+          {
+            "value": "Yes",
+            "frequency": 15
+          },
+          {
+            "value": "No",
+            "frequency": 6
+          }
+        ],
+        "approx_distinct": 3
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "NA",
+            "frequency": 571
+          },
+          {
+            "value": "No",
+            "frequency": 14
+          },
+          {
+            "value": "Yes",
+            "frequency": 7
+          }
+        ],
+        "approx_distinct": 3
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "6",
+            "frequency": 159
+          },
+          {
+            "value": "2",
+            "frequency": 91
+          },
+          {
+            "value": "12",
+            "frequency": 59
+          },
+          {
+            "value": "14",
+            "frequency": 45
+          },
+          {
+            "value": "19",
+            "frequency": 42
+          },
+          {
+            "value": "8",
+            "frequency": 38
+          },
+          {
+            "value": "28",
+            "frequency": 31
+          },
+          {
+            "value": "32",
+            "frequency": 26
+          },
+          {
+            "value": "76",
+            "frequency": 24
+          },
+          {
+            "value": "27",
+            "frequency": 17
+          },
+          {
+            "value": "26",
+            "frequency": 15
+          },
+          {
+            "value": "16",
+            "frequency": 14
+          },
+          {
+            "value": "41",
+            "frequency": 10
+          },
+          {
+            "value": "74",
+            "frequency": 6
+          },
+          {
+            "value": "15",
+            "frequency": 5
+          },
+          {
+            "value": "RR",
+            "frequency": 3
+          },
+          {
+            "value": "4W",
+            "frequency": 3
+          },
+          {
+            "value": "81",
+            "frequency": 2
+          },
+          {
+            "value": "OX",
+            "frequency": 1
+          },
+          {
+            "value": "87",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 20
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TUMOR_TISSUE_SITE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Brain",
+            "frequency": 298
+          },
+          {
+            "value": "NA",
+            "frequency": 294
+          }
+        ],
+        "approx_distinct": 2
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/ANEUPLOIDY_SCORE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "6.0",
+            "frequency": 100
+          },
+          {
+            "value": "8.0",
+            "frequency": 82
+          },
+          {
+            "value": "7.0",
+            "frequency": 76
+          },
+          {
+            "value": "4.0",
+            "frequency": 54
+          },
+          {
+            "value": "5.0",
+            "frequency": 44
+          },
+          {
+            "value": "9.0",
+            "frequency": 38
+          },
+          {
+            "value": "10.0",
+            "frequency": 33
+          },
+          {
+            "value": "None",
+            "frequency": 26
+          },
+          {
+            "value": "3.0",
+            "frequency": 22
+          },
+          {
+            "value": "11.0",
+            "frequency": 14
+          },
+          {
+            "value": "1.0",
+            "frequency": 13
+          },
+          {
+            "value": "13.0",
+            "frequency": 11
+          },
+          {
+            "value": "12.0",
+            "frequency": 9
+          },
+          {
+            "value": "2.0",
+            "frequency": 8
+          },
+          {
+            "value": "22.0",
+            "frequency": 6
+          },
+          {
+            "value": "0.0",
+            "frequency": 6
+          },
+          {
+            "value": "25.0",
+            "frequency": 5
+          },
+          {
+            "value": "27.0",
+            "frequency": 5
+          },
+          {
+            "value": "19.0",
+            "frequency": 4
+          },
+          {
+            "value": "17.0",
+            "frequency": 4
+          },
+          {
+            "value": "18.0",
+            "frequency": 4
+          },
+          {
+            "value": "20.0",
+            "frequency": 3
+          },
+          {
+            "value": "14.0",
+            "frequency": 3
+          },
+          {
+            "value": "23.0",
+            "frequency": 3
+          },
+          {
+            "value": "21.0",
+            "frequency": 3
+          },
+          {
+            "value": "26.0",
+            "frequency": 3
+          },
+          {
+            "value": "30.0",
+            "frequency": 3
+          },
+          {
+            "value": "15.0",
+            "frequency": 3
+          },
+          {
+            "value": "16.0",
+            "frequency": 2
+          },
+          {
+            "value": "29.0",
+            "frequency": 1
+          },
+          {
+            "value": "39.0",
+            "frequency": 1
+          },
+          {
+            "value": "31.0",
+            "frequency": 1
+          },
+          {
+            "value": "24.0",
+            "frequency": 1
+          },
+          {
+            "value": "36.0",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 33
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SAMPLE_TYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Primary",
+            "frequency": 585
+          },
+          {
+            "value": "Recurrence",
+            "frequency": 7
+          }
+        ],
+        "approx_distinct": 2
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/MSI_SCORE_MANTIS",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "None",
+            "frequency": 201
+          },
+          {
+            "value": "0.2839",
+            "frequency": 5
+          },
+          {
+            "value": "0.2807",
+            "frequency": 4
+          },
+          {
+            "value": "0.2726",
+            "frequency": 4
+          },
+          {
+            "value": "0.2763",
+            "frequency": 4
+          },
+          {
+            "value": "0.2721",
+            "frequency": 4
+          },
+          {
+            "value": "0.2619",
+            "frequency": 3
+          },
+          {
+            "value": "0.2935",
+            "frequency": 3
+          },
+          {
+            "value": "0.2753",
+            "frequency": 3
+          },
+          {
+            "value": "0.2696",
+            "frequency": 3
+          },
+          {
+            "value": "0.2652",
+            "frequency": 3
+          },
+          {
+            "value": "0.274",
+            "frequency": 3
+          },
+          {
+            "value": "0.2728",
+            "frequency": 3
+          },
+          {
+            "value": "0.2722",
+            "frequency": 3
+          },
+          {
+            "value": "0.2846",
+            "frequency": 3
+          },
+          {
+            "value": "0.2899",
+            "frequency": 3
+          },
+          {
+            "value": "0.2809",
+            "frequency": 3
+          },
+          {
+            "value": "0.2679",
+            "frequency": 3
+          },
+          {
+            "value": "0.2739",
+            "frequency": 3
+          },
+          {
+            "value": "0.2667",
+            "frequency": 3
+          },
+          {
+            "value": "0.2903",
+            "frequency": 2
+          },
+          {
+            "value": "0.2756",
+            "frequency": 2
+          },
+          {
+            "value": "0.2712",
+            "frequency": 2
+          },
+          {
+            "value": "0.2737",
+            "frequency": 2
+          },
+          {
+            "value": "0.2821",
+            "frequency": 2
+          },
+          {
+            "value": "0.2731",
+            "frequency": 2
+          },
+          {
+            "value": "0.2817",
+            "frequency": 2
+          },
+          {
+            "value": "0.2783",
+            "frequency": 2
+          },
+          {
+            "value": "0.2742",
+            "frequency": 2
+          },
+          {
+            "value": "0.3224",
+            "frequency": 2
+          },
+          {
+            "value": "0.2603",
+            "frequency": 2
+          },
+          {
+            "value": "0.284",
+            "frequency": 2
+          },
+          {
+            "value": "0.279",
+            "frequency": 2
+          },
+          {
+            "value": "0.2674",
+            "frequency": 2
+          },
+          {
+            "value": "0.2769",
+            "frequency": 2
+          },
+          {
+            "value": "0.2793",
+            "frequency": 2
+          },
+          {
+            "value": "0.2833",
+            "frequency": 2
+          },
+          {
+            "value": "0.2931",
+            "frequency": 2
+          },
+          {
+            "value": "0.269",
+            "frequency": 2
+          },
+          {
+            "value": "0.2804",
+            "frequency": 2
+          },
+          {
+            "value": "0.2826",
+            "frequency": 2
+          },
+          {
+            "value": "0.3315",
+            "frequency": 2
+          },
+          {
+            "value": "0.3067",
+            "frequency": 2
+          },
+          {
+            "value": "0.2704",
+            "frequency": 2
+          },
+          {
+            "value": "0.2715",
+            "frequency": 2
+          },
+          {
+            "value": "0.2655",
+            "frequency": 2
+          },
+          {
+            "value": "0.2687",
+            "frequency": 2
+          },
+          {
+            "value": "0.2598",
+            "frequency": 2
+          },
+          {
+            "value": "0.2816",
+            "frequency": 2
+          },
+          {
+            "value": "0.2673",
+            "frequency": 2
+          },
+          {
+            "value": "0.2962",
+            "frequency": 2
+          },
+          {
+            "value": "0.3127",
+            "frequency": 2
+          },
+          {
+            "value": "0.2758",
+            "frequency": 2
+          },
+          {
+            "value": "0.3336",
+            "frequency": 2
+          },
+          {
+            "value": "0.2741",
+            "frequency": 2
+          },
+          {
+            "value": "0.2716",
+            "frequency": 2
+          },
+          {
+            "value": "0.2727",
+            "frequency": 2
+          },
+          {
+            "value": "0.2915",
+            "frequency": 2
+          },
+          {
+            "value": "0.2707",
+            "frequency": 2
+          },
+          {
+            "value": "0.2746",
+            "frequency": 2
+          },
+          {
+            "value": "0.2701",
+            "frequency": 2
+          },
+          {
+            "value": "0.2881",
+            "frequency": 2
+          },
+          {
+            "value": "0.2819",
+            "frequency": 2
+          },
+          {
+            "value": "0.2855",
+            "frequency": 2
+          },
+          {
+            "value": "0.2772",
+            "frequency": 2
+          },
+          {
+            "value": "0.2754",
+            "frequency": 2
+          },
+          {
+            "value": "0.295",
+            "frequency": 2
+          },
+          {
+            "value": "0.2779",
+            "frequency": 2
+          },
+          {
+            "value": "0.2711",
+            "frequency": 2
+          },
+          {
+            "value": "0.2762",
+            "frequency": 2
+          },
+          {
+            "value": "0.3002",
+            "frequency": 2
+          },
+          {
+            "value": "0.2806",
+            "frequency": 2
+          },
+          {
+            "value": "0.2759",
+            "frequency": 2
+          },
+          {
+            "value": "0.2907",
+            "frequency": 2
+          },
+          {
+            "value": "0.2642",
+            "frequency": 2
+          },
+          {
+            "value": "0.2957",
+            "frequency": 2
+          },
+          {
+            "value": "0.2665",
+            "frequency": 2
+          },
+          {
+            "value": "0.2698",
+            "frequency": 2
+          },
+          {
+            "value": "0.2626",
+            "frequency": 2
+          },
+          {
+            "value": "0.2995",
+            "frequency": 2
+          },
+          {
+            "value": "0.2745",
+            "frequency": 2
+          },
+          {
+            "value": "0.2813",
+            "frequency": 1
+          },
+          {
+            "value": "0.3894",
+            "frequency": 1
+          },
+          {
+            "value": "0.3285",
+            "frequency": 1
+          },
+          {
+            "value": "0.263",
+            "frequency": 1
+          },
+          {
+            "value": "0.2685",
+            "frequency": 1
+          },
+          {
+            "value": "0.2834",
+            "frequency": 1
+          },
+          {
+            "value": "0.2961",
+            "frequency": 1
+          },
+          {
+            "value": "0.2643",
+            "frequency": 1
+          },
+          {
+            "value": "0.2997",
+            "frequency": 1
+          },
+          {
+            "value": "0.2863",
+            "frequency": 1
+          },
+          {
+            "value": "0.2934",
+            "frequency": 1
+          },
+          {
+            "value": "0.2959",
+            "frequency": 1
+          },
+          {
+            "value": "0.2925",
+            "frequency": 1
+          },
+          {
+            "value": "0.2972",
+            "frequency": 1
+          },
+          {
+            "value": "0.273",
+            "frequency": 1
+          },
+          {
+            "value": "0.289",
+            "frequency": 1
+          },
+          {
+            "value": "0.2764",
+            "frequency": 1
+          },
+          {
+            "value": "0.2922",
+            "frequency": 1
+          },
+          {
+            "value": "0.2586",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 279
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/MSI_SENSOR_SCORE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "None",
+            "frequency": 185
+          },
+          {
+            "value": "0.0",
+            "frequency": 60
+          },
+          {
+            "value": "0.01",
+            "frequency": 36
+          },
+          {
+            "value": "0.02",
+            "frequency": 27
+          },
+          {
+            "value": "0.03",
+            "frequency": 21
+          },
+          {
+            "value": "0.07",
+            "frequency": 15
+          },
+          {
+            "value": "0.05",
+            "frequency": 14
+          },
+          {
+            "value": "0.04",
+            "frequency": 13
+          },
+          {
+            "value": "0.06",
+            "frequency": 12
+          },
+          {
+            "value": "0.08",
+            "frequency": 12
+          },
+          {
+            "value": "0.19",
+            "frequency": 9
+          },
+          {
+            "value": "0.15",
+            "frequency": 8
+          },
+          {
+            "value": "0.14",
+            "frequency": 8
+          },
+          {
+            "value": "0.3",
+            "frequency": 7
+          },
+          {
+            "value": "0.13",
+            "frequency": 7
+          },
+          {
+            "value": "0.2",
+            "frequency": 7
+          },
+          {
+            "value": "0.09",
+            "frequency": 6
+          },
+          {
+            "value": "0.26",
+            "frequency": 6
+          },
+          {
+            "value": "0.1",
+            "frequency": 6
+          },
+          {
+            "value": "0.23",
+            "frequency": 6
+          },
+          {
+            "value": "0.22",
+            "frequency": 5
+          },
+          {
+            "value": "0.25",
+            "frequency": 5
+          },
+          {
+            "value": "0.11",
+            "frequency": 4
+          },
+          {
+            "value": "0.32",
+            "frequency": 4
+          },
+          {
+            "value": "0.16",
+            "frequency": 4
+          },
+          {
+            "value": "0.4",
+            "frequency": 4
+          },
+          {
+            "value": "0.27",
+            "frequency": 4
+          },
+          {
+            "value": "0.21",
+            "frequency": 4
+          },
+          {
+            "value": "0.17",
+            "frequency": 4
+          },
+          {
+            "value": "0.43",
+            "frequency": 3
+          },
+          {
+            "value": "0.37",
+            "frequency": 3
+          },
+          {
+            "value": "0.68",
+            "frequency": 3
+          },
+          {
+            "value": "0.41",
+            "frequency": 3
+          },
+          {
+            "value": "0.24",
+            "frequency": 3
+          },
+          {
+            "value": "0.29",
+            "frequency": 3
+          },
+          {
+            "value": "0.35",
+            "frequency": 3
+          },
+          {
+            "value": "0.56",
+            "frequency": 2
+          },
+          {
+            "value": "0.34",
+            "frequency": 2
+          },
+          {
+            "value": "0.28",
+            "frequency": 2
+          },
+          {
+            "value": "0.69",
+            "frequency": 2
+          },
+          {
+            "value": "0.36",
+            "frequency": 2
+          },
+          {
+            "value": "0.52",
+            "frequency": 2
+          },
+          {
+            "value": "0.57",
+            "frequency": 2
+          },
+          {
+            "value": "0.12",
+            "frequency": 2
+          },
+          {
+            "value": "0.63",
+            "frequency": 2
+          },
+          {
+            "value": "0.31",
+            "frequency": 2
+          },
+          {
+            "value": "0.53",
+            "frequency": 2
+          },
+          {
+            "value": "0.55",
+            "frequency": 2
+          },
+          {
+            "value": "0.42",
+            "frequency": 2
+          },
+          {
+            "value": "0.71",
+            "frequency": 2
+          },
+          {
+            "value": "0.64",
+            "frequency": 2
+          },
+          {
+            "value": "0.38",
+            "frequency": 2
+          },
+          {
+            "value": "1.96",
+            "frequency": 2
+          },
+          {
+            "value": "0.62",
+            "frequency": 1
+          },
+          {
+            "value": "1.0",
+            "frequency": 1
+          },
+          {
+            "value": "1.1",
+            "frequency": 1
+          },
+          {
+            "value": "1.56",
+            "frequency": 1
+          },
+          {
+            "value": "1.05",
+            "frequency": 1
+          },
+          {
+            "value": "0.96",
+            "frequency": 1
+          },
+          {
+            "value": "0.33",
+            "frequency": 1
+          },
+          {
+            "value": "0.85",
+            "frequency": 1
+          },
+          {
+            "value": "1.39",
+            "frequency": 1
+          },
+          {
+            "value": "1.31",
+            "frequency": 1
+          },
+          {
+            "value": "0.81",
+            "frequency": 1
+          },
+          {
+            "value": "0.18",
+            "frequency": 1
+          },
+          {
+            "value": "0.54",
+            "frequency": 1
+          },
+          {
+            "value": "2.26",
+            "frequency": 1
+          },
+          {
+            "value": "1.4",
+            "frequency": 1
+          },
+          {
+            "value": "1.12",
+            "frequency": 1
+          },
+          {
+            "value": "0.79",
+            "frequency": 1
+          },
+          {
+            "value": "1.43",
+            "frequency": 1
+          },
+          {
+            "value": "1.22",
+            "frequency": 1
+          },
+          {
+            "value": "0.87",
+            "frequency": 1
+          },
+          {
+            "value": "1.2",
+            "frequency": 1
+          },
+          {
+            "value": "0.46",
+            "frequency": 1
+          },
+          {
+            "value": "1.42",
+            "frequency": 1
+          },
+          {
+            "value": "0.72",
+            "frequency": 1
+          },
+          {
+            "value": "6.96",
+            "frequency": 1
+          },
+          {
+            "value": "1.27",
+            "frequency": 1
+          },
+          {
+            "value": "1.88",
+            "frequency": 1
+          },
+          {
+            "value": "0.8",
+            "frequency": 1
+          },
+          {
+            "value": "0.86",
+            "frequency": 1
+          },
+          {
+            "value": "5.26",
+            "frequency": 1
+          },
+          {
+            "value": "0.66",
+            "frequency": 1
+          },
+          {
+            "value": "1.97",
+            "frequency": 1
+          },
+          {
+            "value": "0.94",
+            "frequency": 1
+          },
+          {
+            "value": "6.17",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 87
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SOMATIC_STATUS",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Matched",
+            "frequency": 592
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TMB_NONSYNONYMOUS",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "None",
+            "frequency": 195
+          },
+          {
+            "value": "1.466666667",
+            "frequency": 13
+          },
+          {
+            "value": "1.6",
+            "frequency": 13
+          },
+          {
+            "value": "1.9",
+            "frequency": 12
+          },
+          {
+            "value": "1.7",
+            "frequency": 11
+          },
+          {
+            "value": "1.5",
+            "frequency": 11
+          },
+          {
+            "value": "1.833333333",
+            "frequency": 11
+          },
+          {
+            "value": "1.566666667",
+            "frequency": 11
+          },
+          {
+            "value": "1.366666667",
+            "frequency": 10
+          },
+          {
+            "value": "1.3",
+            "frequency": 9
+          },
+          {
+            "value": "1.433333333",
+            "frequency": 9
+          },
+          {
+            "value": "1.333333333",
+            "frequency": 8
+          },
+          {
+            "value": "1.866666667",
+            "frequency": 8
+          },
+          {
+            "value": "1.233333333",
+            "frequency": 8
+          },
+          {
+            "value": "1.8",
+            "frequency": 8
+          },
+          {
+            "value": "1.133333333",
+            "frequency": 8
+          },
+          {
+            "value": "1.4",
+            "frequency": 7
+          },
+          {
+            "value": "1.166666667",
+            "frequency": 7
+          },
+          {
+            "value": "2.2",
+            "frequency": 7
+          },
+          {
+            "value": "1.766666667",
+            "frequency": 7
+          },
+          {
+            "value": "1.533333333",
+            "frequency": 7
+          },
+          {
+            "value": "1.966666667",
+            "frequency": 7
+          },
+          {
+            "value": "2.166666667",
+            "frequency": 7
+          },
+          {
+            "value": "2.066666667",
+            "frequency": 6
+          },
+          {
+            "value": "2.3",
+            "frequency": 6
+          },
+          {
+            "value": "2.233333333",
+            "frequency": 6
+          },
+          {
+            "value": "0.933333333",
+            "frequency": 6
+          },
+          {
+            "value": "1.066666667",
+            "frequency": 6
+          },
+          {
+            "value": "1.633333333",
+            "frequency": 6
+          },
+          {
+            "value": "2.0",
+            "frequency": 5
+          },
+          {
+            "value": "1.1",
+            "frequency": 5
+          },
+          {
+            "value": "2.1",
+            "frequency": 5
+          },
+          {
+            "value": "2.366666667",
+            "frequency": 5
+          },
+          {
+            "value": "1.666666667",
+            "frequency": 5
+          },
+          {
+            "value": "1.733333333",
+            "frequency": 5
+          },
+          {
+            "value": "0.666666667",
+            "frequency": 4
+          },
+          {
+            "value": "0.966666667",
+            "frequency": 4
+          },
+          {
+            "value": "1.0",
+            "frequency": 4
+          },
+          {
+            "value": "2.266666667",
+            "frequency": 4
+          },
+          {
+            "value": "2.633333333",
+            "frequency": 4
+          },
+          {
+            "value": "2.766666667",
+            "frequency": 4
+          },
+          {
+            "value": "2.533333333",
+            "frequency": 3
+          },
+          {
+            "value": "0.733333333",
+            "frequency": 3
+          },
+          {
+            "value": "2.833333333",
+            "frequency": 3
+          },
+          {
+            "value": "1.933333333",
+            "frequency": 3
+          },
+          {
+            "value": "0.866666667",
+            "frequency": 3
+          },
+          {
+            "value": "1.2",
+            "frequency": 3
+          },
+          {
+            "value": "2.4",
+            "frequency": 3
+          },
+          {
+            "value": "2.133333333",
+            "frequency": 3
+          },
+          {
+            "value": "0.0",
+            "frequency": 3
+          },
+          {
+            "value": "2.466666667",
+            "frequency": 3
+          },
+          {
+            "value": "1.266666667",
+            "frequency": 3
+          },
+          {
+            "value": "2.033333333",
+            "frequency": 2
+          },
+          {
+            "value": "2.7",
+            "frequency": 2
+          },
+          {
+            "value": "0.9",
+            "frequency": 2
+          },
+          {
+            "value": "0.533333333",
+            "frequency": 2
+          },
+          {
+            "value": "2.9",
+            "frequency": 2
+          },
+          {
+            "value": "2.8",
+            "frequency": 2
+          },
+          {
+            "value": "3.166666667",
+            "frequency": 2
+          },
+          {
+            "value": "2.6",
+            "frequency": 2
+          },
+          {
+            "value": "0.633333333",
+            "frequency": 1
+          },
+          {
+            "value": "33.53333333",
+            "frequency": 1
+          },
+          {
+            "value": "4.733333333",
+            "frequency": 1
+          },
+          {
+            "value": "6.133333333",
+            "frequency": 1
+          },
+          {
+            "value": "20.4",
+            "frequency": 1
+          },
+          {
+            "value": "2.333333333",
+            "frequency": 1
+          },
+          {
+            "value": "4.466666667",
+            "frequency": 1
+          },
+          {
+            "value": "3.6",
+            "frequency": 1
+          },
+          {
+            "value": "3.4",
+            "frequency": 1
+          },
+          {
+            "value": "10.1",
+            "frequency": 1
+          },
+          {
+            "value": "3.0",
+            "frequency": 1
+          },
+          {
+            "value": "2.733333333",
+            "frequency": 1
+          },
+          {
+            "value": "0.333333333",
+            "frequency": 1
+          },
+          {
+            "value": "3.733333333",
+            "frequency": 1
+          },
+          {
+            "value": "4.433333333",
+            "frequency": 1
+          },
+          {
+            "value": "2.866666667",
+            "frequency": 1
+          },
+          {
+            "value": "8.9",
+            "frequency": 1
+          },
+          {
+            "value": "3.366666667",
+            "frequency": 1
+          },
+          {
+            "value": "3.666666667",
+            "frequency": 1
+          },
+          {
+            "value": "230.6333333",
+            "frequency": 1
+          },
+          {
+            "value": "1.033333333",
+            "frequency": 1
+          },
+          {
+            "value": "0.8",
+            "frequency": 1
+          },
+          {
+            "value": "0.033333333",
+            "frequency": 1
+          },
+          {
+            "value": "11.43333333",
+            "frequency": 1
+          },
+          {
+            "value": "3.033333333",
+            "frequency": 1
+          },
+          {
+            "value": "5.766666667",
+            "frequency": 1
+          },
+          {
+            "value": "0.6",
+            "frequency": 1
+          },
+          {
+            "value": "11.13333333",
+            "frequency": 1
+          },
+          {
+            "value": "8.133333333",
+            "frequency": 1
+          },
+          {
+            "value": "17.73333333",
+            "frequency": 1
+          },
+          {
+            "value": "4.333333333",
+            "frequency": 1
+          },
+          {
+            "value": "3.233333333",
+            "frequency": 1
+          },
+          {
+            "value": "0.133333333",
+            "frequency": 1
+          },
+          {
+            "value": "2.433333333",
+            "frequency": 1
+          },
+          {
+            "value": "6.0",
+            "frequency": 1
+          },
+          {
+            "value": "3.3",
+            "frequency": 1
+          },
+          {
+            "value": "4.066666667",
+            "frequency": 1
+          },
+          {
+            "value": "7.0",
+            "frequency": 1
+          },
+          {
+            "value": "2.933333333",
+            "frequency": 1
+          },
+          {
+            "value": "6.366666667",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 123
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_SOURCE_SITE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Henry Ford Hospital",
+            "frequency": 159
+          },
+          {
+            "value": "MD Anderson Cancer Center",
+            "frequency": 91
+          },
+          {
+            "value": "Duke",
+            "frequency": 59
+          },
+          {
+            "value": "Emory University",
+            "frequency": 45
+          },
+          {
+            "value": "Case Western",
+            "frequency": 42
+          },
+          {
+            "value": "UCSF",
+            "frequency": 38
+          },
+          {
+            "value": "Cedars Sinai",
+            "frequency": 31
+          },
+          {
+            "value": "St. Josephs Hospital (AZ)",
+            "frequency": 26
+          },
+          {
+            "value": "Thomas Jefferson University",
+            "frequency": 24
+          },
+          {
+            "value": "Milan - Italy, Fondazione IRCCS Instituto Neuroligico C. Besta",
+            "frequency": 17
+          },
+          {
+            "value": "University of Florida",
+            "frequency": 15
+          },
+          {
+            "value": "Toronto Western Hospital",
+            "frequency": 14
+          },
+          {
+            "value": "Christiana Healthcare",
+            "frequency": 10
+          },
+          {
+            "value": "Swedish Neurosciences",
+            "frequency": 6
+          },
+          {
+            "value": "Mayo Clinic - Rochester",
+            "frequency": 5
+          },
+          {
+            "value": "University of Miami",
+            "frequency": 3
+          },
+          {
+            "value": "St. Josephs Hospital AZ",
+            "frequency": 3
+          },
+          {
+            "value": "CHI-Penrose Colorado",
+            "frequency": 2
+          },
+          {
+            "value": "International Genomics Consortium",
+            "frequency": 1
+          },
+          {
+            "value": "University of North Carolina",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 20
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TBL_SCORE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "34.0",
+            "frequency": 12
+          },
+          {
+            "value": "51.0",
+            "frequency": 12
+          },
+          {
+            "value": "64.0",
+            "frequency": 12
+          },
+          {
+            "value": "None",
+            "frequency": 11
+          },
+          {
+            "value": "41.0",
+            "frequency": 10
+          },
+          {
+            "value": "46.0",
+            "frequency": 10
+          },
+          {
+            "value": "37.0",
+            "frequency": 10
+          },
+          {
+            "value": "39.0",
+            "frequency": 9
+          },
+          {
+            "value": "18.0",
+            "frequency": 9
+          },
+          {
+            "value": "68.0",
+            "frequency": 9
+          },
+          {
+            "value": "65.0",
+            "frequency": 8
+          },
+          {
+            "value": "43.0",
+            "frequency": 8
+          },
+          {
+            "value": "25.0",
+            "frequency": 8
+          },
+          {
+            "value": "59.0",
+            "frequency": 8
+          },
+          {
+            "value": "57.0",
+            "frequency": 8
+          },
+          {
+            "value": "22.0",
+            "frequency": 8
+          },
+          {
+            "value": "20.0",
+            "frequency": 8
+          },
+          {
+            "value": "40.0",
+            "frequency": 7
+          },
+          {
+            "value": "16.0",
+            "frequency": 7
+          },
+          {
+            "value": "56.0",
+            "frequency": 7
+          },
+          {
+            "value": "26.0",
+            "frequency": 7
+          },
+          {
+            "value": "49.0",
+            "frequency": 7
+          },
+          {
+            "value": "82.0",
+            "frequency": 7
+          },
+          {
+            "value": "62.0",
+            "frequency": 7
+          },
+          {
+            "value": "63.0",
+            "frequency": 7
+          },
+          {
+            "value": "70.0",
+            "frequency": 7
+          },
+          {
+            "value": "42.0",
+            "frequency": 7
+          },
+          {
+            "value": "48.0",
+            "frequency": 7
+          },
+          {
+            "value": "32.0",
+            "frequency": 7
+          },
+          {
+            "value": "75.0",
+            "frequency": 7
+          },
+          {
+            "value": "29.0",
+            "frequency": 7
+          },
+          {
+            "value": "78.0",
+            "frequency": 6
+          },
+          {
+            "value": "36.0",
+            "frequency": 6
+          },
+          {
+            "value": "21.0",
+            "frequency": 6
+          },
+          {
+            "value": "61.0",
+            "frequency": 6
+          },
+          {
+            "value": "66.0",
+            "frequency": 6
+          },
+          {
+            "value": "80.0",
+            "frequency": 6
+          },
+          {
+            "value": "30.0",
+            "frequency": 6
+          },
+          {
+            "value": "33.0",
+            "frequency": 6
+          },
+          {
+            "value": "52.0",
+            "frequency": 5
+          },
+          {
+            "value": "24.0",
+            "frequency": 5
+          },
+          {
+            "value": "50.0",
+            "frequency": 5
+          },
+          {
+            "value": "47.0",
+            "frequency": 5
+          },
+          {
+            "value": "44.0",
+            "frequency": 5
+          },
+          {
+            "value": "45.0",
+            "frequency": 5
+          },
+          {
+            "value": "13.0",
+            "frequency": 5
+          },
+          {
+            "value": "9.0",
+            "frequency": 5
+          },
+          {
+            "value": "102.0",
+            "frequency": 5
+          },
+          {
+            "value": "53.0",
+            "frequency": 5
+          },
+          {
+            "value": "69.0",
+            "frequency": 5
+          },
+          {
+            "value": "38.0",
+            "frequency": 4
+          },
+          {
+            "value": "84.0",
+            "frequency": 4
+          },
+          {
+            "value": "58.0",
+            "frequency": 4
+          },
+          {
+            "value": "28.0",
+            "frequency": 4
+          },
+          {
+            "value": "15.0",
+            "frequency": 4
+          },
+          {
+            "value": "92.0",
+            "frequency": 4
+          },
+          {
+            "value": "91.0",
+            "frequency": 4
+          },
+          {
+            "value": "131.0",
+            "frequency": 4
+          },
+          {
+            "value": "83.0",
+            "frequency": 4
+          },
+          {
+            "value": "85.0",
+            "frequency": 4
+          },
+          {
+            "value": "27.0",
+            "frequency": 4
+          },
+          {
+            "value": "31.0",
+            "frequency": 4
+          },
+          {
+            "value": "110.0",
+            "frequency": 4
+          },
+          {
+            "value": "133.0",
+            "frequency": 3
+          },
+          {
+            "value": "54.0",
+            "frequency": 3
+          },
+          {
+            "value": "103.0",
+            "frequency": 3
+          },
+          {
+            "value": "72.0",
+            "frequency": 3
+          },
+          {
+            "value": "98.0",
+            "frequency": 3
+          },
+          {
+            "value": "88.0",
+            "frequency": 3
+          },
+          {
+            "value": "134.0",
+            "frequency": 3
+          },
+          {
+            "value": "81.0",
+            "frequency": 3
+          },
+          {
+            "value": "55.0",
+            "frequency": 3
+          },
+          {
+            "value": "4.0",
+            "frequency": 3
+          },
+          {
+            "value": "14.0",
+            "frequency": 3
+          },
+          {
+            "value": "71.0",
+            "frequency": 3
+          },
+          {
+            "value": "19.0",
+            "frequency": 3
+          },
+          {
+            "value": "120.0",
+            "frequency": 3
+          },
+          {
+            "value": "79.0",
+            "frequency": 3
+          },
+          {
+            "value": "109.0",
+            "frequency": 3
+          },
+          {
+            "value": "107.0",
+            "frequency": 3
+          },
+          {
+            "value": "143.0",
+            "frequency": 3
+          },
+          {
+            "value": "99.0",
+            "frequency": 3
+          },
+          {
+            "value": "117.0",
+            "frequency": 3
+          },
+          {
+            "value": "108.0",
+            "frequency": 2
+          },
+          {
+            "value": "74.0",
+            "frequency": 2
+          },
+          {
+            "value": "149.0",
+            "frequency": 2
+          },
+          {
+            "value": "132.0",
+            "frequency": 2
+          },
+          {
+            "value": "119.0",
+            "frequency": 2
+          },
+          {
+            "value": "35.0",
+            "frequency": 2
+          },
+          {
+            "value": "23.0",
+            "frequency": 2
+          },
+          {
+            "value": "6.0",
+            "frequency": 2
+          },
+          {
+            "value": "106.0",
+            "frequency": 2
+          },
+          {
+            "value": "97.0",
+            "frequency": 2
+          },
+          {
+            "value": "191.0",
+            "frequency": 2
+          },
+          {
+            "value": "123.0",
+            "frequency": 2
+          },
+          {
+            "value": "12.0",
+            "frequency": 2
+          },
+          {
+            "value": "115.0",
+            "frequency": 2
+          },
+          {
+            "value": "138.0",
+            "frequency": 2
+          },
+          {
+            "value": "29.5",
+            "frequency": 2
+          },
+          {
+            "value": "11.0",
+            "frequency": 2
+          }
+        ],
+        "approx_distinct": 169
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample",
+      "predicate": "has_sample_rows",
+      "payload": {
+        "rows": [
+          {
+            "PATIENT_ID": "TCGA-02-2466",
+            "SAMPLE_ID": "TCGA-02-2466-01",
+            "ONCOTREE_CODE": "GBM",
+            "CANCER_TYPE": "Glioblastoma",
+            "CANCER_TYPE_DETAILED": "Glioblastoma Multiforme",
+            "TUMOR_TYPE": "Glioblastoma Multiforme (GBM), Treated",
+            "GRADE": "NA",
+            "TISSUE_PROSPECTIVE_COLLECTION_INDICATOR": "NA",
+            "TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR": "NA",
+            "TISSUE_SOURCE_SITE_CODE": "2",
+            "TUMOR_TISSUE_SITE": "Brain",
+            "ANEUPLOIDY_SCORE": "11.0",
+            "SAMPLE_TYPE": "Primary",
+            "MSI_SCORE_MANTIS": "0.2855",
+            "MSI_SENSOR_SCORE": "0.86",
+            "SOMATIC_STATUS": "Matched",
+            "TMB_NONSYNONYMOUS": "3.366666667",
+            "TISSUE_SOURCE_SITE": "MD Anderson Cancer Center",
+            "TBL_SCORE": "93.0"
+          },
+          {
+            "PATIENT_ID": "TCGA-02-2470",
+            "SAMPLE_ID": "TCGA-02-2470-01",
+            "ONCOTREE_CODE": "GBM",
+            "CANCER_TYPE": "Glioblastoma",
+            "CANCER_TYPE_DETAILED": "Glioblastoma Multiforme",
+            "TUMOR_TYPE": "Glioblastoma Multiforme (GBM), Treated",
+            "GRADE": "NA",
+            "TISSUE_PROSPECTIVE_COLLECTION_INDICATOR": "NA",
+            "TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR": "NA",
+            "TISSUE_SOURCE_SITE_CODE": "2",
+            "TUMOR_TISSUE_SITE": "Brain",
+            "ANEUPLOIDY_SCORE": "5.0",
+            "SAMPLE_TYPE": "Primary",
+            "MSI_SCORE_MANTIS": "0.2735",
+            "MSI_SENSOR_SCORE": "0.02",
+            "SOMATIC_STATUS": "Matched",
+            "TMB_NONSYNONYMOUS": "1.7",
+            "TISSUE_SOURCE_SITE": "MD Anderson Cancer Center",
+            "TBL_SCORE": "31.0"
+          },
+          {
+            "PATIENT_ID": "TCGA-02-2483",
+            "SAMPLE_ID": "TCGA-02-2483-01",
+            "ONCOTREE_CODE": "GBM",
+            "CANCER_TYPE": "Glioblastoma",
+            "CANCER_TYPE_DETAILED": "Glioblastoma Multiforme",
+            "TUMOR_TYPE": "Glioblastoma Multiforme (GBM), Untreated",
+            "GRADE": "NA",
+            "TISSUE_PROSPECTIVE_COLLECTION_INDICATOR": "NA",
+            "TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR": "NA",
+            "TISSUE_SOURCE_SITE_CODE": "2",
+            "TUMOR_TISSUE_SITE": "Brain",
+            "ANEUPLOIDY_SCORE": "4.0",
+            "SAMPLE_TYPE": "Primary",
+            "MSI_SCORE_MANTIS": "0.2721",
+            "MSI_SENSOR_SCORE": "0.3",
+            "SOMATIC_STATUS": "Matched",
+            "TMB_NONSYNONYMOUS": "1.5",
+            "TISSUE_SOURCE_SITE": "MD Anderson Cancer Center",
+            "TBL_SCORE": "102.0"
+          },
+          {
+            "PATIENT_ID": "TCGA-02-2485",
+            "SAMPLE_ID": "TCGA-02-2485-01",
+            "ONCOTREE_CODE": "GBM",
+            "CANCER_TYPE": "Glioblastoma",
+            "CANCER_TYPE_DETAILED": "Glioblastoma Multiforme",
+            "TUMOR_TYPE": "Glioblastoma Multiforme (GBM), Untreated",
+            "GRADE": "NA",
+            "TISSUE_PROSPECTIVE_COLLECTION_INDICATOR": "NA",
+            "TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR": "NA",
+            "TISSUE_SOURCE_SITE_CODE": "2",
+            "TUMOR_TISSUE_SITE": "Brain",
+            "ANEUPLOIDY_SCORE": "8.0",
+            "SAMPLE_TYPE": "Primary",
+            "MSI_SCORE_MANTIS": "0.2728",
+            "MSI_SENSOR_SCORE": "0.15",
+            "SOMATIC_STATUS": "Matched",
+            "TMB_NONSYNONYMOUS": "1.833333333",
+            "TISSUE_SOURCE_SITE": "MD Anderson Cancer Center",
+            "TBL_SCORE": "33.0"
+          },
+          {
+            "PATIENT_ID": "TCGA-02-2486",
+            "SAMPLE_ID": "TCGA-02-2486-01",
+            "ONCOTREE_CODE": "GBM",
+            "CANCER_TYPE": "Glioblastoma",
+            "CANCER_TYPE_DETAILED": "Glioblastoma Multiforme",
+            "TUMOR_TYPE": "Glioblastoma Multiforme (GBM), Untreated",
+            "GRADE": "NA",
+            "TISSUE_PROSPECTIVE_COLLECTION_INDICATOR": "NA",
+            "TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR": "NA",
+            "TISSUE_SOURCE_SITE_CODE": "2",
+            "TUMOR_TISSUE_SITE": "Brain",
+            "ANEUPLOIDY_SCORE": "8.0",
+            "SAMPLE_TYPE": "Primary",
+            "MSI_SCORE_MANTIS": "0.2683",
+            "MSI_SENSOR_SCORE": "0.04",
+            "SOMATIC_STATUS": "Matched",
+            "TMB_NONSYNONYMOUS": "1.9",
+            "TISSUE_SOURCE_SITE": "MD Anderson Cancer Center",
+            "TBL_SCORE": "75.0"
+          }
+        ],
+        "columns": [
+          "PATIENT_ID",
+          "SAMPLE_ID",
+          "ONCOTREE_CODE",
+          "CANCER_TYPE",
+          "CANCER_TYPE_DETAILED",
+          "TUMOR_TYPE",
+          "GRADE",
+          "TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+          "TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+          "TISSUE_SOURCE_SITE_CODE",
+          "TUMOR_TISSUE_SITE",
+          "ANEUPLOIDY_SCORE",
+          "SAMPLE_TYPE",
+          "MSI_SCORE_MANTIS",
+          "MSI_SENSOR_SCORE",
+          "SOMATIC_STATUS",
+          "TMB_NONSYNONYMOUS",
+          "TISSUE_SOURCE_SITE",
+          "TBL_SCORE"
+        ]
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample",
+      "predicate": "has_entity_name",
+      "payload": {
+        "value": "Biospecimen/Sample",
+        "grain": "one row per tumor sample (multiple samples per patient)"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "specimen",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor sample",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biopsy",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "genomic sample",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.PATIENT_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.PATIENT_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "subject id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "case id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "participant id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SAMPLE_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SAMPLE_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "specimen/sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SAMPLE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biospecimen id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SAMPLE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "specimen identifier",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.ONCOTREE_CODE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "oncotree cancer classification code"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.ONCOTREE_CODE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.ONCOTREE_CODE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor type code",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.ONCOTREE_CODE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "oncotree category",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.CANCER_TYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "cancer type"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.CANCER_TYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.CANCER_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "malignancy type",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.CANCER_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "disease category",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.CANCER_TYPE_DETAILED",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "detailed cancer type"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.CANCER_TYPE_DETAILED",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.CANCER_TYPE_DETAILED",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "histologic diagnosis",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.CANCER_TYPE_DETAILED",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "detailed diagnosis",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "tumor status type"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "treatment status",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor classification",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.GRADE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "neoplasm grade"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.GRADE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.GRADE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "histologic grade",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.GRADE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor grade",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "prospective collection indicator"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "prospective indicator",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "retrospective collection indicator"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "retrospective indicator",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "tissue source site code"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tss code",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "center code",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TISSUE_SITE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "anatomic site of tumor"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TISSUE_SITE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "diagnosis/condition"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TISSUE_SITE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "body site",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TISSUE_SITE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "anatomic location",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.ANEUPLOIDY_SCORE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "aneuploidy score"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.ANEUPLOIDY_SCORE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.ANEUPLOIDY_SCORE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "chromosomal instability score",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SAMPLE_TYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "specimen type"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SAMPLE_TYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "specimen/sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SAMPLE_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biospecimen type",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SAMPLE_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "sampling event type",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.MSI_SCORE_MANTIS",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "microsatellite instability score (MANTIS)"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.MSI_SCORE_MANTIS",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.MSI_SCORE_MANTIS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "MSI MANTIS",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.MSI_SENSOR_SCORE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "microsatellite instability score (MSIsensor)"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.MSI_SENSOR_SCORE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.MSI_SENSOR_SCORE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "MSI MSIsensor",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SOMATIC_STATUS",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "somatic matching status"
+      },
+      "confidence": 0.8,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SOMATIC_STATUS",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.8,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SOMATIC_STATUS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "matched status",
+        "is_preferred": true
+      },
+      "confidence": 0.8,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TMB_NONSYNONYMOUS",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "nonsynonymous tumor mutational burden"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TMB_NONSYNONYMOUS",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TMB_NONSYNONYMOUS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "TMB",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TMB_NONSYNONYMOUS",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "mutation density",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "tissue source facility name"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "collecting site",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "institution",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TBL_SCORE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "tumor break load score"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TBL_SCORE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TBL_SCORE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "chromosomal break sum",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TBL_SCORE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "TBL",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Glioblastoma Multiforme (GBM)",
+        "label": "Glioblastoma Multiforme"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Untreated",
+        "label": "Untreated primary tumor sample"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TUMOR_TYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Treated",
+        "label": "Post-treatment tumor sample"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.GRADE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "NA",
+        "label": "Not available or not assessed"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "NA",
+        "label": "Data not available"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Yes",
+        "label": "Sample collected prospectively"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "No",
+        "label": "Sample not collected prospectively"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "NA",
+        "label": "Data not available"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "No",
+        "label": "Sample not collected retrospectively"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Yes",
+        "label": "Sample collected retrospectively from archive"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "6",
+        "label": "Tissue source site code 06"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "15",
+        "label": "Tissue source site code 15"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "RR",
+        "label": "Tissue source site code RR"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.TISSUE_SOURCE_SITE_CODE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "4W",
+        "label": "Tissue source site code 4W"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample.SOMATIC_STATUS",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "Matched",
+        "label": "Matched normal/blood sample available for somatic comparison"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_SOURCE_SITE_CODE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "TCGA Tissue Source Site Codes"
+      },
+      "confidence": 0.65,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/CANCER_TYPE_DETAILED",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NCIt"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_RETROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 Version 2 Yes/No Indicator"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TUMOR_TYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "National Cancer Institute Thesaurus (NCIt)"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/ONCOTREE_CODE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "OncoTree"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/CANCER_TYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NCI Thesaurus"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/GRADE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 NullFlavor"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_PROSPECTIVE_COLLECTION_INDICATOR",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 Version 2 Table 0136 (Yes/no indicator)"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TUMOR_TISSUE_SITE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NCIt"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/ANEUPLOIDY_SCORE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "TCGA Aneuploidy Score"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SAMPLE_TYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NCIt (National Cancer Institute Thesaurus)"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/MSI_SCORE_MANTIS",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Custom Numeric Scale"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/MSI_SENSOR_SCORE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "MSIsensor"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/SOMATIC_STATUS",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "GDC"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TISSUE_SOURCE_SITE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "The Cancer Genome Atlas (TCGA) Tissue Source Site Codes"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TMB_NONSYNONYMOUS",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Quantitative Measure"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/sample/TBL_SCORE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Tumor Mutational Burden"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    }
+  ]
+}

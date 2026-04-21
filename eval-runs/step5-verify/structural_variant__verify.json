@@ -1,0 +1,4595 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant",
+  "config_label": "verify",
+  "timestamp": "2026-04-20T21:31:04.170054+00:00",
+  "run_id": "e32bf181-7eb7-4a74-9e72-87904bc07781",
+  "assertions": [
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant",
+      "predicate": "table_exists",
+      "payload": {
+        "table_type": "TABLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Sample_Id",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Sample_Id",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Hugo_Symbol",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Hugo_Symbol",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Chromosome",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Chromosome",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Position",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "LONG",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Position",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "LONG"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Hugo_Symbol",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Hugo_Symbol",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Chromosome",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Chromosome",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Position",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "LONG",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Position",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "LONG"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Effect_On_Frame",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Effect_On_Frame",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/NCBI_Build",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/NCBI_Build",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/SV_Status",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/SV_Status",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Tumor_Split_Read_Count",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Tumor_Split_Read_Count",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Tumor_Paired_End_Read_Count",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Tumor_Paired_End_Read_Count",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Event_info",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Event_info",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Sample_Id",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "TCGA-06-5856-01",
+            "frequency": 24
+          },
+          {
+            "value": "TCGA-32-1970-01",
+            "frequency": 15
+          },
+          {
+            "value": "TCGA-19-A6J5-01",
+            "frequency": 15
+          },
+          {
+            "value": "TCGA-27-1835-01",
+            "frequency": 14
+          },
+          {
+            "value": "TCGA-06-2559-01",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-06-0174-01",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-06-2558-01",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-19-2625-01",
+            "frequency": 9
+          },
+          {
+            "value": "TCGA-41-5651-01",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-32-5222-01",
+            "frequency": 8
+          },
+          {
+            "value": "TCGA-06-0138-01",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-4W-AA9S-01",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-06-A7TK-01",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-28-5204-01",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-06-0141-01",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-06-0882-01",
+            "frequency": 7
+          },
+          {
+            "value": "TCGA-06-1804-01",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-2562-01",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-0190-01",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-28-1747-01",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-19-A6J4-01",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-5859-01",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-76-4926-01",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-28-5216-01",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-0221-02",
+            "frequency": 6
+          },
+          {
+            "value": "TCGA-06-0686-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-26-A7UX-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-06-2565-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-27-2524-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-41-2571-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-12-0616-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-06-0210-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-06-A6S0-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-28-5207-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-27-2521-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-26-5133-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-06-0178-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-28-2513-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-06-A6S1-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-4W-AA9R-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-14-0787-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-06-0157-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-06-5413-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-06-0649-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-27-1830-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-19-A60I-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-27-2523-01",
+            "frequency": 5
+          },
+          {
+            "value": "TCGA-06-0744-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-28-2499-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-41-2572-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-06-2561-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-02-2485-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-27-1831-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-76-4929-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-06-2570-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-06-0750-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-06-0125-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-14-0817-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-41-3915-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-06-0211-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-19-5960-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-02-2486-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-RR-A6KB-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-27-2528-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-06-A7TL-01",
+            "frequency": 4
+          },
+          {
+            "value": "TCGA-06-0132-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-06-0184-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-26-5135-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-32-1980-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-19-2620-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-06-2569-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-14-0871-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-RR-A6KA-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-OX-A56R-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-4W-AA9T-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-14-1034-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-06-0130-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-14-0790-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-41-4097-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-06-0743-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-06-5412-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-28-1753-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-14-1823-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-16-1045-01",
+            "frequency": 3
+          },
+          {
+            "value": "TCGA-06-0158-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-26-5136-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-28-5208-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-32-1982-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-27-2526-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-27-1832-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-12-3652-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-26-5132-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-27-1834-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-06-2564-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-28-5220-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-14-0789-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-06-0747-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-12-3650-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-76-4931-01",
+            "frequency": 2
+          },
+          {
+            "value": "TCGA-27-2519-01",
+            "frequency": 2
+          }
+        ],
+        "approx_distinct": 121
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Hugo_Symbol",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "EGFR",
+            "frequency": 11
+          },
+          {
+            "value": "TSFM",
+            "frequency": 10
+          },
+          {
+            "value": "SEC61G",
+            "frequency": 8
+          },
+          {
+            "value": "R3HDM2",
+            "frequency": 6
+          },
+          {
+            "value": "OS9",
+            "frequency": 5
+          },
+          {
+            "value": "NFASC",
+            "frequency": 4
+          },
+          {
+            "value": "LANCL2",
+            "frequency": 4
+          },
+          {
+            "value": "METTL21B",
+            "frequency": 4
+          },
+          {
+            "value": "CTDSP2",
+            "frequency": 4
+          },
+          {
+            "value": "HOPX",
+            "frequency": 3
+          },
+          {
+            "value": "RAP1B",
+            "frequency": 3
+          },
+          {
+            "value": "LRP1",
+            "frequency": 3
+          },
+          {
+            "value": "GIGYF2",
+            "frequency": 3
+          },
+          {
+            "value": "YEATS4",
+            "frequency": 2
+          },
+          {
+            "value": "ZSWIM4",
+            "frequency": 2
+          },
+          {
+            "value": "ATAD1",
+            "frequency": 2
+          },
+          {
+            "value": "SMAD4",
+            "frequency": 2
+          },
+          {
+            "value": "DANCR",
+            "frequency": 2
+          },
+          {
+            "value": "EPS15",
+            "frequency": 2
+          },
+          {
+            "value": "CNOT2",
+            "frequency": 2
+          },
+          {
+            "value": "FRS2",
+            "frequency": 2
+          },
+          {
+            "value": "TDRD3",
+            "frequency": 2
+          },
+          {
+            "value": "PTPRZ1",
+            "frequency": 2
+          },
+          {
+            "value": "B4GALNT1",
+            "frequency": 2
+          },
+          {
+            "value": "VOPP1",
+            "frequency": 2
+          },
+          {
+            "value": "COX14",
+            "frequency": 2
+          },
+          {
+            "value": "MARCH9",
+            "frequency": 2
+          },
+          {
+            "value": "FGFR3",
+            "frequency": 2
+          },
+          {
+            "value": "NLGN1",
+            "frequency": 2
+          },
+          {
+            "value": "DLG1",
+            "frequency": 2
+          },
+          {
+            "value": "OTUD7A",
+            "frequency": 2
+          },
+          {
+            "value": "SRRT",
+            "frequency": 2
+          },
+          {
+            "value": "ZNF713",
+            "frequency": 2
+          },
+          {
+            "value": "CEP85L",
+            "frequency": 2
+          },
+          {
+            "value": "C12orf49",
+            "frequency": 2
+          },
+          {
+            "value": "CCNT1",
+            "frequency": 2
+          },
+          {
+            "value": "NAT8L",
+            "frequency": 1
+          },
+          {
+            "value": "LHFPL4",
+            "frequency": 1
+          },
+          {
+            "value": "RCAN1",
+            "frequency": 1
+          },
+          {
+            "value": "GALNS",
+            "frequency": 1
+          },
+          {
+            "value": "TRIP12",
+            "frequency": 1
+          },
+          {
+            "value": "BMPR1A",
+            "frequency": 1
+          },
+          {
+            "value": "SLC26A10P",
+            "frequency": 1
+          },
+          {
+            "value": "CPM",
+            "frequency": 1
+          },
+          {
+            "value": "CLTA",
+            "frequency": 1
+          },
+          {
+            "value": "MAP2K4",
+            "frequency": 1
+          },
+          {
+            "value": "RERE",
+            "frequency": 1
+          },
+          {
+            "value": "SCARB1",
+            "frequency": 1
+          },
+          {
+            "value": "SATB1",
+            "frequency": 1
+          },
+          {
+            "value": "CLIC4",
+            "frequency": 1
+          },
+          {
+            "value": "GPLD1",
+            "frequency": 1
+          },
+          {
+            "value": "JAZF1",
+            "frequency": 1
+          },
+          {
+            "value": "AP1G1",
+            "frequency": 1
+          },
+          {
+            "value": "SLC39A3",
+            "frequency": 1
+          },
+          {
+            "value": "STAG2",
+            "frequency": 1
+          },
+          {
+            "value": "ICE2",
+            "frequency": 1
+          },
+          {
+            "value": "HP1BP3",
+            "frequency": 1
+          },
+          {
+            "value": "SP4",
+            "frequency": 1
+          },
+          {
+            "value": "DGKD",
+            "frequency": 1
+          },
+          {
+            "value": "COL6A1",
+            "frequency": 1
+          },
+          {
+            "value": "SRM",
+            "frequency": 1
+          },
+          {
+            "value": "CDKN2A",
+            "frequency": 1
+          },
+          {
+            "value": "LNX1",
+            "frequency": 1
+          },
+          {
+            "value": "ATP11B",
+            "frequency": 1
+          },
+          {
+            "value": "MYH9",
+            "frequency": 1
+          },
+          {
+            "value": "EIF4A1",
+            "frequency": 1
+          },
+          {
+            "value": "KATNBL1",
+            "frequency": 1
+          },
+          {
+            "value": "ATXN2",
+            "frequency": 1
+          },
+          {
+            "value": "ACAP3",
+            "frequency": 1
+          },
+          {
+            "value": "ATP6V0A1",
+            "frequency": 1
+          },
+          {
+            "value": "CD83",
+            "frequency": 1
+          },
+          {
+            "value": "STIM1",
+            "frequency": 1
+          },
+          {
+            "value": "ZNF544",
+            "frequency": 1
+          },
+          {
+            "value": "CPNE2",
+            "frequency": 1
+          },
+          {
+            "value": "PIAS4",
+            "frequency": 1
+          },
+          {
+            "value": "NFX1",
+            "frequency": 1
+          },
+          {
+            "value": "SOBP",
+            "frequency": 1
+          },
+          {
+            "value": "CEP170",
+            "frequency": 1
+          },
+          {
+            "value": "PDZRN4",
+            "frequency": 1
+          },
+          {
+            "value": "HMGA2",
+            "frequency": 1
+          },
+          {
+            "value": "SCAF1",
+            "frequency": 1
+          },
+          {
+            "value": "SV2B",
+            "frequency": 1
+          },
+          {
+            "value": "MEX3C",
+            "frequency": 1
+          },
+          {
+            "value": "PEX14",
+            "frequency": 1
+          },
+          {
+            "value": "UBP1",
+            "frequency": 1
+          },
+          {
+            "value": "RHPN2",
+            "frequency": 1
+          },
+          {
+            "value": "HDAC11",
+            "frequency": 1
+          },
+          {
+            "value": "AGAP3",
+            "frequency": 1
+          },
+          {
+            "value": "ATOSB",
+            "frequency": 1
+          },
+          {
+            "value": "KIAA1671",
+            "frequency": 1
+          },
+          {
+            "value": "HLCS",
+            "frequency": 1
+          },
+          {
+            "value": "FAM149B1",
+            "frequency": 1
+          },
+          {
+            "value": "PDLIM5",
+            "frequency": 1
+          },
+          {
+            "value": "SNX29",
+            "frequency": 1
+          },
+          {
+            "value": "DCUN1D2",
+            "frequency": 1
+          },
+          {
+            "value": "SRGAP3",
+            "frequency": 1
+          },
+          {
+            "value": "SPTBN4",
+            "frequency": 1
+          },
+          {
+            "value": "NF1",
+            "frequency": 1
+          },
+          {
+            "value": "OPA3",
+            "frequency": 1
+          },
+          {
+            "value": "RAB3IP",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 459
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Chromosome",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "12",
+            "frequency": 97
+          },
+          {
+            "value": "7",
+            "frequency": 66
+          },
+          {
+            "value": "1",
+            "frequency": 55
+          },
+          {
+            "value": "19",
+            "frequency": 39
+          },
+          {
+            "value": "4",
+            "frequency": 29
+          },
+          {
+            "value": "9",
+            "frequency": 26
+          },
+          {
+            "value": "16",
+            "frequency": 25
+          },
+          {
+            "value": "17",
+            "frequency": 24
+          },
+          {
+            "value": "3",
+            "frequency": 23
+          },
+          {
+            "value": "2",
+            "frequency": 20
+          },
+          {
+            "value": "6",
+            "frequency": 13
+          },
+          {
+            "value": "15",
+            "frequency": 12
+          },
+          {
+            "value": "14",
+            "frequency": 11
+          },
+          {
+            "value": "5",
+            "frequency": 11
+          },
+          {
+            "value": "22",
+            "frequency": 11
+          },
+          {
+            "value": "11",
+            "frequency": 8
+          },
+          {
+            "value": "10",
+            "frequency": 7
+          },
+          {
+            "value": "8",
+            "frequency": 7
+          },
+          {
+            "value": "13",
+            "frequency": 6
+          },
+          {
+            "value": "18",
+            "frequency": 5
+          },
+          {
+            "value": "X",
+            "frequency": 5
+          },
+          {
+            "value": "20",
+            "frequency": 5
+          },
+          {
+            "value": "21",
+            "frequency": 4
+          },
+          {
+            "value": "Y",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 25
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Position",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "55200413",
+            "frequency": 10
+          },
+          {
+            "value": "54759158",
+            "frequency": 4
+          },
+          {
+            "value": "57773128",
+            "frequency": 4
+          },
+          {
+            "value": "57846372",
+            "frequency": 4
+          },
+          {
+            "value": "57787162",
+            "frequency": 3
+          },
+          {
+            "value": "57696373",
+            "frequency": 3
+          },
+          {
+            "value": "56681255",
+            "frequency": 3
+          },
+          {
+            "value": "204828782",
+            "frequency": 3
+          },
+          {
+            "value": "68611043",
+            "frequency": 3
+          },
+          {
+            "value": "69470530",
+            "frequency": 2
+          },
+          {
+            "value": "116737790",
+            "frequency": 2
+          },
+          {
+            "value": "57430720",
+            "frequency": 2
+          },
+          {
+            "value": "55572271",
+            "frequency": 2
+          },
+          {
+            "value": "57793073",
+            "frequency": 2
+          },
+          {
+            "value": "55366229",
+            "frequency": 2
+          },
+          {
+            "value": "55906379",
+            "frequency": 2
+          },
+          {
+            "value": "54752326",
+            "frequency": 2
+          },
+          {
+            "value": "69370975",
+            "frequency": 2
+          },
+          {
+            "value": "51059916",
+            "frequency": 2
+          },
+          {
+            "value": "51519199",
+            "frequency": 2
+          },
+          {
+            "value": "50112301",
+            "frequency": 2
+          },
+          {
+            "value": "232697392",
+            "frequency": 2
+          },
+          {
+            "value": "57783283",
+            "frequency": 2
+          },
+          {
+            "value": "1806934",
+            "frequency": 2
+          },
+          {
+            "value": "55412089",
+            "frequency": 2
+          },
+          {
+            "value": "57695843",
+            "frequency": 2
+          },
+          {
+            "value": "19941701",
+            "frequency": 1
+          },
+          {
+            "value": "57504786",
+            "frequency": 1
+          },
+          {
+            "value": "155216575",
+            "frequency": 1
+          },
+          {
+            "value": "48692239",
+            "frequency": 1
+          },
+          {
+            "value": "55964701",
+            "frequency": 1
+          },
+          {
+            "value": "20867012",
+            "frequency": 1
+          },
+          {
+            "value": "62260503",
+            "frequency": 1
+          },
+          {
+            "value": "29146960",
+            "frequency": 1
+          },
+          {
+            "value": "27294435",
+            "frequency": 1
+          },
+          {
+            "value": "122895952",
+            "frequency": 1
+          },
+          {
+            "value": "28570537",
+            "frequency": 1
+          },
+          {
+            "value": "14135974",
+            "frequency": 1
+          },
+          {
+            "value": "216729",
+            "frequency": 1
+          },
+          {
+            "value": "3873212",
+            "frequency": 1
+          },
+          {
+            "value": "32298204",
+            "frequency": 1
+          },
+          {
+            "value": "96334603",
+            "frequency": 1
+          },
+          {
+            "value": "18749875",
+            "frequency": 1
+          },
+          {
+            "value": "180808648",
+            "frequency": 1
+          },
+          {
+            "value": "185657424",
+            "frequency": 1
+          },
+          {
+            "value": "31265339",
+            "frequency": 1
+          },
+          {
+            "value": "1344351",
+            "frequency": 1
+          },
+          {
+            "value": "71689704",
+            "frequency": 1
+          },
+          {
+            "value": "33986760",
+            "frequency": 1
+          },
+          {
+            "value": "36052323",
+            "frequency": 1
+          },
+          {
+            "value": "57092790",
+            "frequency": 1
+          },
+          {
+            "value": "227213136",
+            "frequency": 1
+          },
+          {
+            "value": "57395749",
+            "frequency": 1
+          },
+          {
+            "value": "44875225",
+            "frequency": 1
+          },
+          {
+            "value": "63819002",
+            "frequency": 1
+          },
+          {
+            "value": "4845074",
+            "frequency": 1
+          },
+          {
+            "value": "59666853",
+            "frequency": 1
+          },
+          {
+            "value": "3856409",
+            "frequency": 1
+          },
+          {
+            "value": "10130813",
+            "frequency": 1
+          },
+          {
+            "value": "16485972",
+            "frequency": 1
+          },
+          {
+            "value": "160851941",
+            "frequency": 1
+          },
+          {
+            "value": "17798513",
+            "frequency": 1
+          },
+          {
+            "value": "31427182",
+            "frequency": 1
+          },
+          {
+            "value": "88388538",
+            "frequency": 1
+          },
+          {
+            "value": "35115671",
+            "frequency": 1
+          },
+          {
+            "value": "42958634",
+            "frequency": 1
+          },
+          {
+            "value": "123378381",
+            "frequency": 1
+          },
+          {
+            "value": "127979992",
+            "frequency": 1
+          },
+          {
+            "value": "141001125",
+            "frequency": 1
+          },
+          {
+            "value": "39463117",
+            "frequency": 1
+          },
+          {
+            "value": "4029036",
+            "frequency": 1
+          },
+          {
+            "value": "69756663",
+            "frequency": 1
+          },
+          {
+            "value": "227563724",
+            "frequency": 1
+          },
+          {
+            "value": "70564050",
+            "frequency": 1
+          },
+          {
+            "value": "5228211",
+            "frequency": 1
+          },
+          {
+            "value": "47545993",
+            "frequency": 1
+          },
+          {
+            "value": "5500488",
+            "frequency": 1
+          },
+          {
+            "value": "59291306",
+            "frequency": 1
+          },
+          {
+            "value": "54755779",
+            "frequency": 1
+          },
+          {
+            "value": "11094389",
+            "frequency": 1
+          },
+          {
+            "value": "42169636",
+            "frequency": 1
+          },
+          {
+            "value": "9248885",
+            "frequency": 1
+          },
+          {
+            "value": "25049364",
+            "frequency": 1
+          },
+          {
+            "value": "10982991",
+            "frequency": 1
+          },
+          {
+            "value": "232756334",
+            "frequency": 1
+          },
+          {
+            "value": "40467305",
+            "frequency": 1
+          },
+          {
+            "value": "57310264",
+            "frequency": 1
+          },
+          {
+            "value": "63264651",
+            "frequency": 1
+          },
+          {
+            "value": "127843094",
+            "frequency": 1
+          },
+          {
+            "value": "87814438",
+            "frequency": 1
+          },
+          {
+            "value": "132014337",
+            "frequency": 1
+          },
+          {
+            "value": "37036814",
+            "frequency": 1
+          },
+          {
+            "value": "32217259",
+            "frequency": 1
+          },
+          {
+            "value": "1641187",
+            "frequency": 1
+          },
+          {
+            "value": "8796771",
+            "frequency": 1
+          },
+          {
+            "value": "9479546",
+            "frequency": 1
+          },
+          {
+            "value": "32810591",
+            "frequency": 1
+          },
+          {
+            "value": "13623878",
+            "frequency": 1
+          },
+          {
+            "value": "40134229",
+            "frequency": 1
+          },
+          {
+            "value": "38864606",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 489
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Hugo_Symbol",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "SEPT14",
+            "frequency": 13
+          },
+          {
+            "value": "OS9",
+            "frequency": 7
+          },
+          {
+            "value": "CPM",
+            "frequency": 4
+          },
+          {
+            "value": "ELDR",
+            "frequency": 4
+          },
+          {
+            "value": "ATP23",
+            "frequency": 4
+          },
+          {
+            "value": "VOPP1",
+            "frequency": 4
+          },
+          {
+            "value": "TSFM",
+            "frequency": 3
+          },
+          {
+            "value": "PDGFRA",
+            "frequency": 3
+          },
+          {
+            "value": "DTX3",
+            "frequency": 3
+          },
+          {
+            "value": "GLI1",
+            "frequency": 3
+          },
+          {
+            "value": "NUP107",
+            "frequency": 3
+          },
+          {
+            "value": "SOX13",
+            "frequency": 2
+          },
+          {
+            "value": "METTL21B",
+            "frequency": 2
+          },
+          {
+            "value": "FLRT1",
+            "frequency": 2
+          },
+          {
+            "value": "PARK2",
+            "frequency": 2
+          },
+          {
+            "value": "MET",
+            "frequency": 2
+          },
+          {
+            "value": "MARS",
+            "frequency": 2
+          },
+          {
+            "value": "EGFR",
+            "frequency": 2
+          },
+          {
+            "value": "GLUL",
+            "frequency": 2
+          },
+          {
+            "value": "CNOT2",
+            "frequency": 2
+          },
+          {
+            "value": "TERT",
+            "frequency": 2
+          },
+          {
+            "value": "HECW1",
+            "frequency": 2
+          },
+          {
+            "value": "INHBE",
+            "frequency": 2
+          },
+          {
+            "value": "SFSWAP",
+            "frequency": 2
+          },
+          {
+            "value": "C1orf61",
+            "frequency": 2
+          },
+          {
+            "value": "DCTN2",
+            "frequency": 2
+          },
+          {
+            "value": "AVIL",
+            "frequency": 2
+          },
+          {
+            "value": "EPHB2",
+            "frequency": 2
+          },
+          {
+            "value": "UBE2R2",
+            "frequency": 2
+          },
+          {
+            "value": "CAMTA1",
+            "frequency": 2
+          },
+          {
+            "value": "IGLVIV-66-1",
+            "frequency": 2
+          },
+          {
+            "value": "LARGE1",
+            "frequency": 2
+          },
+          {
+            "value": "ERBB3",
+            "frequency": 2
+          },
+          {
+            "value": "HS1BP3",
+            "frequency": 2
+          },
+          {
+            "value": "PSPHP1",
+            "frequency": 2
+          },
+          {
+            "value": "C12orf66",
+            "frequency": 2
+          },
+          {
+            "value": "LYZ",
+            "frequency": 2
+          },
+          {
+            "value": "PCBP2",
+            "frequency": 2
+          },
+          {
+            "value": "LANCL2",
+            "frequency": 2
+          },
+          {
+            "value": "ZMYND19",
+            "frequency": 1
+          },
+          {
+            "value": "ESPN",
+            "frequency": 1
+          },
+          {
+            "value": "EMC1",
+            "frequency": 1
+          },
+          {
+            "value": "RND2",
+            "frequency": 1
+          },
+          {
+            "value": "PRELP",
+            "frequency": 1
+          },
+          {
+            "value": "FMN1",
+            "frequency": 1
+          },
+          {
+            "value": "CACHD1",
+            "frequency": 1
+          },
+          {
+            "value": "FLT4",
+            "frequency": 1
+          },
+          {
+            "value": "CPT1C",
+            "frequency": 1
+          },
+          {
+            "value": "CD2AP",
+            "frequency": 1
+          },
+          {
+            "value": "CDK4",
+            "frequency": 1
+          },
+          {
+            "value": "DOCK6",
+            "frequency": 1
+          },
+          {
+            "value": "VSTM2B",
+            "frequency": 1
+          },
+          {
+            "value": "SUPT6H",
+            "frequency": 1
+          },
+          {
+            "value": "SNRPE",
+            "frequency": 1
+          },
+          {
+            "value": "COX6B1",
+            "frequency": 1
+          },
+          {
+            "value": "CD37",
+            "frequency": 1
+          },
+          {
+            "value": "SIRT4",
+            "frequency": 1
+          },
+          {
+            "value": "PIAS4",
+            "frequency": 1
+          },
+          {
+            "value": "GLYATL2",
+            "frequency": 1
+          },
+          {
+            "value": "POLN",
+            "frequency": 1
+          },
+          {
+            "value": "MB",
+            "frequency": 1
+          },
+          {
+            "value": "ABCB1",
+            "frequency": 1
+          },
+          {
+            "value": "MAP2K4",
+            "frequency": 1
+          },
+          {
+            "value": "SPIRE2",
+            "frequency": 1
+          },
+          {
+            "value": "C9orf24",
+            "frequency": 1
+          },
+          {
+            "value": "MYH9",
+            "frequency": 1
+          },
+          {
+            "value": "FYN",
+            "frequency": 1
+          },
+          {
+            "value": "KIF5A",
+            "frequency": 1
+          },
+          {
+            "value": "PPP2R5E",
+            "frequency": 1
+          },
+          {
+            "value": "ROS1",
+            "frequency": 1
+          },
+          {
+            "value": "ZNF544",
+            "frequency": 1
+          },
+          {
+            "value": "ADCY9",
+            "frequency": 1
+          },
+          {
+            "value": "SOX2OT_exon4",
+            "frequency": 1
+          },
+          {
+            "value": "CAPN11",
+            "frequency": 1
+          },
+          {
+            "value": "CASK",
+            "frequency": 1
+          },
+          {
+            "value": "MRPS31",
+            "frequency": 1
+          },
+          {
+            "value": "RYR1",
+            "frequency": 1
+          },
+          {
+            "value": "HYOU1",
+            "frequency": 1
+          },
+          {
+            "value": "HNRNPDL",
+            "frequency": 1
+          },
+          {
+            "value": "CDKN2A",
+            "frequency": 1
+          },
+          {
+            "value": "MYO18A",
+            "frequency": 1
+          },
+          {
+            "value": "GGCT",
+            "frequency": 1
+          },
+          {
+            "value": "SRGAP1",
+            "frequency": 1
+          },
+          {
+            "value": "ZNF483",
+            "frequency": 1
+          },
+          {
+            "value": "AQP9",
+            "frequency": 1
+          },
+          {
+            "value": "CDK19",
+            "frequency": 1
+          },
+          {
+            "value": "CCDC59",
+            "frequency": 1
+          },
+          {
+            "value": "C12orf45",
+            "frequency": 1
+          },
+          {
+            "value": "ALG14",
+            "frequency": 1
+          },
+          {
+            "value": "DYNC1I1",
+            "frequency": 1
+          },
+          {
+            "value": "ZRANB2",
+            "frequency": 1
+          },
+          {
+            "value": "ALKAL1",
+            "frequency": 1
+          },
+          {
+            "value": "BCL2L13",
+            "frequency": 1
+          },
+          {
+            "value": "HS3ST4",
+            "frequency": 1
+          },
+          {
+            "value": "ACADVL",
+            "frequency": 1
+          },
+          {
+            "value": "TRIP12",
+            "frequency": 1
+          },
+          {
+            "value": "CHCHD2",
+            "frequency": 1
+          },
+          {
+            "value": "SLC26A8",
+            "frequency": 1
+          },
+          {
+            "value": "LETMD1",
+            "frequency": 1
+          },
+          {
+            "value": "SLC26A10P",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 442
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Chromosome",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "12",
+            "frequency": 89
+          },
+          {
+            "value": "7",
+            "frequency": 67
+          },
+          {
+            "value": "1",
+            "frequency": 58
+          },
+          {
+            "value": "19",
+            "frequency": 40
+          },
+          {
+            "value": "6",
+            "frequency": 26
+          },
+          {
+            "value": "4",
+            "frequency": 25
+          },
+          {
+            "value": "16",
+            "frequency": 21
+          },
+          {
+            "value": "17",
+            "frequency": 21
+          },
+          {
+            "value": "2",
+            "frequency": 20
+          },
+          {
+            "value": "3",
+            "frequency": 20
+          },
+          {
+            "value": "9",
+            "frequency": 19
+          },
+          {
+            "value": "22",
+            "frequency": 17
+          },
+          {
+            "value": "11",
+            "frequency": 13
+          },
+          {
+            "value": "14",
+            "frequency": 12
+          },
+          {
+            "value": "5",
+            "frequency": 10
+          },
+          {
+            "value": "8",
+            "frequency": 9
+          },
+          {
+            "value": "10",
+            "frequency": 9
+          },
+          {
+            "value": "15",
+            "frequency": 9
+          },
+          {
+            "value": "X",
+            "frequency": 8
+          },
+          {
+            "value": "13",
+            "frequency": 6
+          },
+          {
+            "value": "18",
+            "frequency": 5
+          },
+          {
+            "value": "21",
+            "frequency": 3
+          },
+          {
+            "value": "20",
+            "frequency": 2
+          },
+          {
+            "value": "Y",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 25
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Position",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "55796092",
+            "frequency": 7
+          },
+          {
+            "value": "57715760",
+            "frequency": 5
+          },
+          {
+            "value": "55238666",
+            "frequency": 4
+          },
+          {
+            "value": "57945628",
+            "frequency": 4
+          },
+          {
+            "value": "55819223",
+            "frequency": 4
+          },
+          {
+            "value": "68932840",
+            "frequency": 3
+          },
+          {
+            "value": "64194658",
+            "frequency": 2
+          },
+          {
+            "value": "57796177",
+            "frequency": 2
+          },
+          {
+            "value": "22058479",
+            "frequency": 2
+          },
+          {
+            "value": "55773181",
+            "frequency": 2
+          },
+          {
+            "value": "204112915",
+            "frequency": 2
+          },
+          {
+            "value": "1282624",
+            "frequency": 2
+          },
+          {
+            "value": "69350108",
+            "frequency": 2
+          },
+          {
+            "value": "55846637",
+            "frequency": 2
+          },
+          {
+            "value": "68741813",
+            "frequency": 2
+          },
+          {
+            "value": "53454726",
+            "frequency": 2
+          },
+          {
+            "value": "116699071",
+            "frequency": 2
+          },
+          {
+            "value": "64103194",
+            "frequency": 2
+          },
+          {
+            "value": "55497690",
+            "frequency": 2
+          },
+          {
+            "value": "55391793",
+            "frequency": 2
+          },
+          {
+            "value": "57535845",
+            "frequency": 2
+          },
+          {
+            "value": "57609077",
+            "frequency": 2
+          },
+          {
+            "value": "57456094",
+            "frequency": 2
+          },
+          {
+            "value": "58844524",
+            "frequency": 1
+          },
+          {
+            "value": "7220604",
+            "frequency": 1
+          },
+          {
+            "value": "23011200",
+            "frequency": 1
+          },
+          {
+            "value": "43609495",
+            "frequency": 1
+          },
+          {
+            "value": "55156533",
+            "frequency": 1
+          },
+          {
+            "value": "197681356",
+            "frequency": 1
+          },
+          {
+            "value": "22863037",
+            "frequency": 1
+          },
+          {
+            "value": "38222708",
+            "frequency": 1
+          },
+          {
+            "value": "143820480",
+            "frequency": 1
+          },
+          {
+            "value": "33911964",
+            "frequency": 1
+          },
+          {
+            "value": "50663089",
+            "frequency": 1
+          },
+          {
+            "value": "27647836",
+            "frequency": 1
+          },
+          {
+            "value": "17504475",
+            "frequency": 1
+          },
+          {
+            "value": "82661047",
+            "frequency": 1
+          },
+          {
+            "value": "41604164",
+            "frequency": 1
+          },
+          {
+            "value": "14950390",
+            "frequency": 1
+          },
+          {
+            "value": "20904971",
+            "frequency": 1
+          },
+          {
+            "value": "2641134",
+            "frequency": 1
+          },
+          {
+            "value": "11947976",
+            "frequency": 1
+          },
+          {
+            "value": "52628163",
+            "frequency": 1
+          },
+          {
+            "value": "67186017",
+            "frequency": 1
+          },
+          {
+            "value": "6626238",
+            "frequency": 1
+          },
+          {
+            "value": "70310895",
+            "frequency": 1
+          },
+          {
+            "value": "15453931",
+            "frequency": 1
+          },
+          {
+            "value": "181563720",
+            "frequency": 1
+          },
+          {
+            "value": "12107790",
+            "frequency": 1
+          },
+          {
+            "value": "79788971",
+            "frequency": 1
+          },
+          {
+            "value": "57524264",
+            "frequency": 1
+          },
+          {
+            "value": "63146209",
+            "frequency": 1
+          },
+          {
+            "value": "10451377",
+            "frequency": 1
+          },
+          {
+            "value": "100540387",
+            "frequency": 1
+          },
+          {
+            "value": "109506331",
+            "frequency": 1
+          },
+          {
+            "value": "24178361",
+            "frequency": 1
+          },
+          {
+            "value": "117320030",
+            "frequency": 1
+          },
+          {
+            "value": "89418368",
+            "frequency": 1
+          },
+          {
+            "value": "41689778",
+            "frequency": 1
+          },
+          {
+            "value": "17655662",
+            "frequency": 1
+          },
+          {
+            "value": "50935236",
+            "frequency": 1
+          },
+          {
+            "value": "1739702",
+            "frequency": 1
+          },
+          {
+            "value": "20560515",
+            "frequency": 1
+          },
+          {
+            "value": "49336909",
+            "frequency": 1
+          },
+          {
+            "value": "26135612",
+            "frequency": 1
+          },
+          {
+            "value": "129161679",
+            "frequency": 1
+          },
+          {
+            "value": "42271775",
+            "frequency": 1
+          },
+          {
+            "value": "9854559",
+            "frequency": 1
+          },
+          {
+            "value": "51251468",
+            "frequency": 1
+          },
+          {
+            "value": "49225004",
+            "frequency": 1
+          },
+          {
+            "value": "40729601",
+            "frequency": 1
+          },
+          {
+            "value": "17450995",
+            "frequency": 1
+          },
+          {
+            "value": "15254844",
+            "frequency": 1
+          },
+          {
+            "value": "64550594",
+            "frequency": 1
+          },
+          {
+            "value": "57040933",
+            "frequency": 1
+          },
+          {
+            "value": "141136509",
+            "frequency": 1
+          },
+          {
+            "value": "41628947",
+            "frequency": 1
+          },
+          {
+            "value": "53066046",
+            "frequency": 1
+          },
+          {
+            "value": "81506241",
+            "frequency": 1
+          },
+          {
+            "value": "149475823",
+            "frequency": 1
+          },
+          {
+            "value": "106360851",
+            "frequency": 1
+          },
+          {
+            "value": "111013828",
+            "frequency": 1
+          },
+          {
+            "value": "49272253",
+            "frequency": 1
+          },
+          {
+            "value": "203865041",
+            "frequency": 1
+          },
+          {
+            "value": "20624892",
+            "frequency": 1
+          },
+          {
+            "value": "51354308",
+            "frequency": 1
+          },
+          {
+            "value": "162443473",
+            "frequency": 1
+          },
+          {
+            "value": "156414753",
+            "frequency": 1
+          },
+          {
+            "value": "67082692",
+            "frequency": 1
+          },
+          {
+            "value": "82853278",
+            "frequency": 1
+          },
+          {
+            "value": "63376108",
+            "frequency": 1
+          },
+          {
+            "value": "28695352",
+            "frequency": 1
+          },
+          {
+            "value": "32949774",
+            "frequency": 1
+          },
+          {
+            "value": "33931215",
+            "frequency": 1
+          },
+          {
+            "value": "57479424",
+            "frequency": 1
+          },
+          {
+            "value": "24651069",
+            "frequency": 1
+          },
+          {
+            "value": "94897310",
+            "frequency": 1
+          },
+          {
+            "value": "79217503",
+            "frequency": 1
+          },
+          {
+            "value": "65669243",
+            "frequency": 1
+          },
+          {
+            "value": "229512936",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 469
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Effect_On_Frame",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 188
+          },
+          {
+            "value": "in-frame",
+            "frequency": 174
+          },
+          {
+            "value": "frameshift",
+            "frequency": 148
+          }
+        ],
+        "approx_distinct": 3
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/NCBI_Build",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "GRCh37",
+            "frequency": 510
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/SV_Status",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "SOMATIC",
+            "frequency": 510
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Tumor_Split_Read_Count",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "2",
+            "frequency": 66
+          },
+          {
+            "value": "3",
+            "frequency": 46
+          },
+          {
+            "value": "1",
+            "frequency": 44
+          },
+          {
+            "value": "4",
+            "frequency": 36
+          },
+          {
+            "value": "7",
+            "frequency": 30
+          },
+          {
+            "value": "6",
+            "frequency": 26
+          },
+          {
+            "value": "5",
+            "frequency": 26
+          },
+          {
+            "value": "8",
+            "frequency": 17
+          },
+          {
+            "value": "10",
+            "frequency": 15
+          },
+          {
+            "value": "9",
+            "frequency": 14
+          },
+          {
+            "value": "12",
+            "frequency": 12
+          },
+          {
+            "value": "14",
+            "frequency": 8
+          },
+          {
+            "value": "13",
+            "frequency": 7
+          },
+          {
+            "value": "25",
+            "frequency": 6
+          },
+          {
+            "value": "15",
+            "frequency": 6
+          },
+          {
+            "value": "11",
+            "frequency": 6
+          },
+          {
+            "value": "1000",
+            "frequency": 5
+          },
+          {
+            "value": "22",
+            "frequency": 5
+          },
+          {
+            "value": "20",
+            "frequency": 5
+          },
+          {
+            "value": "26",
+            "frequency": 5
+          },
+          {
+            "value": "19",
+            "frequency": 4
+          },
+          {
+            "value": "17",
+            "frequency": 4
+          },
+          {
+            "value": "21",
+            "frequency": 4
+          },
+          {
+            "value": "67",
+            "frequency": 4
+          },
+          {
+            "value": "29",
+            "frequency": 4
+          },
+          {
+            "value": "35",
+            "frequency": 3
+          },
+          {
+            "value": "28",
+            "frequency": 3
+          },
+          {
+            "value": "24",
+            "frequency": 3
+          },
+          {
+            "value": "41",
+            "frequency": 3
+          },
+          {
+            "value": "51",
+            "frequency": 3
+          },
+          {
+            "value": "32",
+            "frequency": 3
+          },
+          {
+            "value": "39",
+            "frequency": 2
+          },
+          {
+            "value": "37",
+            "frequency": 2
+          },
+          {
+            "value": "59",
+            "frequency": 2
+          },
+          {
+            "value": "38",
+            "frequency": 2
+          },
+          {
+            "value": "36",
+            "frequency": 2
+          },
+          {
+            "value": "30",
+            "frequency": 2
+          },
+          {
+            "value": "102",
+            "frequency": 2
+          },
+          {
+            "value": "128",
+            "frequency": 2
+          },
+          {
+            "value": "80",
+            "frequency": 2
+          },
+          {
+            "value": "45",
+            "frequency": 2
+          },
+          {
+            "value": "48",
+            "frequency": 2
+          },
+          {
+            "value": "61",
+            "frequency": 2
+          },
+          {
+            "value": "40",
+            "frequency": 2
+          },
+          {
+            "value": "84",
+            "frequency": 2
+          },
+          {
+            "value": "74",
+            "frequency": 2
+          },
+          {
+            "value": "167",
+            "frequency": 1
+          },
+          {
+            "value": "669",
+            "frequency": 1
+          },
+          {
+            "value": "110",
+            "frequency": 1
+          },
+          {
+            "value": "108",
+            "frequency": 1
+          },
+          {
+            "value": "70",
+            "frequency": 1
+          },
+          {
+            "value": "153",
+            "frequency": 1
+          },
+          {
+            "value": "16",
+            "frequency": 1
+          },
+          {
+            "value": "161",
+            "frequency": 1
+          },
+          {
+            "value": "76",
+            "frequency": 1
+          },
+          {
+            "value": "72",
+            "frequency": 1
+          },
+          {
+            "value": "3378",
+            "frequency": 1
+          },
+          {
+            "value": "124",
+            "frequency": 1
+          },
+          {
+            "value": "181",
+            "frequency": 1
+          },
+          {
+            "value": "58",
+            "frequency": 1
+          },
+          {
+            "value": "56",
+            "frequency": 1
+          },
+          {
+            "value": "94",
+            "frequency": 1
+          },
+          {
+            "value": "66",
+            "frequency": 1
+          },
+          {
+            "value": "100",
+            "frequency": 1
+          },
+          {
+            "value": "169",
+            "frequency": 1
+          },
+          {
+            "value": "115",
+            "frequency": 1
+          },
+          {
+            "value": "724",
+            "frequency": 1
+          },
+          {
+            "value": "44",
+            "frequency": 1
+          },
+          {
+            "value": "43",
+            "frequency": 1
+          },
+          {
+            "value": "615",
+            "frequency": 1
+          },
+          {
+            "value": "78",
+            "frequency": 1
+          },
+          {
+            "value": "178",
+            "frequency": 1
+          },
+          {
+            "value": "52",
+            "frequency": 1
+          },
+          {
+            "value": "303",
+            "frequency": 1
+          },
+          {
+            "value": "183",
+            "frequency": 1
+          },
+          {
+            "value": "95",
+            "frequency": 1
+          },
+          {
+            "value": "23",
+            "frequency": 1
+          },
+          {
+            "value": "464",
+            "frequency": 1
+          },
+          {
+            "value": "186",
+            "frequency": 1
+          },
+          {
+            "value": "10233",
+            "frequency": 1
+          },
+          {
+            "value": "71",
+            "frequency": 1
+          },
+          {
+            "value": "121",
+            "frequency": 1
+          },
+          {
+            "value": "136",
+            "frequency": 1
+          },
+          {
+            "value": "27",
+            "frequency": 1
+          },
+          {
+            "value": "591",
+            "frequency": 1
+          },
+          {
+            "value": "54",
+            "frequency": 1
+          },
+          {
+            "value": "18",
+            "frequency": 1
+          },
+          {
+            "value": "79",
+            "frequency": 1
+          },
+          {
+            "value": "576",
+            "frequency": 1
+          },
+          {
+            "value": "593",
+            "frequency": 1
+          },
+          {
+            "value": "558",
+            "frequency": 1
+          },
+          {
+            "value": "154",
+            "frequency": 1
+          },
+          {
+            "value": "179",
+            "frequency": 1
+          },
+          {
+            "value": "63",
+            "frequency": 1
+          },
+          {
+            "value": "49",
+            "frequency": 1
+          },
+          {
+            "value": "42",
+            "frequency": 1
+          },
+          {
+            "value": "50",
+            "frequency": 1
+          },
+          {
+            "value": "317",
+            "frequency": 1
+          },
+          {
+            "value": "131",
+            "frequency": 1
+          },
+          {
+            "value": "122",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 106
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Tumor_Paired_End_Read_Count",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "2",
+            "frequency": 70
+          },
+          {
+            "value": "1",
+            "frequency": 63
+          },
+          {
+            "value": "0",
+            "frequency": 47
+          },
+          {
+            "value": "4",
+            "frequency": 40
+          },
+          {
+            "value": "3",
+            "frequency": 34
+          },
+          {
+            "value": "6",
+            "frequency": 26
+          },
+          {
+            "value": "5",
+            "frequency": 25
+          },
+          {
+            "value": "7",
+            "frequency": 16
+          },
+          {
+            "value": "9",
+            "frequency": 14
+          },
+          {
+            "value": "8",
+            "frequency": 11
+          },
+          {
+            "value": "10",
+            "frequency": 10
+          },
+          {
+            "value": "13",
+            "frequency": 10
+          },
+          {
+            "value": "11",
+            "frequency": 8
+          },
+          {
+            "value": "20",
+            "frequency": 7
+          },
+          {
+            "value": "18",
+            "frequency": 6
+          },
+          {
+            "value": "19",
+            "frequency": 5
+          },
+          {
+            "value": "12",
+            "frequency": 5
+          },
+          {
+            "value": "1000",
+            "frequency": 5
+          },
+          {
+            "value": "17",
+            "frequency": 5
+          },
+          {
+            "value": "15",
+            "frequency": 5
+          },
+          {
+            "value": "21",
+            "frequency": 4
+          },
+          {
+            "value": "37",
+            "frequency": 4
+          },
+          {
+            "value": "22",
+            "frequency": 4
+          },
+          {
+            "value": "23",
+            "frequency": 4
+          },
+          {
+            "value": "28",
+            "frequency": 4
+          },
+          {
+            "value": "16",
+            "frequency": 3
+          },
+          {
+            "value": "46",
+            "frequency": 3
+          },
+          {
+            "value": "45",
+            "frequency": 3
+          },
+          {
+            "value": "44",
+            "frequency": 2
+          },
+          {
+            "value": "27",
+            "frequency": 2
+          },
+          {
+            "value": "57",
+            "frequency": 2
+          },
+          {
+            "value": "55",
+            "frequency": 2
+          },
+          {
+            "value": "72",
+            "frequency": 2
+          },
+          {
+            "value": "56",
+            "frequency": 2
+          },
+          {
+            "value": "24",
+            "frequency": 2
+          },
+          {
+            "value": "14",
+            "frequency": 2
+          },
+          {
+            "value": "26",
+            "frequency": 2
+          },
+          {
+            "value": "33",
+            "frequency": 1
+          },
+          {
+            "value": "30",
+            "frequency": 1
+          },
+          {
+            "value": "305",
+            "frequency": 1
+          },
+          {
+            "value": "130",
+            "frequency": 1
+          },
+          {
+            "value": "386",
+            "frequency": 1
+          },
+          {
+            "value": "49",
+            "frequency": 1
+          },
+          {
+            "value": "170",
+            "frequency": 1
+          },
+          {
+            "value": "112",
+            "frequency": 1
+          },
+          {
+            "value": "48",
+            "frequency": 1
+          },
+          {
+            "value": "81",
+            "frequency": 1
+          },
+          {
+            "value": "103",
+            "frequency": 1
+          },
+          {
+            "value": "58",
+            "frequency": 1
+          },
+          {
+            "value": "29",
+            "frequency": 1
+          },
+          {
+            "value": "542",
+            "frequency": 1
+          },
+          {
+            "value": "595",
+            "frequency": 1
+          },
+          {
+            "value": "25",
+            "frequency": 1
+          },
+          {
+            "value": "59",
+            "frequency": 1
+          },
+          {
+            "value": "42",
+            "frequency": 1
+          },
+          {
+            "value": "633",
+            "frequency": 1
+          },
+          {
+            "value": "43",
+            "frequency": 1
+          },
+          {
+            "value": "92",
+            "frequency": 1
+          },
+          {
+            "value": "79",
+            "frequency": 1
+          },
+          {
+            "value": "1640",
+            "frequency": 1
+          },
+          {
+            "value": "51",
+            "frequency": 1
+          },
+          {
+            "value": "148",
+            "frequency": 1
+          },
+          {
+            "value": "935",
+            "frequency": 1
+          },
+          {
+            "value": "140",
+            "frequency": 1
+          },
+          {
+            "value": "504",
+            "frequency": 1
+          },
+          {
+            "value": "73",
+            "frequency": 1
+          },
+          {
+            "value": "62",
+            "frequency": 1
+          },
+          {
+            "value": "105",
+            "frequency": 1
+          },
+          {
+            "value": "294",
+            "frequency": 1
+          },
+          {
+            "value": "503",
+            "frequency": 1
+          },
+          {
+            "value": "6034",
+            "frequency": 1
+          },
+          {
+            "value": "344",
+            "frequency": 1
+          },
+          {
+            "value": "40",
+            "frequency": 1
+          },
+          {
+            "value": "41",
+            "frequency": 1
+          },
+          {
+            "value": "95",
+            "frequency": 1
+          },
+          {
+            "value": "75",
+            "frequency": 1
+          },
+          {
+            "value": "115",
+            "frequency": 1
+          },
+          {
+            "value": "34",
+            "frequency": 1
+          },
+          {
+            "value": "287",
+            "frequency": 1
+          },
+          {
+            "value": "106",
+            "frequency": 1
+          },
+          {
+            "value": "78",
+            "frequency": 1
+          },
+          {
+            "value": "85",
+            "frequency": 1
+          },
+          {
+            "value": "114",
+            "frequency": 1
+          },
+          {
+            "value": "213",
+            "frequency": 1
+          },
+          {
+            "value": "109",
+            "frequency": 1
+          },
+          {
+            "value": "32",
+            "frequency": 1
+          },
+          {
+            "value": "195",
+            "frequency": 1
+          },
+          {
+            "value": "53",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 89
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Event_info",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "EGFR-SEPT14 fusion",
+            "frequency": 9
+          },
+          {
+            "value": "R3HDM2-TSFM fusion",
+            "frequency": 2
+          },
+          {
+            "value": "TSFM-OS9 fusion",
+            "frequency": 2
+          },
+          {
+            "value": "LANCL2-SEPT14 fusion",
+            "frequency": 2
+          },
+          {
+            "value": "PTPRZ1-MET fusion",
+            "frequency": 2
+          },
+          {
+            "value": "SEC61G-EGFR fusion",
+            "frequency": 2
+          },
+          {
+            "value": "FRS2-DTX3 fusion",
+            "frequency": 2
+          },
+          {
+            "value": "SEC61G-ELDR fusion",
+            "frequency": 2
+          },
+          {
+            "value": "NFASC-SOX13 fusion",
+            "frequency": 2
+          },
+          {
+            "value": "SRRT-PPP1R17 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "DBF4-GLUL fusion",
+            "frequency": 1
+          },
+          {
+            "value": "B4GALNT1-TSFM fusion",
+            "frequency": 1
+          },
+          {
+            "value": "UBAP2-NCF4 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "PLEKHF2-TRIQK fusion",
+            "frequency": 1
+          },
+          {
+            "value": "R3HDM2-ATP23 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "TMEM234-CSMD2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "YARS-RNF19B fusion",
+            "frequency": 1
+          },
+          {
+            "value": "MED27-FLRT1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "VASN-RBFOX1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "MTMR6-CDX2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "FUT8-PCNX1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "EGFR-TEAD3 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "DIP2B-TMBIM6 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "DGKD-SPP2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "ZSWIM4-UBQLN4 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "LONP1-ELOF1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "ATOH8-USP39 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "AKAP9-SEC61G fusion",
+            "frequency": 1
+          },
+          {
+            "value": "PIGG-SPINK2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "DPH7-ZMYND19 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SMARCC1-ITGB4 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "GTF2IP4-ABCB1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "HDAC1-SERINC2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "AKT2-BTBD2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "STAG2-PAK3 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "PIK3R1-SH3TC2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "RAB40C-PRR35 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "C12orf49-HSPB8 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "RAP1B-CPM fusion",
+            "frequency": 1
+          },
+          {
+            "value": "FGFR3-TACC3 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SMAD4-CPLX4 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "DLG1-EHHADH fusion",
+            "frequency": 1
+          },
+          {
+            "value": "DCTD-ECE2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "ANK2-ARHGAP10 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "ACAP3-DVL1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "ASH1L-C1orf61 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "HNRNPM-PIAS4 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "NFASC-PRELP fusion",
+            "frequency": 1
+          },
+          {
+            "value": "HARBI1-PTPRS fusion",
+            "frequency": 1
+          },
+          {
+            "value": "TTLL5-TTC6 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "C11orf84-MACROD1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "TAOK3-ATP23 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "MGAT1-FLT4 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "TACC3-FGFR3 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "TESK1-LARGE1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "VBP1-BRCC3 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "ZNRF3-CDC42EP1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "OPA3-EIF1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "CTDSP2-TSPAN31 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "JAGN1-ZC3H4 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "TRIM65-GALK1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "C8orf33-RPL23AP87 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "ZMAT5-ASCC2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "KNTC1-METTL7A fusion",
+            "frequency": 1
+          },
+          {
+            "value": "FBXW9-PRDX2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "MIIP-CMYA5 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "EBF4-TMC2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "CCNT1-OS9 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "CYSTM1-GNPDA1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SMURF1-COL26A1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "CRB2-RECK fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SLC39A9-BCL2L13 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "ACHE-VPS50 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "FREM2-MTRF1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "VWC2-RAB20 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SEC61G-SLC26A8 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SUDS3-CDK4 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SKI-SSU72 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SETD1B-KDM2B fusion",
+            "frequency": 1
+          },
+          {
+            "value": "YEATS4-ATP23 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "PATL1-TECTA fusion",
+            "frequency": 1
+          },
+          {
+            "value": "LRP5-ATG16L2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "STX8-TRIM16L fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SKIV2L2-IGF2R fusion",
+            "frequency": 1
+          },
+          {
+            "value": "LHFPL4-SOX2-OT fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SNX13-SDK1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "COA1-HECW1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "MARCH9-CD2AP fusion",
+            "frequency": 1
+          },
+          {
+            "value": "R3HDM2-MARS fusion",
+            "frequency": 1
+          },
+          {
+            "value": "NISCH-CYHR1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "TSFM-CNOT2 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "CDK14-GATAD1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "FBXL18-WDR83OS fusion",
+            "frequency": 1
+          },
+          {
+            "value": "CHI3L1-PTPRZ1 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "KIAA1671-USP18 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "CDKN2A-FAM124A fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SLC39A3-SGTA fusion",
+            "frequency": 1
+          },
+          {
+            "value": "SCAF1-TRAPPC6A fusion",
+            "frequency": 1
+          },
+          {
+            "value": "MAP2K4-HCG18 fusion",
+            "frequency": 1
+          },
+          {
+            "value": "ZC3H18-CHMP1A fusion",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 497
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant",
+      "predicate": "has_sample_rows",
+      "payload": {
+        "rows": [
+          {
+            "Sample_Id": "TCGA-OX-A56R-01",
+            "Site1_Hugo_Symbol": "STON2",
+            "Site1_Chromosome": "14",
+            "Site1_Position": "81370988",
+            "Site2_Hugo_Symbol": "SEL1L",
+            "Site2_Chromosome": "14",
+            "Site2_Position": "81506241",
+            "Site2_Effect_On_Frame": "",
+            "NCBI_Build": "GRCh37",
+            "SV_Status": "SOMATIC",
+            "Tumor_Split_Read_Count": "4",
+            "Tumor_Paired_End_Read_Count": "2",
+            "Event_info": "STON2-SEL1L fusion"
+          },
+          {
+            "Sample_Id": "TCGA-OX-A56R-01",
+            "Site1_Hugo_Symbol": "ZNF19",
+            "Site1_Chromosome": "16",
+            "Site1_Position": "71494954",
+            "Site2_Hugo_Symbol": "PARK2",
+            "Site2_Chromosome": "6",
+            "Site2_Position": "162443473",
+            "Site2_Effect_On_Frame": "",
+            "NCBI_Build": "GRCh37",
+            "SV_Status": "SOMATIC",
+            "Tumor_Split_Read_Count": "1",
+            "Tumor_Paired_End_Read_Count": "2",
+            "Event_info": "ZNF19-PARK2 fusion"
+          },
+          {
+            "Sample_Id": "TCGA-RR-A6KA-01",
+            "Site1_Hugo_Symbol": "ATP23",
+            "Site1_Chromosome": "12",
+            "Site1_Position": "57950615",
+            "Site2_Hugo_Symbol": "MBD6",
+            "Site2_Chromosome": "12",
+            "Site2_Position": "57524264",
+            "Site2_Effect_On_Frame": "",
+            "NCBI_Build": "GRCh37",
+            "SV_Status": "SOMATIC",
+            "Tumor_Split_Read_Count": "13",
+            "Tumor_Paired_End_Read_Count": "44",
+            "Event_info": "ATP23-MBD6 fusion"
+          },
+          {
+            "Sample_Id": "TCGA-RR-A6KA-01",
+            "Site1_Hugo_Symbol": "INTS11",
+            "Site1_Chromosome": "1",
+            "Site1_Position": "1324581",
+            "Site2_Hugo_Symbol": "PRAMEF2",
+            "Site2_Chromosome": "1",
+            "Site2_Position": "12858985",
+            "Site2_Effect_On_Frame": "",
+            "NCBI_Build": "GRCh37",
+            "SV_Status": "SOMATIC",
+            "Tumor_Split_Read_Count": "15",
+            "Tumor_Paired_End_Read_Count": "1",
+            "Event_info": "INTS11-PRAMEF2 fusion"
+          },
+          {
+            "Sample_Id": "TCGA-RR-A6KA-01",
+            "Site1_Hugo_Symbol": "DAZAP1",
+            "Site1_Chromosome": "19",
+            "Site1_Position": "1430362",
+            "Site2_Hugo_Symbol": "HIVEP3",
+            "Site2_Chromosome": "1",
+            "Site2_Position": "41628947",
+            "Site2_Effect_On_Frame": "frameshift",
+            "NCBI_Build": "GRCh37",
+            "SV_Status": "SOMATIC",
+            "Tumor_Split_Read_Count": "1",
+            "Tumor_Paired_End_Read_Count": "1",
+            "Event_info": "DAZAP1-HIVEP3 fusion"
+          }
+        ],
+        "columns": [
+          "Sample_Id",
+          "Site1_Hugo_Symbol",
+          "Site1_Chromosome",
+          "Site1_Position",
+          "Site2_Hugo_Symbol",
+          "Site2_Chromosome",
+          "Site2_Position",
+          "Site2_Effect_On_Frame",
+          "NCBI_Build",
+          "SV_Status",
+          "Tumor_Split_Read_Count",
+          "Tumor_Paired_End_Read_Count",
+          "Event_info"
+        ]
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant",
+      "predicate": "has_entity_name",
+      "payload": {
+        "value": "Structural Variant",
+        "grain": "one row per structural variant (e.g., fusion, translocation) per sample"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "genomic rearrangement",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "gene fusion",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "chromosomal breakpoint",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "SV",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Sample_Id",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Sample_Id",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "specimen/sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Sample_Id",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "specimen id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Sample_Id",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biospecimen id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Sample_Id",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor sample id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Hugo_Symbol",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "upstream gene symbol"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Hugo_Symbol",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Hugo_Symbol",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "5' gene symbol",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Hugo_Symbol",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "partner 1 gene",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Chromosome",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "upstream chromosome"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Chromosome",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Chromosome",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "chrom 1",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Chromosome",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "breakpoint 1 chromosome",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Position",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "upstream genomic position"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Position",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Position",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "pos 1",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site1_Position",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "breakpoint 1 coordinate",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Hugo_Symbol",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "downstream gene symbol"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Hugo_Symbol",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Hugo_Symbol",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "3' gene symbol",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Hugo_Symbol",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "partner 2 gene",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Chromosome",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "downstream chromosome"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Chromosome",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Chromosome",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "chrom 2",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Chromosome",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "breakpoint 2 chromosome",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Position",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "downstream genomic position"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Position",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Position",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "pos 2",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Position",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "breakpoint 2 coordinate",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Effect_On_Frame",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "variant fusion frame status"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Effect_On_Frame",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Effect_On_Frame",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "fusion frame",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Effect_On_Frame",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "coding effect",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.NCBI_Build",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "genomic reference build"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.NCBI_Build",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.NCBI_Build",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "genome assembly",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.NCBI_Build",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "reference genome",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.SV_Status",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "somatic status"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.SV_Status",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.SV_Status",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "mutation status",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.SV_Status",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "origin",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Tumor_Split_Read_Count",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "tumor split read count"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Tumor_Split_Read_Count",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "lab measurement"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Tumor_Split_Read_Count",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "split reads",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Tumor_Split_Read_Count",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "fusion support reads",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Tumor_Paired_End_Read_Count",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "tumor paired-end read count"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Tumor_Paired_End_Read_Count",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "lab measurement"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Tumor_Paired_End_Read_Count",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "spanning pairs",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Tumor_Paired_End_Read_Count",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "discordant pairs",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Event_info",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "structural variant description"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Event_info",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Event_info",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "fusion name",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Event_info",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "event description",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Effect_On_Frame",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "",
+        "label": "unknown or not applicable"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Effect_On_Frame",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "in-frame",
+        "label": "structural variant maintains the reading frame at the second breakpoint"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.Site2_Effect_On_Frame",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "frameshift",
+        "label": "structural variant disrupts the reading frame at the second breakpoint"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant.SV_Status",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "SOMATIC",
+        "label": "somatic mutation present in tumor but not germline"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Hugo_Symbol",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HGNC"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Position",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "NCBI Entrez Gene/GRCh38 Genomic Coordinates"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Effect_On_Frame",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "CIViC Variant Fusion Frame Status"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Chromosome",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HGNC chromosome nomenclature"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Sample_Id",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "TCGA Barcode"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Chromosome",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HUGO Gene Nomenclature Committee (HGNC) / GenBank Chromosome Names"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site2_Hugo_Symbol",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HGNC"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Site1_Position",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "GRCh38/hg38 Genomic Coordinates"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/NCBI_Build",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Genome Reference Consortium"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/SV_Status",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "VICC Variant Interpretation for Cancer Consortium"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Tumor_Paired_End_Read_Count",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Integer"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Event_info",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HGNC"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant/Tumor_Split_Read_Count",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "IEEE (Integer)"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    }
+  ]
+}

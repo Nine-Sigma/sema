@@ -31,6 +31,7 @@ Thumbs.db
 
 # Project tooling
 openspec/
+.wolf/
 .mypy_cache
 .pytest_cache
 htmlcov/
@@ -40,3 +41,6 @@ coverage.xml
 # Docs (generated, source lives elsewhere)
 docs/
 backups/
+
+# Eval run logs (artifacts kept, logs are transient)
+eval-runs/*.log

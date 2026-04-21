@@ -15,6 +15,12 @@ from sema.models.assertions import (
     AssertionPredicate,
     AssertionStatus,
 )
+from sema.models.stages import (
+    StageBCoverage,
+    StageBResult,
+    StageAResult,
+    StageStatus,
+)
 
 if TYPE_CHECKING:
     from sema.connectors.databricks import (
@@ -24,6 +30,7 @@ if TYPE_CHECKING:
     from sema.engine.semantic import SemanticEngine
     from sema.graph.loader import GraphLoader
     from sema.llm_client import LLMClient
+    from sema.models.domain import DomainContext
 
 
 def _parse_table_ref(ref: str) -> tuple[str, str, str, str | None]:
@@ -100,13 +107,33 @@ def _run_extraction(
     return extraction_assertions, col_count
 
 
+class _StagedOutput:
+    """Carries staged intermediates for enriched vocab context."""
+
+    __slots__ = ("stage_a", "stage_b", "status", "telemetry")
+
+    def __init__(
+        self,
+        stage_a: StageAResult,
+        stage_b: StageBResult,
+        status: StageStatus,
+        telemetry: Any = None,
+    ) -> None:
+        self.stage_a = stage_a
+        self.stage_b = stage_b
+        self.status = status
+        self.telemetry = telemetry
+
+
 def _run_semantic_interpretation(
     table_meta: dict[str, Any],
     work_item: TableWorkItem,
     llm_client: LLMClient,
     run_id: str,
     column_batch_size: int,
-) -> list[Assertion]:
+    domain_context: DomainContext | None = None,
+    prompt_layers: Any = None,
+) -> tuple[list[Assertion], _StagedOutput]:
     from sema.engine.semantic import SemanticEngine
 
     col_count = len(table_meta.get("columns", []))
@@ -118,13 +145,83 @@ def _run_semantic_interpretation(
         llm_client=llm_client,
         run_id=run_id,
         column_batch_size=column_batch_size,
+        domain_context=domain_context,
+        prompt_layers=prompt_layers,
     )
-    semantic_assertions = semantic.interpret_table(table_meta)
+
+    assertions, stage_a, stage_b, c_results, metrics = (
+        semantic.interpret_table_staged_with_metrics(table_meta)
+    )
+    status = _build_stage_status(stage_b, c_results)
+
+    from sema.eval.telemetry import TableTelemetry
+    tel = TableTelemetry.from_stages(
+        table_ref=table_meta.get("table_ref", work_item.fqn),
+        stage_a=stage_a,
+        stage_b=stage_b,
+        stage_c_calls=metrics.stage_c_calls,
+        stage_a_latency_ms=metrics.stage_a_latency_ms,
+        stage_b_latency_ms=metrics.stage_b_latency_ms,
+        stage_c_latency_ms=metrics.stage_c_latency_ms,
+        tokens_input=metrics.tokens_input,
+        tokens_output=metrics.tokens_output,
+    )
     logger.info(
-        f"[{work_item.table_name}] L2 produced "
-        f"{len(semantic_assertions)} assertions"
+        f"[{work_item.table_name}] L2 staged produced "
+        f"{len(assertions)} assertions "
+        f"(B: {stage_b.status}, "
+        f"C: {len(c_results)} cols decoded, "
+        f"coverage: {tel.raw_coverage_pct:.0%})"
     )
-    return semantic_assertions
+    return assertions, _StagedOutput(
+        stage_a, stage_b, status, telemetry=tel,
+    )
+
+
+_B_STATUS_MAP: dict[str, str] = {
+    "B_SUCCESS": "success",
+    "B_PARTIAL": "partial",
+    "B_FAILED": "failed",
+}
+
+
+def _build_stage_status(
+    stage_b: Any,
+    c_results: dict[str, Any] | None = None,
+) -> StageStatus:
+    """Build StageStatus from stage B and optional C results."""
+    from sema.engine.stage_utils import should_trigger_stage_c
+
+    mapped: Any = _B_STATUS_MAP[stage_b.status]
+    partial = stage_b.status == "B_PARTIAL"
+
+    # Compute C metrics from B output and C results
+    c_requested = 0
+    for br in stage_b.batch_results:
+        for col in br.columns:
+            if should_trigger_stage_c(col):
+                c_requested += 1
+
+    c_succeeded = len(c_results) if c_results else 0
+    c_triggered = c_requested > 0
+
+    if c_triggered and c_succeeded < c_requested:
+        partial = True
+
+    return StageStatus(
+        stage_a="success",
+        stage_b_status=mapped,
+        stage_b_raw_coverage=stage_b.raw_coverage,
+        stage_b_critical_coverage=stage_b.critical_coverage,
+        stage_b_unresolved_columns=stage_b.unresolved_columns,
+        stage_b_retries_used=stage_b.retries_used,
+        stage_b_splits_used=stage_b.splits_used,
+        stage_b_rescues_used=stage_b.rescues_used,
+        stage_c_triggered=c_triggered,
+        stage_c_columns_requested=c_requested,
+        stage_c_columns_succeeded=c_succeeded,
+        partial_output=partial,
+    )
 
 
 def _build_vocab_work_items(
@@ -150,6 +247,51 @@ def _build_vocab_work_items(
         ]
         ctx = _extract_column_context(col_ref, sem_index)
         items.append((col_ref, values, decoded or None, ctx))
+    return items
+
+
+def _build_vocab_work_items_staged(
+    extraction_assertions: list[Assertion],
+    staged: _StagedOutput,
+    domain_context: DomainContext | None = None,
+) -> list[tuple[str, list[str], list[dict[str, Any]] | None, VocabColumnContext]]:
+    """Build vocab work items using enriched VocabColumnContext from staged B."""
+    from sema.engine.stage_utils import build_enriched_vocab_context
+
+    unresolved = {u.column for u in staged.stage_b.unresolved_columns}
+    b_cols = {
+        col.column: col
+        for br in staged.stage_b.batch_results
+        for col in br.columns
+        if col.column not in unresolved
+    }
+
+    # Build table name from extraction assertions
+    table_name = ""
+    table_ref = ""
+    for a in extraction_assertions:
+        if a.predicate == AssertionPredicate.TABLE_EXISTS:
+            _, _, tbl, _ = _parse_table_ref(a.subject_ref)
+            table_name = tbl
+            table_ref = a.subject_ref
+            break
+
+    items: list[
+        tuple[str, list[str], list[dict[str, Any]] | None, VocabColumnContext]
+    ] = []
+    for a in extraction_assertions:
+        if a.predicate != AssertionPredicate.HAS_TOP_VALUES:
+            continue
+        col_ref = a.subject_ref
+        col_name = col_ref.rsplit("/", 1)[-1] if "/" in col_ref else col_ref
+        if col_name in unresolved or col_name not in b_cols:
+            continue
+        values = [v["value"] for v in a.payload.get("values", [])]
+        ctx = build_enriched_vocab_context(
+            b_cols[col_name], staged.stage_a,
+            table_name, domain_context,
+        )
+        items.append((col_ref, values, None, ctx))
     return items
 
 
@@ -193,13 +335,21 @@ def _run_vocabulary_alignment(
     llm_client: LLMClient,
     run_id: str,
     vocab_workers: int = 8,
+    domain_context: DomainContext | None = None,
+    staged_output: _StagedOutput | None = None,
 ) -> list[Assertion]:
     vocab = VocabularyEngine(
-        llm_client=llm_client, run_id=run_id
+        llm_client=llm_client, run_id=run_id,
+        domain_context=domain_context,
     )
-    work_items = _build_vocab_work_items(
-        extraction_assertions, semantic_assertions
-    )
+    if staged_output:
+        work_items = _build_vocab_work_items_staged(
+            extraction_assertions, staged_output, domain_context,
+        )
+    else:
+        work_items = _build_vocab_work_items(
+            extraction_assertions, semantic_assertions,
+        )
     if not work_items:
         return []
 
@@ -311,10 +461,12 @@ def _run_pipeline_stages(
     run_id: str,
     column_batch_size: int,
     vocab_workers: int = 8,
-) -> list[Assertion] | Any:
+    domain_context: DomainContext | None = None,
+    prompt_layers: Any = None,
+) -> tuple[list[Assertion], _StagedOutput] | Any:
     """Run all pipeline stages for a single table.
 
-    Returns either a list of assertions on success or a TableResult
+    Returns (assertions, staged_output) on success or a TableResult
     if the table should be skipped.
     """
     from sema.pipeline.build import TableResult
@@ -334,9 +486,11 @@ def _run_pipeline_stages(
             work_item.fqn, "no table metadata"
         )
 
-    semantic_assertions = _run_semantic_interpretation(
+    semantic_assertions, staged_output = _run_semantic_interpretation(
         table_meta, work_item, llm_client, run_id,
         column_batch_size,
+        domain_context=domain_context,
+        prompt_layers=prompt_layers,
     )
     all_assertions.extend(semantic_assertions)
 
@@ -344,9 +498,11 @@ def _run_pipeline_stages(
         extraction_assertions, semantic_assertions,
         work_item, llm_client, run_id,
         vocab_workers=vocab_workers,
+        domain_context=domain_context,
+        staged_output=staged_output,
     )
     all_assertions.extend(vocab_assertions)
 
     _commit_and_materialize(all_assertions, work_item, loader)
 
-    return all_assertions
+    return all_assertions, staged_output

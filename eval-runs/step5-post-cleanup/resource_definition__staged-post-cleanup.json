@@ -1,0 +1,615 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition",
+  "config_label": "staged-post-cleanup",
+  "timestamp": "2026-04-20T20:51:48.746263+00:00",
+  "run_id": "87a7e876-1df5-4809-8a09-b2b7e84a8f8e",
+  "assertions": [
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition",
+      "predicate": "table_exists",
+      "payload": {
+        "table_type": "TABLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/RESOURCE_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/RESOURCE_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/DISPLAY_NAME",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/DISPLAY_NAME",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/RESOURCE_TYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/RESOURCE_TYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/DESCRIPTION",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/DESCRIPTION",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/OPEN_BY_DEFAULT",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/OPEN_BY_DEFAULT",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/PRIORITY",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/PRIORITY",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/RESOURCE_ID",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "IDC_OHIF_V2",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/DISPLAY_NAME",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "CT Scan",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/RESOURCE_TYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "PATIENT",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/DESCRIPTION",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "CT Scan",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/OPEN_BY_DEFAULT",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "TRUE",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/PRIORITY",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "1",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition",
+      "predicate": "has_sample_rows",
+      "payload": {
+        "rows": [
+          {
+            "RESOURCE_ID": "IDC_OHIF_V2",
+            "DISPLAY_NAME": "CT Scan",
+            "RESOURCE_TYPE": "PATIENT",
+            "DESCRIPTION": "CT Scan",
+            "OPEN_BY_DEFAULT": "TRUE",
+            "PRIORITY": "1"
+          }
+        ],
+        "columns": [
+          "RESOURCE_ID",
+          "DISPLAY_NAME",
+          "RESOURCE_TYPE",
+          "DESCRIPTION",
+          "OPEN_BY_DEFAULT",
+          "PRIORITY"
+        ]
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition",
+      "predicate": "has_entity_name",
+      "payload": {
+        "value": "Resource Definition",
+        "grain": "one row per UI application, clinical tool, or data viewer resource configuration"
+      },
+      "confidence": 0.8,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Viewer configuration",
+        "is_preferred": true
+      },
+      "confidence": 0.8,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "App definition",
+        "is_preferred": false
+      },
+      "confidence": 0.8,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Clinical tool link",
+        "is_preferred": false
+      },
+      "confidence": 0.8,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Component definition",
+        "is_preferred": false
+      },
+      "confidence": 0.8,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.RESOURCE_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "resource identifier"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.RESOURCE_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.RESOURCE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "app id",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.RESOURCE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tool id",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.RESOURCE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "configuration id",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.DISPLAY_NAME",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "resource name"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.DISPLAY_NAME",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.DISPLAY_NAME",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "label",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.DISPLAY_NAME",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "human readable name",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.RESOURCE_TYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "resource category"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.RESOURCE_TYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.RESOURCE_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "resource classification",
+        "is_preferred": true
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.RESOURCE_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tool type",
+        "is_preferred": false
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.DESCRIPTION",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "resource description"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.DESCRIPTION",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "free text"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.DESCRIPTION",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "summary",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.DESCRIPTION",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "resource notes",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.OPEN_BY_DEFAULT",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "auto-open status"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.OPEN_BY_DEFAULT",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.OPEN_BY_DEFAULT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "default visibility",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.OPEN_BY_DEFAULT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "auto-launch",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.PRIORITY",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "display priority"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.PRIORITY",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.PRIORITY",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "sort order",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.PRIORITY",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "ranking",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.PRIORITY",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "display order",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition.RESOURCE_TYPE",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "PATIENT",
+        "label": "patient-centric medical record or clinical data viewer"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/RESOURCE_TYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 FHIR ResourceType"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/DISPLAY_NAME",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "LOINC"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/RESOURCE_ID",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Internal/Proprietary Identifier"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/DESCRIPTION",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "LOINC"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/OPEN_BY_DEFAULT",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Boolean"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/resource_definition/PRIORITY",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Custom ranking indicator"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    }
+  ]
+}

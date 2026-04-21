@@ -19,8 +19,10 @@ from sema.models.assertions import (
     AssertionStatus,
 )
 from sema.llm_client import LLMClient
-from sema.engine.semantic import (
-    TableInterpretation,
+from sema.models.stages import (
+    StageAResult,
+    StageBBatchResult,
+    StageBColumnResult,
 )
 
 
@@ -55,10 +57,22 @@ def _make_mock_resources(table_name):
     ]
 
     llm_client = MagicMock(spec=LLMClient)
-    llm_client.invoke.return_value = TableInterpretation(
-        entity_name=f"Entity_{table_name}",
-        properties=[],
-    )
+    llm_client.invoke.side_effect = [
+        StageAResult(
+            primary_entity=f"Entity_{table_name}",
+            grain_hypothesis="one row per entity",
+            confidence=0.9,
+        ),
+        StageBBatchResult(columns=[
+            StageBColumnResult(
+                column="col1",
+                canonical_property_label="column one",
+                semantic_type="identifier",
+                entity_role="attribute",
+                needs_stage_c=False,
+            ),
+        ]),
+    ]
 
     loader = MagicMock()
     return connector, llm_client, loader

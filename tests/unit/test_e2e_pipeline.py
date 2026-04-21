@@ -26,10 +26,32 @@ from sema.llm_client import (
     LLMClient,
     LLMStageError,
 )
-from sema.engine.semantic import (
-    TableInterpretation,
-    PropertyInterpretation,
+from sema.models.stages import (
+    StageAResult,
+    StageBBatchResult,
+    StageBColumnResult,
 )
+
+
+def _stage_a(name: str) -> StageAResult:
+    return StageAResult(
+        primary_entity=name,
+        grain_hypothesis="one row per row",
+        confidence=0.9,
+    )
+
+
+def _stage_b(columns: list[str]) -> StageBBatchResult:
+    return StageBBatchResult(columns=[
+        StageBColumnResult(
+            column=c,
+            canonical_property_label=c.replace("_", " "),
+            semantic_type="free_text",
+            entity_role="attribute",
+            needs_stage_c=False,
+        )
+        for c in columns
+    ])
 
 
 def _make_assertion(subject_ref, predicate, payload=None, run_id="r"):
@@ -81,9 +103,10 @@ class TestSequentialEquivalence:
                 t.table_name
             )
             llm_client = MagicMock(spec=LLMClient)
-            llm_client.invoke.return_value = TableInterpretation(
-                entity_name=f"E_{t.table_name}", properties=[]
-            )
+            llm_client.invoke.side_effect = [
+                _stage_a(f"E_{t.table_name}"),
+                _stage_b([f"col{i}" for i in range(3)]),
+            ]
             loader = MagicMock()
             r = process_table(t, connector, llm_client, loader, "run-1")
             results.append(r)
@@ -113,15 +136,10 @@ class TestConcurrentMultipleTables:
                 t.table_name
             )
             llm_client = MagicMock(spec=LLMClient)
-            llm_client.invoke.return_value = TableInterpretation(
-                entity_name=f"E_{t.table_name}",
-                properties=[
-                    PropertyInterpretation(
-                        column="col0", name="Col 0",
-                        semantic_type="free_text",
-                    ),
-                ],
-            )
+            llm_client.invoke.side_effect = [
+                _stage_a(f"E_{t.table_name}"),
+                _stage_b([f"col{i}" for i in range(3)]),
+            ]
             loader = MagicMock()
 
             def capture(assertions):
@@ -138,7 +156,7 @@ class TestConcurrentMultipleTables:
         report = aggregate_report(results)
         assert report["tables_processed"] == 6
         assert report["entities_created"] == 6
-        assert report["properties_created"] == 6
+        assert report["properties_created"] == 18  # 6 tables × 3 columns each
 
         # Every table committed assertions
         assert len(committed_counts) == 6
@@ -146,16 +164,11 @@ class TestConcurrentMultipleTables:
 
 
 # ---------------------------------------------------------------------------
-# Task 10.3: Wide table with two-pass
+# Task 10.3: Wide table exercised by staged Stage B batching
 # ---------------------------------------------------------------------------
 
-class TestWideTableTwoPass:
-    def test_60_columns_two_pass_produces_all_properties(self):
-        from sema.llm_client import TableSummary
-        from sema.engine.semantic import (
-            _PropertyBatchResult,
-        )
-
+class TestWideTableMultiBatchB:
+    def test_60_columns_produces_all_properties_via_batched_b(self):
         work_item = TableWorkItem(
             "cat", "sch", "wide_tbl", "unity://cat.sch.wide_tbl"
         )
@@ -165,31 +178,17 @@ class TestWideTableTwoPass:
             "wide_tbl", num_cols=60
         )
 
-        # LLMClient mock: summary + 3 property batches (25+25+10)
+        # Staged flow: 1 Stage A + 3 Stage B batches (25+25+10) at bs=25
         call_idx = [0]
+
         def llm_invoke(prompt, schema, **kwargs):
             call_idx[0] += 1
             if call_idx[0] == 1:
-                # Table summary
-                return TableSummary(
-                    entity_name="Wide Entity",
-                    synonyms=["we"],
-                )
-            else:
-                # Property batch
-                batch_num = call_idx[0] - 1
-                start = (batch_num - 1) * 25
-                end = min(start + 25, 60)
-                return _PropertyBatchResult(
-                    properties=[
-                        PropertyInterpretation(
-                            column=f"col{i}",
-                            name=f"Col {i}",
-                            semantic_type="free_text",
-                        )
-                        for i in range(start, end)
-                    ]
-                )
+                return _stage_a("Wide Entity")
+            batch_num = call_idx[0] - 1
+            start = (batch_num - 1) * 25
+            end = min(start + 25, 60)
+            return _stage_b([f"col{i}" for i in range(start, end)])
 
         llm_client = MagicMock(spec=LLMClient)
         llm_client.invoke.side_effect = llm_invoke
@@ -206,7 +205,6 @@ class TestWideTableTwoPass:
         assert result.entities_created == 1
         assert result.properties_created == 60
 
-        # Verify commit was called with all assertions
         committed = loader.commit_table_assertions.call_args[0][0]
         prop_assertions = [
             a for a in committed
@@ -235,12 +233,27 @@ class TestLLMFallbackChainE2E:
         structured_mock.invoke.side_effect = Exception("structured failed")
         mock_llm.with_structured_output.return_value = structured_mock
 
-        response = MagicMock()
-        response.content = json.dumps({
-            "entity_name": "Test Entity",
-            "properties": [],
-        })
-        mock_llm.invoke.return_value = response
+        # Plain invoke returns JSON matching StageAResult, then Stage B
+        responses = [
+            MagicMock(content=json.dumps({
+                "primary_entity": "Test Entity",
+                "grain_hypothesis": "one row per test",
+                "confidence": 0.9,
+            })),
+            MagicMock(content=json.dumps({
+                "columns": [
+                    {
+                        "column": f"col{i}",
+                        "canonical_property_label": f"col {i}",
+                        "semantic_type": "free_text",
+                        "entity_role": "attribute",
+                        "needs_stage_c": False,
+                    }
+                    for i in range(3)
+                ],
+            })),
+        ]
+        mock_llm.invoke.side_effect = responses
 
         llm_client = LLMClient(mock_llm, retry_max_attempts=1)
         loader = MagicMock()
@@ -269,9 +282,10 @@ class TestTransactionalWriteFailure:
         connector.extract_table.return_value = _make_extraction_for_table("tbl")
 
         llm_client = MagicMock(spec=LLMClient)
-        llm_client.invoke.return_value = TableInterpretation(
-            entity_name="E", properties=[]
-        )
+        llm_client.invoke.side_effect = [
+            _stage_a("E"),
+            _stage_b([f"col{i}" for i in range(3)]),
+        ]
 
         loader = MagicMock()
         loader.commit_table_assertions.side_effect = Exception(
@@ -304,9 +318,10 @@ class TestMaterializationIdempotency:
                 _make_extraction_for_table("tbl")
             )
             llm_client = MagicMock(spec=LLMClient)
-            llm_client.invoke.return_value = TableInterpretation(
-                entity_name="E", properties=[]
-            )
+            llm_client.invoke.side_effect = [
+                _stage_a("E"),
+                _stage_b([f"col{i}" for i in range(3)]),
+            ]
             loader = MagicMock()
 
             result = process_table(
@@ -345,9 +360,10 @@ class TestFailureAccounting:
                     step_errors=[("all", ValueError("boom"))],
                 )
             else:
-                llm_client.invoke.return_value = TableInterpretation(
-                    entity_name=f"E{i}", properties=[]
-                )
+                llm_client.invoke.side_effect = [
+                    _stage_a(f"E{i}"),
+                    _stage_b([f"col{j}" for j in range(3)]),
+                ]
 
             loader = MagicMock()
             r = process_table(t, connector, llm_client, loader, "run-1")

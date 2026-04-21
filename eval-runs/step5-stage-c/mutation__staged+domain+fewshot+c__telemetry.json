@@ -1,0 +1,22 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/mutation",
+  "stage_a_calls": 1,
+  "stage_b_batches_attempted": 5,
+  "stage_b_batches_succeeded": 5,
+  "stage_c_calls": 30,
+  "b_outcome": "B_SUCCESS",
+  "retries_used": 0,
+  "splits_used": 0,
+  "rescues_used": 0,
+  "raw_coverage_pct": 1.0,
+  "critical_coverage_pct": 1.0,
+  "c_columns_flagged": 33,
+  "total_columns": 111,
+  "c_trigger_rate": 0.2972972972972973,
+  "stage_a_latency_ms": 1779,
+  "stage_b_latency_ms": 80941,
+  "stage_c_latency_ms": 15773,
+  "total_latency_ms": 98493,
+  "tokens_input": 20270,
+  "tokens_output": 13429
+}

@@ -1,0 +1,22 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/structural_variant",
+  "stage_a_calls": 1,
+  "stage_b_batches_attempted": 1,
+  "stage_b_batches_succeeded": 1,
+  "stage_c_calls": 2,
+  "b_outcome": "B_SUCCESS",
+  "retries_used": 0,
+  "splits_used": 0,
+  "rescues_used": 0,
+  "raw_coverage_pct": 1.0,
+  "critical_coverage_pct": 1.0,
+  "c_columns_flagged": 2,
+  "total_columns": 13,
+  "c_trigger_rate": 0.15384615384615385,
+  "stage_a_latency_ms": 1967,
+  "stage_b_latency_ms": 10185,
+  "stage_c_latency_ms": 2402,
+  "total_latency_ms": 14554,
+  "tokens_input": 4453,
+  "tokens_output": 1621
+}

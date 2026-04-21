@@ -1,0 +1,72 @@
+{
+  "summary": {
+    "tables_compared": 6,
+    "total_added": 3,
+    "total_removed": 16,
+    "total_changed": 611,
+    "only_in_baseline": [],
+    "only_in_current": []
+  },
+  "per_table": [
+    {
+      "table": "mutation",
+      "summary": {
+        "added_count": 1,
+        "removed_count": 9,
+        "changed_count": 305,
+        "total_before": 733,
+        "total_after": 738
+      }
+    },
+    {
+      "table": "patient",
+      "summary": {
+        "added_count": 1,
+        "removed_count": 2,
+        "changed_count": 109,
+        "total_before": 333,
+        "total_after": 340
+      }
+    },
+    {
+      "table": "sample",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 0,
+        "changed_count": 61,
+        "total_before": 166,
+        "total_after": 172
+      }
+    },
+    {
+      "table": "timeline_sample_acquisition",
+      "summary": {
+        "added_count": 1,
+        "removed_count": 4,
+        "changed_count": 26,
+        "total_before": 104,
+        "total_after": 105
+      }
+    },
+    {
+      "table": "timeline_status",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 0,
+        "changed_count": 44,
+        "total_before": 125,
+        "total_after": 123
+      }
+    },
+    {
+      "table": "timeline_treatment",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 1,
+        "changed_count": 66,
+        "total_before": 198,
+        "total_after": 202
+      }
+    }
+  ]
+}

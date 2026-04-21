@@ -1,0 +1,59 @@
+# Holdout Set Definition v1
+# 10 cBioPortal tables disjoint from dev_slice.yaml.
+# Frozen before any prompt tuning or few-shot authoring.
+#
+# Rules:
+#   - NEVER use holdout table data to author/tune prompts or few-shot examples.
+#   - MAY be evaluated at milestone boundaries alongside full corpus.
+#   - Selection covers similar failure mode distribution as dev slice
+#     without overlap.
+#
+# Version log:
+#   v1 (2026-04-13): Initial selection. Frozen before Step 3 (domain-aware prompts).
+
+version: 1
+created: "2026-04-13"
+frozen_before_step: 3
+catalog: unity
+schema: cbioportal
+
+tables:
+  - table_name: resource_patient
+    reason: "Bridge table (identifier-heavy) disjoint from resource_sample in dev slice"
+    failure_mode: identifier_only
+
+  - table_name: cancer_type
+    reason: "Reference/lookup table with hierarchical cancer type taxonomy. Short, flat."
+    failure_mode: non_clinical_entity
+
+  - table_name: genetic_profile
+    reason: "Assay/profile definition table. Technical metadata, non-patient entity."
+    failure_mode: non_clinical_entity
+
+  - table_name: clinical_sample
+    reason: "Sample-level clinical attributes. Overlapping semantics with 'sample' but different column set."
+    failure_mode: mixed_semantic_types
+
+  - table_name: clinical_patient
+    reason: "Patient-level clinical attributes. May overlap semantics with 'patient' table."
+    failure_mode: mixed_semantic_types
+
+  - table_name: mutation_extended
+    reason: "Extended MAF format. Very wide table (50+ cols), heavy abbreviation use."
+    failure_mode: wide_table_batching
+
+  - table_name: timeline_treatment
+    reason: "Timeline-format treatment data. Temporal encoding, categorical subtypes."
+    failure_mode: encoded_categorical
+
+  - table_name: timeline_status
+    reason: "Timeline-format status events. Binary/categorical flags with temporal context."
+    failure_mode: encoded_categorical
+
+  - table_name: study
+    reason: "Study metadata table. Non-clinical, minimal columns."
+    failure_mode: non_clinical_entity
+
+  - table_name: data_clinical_supp
+    reason: "Supplemental clinical data with varied column semantics. Medium width."
+    failure_mode: abbreviation_ambiguity

@@ -1,0 +1,475 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna",
+  "config_label": "staged+domain+fewshot+c-v2",
+  "timestamp": "2026-04-20T20:33:33.234770+00:00",
+  "run_id": "57c5ba82-5b47-4f11-bc74-b94605dac151",
+  "assertions": [
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna",
+      "predicate": "table_exists",
+      "payload": {
+        "table_type": "TABLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna/sample_id",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna/sample_id",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna/hugo_symbol",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna/hugo_symbol",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna/entrez_gene_id",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "LONG",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna/entrez_gene_id",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "LONG"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna/cna_value",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "INT",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna/cna_value",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "INT"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna/cna_value",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "0",
+            "frequency": 70110
+          },
+          {
+            "value": "-1",
+            "frequency": 15401
+          },
+          {
+            "value": "1",
+            "frequency": 13945
+          },
+          {
+            "value": "2",
+            "frequency": 383
+          },
+          {
+            "value": "-2",
+            "frequency": 161
+          }
+        ],
+        "approx_distinct": 5
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna",
+      "predicate": "has_sample_rows",
+      "payload": {
+        "rows": [
+          {
+            "sample_id": "TCGA-02-0338-01",
+            "hugo_symbol": "HIST1H3I",
+            "entrez_gene_id": "8354",
+            "cna_value": "0"
+          },
+          {
+            "sample_id": "TCGA-06-0155-01",
+            "hugo_symbol": "RAB32",
+            "entrez_gene_id": "10981",
+            "cna_value": "0"
+          },
+          {
+            "sample_id": "TCGA-28-1749-01",
+            "hugo_symbol": "SMIM48",
+            "entrez_gene_id": "728392",
+            "cna_value": "0"
+          },
+          {
+            "sample_id": "TCGA-02-0059-01",
+            "hugo_symbol": "LOC145474",
+            "entrez_gene_id": "145474",
+            "cna_value": "1"
+          },
+          {
+            "sample_id": "TCGA-02-0266-01",
+            "hugo_symbol": "SLC26A4-AS1",
+            "entrez_gene_id": "286002",
+            "cna_value": "1"
+          }
+        ],
+        "columns": [
+          "sample_id",
+          "hugo_symbol",
+          "entrez_gene_id",
+          "cna_value"
+        ]
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna",
+      "predicate": "has_entity_name",
+      "payload": {
+        "value": "Copy Number Alteration",
+        "grain": "one row per gene copy number call per sample"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "CNA",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "CNV",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Copy Number Variant",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "Copy Number Status",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "gene-level copy number",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.sample_id",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.sample_id",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "specimen/sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.sample_id",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "specimen id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.sample_id",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biospecimen id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.sample_id",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor sample id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.hugo_symbol",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "gene symbol"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.hugo_symbol",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.hugo_symbol",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "gene name",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.hugo_symbol",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "HGNC symbol",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.hugo_symbol",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "gene",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.entrez_gene_id",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "entrez gene identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.entrez_gene_id",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.entrez_gene_id",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "NCBI gene id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.entrez_gene_id",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "gene id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.cna_value",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "discrete copy number alteration call"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.cna_value",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "biomarker/gene/variant"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.cna_value",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "copy number call",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.cna_value",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "gistic status",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.cna_value",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "cna status",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.cna_value",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "0",
+        "label": "diploid (no copy number change)"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.cna_value",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "-1",
+        "label": "shallow deletion (hemizygous loss)"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.cna_value",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "1",
+        "label": "gain (low-level amplification)"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.cna_value",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "2",
+        "label": "high-level amplification"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna.cna_value",
+      "predicate": "has_decoded_value",
+      "payload": {
+        "raw": "-2",
+        "label": "deep deletion (homozygous loss)"
+      },
+      "confidence": 0.75,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/cna/cna_value",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "GISTIC 2.0"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    }
+  ]
+}

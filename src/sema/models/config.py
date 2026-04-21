@@ -80,9 +80,21 @@ class BuildConfig(BaseSettings):
     catalog: str = ""
     schemas: list[str] = []
     table_pattern: str | None = None
+    domain: str | None = None
+    domain_from_cli: bool = False
     verbose: bool = False
     skip_embeddings: bool = False
     resume: bool = False
+
+    enable_domain_bias: bool = True
+    enable_type_inventory: bool = True
+    enable_vocab_hints: bool = True
+    enable_few_shot: bool = True
+    enable_stage_c: bool = True
+
+    eval_dump_dir: str | None = None
+    eval_config_label: str = "run"
+    slice_tables: list[str] = []
 
     table_workers: int = 4
     vocab_workers: int = 8
@@ -101,6 +113,46 @@ class BuildConfig(BaseSettings):
 
     @classmethod
     def from_file(cls, path: str, overrides: dict[str, Any] | None = None) -> BuildConfig:
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        if overrides:
+            data.update({k: v for k, v in overrides.items() if v is not None})
+        return cls(**data)
+
+
+class IngestDatabricksTargetConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="INGEST_DATABRICKS_")
+
+    catalog: str = "workspace"
+    schemas: list[str] = Field(
+        default_factory=lambda: ["cbioportal", "ontology_omop", "vocabulary_omop"]
+    )
+
+
+class IngestOmopConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="INGEST_OMOP_")
+
+    cdm_version: str = "5.4"
+    vocab_path: str | None = None
+
+
+class IngestConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="INGEST_")
+
+    duckdb_path: str = "~/.sema/poc.duckdb"
+    cache_dir: str = "~/.sema/cache/cbioportal"
+    cloud_staging_uri: str | None = None
+
+    databricks: IngestDatabricksTargetConfig = Field(
+        default_factory=IngestDatabricksTargetConfig
+    )
+    omop: IngestOmopConfig = Field(default_factory=IngestOmopConfig)
+    databricks_creds: DatabricksConfig = Field(default_factory=DatabricksConfig)
+
+    @classmethod
+    def from_file(
+        cls, path: str, overrides: dict[str, Any] | None = None
+    ) -> IngestConfig:
         with open(path) as f:
             data = yaml.safe_load(f) or {}
         if overrides:

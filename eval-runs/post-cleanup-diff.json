@@ -1,0 +1,132 @@
+{
+  "summary": {
+    "tables_compared": 12,
+    "total_added": 23,
+    "total_removed": 22,
+    "total_changed": 670,
+    "only_in_baseline": [],
+    "only_in_current": []
+  },
+  "per_table": [
+    {
+      "table": "clinical_supp_hypoxia",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 0,
+        "changed_count": 9,
+        "total_before": 44,
+        "total_after": 44
+      }
+    },
+    {
+      "table": "cna",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 0,
+        "changed_count": 8,
+        "total_before": 42,
+        "total_after": 41
+      }
+    },
+    {
+      "table": "gene_panel_matrix",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 0,
+        "changed_count": 17,
+        "total_before": 44,
+        "total_after": 43
+      }
+    },
+    {
+      "table": "mutation",
+      "summary": {
+        "added_count": 14,
+        "removed_count": 11,
+        "changed_count": 256,
+        "total_before": 788,
+        "total_after": 795
+      }
+    },
+    {
+      "table": "patient",
+      "summary": {
+        "added_count": 1,
+        "removed_count": 0,
+        "changed_count": 116,
+        "total_before": 364,
+        "total_after": 362
+      }
+    },
+    {
+      "table": "resource_definition",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 0,
+        "changed_count": 17,
+        "total_before": 57,
+        "total_after": 58
+      }
+    },
+    {
+      "table": "resource_patient",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 0,
+        "changed_count": 9,
+        "total_before": 31,
+        "total_after": 30
+      }
+    },
+    {
+      "table": "sample",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 1,
+        "changed_count": 50,
+        "total_before": 184,
+        "total_after": 182
+      }
+    },
+    {
+      "table": "structural_variant",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 0,
+        "changed_count": 38,
+        "total_before": 117,
+        "total_after": 115
+      }
+    },
+    {
+      "table": "timeline_sample_acquisition",
+      "summary": {
+        "added_count": 5,
+        "removed_count": 1,
+        "changed_count": 44,
+        "total_before": 118,
+        "total_after": 118
+      }
+    },
+    {
+      "table": "timeline_status",
+      "summary": {
+        "added_count": 0,
+        "removed_count": 5,
+        "changed_count": 25,
+        "total_before": 99,
+        "total_after": 77
+      }
+    },
+    {
+      "table": "timeline_treatment",
+      "summary": {
+        "added_count": 3,
+        "removed_count": 4,
+        "changed_count": 81,
+        "total_before": 301,
+        "total_after": 264
+      }
+    }
+  ]
+}

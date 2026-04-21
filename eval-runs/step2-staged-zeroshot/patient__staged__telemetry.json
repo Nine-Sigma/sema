@@ -1,0 +1,22 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/patient",
+  "stage_a_calls": 1,
+  "stage_b_batches_attempted": 2,
+  "stage_b_batches_succeeded": 2,
+  "stage_c_calls": 0,
+  "b_outcome": "B_SUCCESS",
+  "retries_used": 0,
+  "splits_used": 0,
+  "rescues_used": 0,
+  "raw_coverage_pct": 1.0,
+  "critical_coverage_pct": 1.0,
+  "c_columns_flagged": 14,
+  "total_columns": 38,
+  "c_trigger_rate": 0.3684210526315789,
+  "stage_a_latency_ms": 1989,
+  "stage_b_latency_ms": 28440,
+  "stage_c_latency_ms": 0,
+  "total_latency_ms": 30429,
+  "tokens_input": 5378,
+  "tokens_output": 3908
+}

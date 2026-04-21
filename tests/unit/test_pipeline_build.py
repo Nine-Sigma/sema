@@ -19,7 +19,11 @@ from sema.models.assertions import (
     AssertionStatus,
 )
 from sema.llm_client import LLMStageError, LLMClient
-from sema.engine.semantic import TableInterpretation, PropertyInterpretation
+from sema.models.stages import (
+    StageAResult,
+    StageBBatchResult,
+    StageBColumnResult,
+)
 from sema.pipeline.build_utils import _build_table_metadata
 
 
@@ -118,15 +122,22 @@ class TestProcessTable:
         connector.extract_table.return_value = _make_extraction_assertions()
 
         llm_client = MagicMock(spec=LLMClient)
-        llm_client.invoke.return_value = TableInterpretation(
-            entity_name="Entity",
-            properties=[
-                PropertyInterpretation(
-                    column="col1", name="Column 1",
+        llm_client.invoke.side_effect = [
+            StageAResult(
+                primary_entity="Entity",
+                grain_hypothesis="one row per row",
+                confidence=0.9,
+            ),
+            StageBBatchResult(columns=[
+                StageBColumnResult(
+                    column="col1",
+                    canonical_property_label="Column 1",
                     semantic_type="free_text",
+                    entity_role="attribute",
+                    needs_stage_c=False,
                 ),
-            ],
-        )
+            ]),
+        ]
 
         loader = MagicMock()
 
@@ -261,9 +272,22 @@ class TestAssertionIsolation:
             ]
 
             llm_client = MagicMock(spec=LLMClient)
-            llm_client.invoke.return_value = TableInterpretation(
-                entity_name=f"Entity{i}", properties=[]
-            )
+            llm_client.invoke.side_effect = [
+                StageAResult(
+                    primary_entity=f"Entity{i}",
+                    grain_hypothesis="one row per row",
+                    confidence=0.9,
+                ),
+                StageBBatchResult(columns=[
+                    StageBColumnResult(
+                        column="col1",
+                        canonical_property_label="Column 1",
+                        semantic_type="identifier",
+                        entity_role="attribute",
+                        needs_stage_c=False,
+                    ),
+                ]),
+            ]
 
             loader = MagicMock()
 

@@ -1,0 +1,2277 @@
+{
+  "table_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition",
+  "config_label": "staged+domain+fewshot",
+  "timestamp": "2026-04-19T23:06:21.235665+00:00",
+  "run_id": "9bf71d4b-7e59-4730-9526-1cd6abcc483a",
+  "assertions": [
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition",
+      "predicate": "table_exists",
+      "payload": {
+        "table_type": "TABLE"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/PATIENT_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/PATIENT_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/START_DATE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/START_DATE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/STOP_DATE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/STOP_DATE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/EVENT_TYPE",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/EVENT_TYPE",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/SAMPLE_ID",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/SAMPLE_ID",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/METHOD_OF_SAMPLE_PROCUREMENT",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/METHOD_OF_SAMPLE_PROCUREMENT",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/COUNTRY",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/COUNTRY",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/SAMPLE_PRESCREENED",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/SAMPLE_PRESCREENED",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TOP_SLIDE_SUBMITTED",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TOP_SLIDE_SUBMITTED",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NUCLEI_PERCENT",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NUCLEI_PERCENT",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_WEIGHT",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_WEIGHT",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/VESSEL_USED",
+      "predicate": "column_exists",
+      "payload": {
+        "data_type": "STRING",
+        "nullable": true,
+        "comment": null
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/VESSEL_USED",
+      "predicate": "has_datatype",
+      "payload": {
+        "value": "STRING"
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/START_DATE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "0",
+            "frequency": 235
+          },
+          {
+            "value": "31",
+            "frequency": 31
+          },
+          {
+            "value": "28",
+            "frequency": 26
+          },
+          {
+            "value": "34",
+            "frequency": 25
+          },
+          {
+            "value": "30",
+            "frequency": 25
+          },
+          {
+            "value": "35",
+            "frequency": 24
+          },
+          {
+            "value": "20",
+            "frequency": 24
+          },
+          {
+            "value": "21",
+            "frequency": 24
+          },
+          {
+            "value": "13",
+            "frequency": 21
+          },
+          {
+            "value": "7",
+            "frequency": 20
+          },
+          {
+            "value": "27",
+            "frequency": 20
+          },
+          {
+            "value": "40",
+            "frequency": 19
+          },
+          {
+            "value": "14",
+            "frequency": 18
+          },
+          {
+            "value": "29",
+            "frequency": 18
+          },
+          {
+            "value": "37",
+            "frequency": 18
+          },
+          {
+            "value": "12",
+            "frequency": 18
+          },
+          {
+            "value": "16",
+            "frequency": 17
+          },
+          {
+            "value": "22",
+            "frequency": 17
+          },
+          {
+            "value": "17",
+            "frequency": 17
+          },
+          {
+            "value": "24",
+            "frequency": 16
+          },
+          {
+            "value": "19",
+            "frequency": 16
+          },
+          {
+            "value": "15",
+            "frequency": 15
+          },
+          {
+            "value": "8",
+            "frequency": 14
+          },
+          {
+            "value": "33",
+            "frequency": 13
+          },
+          {
+            "value": "36",
+            "frequency": 13
+          },
+          {
+            "value": "18",
+            "frequency": 12
+          },
+          {
+            "value": "42",
+            "frequency": 12
+          },
+          {
+            "value": "23",
+            "frequency": 12
+          },
+          {
+            "value": "44",
+            "frequency": 11
+          },
+          {
+            "value": "10",
+            "frequency": 11
+          },
+          {
+            "value": "56",
+            "frequency": 11
+          },
+          {
+            "value": "25",
+            "frequency": 11
+          },
+          {
+            "value": "9",
+            "frequency": 11
+          },
+          {
+            "value": "32",
+            "frequency": 10
+          },
+          {
+            "value": "1",
+            "frequency": 9
+          },
+          {
+            "value": "39",
+            "frequency": 9
+          },
+          {
+            "value": "26",
+            "frequency": 9
+          },
+          {
+            "value": "48",
+            "frequency": 8
+          },
+          {
+            "value": "6",
+            "frequency": 8
+          },
+          {
+            "value": "3",
+            "frequency": 8
+          },
+          {
+            "value": "41",
+            "frequency": 8
+          },
+          {
+            "value": "43",
+            "frequency": 7
+          },
+          {
+            "value": "46",
+            "frequency": 7
+          },
+          {
+            "value": "5",
+            "frequency": 7
+          },
+          {
+            "value": "49",
+            "frequency": 7
+          },
+          {
+            "value": "38",
+            "frequency": 6
+          },
+          {
+            "value": "4",
+            "frequency": 6
+          },
+          {
+            "value": "50",
+            "frequency": 6
+          },
+          {
+            "value": "62",
+            "frequency": 6
+          },
+          {
+            "value": "55",
+            "frequency": 6
+          },
+          {
+            "value": "11",
+            "frequency": 6
+          },
+          {
+            "value": "2",
+            "frequency": 6
+          },
+          {
+            "value": "52",
+            "frequency": 6
+          },
+          {
+            "value": "61",
+            "frequency": 5
+          },
+          {
+            "value": "-1",
+            "frequency": 5
+          },
+          {
+            "value": "47",
+            "frequency": 5
+          },
+          {
+            "value": "90",
+            "frequency": 4
+          },
+          {
+            "value": "45",
+            "frequency": 4
+          },
+          {
+            "value": "54",
+            "frequency": 4
+          },
+          {
+            "value": "-8",
+            "frequency": 4
+          },
+          {
+            "value": "70",
+            "frequency": 4
+          },
+          {
+            "value": "72",
+            "frequency": 4
+          },
+          {
+            "value": "113",
+            "frequency": 4
+          },
+          {
+            "value": "63",
+            "frequency": 4
+          },
+          {
+            "value": "64",
+            "frequency": 3
+          },
+          {
+            "value": "58",
+            "frequency": 3
+          },
+          {
+            "value": "53",
+            "frequency": 3
+          },
+          {
+            "value": "78",
+            "frequency": 3
+          },
+          {
+            "value": "74",
+            "frequency": 3
+          },
+          {
+            "value": "-7",
+            "frequency": 3
+          },
+          {
+            "value": "-13",
+            "frequency": 2
+          },
+          {
+            "value": "59",
+            "frequency": 2
+          },
+          {
+            "value": "84",
+            "frequency": 2
+          },
+          {
+            "value": "-19",
+            "frequency": 2
+          },
+          {
+            "value": "-14",
+            "frequency": 2
+          },
+          {
+            "value": "85",
+            "frequency": 2
+          },
+          {
+            "value": "66",
+            "frequency": 2
+          },
+          {
+            "value": "51",
+            "frequency": 2
+          },
+          {
+            "value": "73",
+            "frequency": 2
+          },
+          {
+            "value": "138",
+            "frequency": 2
+          },
+          {
+            "value": "65",
+            "frequency": 2
+          },
+          {
+            "value": "57",
+            "frequency": 2
+          },
+          {
+            "value": "92",
+            "frequency": 2
+          },
+          {
+            "value": "76",
+            "frequency": 2
+          },
+          {
+            "value": "-4",
+            "frequency": 1
+          },
+          {
+            "value": "-9",
+            "frequency": 1
+          },
+          {
+            "value": "-57",
+            "frequency": 1
+          },
+          {
+            "value": "191",
+            "frequency": 1
+          },
+          {
+            "value": "152",
+            "frequency": 1
+          },
+          {
+            "value": "242",
+            "frequency": 1
+          },
+          {
+            "value": "371",
+            "frequency": 1
+          },
+          {
+            "value": "215",
+            "frequency": 1
+          },
+          {
+            "value": "457",
+            "frequency": 1
+          },
+          {
+            "value": "99",
+            "frequency": 1
+          },
+          {
+            "value": "91",
+            "frequency": 1
+          },
+          {
+            "value": "2253",
+            "frequency": 1
+          },
+          {
+            "value": "1217",
+            "frequency": 1
+          },
+          {
+            "value": "-6",
+            "frequency": 1
+          },
+          {
+            "value": "394",
+            "frequency": 1
+          },
+          {
+            "value": "75",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 134
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/STOP_DATE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 1081
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/EVENT_TYPE",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Sample Acquisition",
+            "frequency": 1081
+          }
+        ],
+        "approx_distinct": 1
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/METHOD_OF_SAMPLE_PROCUREMENT",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "",
+            "frequency": 446
+          },
+          {
+            "value": "Modified Radical Mastectomy",
+            "frequency": 198
+          },
+          {
+            "value": "Tumor Resection",
+            "frequency": 153
+          },
+          {
+            "value": "Lumpectomy",
+            "frequency": 133
+          },
+          {
+            "value": "Simple Mastectomy",
+            "frequency": 111
+          },
+          {
+            "value": "Excisional Biopsy",
+            "frequency": 40
+          }
+        ],
+        "approx_distinct": 6
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/COUNTRY",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "United States",
+            "frequency": 415
+          },
+          {
+            "value": "",
+            "frequency": 395
+          },
+          {
+            "value": "Germany",
+            "frequency": 79
+          },
+          {
+            "value": "Poland",
+            "frequency": 76
+          },
+          {
+            "value": "Vietnam",
+            "frequency": 46
+          },
+          {
+            "value": "Ukraine",
+            "frequency": 30
+          },
+          {
+            "value": "Russia",
+            "frequency": 30
+          },
+          {
+            "value": "Nigeria",
+            "frequency": 4
+          },
+          {
+            "value": "Pakistan",
+            "frequency": 2
+          },
+          {
+            "value": "Moldova",
+            "frequency": 1
+          },
+          {
+            "value": "Brazil",
+            "frequency": 1
+          },
+          {
+            "value": "Afghanistan",
+            "frequency": 1
+          },
+          {
+            "value": "Canada",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 13
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/SAMPLE_PRESCREENED",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Yes",
+            "frequency": 1080
+          },
+          {
+            "value": "",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 2
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TOP_SLIDE_SUBMITTED",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Yes",
+            "frequency": 798
+          },
+          {
+            "value": "",
+            "frequency": 169
+          },
+          {
+            "value": "No",
+            "frequency": 114
+          }
+        ],
+        "approx_distinct": 3
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "0",
+            "frequency": 619
+          },
+          {
+            "value": "5",
+            "frequency": 105
+          },
+          {
+            "value": "30",
+            "frequency": 99
+          },
+          {
+            "value": "20",
+            "frequency": 97
+          },
+          {
+            "value": "10",
+            "frequency": 45
+          },
+          {
+            "value": "1",
+            "frequency": 43
+          },
+          {
+            "value": "2",
+            "frequency": 23
+          },
+          {
+            "value": "15",
+            "frequency": 14
+          },
+          {
+            "value": "3",
+            "frequency": 10
+          },
+          {
+            "value": "25",
+            "frequency": 9
+          },
+          {
+            "value": "4",
+            "frequency": 6
+          },
+          {
+            "value": "8",
+            "frequency": 4
+          },
+          {
+            "value": "9",
+            "frequency": 3
+          },
+          {
+            "value": "19",
+            "frequency": 2
+          },
+          {
+            "value": "13",
+            "frequency": 1
+          },
+          {
+            "value": "0.5",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 16
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NUCLEI_PERCENT",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "70",
+            "frequency": 375
+          },
+          {
+            "value": "80",
+            "frequency": 196
+          },
+          {
+            "value": "90",
+            "frequency": 157
+          },
+          {
+            "value": "85",
+            "frequency": 92
+          },
+          {
+            "value": "75",
+            "frequency": 84
+          },
+          {
+            "value": "95",
+            "frequency": 55
+          },
+          {
+            "value": "60",
+            "frequency": 36
+          },
+          {
+            "value": "65",
+            "frequency": 27
+          },
+          {
+            "value": "100",
+            "frequency": 19
+          },
+          {
+            "value": "50",
+            "frequency": 6
+          },
+          {
+            "value": "99",
+            "frequency": 6
+          },
+          {
+            "value": "30",
+            "frequency": 5
+          },
+          {
+            "value": "92",
+            "frequency": 4
+          },
+          {
+            "value": "93",
+            "frequency": 2
+          },
+          {
+            "value": "94",
+            "frequency": 2
+          },
+          {
+            "value": "98",
+            "frequency": 2
+          },
+          {
+            "value": "61",
+            "frequency": 2
+          },
+          {
+            "value": "20",
+            "frequency": 2
+          },
+          {
+            "value": "55",
+            "frequency": 1
+          },
+          {
+            "value": "91",
+            "frequency": 1
+          },
+          {
+            "value": "72",
+            "frequency": 1
+          },
+          {
+            "value": "74",
+            "frequency": 1
+          },
+          {
+            "value": "97",
+            "frequency": 1
+          },
+          {
+            "value": "88",
+            "frequency": 1
+          },
+          {
+            "value": "78",
+            "frequency": 1
+          },
+          {
+            "value": "87",
+            "frequency": 1
+          },
+          {
+            "value": "40",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 28
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_WEIGHT",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "200",
+            "frequency": 205
+          },
+          {
+            "value": "100",
+            "frequency": 112
+          },
+          {
+            "value": "",
+            "frequency": 56
+          },
+          {
+            "value": "500",
+            "frequency": 34
+          },
+          {
+            "value": "400",
+            "frequency": 23
+          },
+          {
+            "value": "300",
+            "frequency": 21
+          },
+          {
+            "value": "250",
+            "frequency": 15
+          },
+          {
+            "value": "150",
+            "frequency": 14
+          },
+          {
+            "value": "130",
+            "frequency": 12
+          },
+          {
+            "value": "230",
+            "frequency": 12
+          },
+          {
+            "value": "260",
+            "frequency": 11
+          },
+          {
+            "value": "120",
+            "frequency": 11
+          },
+          {
+            "value": "110",
+            "frequency": 11
+          },
+          {
+            "value": "600",
+            "frequency": 10
+          },
+          {
+            "value": "160",
+            "frequency": 10
+          },
+          {
+            "value": "240",
+            "frequency": 9
+          },
+          {
+            "value": "270",
+            "frequency": 9
+          },
+          {
+            "value": "180",
+            "frequency": 9
+          },
+          {
+            "value": "220",
+            "frequency": 8
+          },
+          {
+            "value": "190",
+            "frequency": 8
+          },
+          {
+            "value": "800",
+            "frequency": 8
+          },
+          {
+            "value": "350",
+            "frequency": 8
+          },
+          {
+            "value": "700",
+            "frequency": 8
+          },
+          {
+            "value": "290",
+            "frequency": 7
+          },
+          {
+            "value": "390",
+            "frequency": 7
+          },
+          {
+            "value": "380",
+            "frequency": 6
+          },
+          {
+            "value": "360",
+            "frequency": 5
+          },
+          {
+            "value": "440",
+            "frequency": 5
+          },
+          {
+            "value": "127",
+            "frequency": 5
+          },
+          {
+            "value": "1000",
+            "frequency": 5
+          },
+          {
+            "value": "210",
+            "frequency": 5
+          },
+          {
+            "value": "140",
+            "frequency": 5
+          },
+          {
+            "value": "70",
+            "frequency": 4
+          },
+          {
+            "value": "170",
+            "frequency": 4
+          },
+          {
+            "value": "370",
+            "frequency": 4
+          },
+          {
+            "value": "650",
+            "frequency": 4
+          },
+          {
+            "value": "310",
+            "frequency": 4
+          },
+          {
+            "value": "125",
+            "frequency": 4
+          },
+          {
+            "value": "450",
+            "frequency": 4
+          },
+          {
+            "value": "312",
+            "frequency": 4
+          },
+          {
+            "value": "1400",
+            "frequency": 3
+          },
+          {
+            "value": "470",
+            "frequency": 3
+          },
+          {
+            "value": "90",
+            "frequency": 3
+          },
+          {
+            "value": "112",
+            "frequency": 3
+          },
+          {
+            "value": "1100",
+            "frequency": 3
+          },
+          {
+            "value": "155",
+            "frequency": 3
+          },
+          {
+            "value": "460",
+            "frequency": 3
+          },
+          {
+            "value": "128",
+            "frequency": 3
+          },
+          {
+            "value": "378",
+            "frequency": 3
+          },
+          {
+            "value": "900",
+            "frequency": 3
+          },
+          {
+            "value": "211",
+            "frequency": 3
+          },
+          {
+            "value": "330",
+            "frequency": 3
+          },
+          {
+            "value": "320",
+            "frequency": 3
+          },
+          {
+            "value": "530",
+            "frequency": 3
+          },
+          {
+            "value": "550",
+            "frequency": 3
+          },
+          {
+            "value": "340",
+            "frequency": 3
+          },
+          {
+            "value": "121",
+            "frequency": 3
+          },
+          {
+            "value": "2200",
+            "frequency": 3
+          },
+          {
+            "value": "215",
+            "frequency": 2
+          },
+          {
+            "value": "278",
+            "frequency": 2
+          },
+          {
+            "value": "179",
+            "frequency": 2
+          },
+          {
+            "value": "412",
+            "frequency": 2
+          },
+          {
+            "value": "410",
+            "frequency": 2
+          },
+          {
+            "value": "870",
+            "frequency": 2
+          },
+          {
+            "value": "280",
+            "frequency": 2
+          },
+          {
+            "value": "135",
+            "frequency": 2
+          },
+          {
+            "value": "430",
+            "frequency": 2
+          },
+          {
+            "value": "620",
+            "frequency": 2
+          },
+          {
+            "value": "153",
+            "frequency": 2
+          },
+          {
+            "value": "193",
+            "frequency": 2
+          },
+          {
+            "value": "952",
+            "frequency": 2
+          },
+          {
+            "value": "423",
+            "frequency": 2
+          },
+          {
+            "value": "252",
+            "frequency": 2
+          },
+          {
+            "value": "1500",
+            "frequency": 2
+          },
+          {
+            "value": "375",
+            "frequency": 2
+          },
+          {
+            "value": "2990",
+            "frequency": 2
+          },
+          {
+            "value": "429",
+            "frequency": 2
+          },
+          {
+            "value": "122",
+            "frequency": 2
+          },
+          {
+            "value": "287",
+            "frequency": 2
+          },
+          {
+            "value": "368",
+            "frequency": 2
+          },
+          {
+            "value": "235",
+            "frequency": 2
+          },
+          {
+            "value": "162",
+            "frequency": 2
+          },
+          {
+            "value": "265",
+            "frequency": 2
+          },
+          {
+            "value": "1970",
+            "frequency": 2
+          },
+          {
+            "value": "480",
+            "frequency": 2
+          },
+          {
+            "value": "202",
+            "frequency": 2
+          },
+          {
+            "value": "259",
+            "frequency": 2
+          },
+          {
+            "value": "344",
+            "frequency": 2
+          },
+          {
+            "value": "750",
+            "frequency": 2
+          },
+          {
+            "value": "475",
+            "frequency": 2
+          },
+          {
+            "value": "216",
+            "frequency": 2
+          },
+          {
+            "value": "80",
+            "frequency": 2
+          },
+          {
+            "value": "288",
+            "frequency": 2
+          },
+          {
+            "value": "136",
+            "frequency": 2
+          },
+          {
+            "value": "358",
+            "frequency": 2
+          },
+          {
+            "value": "158",
+            "frequency": 2
+          },
+          {
+            "value": "1800",
+            "frequency": 2
+          },
+          {
+            "value": "175",
+            "frequency": 2
+          },
+          {
+            "value": "408",
+            "frequency": 2
+          },
+          {
+            "value": "289",
+            "frequency": 2
+          }
+        ],
+        "approx_distinct": 320
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/VESSEL_USED",
+      "predicate": "has_top_values",
+      "payload": {
+        "values": [
+          {
+            "value": "Cryovial",
+            "frequency": 416
+          },
+          {
+            "value": "Cassette",
+            "frequency": 154
+          },
+          {
+            "value": "Cryomold",
+            "frequency": 154
+          },
+          {
+            "value": "Polycon",
+            "frequency": 68
+          },
+          {
+            "value": "Specimen Storage Bags",
+            "frequency": 66
+          },
+          {
+            "value": "Biospecimen Storage Bag",
+            "frequency": 59
+          },
+          {
+            "value": "Bag",
+            "frequency": 43
+          },
+          {
+            "value": "Oct Block",
+            "frequency": 38
+          },
+          {
+            "value": "Other",
+            "frequency": 22
+          },
+          {
+            "value": "Polypropylene",
+            "frequency": 20
+          },
+          {
+            "value": "",
+            "frequency": 14
+          },
+          {
+            "value": "Fisherbrand Specimen Storage Bags",
+            "frequency": 10
+          },
+          {
+            "value": "Polypropylene Tube",
+            "frequency": 8
+          },
+          {
+            "value": "Polypropylene Conical",
+            "frequency": 3
+          },
+          {
+            "value": "Not Indicated On Paper",
+            "frequency": 1
+          },
+          {
+            "value": "Polyproylene",
+            "frequency": 1
+          },
+          {
+            "value": "Polypropylete Tube",
+            "frequency": 1
+          },
+          {
+            "value": "Polypropyene Tube",
+            "frequency": 1
+          },
+          {
+            "value": "Speciment Storage Bags",
+            "frequency": 1
+          },
+          {
+            "value": "Sepcimen Storage Bags",
+            "frequency": 1
+          }
+        ],
+        "approx_distinct": 20
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition",
+      "predicate": "has_sample_rows",
+      "payload": {
+        "rows": [
+          {
+            "PATIENT_ID": "TCGA-GM-A5PX",
+            "START_DATE": "33",
+            "STOP_DATE": "",
+            "EVENT_TYPE": "Sample Acquisition",
+            "SAMPLE_ID": "TCGA-GM-A5PX-01",
+            "METHOD_OF_SAMPLE_PROCUREMENT": "Simple Mastectomy",
+            "COUNTRY": "United States",
+            "SAMPLE_PRESCREENED": "Yes",
+            "TOP_SLIDE_SUBMITTED": "",
+            "TUMOR_NECROSIS_PERCENT": "0",
+            "TUMOR_NUCLEI_PERCENT": "70",
+            "TUMOR_WEIGHT": "136",
+            "VESSEL_USED": "Cryovial"
+          },
+          {
+            "PATIENT_ID": "TCGA-HN-A2OB",
+            "START_DATE": "-14",
+            "STOP_DATE": "",
+            "EVENT_TYPE": "Sample Acquisition",
+            "SAMPLE_ID": "TCGA-HN-A2OB-01",
+            "METHOD_OF_SAMPLE_PROCUREMENT": "",
+            "COUNTRY": "Canada",
+            "SAMPLE_PRESCREENED": "Yes",
+            "TOP_SLIDE_SUBMITTED": "",
+            "TUMOR_NECROSIS_PERCENT": "9",
+            "TUMOR_NUCLEI_PERCENT": "60",
+            "TUMOR_WEIGHT": "250",
+            "VESSEL_USED": "Cryovial"
+          },
+          {
+            "PATIENT_ID": "TCGA-JL-A3YW",
+            "START_DATE": "72",
+            "STOP_DATE": "",
+            "EVENT_TYPE": "Sample Acquisition",
+            "SAMPLE_ID": "TCGA-JL-A3YW-01",
+            "METHOD_OF_SAMPLE_PROCUREMENT": "Simple Mastectomy",
+            "COUNTRY": "Pakistan",
+            "SAMPLE_PRESCREENED": "Yes",
+            "TOP_SLIDE_SUBMITTED": "Yes",
+            "TUMOR_NECROSIS_PERCENT": "5",
+            "TUMOR_NUCLEI_PERCENT": "70",
+            "TUMOR_WEIGHT": "200",
+            "VESSEL_USED": "Cryovial"
+          },
+          {
+            "PATIENT_ID": "TCGA-JL-A3YX",
+            "START_DATE": "73",
+            "STOP_DATE": "",
+            "EVENT_TYPE": "Sample Acquisition",
+            "SAMPLE_ID": "TCGA-JL-A3YX-01",
+            "METHOD_OF_SAMPLE_PROCUREMENT": "Simple Mastectomy",
+            "COUNTRY": "Pakistan",
+            "SAMPLE_PRESCREENED": "Yes",
+            "TOP_SLIDE_SUBMITTED": "Yes",
+            "TUMOR_NECROSIS_PERCENT": "0",
+            "TUMOR_NUCLEI_PERCENT": "90",
+            "TUMOR_WEIGHT": "200",
+            "VESSEL_USED": "Cryovial"
+          },
+          {
+            "PATIENT_ID": "TCGA-LD-A7W5",
+            "START_DATE": "39",
+            "STOP_DATE": "",
+            "EVENT_TYPE": "Sample Acquisition",
+            "SAMPLE_ID": "TCGA-LD-A7W5-01",
+            "METHOD_OF_SAMPLE_PROCUREMENT": "Lumpectomy",
+            "COUNTRY": "United States",
+            "SAMPLE_PRESCREENED": "Yes",
+            "TOP_SLIDE_SUBMITTED": "",
+            "TUMOR_NECROSIS_PERCENT": "0",
+            "TUMOR_NUCLEI_PERCENT": "70",
+            "TUMOR_WEIGHT": "465",
+            "VESSEL_USED": "Other"
+          }
+        ],
+        "columns": [
+          "PATIENT_ID",
+          "START_DATE",
+          "STOP_DATE",
+          "EVENT_TYPE",
+          "SAMPLE_ID",
+          "METHOD_OF_SAMPLE_PROCUREMENT",
+          "COUNTRY",
+          "SAMPLE_PRESCREENED",
+          "TOP_SLIDE_SUBMITTED",
+          "TUMOR_NECROSIS_PERCENT",
+          "TUMOR_NUCLEI_PERCENT",
+          "TUMOR_WEIGHT",
+          "VESSEL_USED"
+        ]
+      },
+      "confidence": 1.0,
+      "source": "unity_catalog"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition",
+      "predicate": "has_entity_name",
+      "payload": {
+        "value": "Sample Acquisition Event",
+        "grain": "one row per specimen collection event per sample (multiple events per patient possible)"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biospecimen collection",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tissue acquisition",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biopsy event",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "surgical specimen procurement",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.PATIENT_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.PATIENT_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "patient identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "subject id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.PATIENT_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "case id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.START_DATE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "acquisition start day"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.START_DATE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "temporal field"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.START_DATE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "collection date",
+        "is_preferred": true
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.START_DATE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "procedure date",
+        "is_preferred": false
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.STOP_DATE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "acquisition end day"
+      },
+      "confidence": 0.8,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.STOP_DATE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "temporal field"
+      },
+      "confidence": 0.8,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.EVENT_TYPE",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "event category"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.EVENT_TYPE",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.EVENT_TYPE",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "timeline event type",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.SAMPLE_ID",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.SAMPLE_ID",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "specimen/sample identifier"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.SAMPLE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "specimen id",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.SAMPLE_ID",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biospecimen id",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.METHOD_OF_SAMPLE_PROCUREMENT",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "procurement procedure"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.METHOD_OF_SAMPLE_PROCUREMENT",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "therapy/drug/regimen"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.METHOD_OF_SAMPLE_PROCUREMENT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "surgical method",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.METHOD_OF_SAMPLE_PROCUREMENT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "biopsy type",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.COUNTRY",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "collection country"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.COUNTRY",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "demographic"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.SAMPLE_PRESCREENED",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "sample prescreening status"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.SAMPLE_PRESCREENED",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.85,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TOP_SLIDE_SUBMITTED",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "pathology slide submission status"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TOP_SLIDE_SUBMITTED",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 0.9,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_NECROSIS_PERCENT",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "tumor necrosis percentage"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_NECROSIS_PERCENT",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "lab measurement"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_NECROSIS_PERCENT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "percent necrosis",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_NUCLEI_PERCENT",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "tumor nuclei percentage"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_NUCLEI_PERCENT",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "lab measurement"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_NUCLEI_PERCENT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "percent nuclei",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_NUCLEI_PERCENT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor cellularity",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_WEIGHT",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "specimen weight"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_WEIGHT",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "lab measurement"
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_WEIGHT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "sample weight",
+        "is_preferred": true
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.TUMOR_WEIGHT",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "tumor mass",
+        "is_preferred": false
+      },
+      "confidence": 0.95,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.VESSEL_USED",
+      "predicate": "has_property_name",
+      "payload": {
+        "value": "specimen storage vessel"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.VESSEL_USED",
+      "predicate": "has_semantic_type",
+      "payload": {
+        "value": "administrative metadata"
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.VESSEL_USED",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "container type",
+        "is_preferred": true
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition.VESSEL_USED",
+      "predicate": "has_alias",
+      "payload": {
+        "value": "storage device",
+        "is_preferred": false
+      },
+      "confidence": 1.0,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/STOP_DATE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "ISO 8601"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/EVENT_TYPE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "EBI Biosamples"
+      },
+      "confidence": 0.6,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/COUNTRY",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "ISO 3166-1"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/SAMPLE_PRESCREENED",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 Table 0136 (Yes/No Indicator)"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "LOINC"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "2",
+        "child": "20"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "2",
+        "child": "25"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "0",
+        "child": "0.5"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "3",
+        "child": "30"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "1",
+        "child": "15"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "1",
+        "child": "19"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "1",
+        "child": "13"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NECROSIS_PERCENT",
+      "predicate": "parent_of",
+      "payload": {
+        "parent": "1",
+        "child": "10"
+      },
+      "confidence": 0.85,
+      "source": "pattern_match"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/START_DATE",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "Custom/Study-specific Relative Days"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/METHOD_OF_SAMPLE_PROCUREMENT",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "SNOMED CT"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TOP_SLIDE_SUBMITTED",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "HL7 User-defined Table 0136 (Yes/No Indicator)"
+      },
+      "confidence": 0.5,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/VESSEL_USED",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "National Cancer Institute Thesaurus (NCIt)"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_NUCLEI_PERCENT",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "percentage"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    },
+    {
+      "subject_ref": "databricks://dbc-6395977d-5b1c.cloud.databricks.com/workspace/cbioportal/timeline_sample_acquisition/TUMOR_WEIGHT",
+      "predicate": "vocabulary_match",
+      "payload": {
+        "value": "UCUM"
+      },
+      "confidence": 0.55,
+      "source": "llm_interpretation"
+    }
+  ]
+}
