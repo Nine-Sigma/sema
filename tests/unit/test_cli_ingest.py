@@ -13,9 +13,9 @@ from sema.cli import cli
 class TestIngestCbioportalCommand:
     def test_calls_ingest_study_with_parsed_args(self, tmp_path: Path) -> None:
         runner = CliRunner()
-        with patch("sema.cli_ingest.ingest_study") as mock_ingest, patch(
-            "sema.cli_ingest.Staging"
-        ) as mock_staging:
+        with patch(
+            "showcase.cbioportal_to_omop.parsers.ingest_study"
+        ) as mock_ingest, patch("sema.cli_ingest.Staging") as mock_staging:
             mock_staging.return_value = MagicMock()
             result = runner.invoke(
                 cli,

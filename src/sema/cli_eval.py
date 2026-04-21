@@ -23,7 +23,7 @@ def eval_group() -> None:
 @eval_group.command("run")
 @click.option(
     "--slice", "slice_path", required=True, type=click.Path(exists=True),
-    help="Path to slice YAML (e.g. eval/dev_slice.yaml).",
+    help="Path to slice YAML (e.g. showcase/cbioportal_to_omop/slices/dev_slice.yaml).",
 )
 @click.option(
     "--label", required=True,
