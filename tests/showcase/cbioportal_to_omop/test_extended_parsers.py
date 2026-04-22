@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from sema.ingest.cbioportal import (
+from showcase.cbioportal_to_omop.parsers import (
     parse_cna_file,
     parse_gene_panel_matrix,
     parse_resource_file,
@@ -142,7 +142,7 @@ class TestParseResourceFile:
 
 class TestDownloadFilterIncludesNewFileTypes:
     def test_should_download_includes_new_types(self) -> None:
-        from sema.ingest.cbioportal import _should_download
+        from showcase.cbioportal_to_omop.parsers import _should_download
 
         for name in (
             "data_sv.txt",
@@ -156,7 +156,7 @@ class TestDownloadFilterIncludesNewFileTypes:
             assert _should_download(name), f"should download {name}"
 
     def test_still_skips_non_ingested_types(self) -> None:
-        from sema.ingest.cbioportal import _should_download
+        from showcase.cbioportal_to_omop.parsers import _should_download
 
         for name in (
             "data_expression_median.txt",
@@ -172,7 +172,7 @@ class TestIngestStudyDirWiringNewTables:
     def test_ingests_sv_cna_panel_matrix_and_resources(
         self, tmp_path: Path,
     ) -> None:
-        from sema.ingest.cbioportal import _ingest_study_dir
+        from showcase.cbioportal_to_omop.parsers import _ingest_study_dir
         from sema.ingest.duckdb_staging import Staging
 
         study_dir = tmp_path / "study"

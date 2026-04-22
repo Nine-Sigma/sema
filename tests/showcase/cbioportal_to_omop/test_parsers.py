@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sema.ingest.cbioportal import (
+from showcase.cbioportal_to_omop.parsers import (
     fetch_study_files,
     iter_timeline_files,
     parse_clinical_file,
@@ -172,7 +172,7 @@ class TestIngestStudySkipsMatrixFiles:
     def test_skips_expression_methylation_and_case_lists(
         self, tmp_path: Path,
     ) -> None:
-        from sema.ingest.cbioportal import _list_skipped_files
+        from showcase.cbioportal_to_omop.parsers import _list_skipped_files
 
         (tmp_path / "data_expression_median.txt").write_text("")
         (tmp_path / "data_methylation_hm27.txt").write_text("")
@@ -198,7 +198,7 @@ class TestFetchStudyFiles:
         study_dir.mkdir(parents=True)
         (study_dir / ".done").touch()
 
-        with patch("sema.ingest.cbioportal.urlopen") as mock_urlopen:
+        with patch("showcase.cbioportal_to_omop.parsers.urlopen") as mock_urlopen:
             result = fetch_study_files("brca_tcga", cache_dir=cache)
             mock_urlopen.assert_not_called()
         assert result == study_dir
@@ -230,7 +230,7 @@ class TestFetchStudyFiles:
             download_responses.append(dl)
 
         urlopen_mock = MagicMock(side_effect=[api_resp, *download_responses])
-        with patch("sema.ingest.cbioportal.urlopen", urlopen_mock):
+        with patch("showcase.cbioportal_to_omop.parsers.urlopen", urlopen_mock):
             result = fetch_study_files("brca_tcga", cache_dir=cache)
 
         downloaded = {p.name for p in result.iterdir() if p.is_file() and p.name != ".done"}

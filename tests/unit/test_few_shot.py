@@ -127,17 +127,57 @@ class TestFewShotInjection:
         assert len(block) > 0
         assert "semantic_type" in block
 
-    def test_format_unknown_domain_returns_empty(self) -> None:
+    def test_format_unknown_domain_falls_back_to_generic(self) -> None:
         from sema.engine.few_shot import format_examples
 
         block = format_examples(domain="geology", stage="A")
-        assert block == ""
+        assert len(block) > 0
+        assert "primary_entity" in block
 
-    def test_format_none_domain_returns_empty(self) -> None:
+    def test_format_none_domain_returns_generic(self) -> None:
         from sema.engine.few_shot import format_examples
 
         block = format_examples(domain=None, stage="A")
-        assert block == ""
+        assert len(block) > 0
+        assert "primary_entity" in block
+
+
+class TestGenericFewShot:
+    """Generic base layer — industry-agnostic archetypes."""
+
+    def test_generic_stage_a_has_archetypes(self) -> None:
+        from sema.engine.few_shot import get_examples
+
+        examples = get_examples(domain="generic", stage="A")
+        assert len(examples) >= 4
+        entities = {ex["output"]["primary_entity"] for ex in examples}
+        assert {"Event", "Order", "Product"} & entities
+
+    def test_generic_stage_b_covers_column_archetypes(self) -> None:
+        from sema.engine.few_shot import get_examples
+
+        examples = get_examples(domain="generic", stage="B")
+        sem_types = {ex["output"]["semantic_type"] for ex in examples}
+        assert {
+            "identifier", "temporal", "numeric",
+            "categorical", "boolean",
+        } <= sem_types
+
+    def test_generic_stage_c_has_decoding_patterns(self) -> None:
+        from sema.engine.few_shot import get_examples
+
+        examples = get_examples(domain="generic", stage="C")
+        assert len(examples) >= 3
+
+    def test_compose_prepends_generic_to_domain(self) -> None:
+        from sema.engine.few_shot import compose_examples, get_examples
+
+        generic = get_examples(domain="generic", stage="A")
+        healthcare = get_examples(domain="healthcare", stage="A")
+        composed = compose_examples(domain="healthcare", stage="A")
+        assert len(composed) == len(generic) + len(healthcare)
+        assert composed[:len(generic)] == generic
+        assert composed[len(generic):] == healthcare
 
 
 class TestHoldoutDisjointness:
@@ -150,7 +190,8 @@ class TestHoldoutDisjointness:
 
         holdout_path = (
             Path(__file__).resolve().parents[2]
-            / "eval" / "holdout.yaml"
+            / "showcase" / "cbioportal_to_omop"
+            / "slices" / "holdout.yaml"
         )
         if not holdout_path.exists():
             pytest.skip("holdout.yaml not found")

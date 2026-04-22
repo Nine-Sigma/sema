@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen
 
 import pyarrow as pa
 
-from sema.ingest.cbioportal_utils import (
+from showcase.cbioportal_to_omop.cbioportal_utils import (
     DOWNLOAD_EXACT_FILENAMES,
     DOWNLOAD_PREFIXES,
     EXCLUDED_DOWNLOAD_PREFIXES,

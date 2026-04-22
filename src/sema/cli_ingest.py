@@ -4,7 +4,6 @@ from pathlib import Path
 
 import click
 
-from sema.ingest.cbioportal import ingest_study
 from sema.ingest.databricks_push import Bridge, PushError
 from sema.ingest.duckdb_staging import Staging
 from sema.ingest.omop import ingest_cdm_schema, ingest_vocabulary
@@ -51,6 +50,13 @@ def ingest_cbioportal_cmd(
     duckdb_path: str | None,
 ) -> None:
     """Download, parse, and stage a cBioPortal study into the DuckDB staging file."""
+    try:
+        from showcase.cbioportal_to_omop.parsers import ingest_study
+    except ImportError as err:
+        raise click.ClickException(
+            "The cBioPortal showcase is not importable. Run from a source "
+            "checkout where the 'showcase/' directory is on sys.path."
+        ) from err
     config = _load_ingest_config(duckdb_path)
     resolved_cache = Path(cache_dir).expanduser() if cache_dir else Path(
         config.cache_dir
