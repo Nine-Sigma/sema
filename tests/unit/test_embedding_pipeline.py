@@ -161,36 +161,31 @@ class TestEmbeddingComputation:
 
 class TestSkipEmbeddings:
     @patch("sema.pipeline.orchestrate_utils._get_embedder")
-    def test_skip_embeddings_flag(self, mock_get_embedder):
-        config = BuildConfig(
-            catalog="test_catalog",
-            schemas=["default"],
-        )
-        mock_loader = MagicMock()
+    def test_skip_embeddings_short_circuits(self, mock_get_embedder):
+        """skip_embeddings=True must not touch the embedder or Neo4j indexes.
 
-        assert not hasattr(config, "skip_embeddings") or not getattr(config, "skip_embeddings", False)
-
-        _compute_embeddings(config, mock_loader)
-
-        mock_get_embedder.assert_called_once()
-
+        Avoids probe-dim calls against a live provider and avoids the
+        write-path dim guard firing during LLM-only eval runs.
+        """
         config_skip = BuildConfig(
             catalog="test_catalog",
             schemas=["default"],
             skip_embeddings=True,
         )
-
-        mock_get_embedder.reset_mock()
-        mock_loader.reset_mock()
+        mock_loader = MagicMock()
 
         _compute_embeddings(config_skip, mock_loader)
 
-        mock_loader.create_vector_index.assert_called()
-        assert not any(
-            c[0][0] == "embed_and_store"
-            for c in mock_loader.method_calls
-            if c[0] == "embed_and_store"
-        )
+        mock_get_embedder.assert_not_called()
+        mock_loader.create_vector_index.assert_not_called()
+        mock_loader.set_embedding.assert_not_called()
+
+    @patch("sema.pipeline.orchestrate_utils._get_embedder")
+    def test_no_skip_invokes_embedder(self, mock_get_embedder):
+        config = BuildConfig(catalog="test_catalog", schemas=["default"])
+        mock_loader = MagicMock()
+        _compute_embeddings(config, mock_loader)
+        mock_get_embedder.assert_called_once()
 
 
 class TestQueryEmbeddingConfig:

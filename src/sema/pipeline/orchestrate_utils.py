@@ -11,6 +11,7 @@ import click
 
 import sema.cli_factories as _factories
 from sema.cli_factories import (
+    DatabricksProviderAuthError,
     _get_embedder,
     _get_neo4j_driver,
 )
@@ -208,11 +209,18 @@ def _compute_embeddings(
     from sema.engine.embeddings import (
         EMBEDDING_KEY_MAP,
         EmbeddingEngine,
-        build_embedding_text,
+    )
+    from sema.graph.vector_index_utils import (
+        EmbeddingDimensionMismatchError,
+        assert_write_dim_matches,
     )
 
     if config.verbose:
         click.echo("Step 3: Computing embeddings...")
+    if skip_embeddings or config.skip_embeddings:
+        if config.verbose:
+            click.echo("  Skipping embeddings (skip_embeddings=True)")
+        return
     try:
         embeddable_labels = config.embedding.embeddable_labels
         embedder = _get_embedder(config.embedding)
@@ -225,14 +233,16 @@ def _compute_embeddings(
         else:
             probe = emb_engine.embed_batch(["dimension probe"])
             dimensions = len(probe[0]) if probe and probe[0] else 768
+        index_names = [
+            f"{label.lower()}_embedding_index" for label in embeddable_labels
+        ]
+        assert_write_dim_matches(
+            loader._driver, index_names, dimensions,
+            model_name=config.embedding.model,
+        )
         emb_engine.create_all_indexes(dimensions=dimensions)
         if config.verbose:
             click.echo(f"  Vector indexes created (dimensions={dimensions})")
-
-        if skip_embeddings or config.skip_embeddings:
-            if config.verbose:
-                click.echo("  Skipping embed_and_store (skip_embeddings=True)")
-            return
 
         for label in embeddable_labels:
             nodes = loader.query_nodes_by_label(label)
@@ -244,6 +254,8 @@ def _compute_embeddings(
             )
             if config.verbose:
                 click.echo(f"  {label}: embedded {len(nodes)} nodes")
+    except EmbeddingDimensionMismatchError:
+        raise
     except Exception as e:
         if config.verbose:
             click.echo(f"  Skipping embeddings: {e}")
@@ -290,10 +302,16 @@ def _retrieve_context(config: QueryConfig) -> Any:
 
     try:
         embedder = _factories._get_embedder(config.embedding)
+    except DatabricksProviderAuthError:
+        raise
     except Exception:
         embedder = None
 
-    engine = RetrievalEngine(driver=driver, embedder=embedder)
+    engine = RetrievalEngine(
+        driver=driver,
+        embedder=embedder,
+        embedder_model_name=config.embedding.model,
+    )
     candidate_set = engine.retrieve(config.question)
     sco = prune_to_sco(candidate_set, consumer=config.consumer)
 

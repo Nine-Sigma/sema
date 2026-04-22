@@ -23,12 +23,37 @@ from sema.pipeline.retrieval_utils import (
 )
 
 
+_VECTOR_INDEX_NAMES: tuple[str, ...] = (
+    "entity_embedding_index",
+    "property_embedding_index",
+    "term_embedding_index",
+    "alias_embedding_index",
+    "metric_embedding_index",
+)
+
+
 class RetrievalEngine:
     """Hybrid retrieval: vector + lexical + graph traversal."""
 
-    def __init__(self, driver: Any, embedder: Any = None) -> None:
+    def __init__(
+        self,
+        driver: Any,
+        embedder: Any = None,
+        *,
+        embedder_model_name: str = "<configured embedder>",
+    ) -> None:
         self._driver = driver
         self._embedder = embedder
+        if embedder is not None:
+            from sema.graph.vector_index_utils import (
+                assert_retrieval_dim_matches,
+            )
+            assert_retrieval_dim_matches(
+                driver,
+                embedder,
+                list(_VECTOR_INDEX_NAMES),
+                model_name=embedder_model_name,
+            )
 
     def _run_query(self, query: str, **params: Any) -> list[dict[str, Any]]:
         with self._driver.session() as session:

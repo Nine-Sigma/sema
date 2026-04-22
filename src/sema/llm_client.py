@@ -11,59 +11,32 @@ import json
 import random
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Final, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
+from sema.llm_client_utils import (
+    approx_tokens,
+    normalize_keys,
+    resolve_structured_support,
+    try_usage_tokens,
+)
 from sema.log import logger
-from sema.models.protocols import JsonValue, LLMProtocol
+from sema.models.protocols import LLMProtocol
 
 T = TypeVar("T", bound=BaseModel)
 
 
 @dataclass
 class InvocationStats:
-    """Captured stats from the most recent LLMClient.invoke() call.
-
-    Token counts are estimates derived from char length when the
-    underlying model response does not carry real usage metadata.
-    """
+    """Captured stats from the most recent LLMClient.invoke() call."""
 
     duration_ns: int = 0
     prompt_chars: int = 0
     response_chars: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
-
-
-def _approx_tokens(char_count: int) -> int:
-    """Rough English token estimate at ~4 chars per token."""
-    return max(0, char_count // 4)
-
-
-def _try_usage_tokens(response: Any) -> tuple[int, int] | None:
-    """Extract (prompt, completion) tokens from a langchain response.
-
-    Returns None when usage metadata is not present.
-    """
-    usage = getattr(response, "usage_metadata", None) or getattr(
-        response, "response_metadata", None,
-    )
-    if isinstance(usage, dict):
-        prompt = (
-            usage.get("prompt_tokens")
-            or usage.get("input_tokens")
-            or usage.get("token_usage", {}).get("prompt_tokens")
-        )
-        completion = (
-            usage.get("completion_tokens")
-            or usage.get("output_tokens")
-            or usage.get("token_usage", {}).get("completion_tokens")
-        )
-        if prompt is not None and completion is not None:
-            return int(prompt), int(completion)
-    return None
 
 
 class TableSummary(BaseModel):
@@ -95,11 +68,7 @@ class SynonymExpansion(BaseModel):
 
 
 class LLMStageError(Exception):
-    """Raised when all LLM fallback steps are exhausted for a call.
-
-    Engines MUST NOT catch this — it propagates to _process_table()
-    which converts it to TableResult.failed.
-    """
+    """Raised when all LLM fallback steps are exhausted for a call."""
 
     def __init__(
         self,
@@ -125,7 +94,6 @@ def _is_transient_error(exc: Exception) -> bool:
     status = getattr(exc, "status_code", None) or getattr(exc, "http_status", None)
     if status is not None:
         return int(status) in TRANSIENT_STATUS_CODES
-    # Parse failures are transient (LLM may succeed on retry)
     if isinstance(exc, (json.JSONDecodeError, ValueError)):
         return True
     msg = str(exc).lower()
@@ -134,20 +102,8 @@ def _is_transient_error(exc: Exception) -> bool:
     return False
 
 
-def _normalize_keys(obj: JsonValue) -> JsonValue:
-    if isinstance(obj, dict):
-        return {k.lower(): _normalize_keys(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_normalize_keys(item) for item in obj]
-    return obj
-
-
 def parse_llm_response(raw: str, schema: type[T]) -> T:
-    """Universal fallback parser for raw LLM text responses.
-
-    Pipeline: strip markdown fences → strip prose → extract JSON block →
-    json.loads → normalize keys → schema.model_validate.
-    """
+    """Universal fallback parser for raw LLM text responses."""
     text = raw.strip()
 
     if text.startswith("```"):
@@ -157,8 +113,7 @@ def parse_llm_response(raw: str, schema: type[T]) -> T:
 
     try:
         parsed = json.loads(text)
-        normalized = _normalize_keys(parsed)
-        return schema.model_validate(normalized)
+        return schema.model_validate(normalize_keys(parsed))
     except (json.JSONDecodeError, Exception):
         pass
 
@@ -166,8 +121,7 @@ def parse_llm_response(raw: str, schema: type[T]) -> T:
     if match:
         try:
             parsed = json.loads(match.group(1))
-            normalized = _normalize_keys(parsed)
-            return schema.model_validate(normalized)
+            return schema.model_validate(normalize_keys(parsed))
         except (json.JSONDecodeError, Exception):
             pass
 
@@ -179,7 +133,7 @@ def parse_llm_response(raw: str, schema: type[T]) -> T:
         else:
             raise ValueError(f"No JSON found in LLM response: {text[:200]}")
 
-    normalized = _normalize_keys(parsed)
+    normalized = normalize_keys(parsed)
     if isinstance(normalized, dict):
         for wrapper_key in ("result", "data", "response"):
             if wrapper_key in normalized and isinstance(normalized[wrapper_key], dict):
@@ -189,35 +143,6 @@ def parse_llm_response(raw: str, schema: type[T]) -> T:
                     continue
 
     raise ValueError(f"Could not parse LLM response into {schema.__name__}: {text[:200]}")
-
-
-class _StructuredProbe(BaseModel):
-    ok: bool = True
-
-
-def _resolve_structured_support(
-    llm: LLMProtocol,
-    use_structured_output: str,
-) -> bool:
-    has_method = hasattr(llm, "with_structured_output")
-    mode = use_structured_output.lower().strip()
-
-    if mode == "true":
-        return has_method
-    if mode == "false":
-        return False
-
-    if not has_method:
-        return False
-    return _probe_structured_output(llm)
-
-
-def _probe_structured_output(llm: LLMProtocol) -> bool:
-    try:
-        llm.with_structured_output(_StructuredProbe).invoke("Respond with ok=true")
-        return True
-    except Exception:
-        return False
 
 
 class LLMClient:
@@ -243,7 +168,7 @@ class LLMClient:
         self._retry_jitter = retry_jitter
         self._circuit_breaker = circuit_breaker
 
-        self._supports_structured = _resolve_structured_support(
+        self._supports_structured = resolve_structured_support(
             llm, use_structured_output,
         )
         self.last_stats: InvocationStats = InvocationStats()
@@ -265,15 +190,7 @@ class LLMClient:
         stage_name: str = "",
         simplified_prompt: str | None = None,
     ) -> T:
-        """Invoke the LLM with a three-step fallback chain.
-
-        1. Native structured output (if supported)
-        2. Plain invoke + universal fallback parser
-        3. Simplified prompt + universal fallback parser
-
-        Raises LLMStageError if all steps are exhausted. Populates
-        `self.last_stats` with duration and estimated token counts.
-        """
+        """Invoke the LLM with a three-step fallback chain."""
         if self._circuit_breaker is not None:
             self._circuit_breaker.check()
 
@@ -296,7 +213,6 @@ class LLMClient:
         return result
 
     def _response_text_for_stats(self, result: Any) -> str:
-        """Best-effort char-length source for completion token estimate."""
         if hasattr(result, "model_dump_json"):
             return str(result.model_dump_json())
         return str(result)
@@ -305,12 +221,12 @@ class LLMClient:
         self, start_ns: int, prompt: str, response_text: str,
     ) -> None:
         duration = time.monotonic_ns() - start_ns
-        usage = _try_usage_tokens(self._last_response)
+        usage = try_usage_tokens(self._last_response)
         if usage is not None:
             prompt_tokens, completion_tokens = usage
         else:
-            prompt_tokens = _approx_tokens(len(prompt))
-            completion_tokens = _approx_tokens(len(response_text))
+            prompt_tokens = approx_tokens(len(prompt))
+            completion_tokens = approx_tokens(len(response_text))
         self.last_stats = InvocationStats(
             duration_ns=duration,
             prompt_chars=len(prompt),
@@ -331,10 +247,7 @@ class LLMClient:
 
         if self._supports_structured:
             try:
-                return self._invoke_with_retry(  # type: ignore[no-any-return]
-                    lambda: self._llm.with_structured_output(schema).invoke(prompt),
-                    step_name="structured_output",
-                )
+                return self._invoke_structured(prompt, schema)
             except Exception as e:
                 step_errors.append(("structured_output", e))
                 logger.debug(f"Structured output failed for {table_ref}: {e}")
@@ -365,6 +278,43 @@ class LLMClient:
             stage_name=stage_name,
             step_errors=step_errors,
         )
+
+    def _invoke_structured(self, prompt: str, schema: type[T]) -> T:
+        """Run native structured output and capture raw response for stats.
+
+        Uses `with_structured_output(schema, include_raw=True)` so the raw
+        `AIMessage` is available for `try_usage_tokens`. Parse failures
+        (returned as `{"parsed": None, "parsing_error": <exc>}`) are raised
+        so the plain-invoke fallback path engages.
+        """
+        def _call() -> Any:
+            return self._llm.with_structured_output(
+                schema, include_raw=True,
+            ).invoke(prompt)
+
+        result = self._invoke_with_retry(_call, step_name="structured_output")
+        if isinstance(result, dict):
+            return self._unpack_structured_result(result)  # type: ignore[return-value]
+        self._last_response = result
+        return result  # type: ignore[no-any-return]
+
+    def _unpack_structured_result(self, result: dict[str, Any]) -> BaseModel:
+        raw = result.get("raw")
+        parsed = result.get("parsed")
+        parsing_error = result.get("parsing_error")
+        if raw is not None:
+            self._last_response = raw
+            if try_usage_tokens(raw) is None:
+                logger.debug("Structured-output raw response lacked usage_metadata")
+        if parsing_error is not None:
+            raise parsing_error if isinstance(
+                parsing_error, BaseException,
+            ) else ValueError(str(parsing_error))
+        if parsed is None:
+            raise ValueError(
+                "Structured output returned parsed=None without a parsing_error",
+            )
+        return parsed  # type: ignore[no-any-return]
 
     def _raw_invoke(self, prompt: str) -> str:
         response = self._llm.invoke(prompt)

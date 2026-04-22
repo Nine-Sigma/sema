@@ -217,6 +217,17 @@ uv run sema query --question "Average age of patients by cancer type"
 
 All commands are run with `uv run sema` (or just `sema` if you installed with pip).
 
+### LLM provider configuration
+
+Sema supports `openrouter` (default), `anthropic`, `openai`, `databricks`
+(Mosaic AI Model Serving), and `custom` (any OpenAI-compatible endpoint) as
+LLM providers, and the same set plus `sentence-transformers` for embeddings.
+
+For Databricks Mosaic-specific operation — endpoint discovery, supported vs
+unsupported endpoints, profile-based auth, dimension-guard resolution, and
+the baseline/candidate eval workflow — see
+[`docs/runbooks/databricks-mosaic-provider.md`](docs/runbooks/databricks-mosaic-provider.md).
+
 ### `sema build`
 
 Build the knowledge graph from your warehouse catalog.

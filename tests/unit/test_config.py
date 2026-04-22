@@ -57,8 +57,8 @@ class TestLLMConfig:
         monkeypatch.delenv("LLM_API_KEY", raising=False)
         monkeypatch.delenv("LLM_BASE_URL", raising=False)
         config = LLMConfig()
-        assert config.provider == "openrouter"
-        assert config.model == "anthropic/claude-sonnet-4"
+        assert config.provider == "databricks"
+        assert config.model == "databricks-llama-4-maverick"
         assert config.base_url is None
 
     def test_from_env_vars(self, monkeypatch):
@@ -100,8 +100,8 @@ class TestEmbeddingConfig:
         monkeypatch.delenv("EMBEDDING_BASE_URL", raising=False)
         monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
         config = EmbeddingConfig()
-        assert config.provider == "openrouter"
-        assert config.model == "google/gemini-embedding-001"
+        assert config.provider == "databricks"
+        assert config.model == "databricks-bge-large-en"
         assert config.base_url is None
 
     def test_openai_provider(self, monkeypatch):
