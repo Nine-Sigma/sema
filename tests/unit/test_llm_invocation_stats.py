@@ -63,3 +63,66 @@ class TestInvocationStatsReset:
         client.invoke("x", _Probe)
         assert client.last_stats.prompt_chars == 1
         assert first_chars != client.last_stats.prompt_chars
+
+
+def _ai_message(text: str, *, input_tokens: int, output_tokens: int) -> MagicMock:
+    msg = MagicMock()
+    msg.content = text
+    msg.usage_metadata = {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+    }
+    return msg
+
+
+def _make_structured_client(raw_response: MagicMock, parsed: _Probe) -> LLMClient:
+    llm = MagicMock()
+    structured = MagicMock()
+    structured.invoke.return_value = {
+        "raw": raw_response,
+        "parsed": parsed,
+        "parsing_error": None,
+    }
+    llm.with_structured_output.return_value = structured
+    return LLMClient(llm=llm, use_structured_output="true")
+
+
+class TestStructuredOutputStats:
+    def test_records_real_usage_from_ai_message(self) -> None:
+        raw = _ai_message(
+            "{}", input_tokens=123, output_tokens=45,
+        )
+        client = _make_structured_client(raw, _Probe())
+        client.invoke("prompt" * 10, _Probe)
+        assert client.last_stats.prompt_tokens == 123
+        assert client.last_stats.completion_tokens == 45
+
+    def test_falls_back_to_char_estimates_when_no_metadata(self) -> None:
+        raw = MagicMock()
+        raw.content = "{}"
+        del raw.usage_metadata
+        del raw.response_metadata
+        client = _make_structured_client(raw, _Probe())
+        prompt = "a" * 400
+        client.invoke(prompt, _Probe)
+        assert client.last_stats.prompt_tokens == 100
+
+
+class TestStructuredOutputParseFailureFallback:
+    def test_parse_error_triggers_plain_invoke_fallback(self) -> None:
+        raw = _ai_message("{}", input_tokens=10, output_tokens=5)
+        llm = MagicMock()
+        structured = MagicMock()
+        structured.invoke.return_value = {
+            "raw": raw,
+            "parsed": None,
+            "parsing_error": ValueError("could not parse schema"),
+        }
+        llm.with_structured_output.return_value = structured
+        llm.invoke = MagicMock(
+            return_value=MagicMock(content='{"value": "fallback"}'),
+        )
+        client = LLMClient(llm=llm, use_structured_output="true")
+        result = client.invoke("prompt", _Probe)
+        assert result.value == "fallback"
+        assert llm.invoke.called, "plain-invoke fallback did not engage"

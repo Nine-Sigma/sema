@@ -42,5 +42,5 @@ coverage.xml
 docs/
 backups/
 
-# Eval run logs (artifacts kept, logs are transient)
-eval-runs/*.log
+# Eval run artifacts — local by default (previously-tracked runs stay tracked)
+eval-runs/

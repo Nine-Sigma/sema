@@ -30,14 +30,19 @@ class LLMConfig(BaseSettings):
         openrouter  - OpenRouter API (default, routes to any model)
         anthropic   - Direct Anthropic API
         openai      - Direct OpenAI API
-        databricks  - Mosaic AI / Databricks Model Serving
+        databricks  - Mosaic AI / Databricks Model Serving. `model` is a
+                      serving-endpoint name (e.g., databricks-llama-4-maverick),
+                      not an OpenAI-style provider/model string. `api_key` and
+                      `base_url` are IGNORED; auth is resolved by the
+                      Databricks SDK chain (DATABRICKS_HOST/DATABRICKS_TOKEN,
+                      then ~/.databrickscfg profile).
         custom      - Any OpenAI-compatible endpoint (set base_url)
     """
 
     model_config = SettingsConfigDict(env_prefix="LLM_")
 
-    provider: str = "openrouter"
-    model: str = "anthropic/claude-sonnet-4"
+    provider: str = "databricks"
+    model: str = "databricks-llama-4-maverick"
     api_key: SecretStr = SecretStr("")
     base_url: str | None = None
     use_structured_output: str = "auto"
@@ -51,14 +56,18 @@ class EmbeddingConfig(BaseSettings):
         openrouter          - OpenRouter API (default)
         openai              - Direct OpenAI API
         sentence-transformers - Local sentence-transformers model
-        databricks          - Mosaic AI / Databricks Model Serving
+        databricks          - Mosaic AI / Databricks Model Serving. `model` is
+                              a serving-endpoint name (e.g.,
+                              databricks-bge-large-en). `api_key` and
+                              `base_url` are IGNORED; auth is resolved by the
+                              Databricks SDK chain.
         custom              - Any OpenAI-compatible endpoint (set base_url)
     """
 
     model_config = SettingsConfigDict(env_prefix="EMBEDDING_")
 
-    provider: str = "openrouter"
-    model: str = "google/gemini-embedding-001"
+    provider: str = "databricks"
+    model: str = "databricks-bge-large-en"
     api_key: SecretStr = SecretStr("")
     base_url: str | None = None
     embeddable_labels: list[str] = [

@@ -5,6 +5,7 @@ from typing import Any
 import click
 
 from sema.cli_factories import (
+    DatabricksProviderAuthError,
     _get_embedder,
     _get_llm,
     _get_neo4j_driver,
@@ -121,10 +122,16 @@ def run_context(config: QueryConfig) -> dict[str, Any]:
     driver = _get_neo4j_driver(config.neo4j)
     try:
         embedder = _get_embedder(config.embedding)
+    except DatabricksProviderAuthError:
+        raise
     except Exception:
         embedder = None
 
-    engine = RetrievalEngine(driver=driver, embedder=embedder)
+    engine = RetrievalEngine(
+        driver=driver,
+        embedder=embedder,
+        embedder_model_name=config.embedding.model,
+    )
     candidate_set = engine.retrieve(config.question)
     sco = prune_to_sco(candidate_set, consumer=config.consumer)
 
