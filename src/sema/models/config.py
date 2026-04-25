@@ -133,9 +133,7 @@ class IngestDatabricksTargetConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="INGEST_DATABRICKS_")
 
     catalog: str = "workspace"
-    schemas: list[str] = Field(
-        default_factory=lambda: ["cbioportal", "ontology_omop", "vocabulary_omop"]
-    )
+    schemas: list[str] = Field(default_factory=list)
 
 
 class IngestOmopConfig(BaseSettings):

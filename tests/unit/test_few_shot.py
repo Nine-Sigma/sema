@@ -11,22 +11,22 @@ class TestFewShotStorage:
         from sema.engine.few_shot import get_examples
 
         examples = get_examples(domain="healthcare", stage="A")
-        assert len(examples) >= 3
-        assert len(examples) <= 5
+        assert len(examples) >= 5
+        assert len(examples) <= 12
 
     def test_lookup_healthcare_stage_b(self) -> None:
         from sema.engine.few_shot import get_examples
 
         examples = get_examples(domain="healthcare", stage="B")
-        assert len(examples) >= 8
-        assert len(examples) <= 12
+        assert len(examples) >= 12
+        assert len(examples) <= 25
 
     def test_lookup_healthcare_stage_c(self) -> None:
         from sema.engine.few_shot import get_examples
 
         examples = get_examples(domain="healthcare", stage="C")
-        assert len(examples) >= 6
-        assert len(examples) <= 10
+        assert len(examples) >= 8
+        assert len(examples) <= 18
 
     def test_unknown_domain_returns_empty(self) -> None:
         from sema.engine.few_shot import get_examples

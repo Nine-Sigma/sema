@@ -49,15 +49,15 @@ class TestFewShotFormatCompact:
         )
 
     def test_block_stays_under_token_budget(self) -> None:
-        """Stage B composed (generic + healthcare) must stay under 2100 tokens.
+        """Stage B composed (generic + healthcare) must stay under 3500 tokens.
 
-        Budget raised from the 1200 healthcare-only ceiling after adding the
-        8-example generic base layer. Target ~90 tokens/example at compact
-        JSON, 20 composed examples, plus framing.
+        Budget raised again after MSK CHORD expansion: lab/biomarker/procedure/
+        performance examples added 9 entries. ~30 composed examples × ~100
+        tokens compact + framing.
         """
         block = format_examples("healthcare", "B")
         approx_tokens = len(block) // 4
-        assert approx_tokens <= 2100, (
+        assert approx_tokens <= 3500, (
             f"Stage B few-shot block is {approx_tokens} tokens — "
-            f"budget is 2100."
+            f"budget is 3500."
         )

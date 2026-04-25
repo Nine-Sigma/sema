@@ -4,6 +4,12 @@ from pathlib import Path
 
 DEFAULT_SCHEMAS: tuple[str, ...] = ("cbioportal", "ontology_omop", "vocabulary_omop")
 
+KNOWN_SHARED_SCHEMAS: tuple[str, ...] = ("ontology_omop", "vocabulary_omop")
+
+SYSTEM_SCHEMAS: frozenset[str] = frozenset(
+    {"main", "information_schema", "pg_catalog", "_sema"}
+)
+
 
 def resolve_db_path(raw: str) -> Path:
     return Path(raw).expanduser()

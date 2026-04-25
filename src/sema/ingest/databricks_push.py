@@ -65,13 +65,20 @@ class Bridge:
         except Exception as exc:
             raise ConnectionError(f"Failed to connect to Databricks: {exc}") from exc
 
-    def ensure_schemas(self) -> None:
-        for schema in self._schemas:
+    def ensure_schemas(self, schemas: list[str] | None = None) -> None:
+        targets = schemas if schemas is not None else self._resolve_targets(None, False)
+        for schema in targets:
             self._execute(build_create_schema_sql(self._catalog, schema))
 
-    def push_schemas(self, schemas: list[str] | None = None) -> list[PushResult]:
-        self.ensure_schemas()
-        targets = schemas or self._schemas
+    def push_schemas(
+        self,
+        schemas: list[str] | None = None,
+        discover_all: bool = False,
+    ) -> list[PushResult]:
+        targets = self._resolve_targets(schemas, discover_all)
+        if not targets:
+            return []
+        self.ensure_schemas(schemas=targets)
         results: list[PushResult] = []
         failures: list[tuple[str, str, str]] = []
         for schema in targets:
@@ -79,6 +86,24 @@ class Bridge:
         if failures:
             raise PushError(failures)
         return results
+
+    def _resolve_targets(
+        self, explicit: list[str] | None, discover_all: bool
+    ) -> list[str]:
+        if explicit:
+            return list(dict.fromkeys(explicit))
+        if discover_all:
+            discovered = self._staging.list_all_schemas()
+            logger.warning(
+                "--discover-all-schemas: pushing every non-system DuckDB schema: {}",
+                ", ".join(discovered),
+            )
+        else:
+            discovered = self._staging.list_registered_schemas()
+        if self._schemas:
+            allowlist = set(self._schemas)
+            return [s for s in discovered if s in allowlist]
+        return discovered
 
     def _push_schema_collect(
         self, schema: str, failures: list[tuple[str, str, str]]

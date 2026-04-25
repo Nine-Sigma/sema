@@ -198,7 +198,7 @@ class TestFetchStudyFiles:
         study_dir.mkdir(parents=True)
         (study_dir / ".done").touch()
 
-        with patch("showcase.cbioportal_to_omop.parsers.urlopen") as mock_urlopen:
+        with patch("showcase.cbioportal_to_omop.cbioportal_fetch_utils.urlopen") as mock_urlopen:
             result = fetch_study_files("brca_tcga", cache_dir=cache)
             mock_urlopen.assert_not_called()
         assert result == study_dir
@@ -230,7 +230,7 @@ class TestFetchStudyFiles:
             download_responses.append(dl)
 
         urlopen_mock = MagicMock(side_effect=[api_resp, *download_responses])
-        with patch("showcase.cbioportal_to_omop.parsers.urlopen", urlopen_mock):
+        with patch("showcase.cbioportal_to_omop.cbioportal_fetch_utils.urlopen", urlopen_mock):
             result = fetch_study_files("brca_tcga", cache_dir=cache)
 
         downloaded = {p.name for p in result.iterdir() if p.is_file() and p.name != ".done"}

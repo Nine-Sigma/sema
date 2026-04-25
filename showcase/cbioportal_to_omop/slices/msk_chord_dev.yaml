@@ -1,0 +1,75 @@
+# MSK CHORD 2024 dev slice — 12 tables for iteration / regression.
+#
+# Schema reference: cbioportal_msk_chord_2024 (the namespaced staging schema
+# created by `sema ingest cbioportal msk_chord_2024`).
+#
+# This slice INCLUDES tables that appear in healthcare few-shot sources;
+# that is intentional — dev runs verify the pipeline reproduces the
+# patterns it has been taught. Holdout slice (msk_chord_holdout.yaml) is
+# disjoint from few-shot sources for unbiased eval.
+
+version: 1
+created: "2026-04-24"
+catalog: workspace
+schema: cbioportal_msk_chord_2024
+
+tables:
+  - table_name: patient
+    reason: "MSK CHORD demographics; baseline cross-study collapse target"
+    failure_mode: encoded_categorical
+    tier: sanity
+
+  - table_name: sample
+    reason: "Specimen-level biomarkers, MSI / TMB / cancer types"
+    failure_mode: mixed_semantic_types
+    tier: sanity
+
+  - table_name: mutation
+    reason: "Wide MAF table; multi-batch Stage B; large row count"
+    failure_mode: wide_table_batching
+    tier: stress
+
+  - table_name: structural_variant
+    reason: "SV/fusion calls; site1/site2 column structure"
+    failure_mode: abbreviation_ambiguity
+    tier: standard
+
+  - table_name: cna_segmented
+    reason: "Genomic-segment-level CNA from .seg file (new format)"
+    failure_mode: mixed_semantic_types
+    tier: standard
+
+  - table_name: gene_panel_matrix
+    reason: "Long-format sample×assay panel assignments (new shape)"
+    failure_mode: identifier_only
+    tier: standard
+
+  - table_name: timeline_labtest
+    reason: "Lab measurements with TEST/VALUE/UNITS — new few-shot family"
+    failure_mode: mixed_semantic_types
+    tier: standard
+
+  - table_name: timeline_surgery
+    reason: "Procedure events with PROCEDURE_CODE column"
+    failure_mode: encoded_categorical
+    tier: standard
+
+  - table_name: timeline_performance_status
+    reason: "ECOG / Karnofsky scores; ordinal decoding"
+    failure_mode: encoded_categorical
+    tier: standard
+
+  - table_name: timeline_treatment
+    reason: "Treatment events with agent / regimen vocabulary"
+    failure_mode: encoded_categorical
+    tier: standard
+
+  - table_name: timeline_imaging
+    reason: "Imaging timeline — date encoding, modality categoricals"
+    failure_mode: encoded_categorical
+    tier: standard
+
+  - table_name: timeline_status
+    reason: "Status changes — binary flags, encoded dates"
+    failure_mode: encoded_categorical
+    tier: standard

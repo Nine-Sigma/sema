@@ -8,6 +8,7 @@ import pytest
 
 from sema.ingest.databricks_push import Bridge, PushError, PushResult
 from sema.ingest.duckdb_staging import Staging
+from sema.ingest.study_registry import StudyRegistry
 from sema.models.config import (
     DatabricksConfig,
     IngestConfig,
@@ -60,7 +61,11 @@ def staging(tmp_path: Path) -> Staging:
 
 @pytest.mark.unit
 class TestBridgeProvisioning:
-    def test_ensure_schemas_issues_create_if_not_exists(self, staging: Staging) -> None:
+    def test_ensure_schemas_issues_create_for_registered_and_shared(
+        self, staging: Staging
+    ) -> None:
+        registry = StudyRegistry(staging)
+        registry.register("cbioportal_msk_chord_2024", "msk_chord_2024", "cbioportal")
         cursor = _mock_cursor()
         conn = _mock_connection(cursor)
         with patch("sema.ingest.databricks_push.sql_connect", return_value=conn):
@@ -68,7 +73,10 @@ class TestBridgeProvisioning:
             bridge.ensure_schemas()
 
         executed = [call.args[0] for call in cursor.execute.call_args_list]
-        assert any("CREATE SCHEMA IF NOT EXISTS `workspace`.`cbioportal`" in sql for sql in executed)
+        assert any(
+            "CREATE SCHEMA IF NOT EXISTS `workspace`.`cbioportal_msk_chord_2024`" in sql
+            for sql in executed
+        )
         assert any("CREATE SCHEMA IF NOT EXISTS `workspace`.`ontology_omop`" in sql for sql in executed)
         assert any("CREATE SCHEMA IF NOT EXISTS `workspace`.`vocabulary_omop`" in sql for sql in executed)
 

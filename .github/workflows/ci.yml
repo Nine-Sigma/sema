@@ -30,6 +30,13 @@ jobs:
             --cov-fail-under=85 \
             -q
 
+      - name: Verify holdout slice contamination
+        run: |
+          uv run python scripts/check_slice_contamination.py \
+            --holdout showcase/cbioportal_to_omop/slices/msk_chord_holdout.yaml \
+            --against showcase/cbioportal_to_omop/slices/contamination_map.yaml \
+            --against showcase/cbioportal_to_omop/slices/msk_chord_dev.yaml
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4

@@ -110,9 +110,9 @@ class TestParseGenePanelMatrix:
             "SAMPLE-2\tIMPACT410\tIMPACT410\tIMPACT410\n",
         )
         rows, types, _ = parse_gene_panel_matrix(path)
-        assert rows.num_rows == 2
-        assert "SAMPLE_ID" in rows.column_names
-        assert types["mutations"] == "VARCHAR"
+        assert set(rows.column_names) == {"sample_id", "panel_id", "assay"}
+        assert rows.num_rows == 6  # 2 samples × 3 assays
+        assert types["assay"] == "VARCHAR"
 
 
 class TestParseResourceFile:
