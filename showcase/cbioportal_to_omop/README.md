@@ -15,28 +15,66 @@ End-to-end demo of the sema pipeline:
 - `slices/dev_slice_poc.yaml` — 12-table subset matching the current Databricks POC ingest
 - `slices/holdout.yaml` — 10-table held-out slice for bias checks
 
-## Run from a source checkout
+## Multi-study workflow (post-namespacing, 2026-04-24)
+
+Each cBioPortal `study_id` produces its own DuckDB schema and own Databricks
+schema, named `cbioportal_<sanitized_study_id>`. The ingest path sanitizes,
+records the schema in `_sema_study_registry` (DuckDB), and is idempotent on
+re-ingest. Push (default) discovers schemas from the registry plus the
+known shared schemas (`ontology_omop`, `vocabulary_omop`); scratch schemas
+in DuckDB are NOT published unless `--discover-all-schemas` is set.
 
 ```bash
-# Step 1 — stage cBioPortal study into DuckDB
-uv run sema ingest cbioportal gbm_tcga_pan_can_atlas_2018 \
-    --cache-dir ~/.cache/sema/cbioportal \
-    --duckdb-path ./poc.duckdb
+# Step 1a — stage two cBioPortal studies into DuckDB (each lands in its own schema)
+PYTHONPATH=. uv run sema ingest cbioportal gbm_tcga_pan_can_atlas_2018 \
+    --cache-dir ~/.sema/cache/cbioportal \
+    --duckdb-path ~/.sema/poc.duckdb
+PYTHONPATH=. uv run sema ingest cbioportal msk_chord_2024 \
+    --cache-dir ~/.sema/cache/cbioportal \
+    --duckdb-path ~/.sema/poc.duckdb
 
-# Step 2 — push to Databricks (requires DATABRICKS_* env)
-uv run sema push --target databricks --duckdb-path ./poc.duckdb
+# Step 1b — OMOP CDM + vocabulary
+uv run sema ingest omop --vocab-path ~/data/omop/athena_2026_04
 
-# Step 3 — run the staged L2 pipeline against the catalog
+# Step 2 — push to Databricks. Default mode discovers from
+# `_sema_study_registry` ∪ {ontology_omop, vocabulary_omop}; both study
+# schemas land alongside the shared ontology/vocab schemas.
+uv run sema push --target databricks --duckdb-path ~/.sema/poc.duckdb
+
+# Step 3 — run the staged L2 pipeline against ONE study's catalog
 uv run sema build \
-    --catalog workspace --schemas cbioportal_omop \
-    --domain healthcare \
-    --table-workers 1 --skip-embeddings --verbose
+    --catalog workspace --schemas cbioportal_msk_chord_2024 \
+    --domain healthcare --table-workers 1 --skip-embeddings --verbose
 
-# Step 4 — evaluate against a slice
+# Step 4 — evaluate against a slice (slice file references the namespaced schema)
 uv run sema eval run \
-    --slice showcase/cbioportal_to_omop/slices/dev_slice_poc.yaml \
-    --label post-showcase-refactor \
-    --output-dir eval-runs/post-showcase-refactor
+    --slice showcase/cbioportal_to_omop/slices/msk_chord_dev.yaml \
+    --label baseline-A \
+    --output-dir eval-runs/msk-chord-baseline-A
+```
+
+### Scoped re-build per study
+
+Each `sema build --schemas X` run begins with a scoped-delete that removes
+every relationship stamped with `source_schema = X` plus `:Assertion` and
+`:JoinPath` nodes whose `source_schema = X`. Other studies' assertions and
+provenance edges are untouched; shared concept and physical nodes are
+never deleted. Re-running BRCA(GBM) does not affect MSK CHORD's slice of
+the graph, and vice versa.
+
+### Legacy schema deprecation
+
+The flat `workspace.cbioportal` schema (pre-2026-04-24) is **deprecated**
+and tagged with a `COMMENT ON SCHEMA` describing the migration. Its
+contents (GBM TCGA Pan-Can Atlas 2018) live at
+`workspace.cbioportal_gbm_tcga_pan_can_atlas_2018` post-migration. The
+flat schema will be dropped in a follow-up change after a one-milestone
+deprecation window. To migrate a local DuckDB staging file, run:
+
+```bash
+uv run python scripts/migrate_cbioportal_to_namespaced.py \
+    --duckdb-path ~/.sema/poc.duckdb \
+    --study-id gbm_tcga_pan_can_atlas_2018
 ```
 
 ## Packaging note

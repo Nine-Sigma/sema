@@ -9,11 +9,13 @@
 #
 # Version log:
 #   v1 (2026-04-13): Initial selection based on known cBioPortal GENIE corpus.
+#   v2 (2026-04-24): namespaced schema migration — schema renamed from
+#     `cbioportal` to `cbioportal_gbm_tcga_pan_can_atlas_2018`.
 
-version: 1
-created: "2026-04-13"
+version: 2
+created: "2026-04-24"
 catalog: unity
-schema: cbioportal
+schema: cbioportal_gbm_tcga_pan_can_atlas_2018
 
 tables:
   - table_name: patient

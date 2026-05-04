@@ -1,5 +1,6 @@
 # Dev Slice POC — matches current Databricks ingest from
-# gbm_tcga_pan_can_atlas_2018 (12 tables in workspace.cbioportal).
+# gbm_tcga_pan_can_atlas_2018 (12 tables in
+# workspace.cbioportal_gbm_tcga_pan_can_atlas_2018, post-namespacing).
 #
 # Covers 9 of the 13 tables in the original eval/dev_slice.yaml spec
 # plus 3 extras (timeline_*, clinical_supp_hypoxia, resource_patient
@@ -10,11 +11,13 @@
 #     (patient/sample/mutation/3 timelines) to gbm_tcga_pan_can_atlas_2018
 #     (adds structural_variant, cna, gene_panel_matrix,
 #     resource_definition, resource_patient, clinical_supp_hypoxia).
+#   v3 (2026-04-24): namespaced schema migration — schema renamed from
+#     `cbioportal` to `cbioportal_gbm_tcga_pan_can_atlas_2018`.
 
-version: 2
-created: "2026-04-19"
+version: 3
+created: "2026-04-24"
 catalog: workspace
-schema: cbioportal
+schema: cbioportal_gbm_tcga_pan_can_atlas_2018
 
 tables:
   - table_name: patient

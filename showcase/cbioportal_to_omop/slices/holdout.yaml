@@ -10,12 +10,14 @@
 #
 # Version log:
 #   v1 (2026-04-13): Initial selection. Frozen before Step 3 (domain-aware prompts).
+#   v2 (2026-04-24): namespaced schema migration — schema renamed from
+#     `cbioportal` to `cbioportal_gbm_tcga_pan_can_atlas_2018`. Table list unchanged.
 
-version: 1
-created: "2026-04-13"
+version: 2
+created: "2026-04-24"
 frozen_before_step: 3
 catalog: unity
-schema: cbioportal
+schema: cbioportal_gbm_tcga_pan_can_atlas_2018
 
 tables:
   - table_name: resource_patient

@@ -44,8 +44,8 @@ tables:
     failure_mode: identifier_only
     tier: standard
 
-  - table_name: timeline_labtest
-    reason: "Lab measurements with TEST/VALUE/UNITS — new few-shot family"
+  - table_name: timeline_cea_labs
+    reason: "CEA lab measurements with TEST/VALUE/UNITS — new few-shot family"
     failure_mode: mixed_semantic_types
     tier: standard
 
@@ -64,12 +64,12 @@ tables:
     failure_mode: encoded_categorical
     tier: standard
 
-  - table_name: timeline_imaging
-    reason: "Imaging timeline — date encoding, modality categoricals"
+  - table_name: timeline_specimen
+    reason: "Specimen collection timeline — encoded dates, sample-of-collection"
     failure_mode: encoded_categorical
     tier: standard
 
-  - table_name: timeline_status
-    reason: "Status changes — binary flags, encoded dates"
+  - table_name: timeline_progression
+    reason: "Disease progression events — date encoding, status flags"
     failure_mode: encoded_categorical
     tier: standard

@@ -163,8 +163,22 @@ class TestTimelineParsing:
         assert set(kinds.keys()) == {"treatment", "status"}
         assert "timeline_treatment" not in kinds
 
+    def test_iter_timeline_files_accepts_hyphen_in_kind(self, tmp_path: Path) -> None:
+        _write(tmp_path / "data_timeline_ca_15-3_labs.txt", "PATIENT_ID\n")
+        _write(tmp_path / "data_timeline_ca_19-9_labs.txt", "PATIENT_ID\n")
+
+        kinds = {kind for kind, _ in iter_timeline_files(tmp_path)}
+        assert kinds == {"ca_15-3_labs", "ca_19-9_labs"}
+
     def test_iter_timeline_files_returns_empty_when_no_files(self, tmp_path: Path) -> None:
         assert list(iter_timeline_files(tmp_path)) == []
+
+    def test_timeline_table_name_sanitizes_hyphen(self) -> None:
+        from showcase.cbioportal_to_omop.parsers import timeline_table_name
+
+        assert timeline_table_name("treatment") == "timeline_treatment"
+        assert timeline_table_name("ca_15-3_labs") == "timeline_ca_15_3_labs"
+        assert timeline_table_name("ca_19-9_labs") == "timeline_ca_19_9_labs"
 
 
 @pytest.mark.unit

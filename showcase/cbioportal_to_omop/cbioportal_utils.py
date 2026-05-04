@@ -94,7 +94,7 @@ SKIP_FILENAME_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^data_rppa.*\.txt$"),
 )
 
-TIMELINE_PATTERN = re.compile(r"^data_timeline_(?P<kind>[a-zA-Z0-9_]+)\.txt$")
+TIMELINE_PATTERN = re.compile(r"^data_timeline_(?P<kind>[a-zA-Z0-9_-]+)\.txt$")
 
 
 @dataclass
@@ -232,6 +232,27 @@ def _identify_cna_gene_columns(header: list[str]) -> dict[str, int]:
 
 def open_text_defensive(path: Path) -> IO[str]:
     return path.open("r", encoding="utf-8", errors="replace")
+
+
+def dedupe_header_case_insensitive(header: list[str]) -> list[str]:
+    """Suffix duplicate column names so DuckDB's case-insensitive identifier
+    rule does not reject the CREATE TABLE.
+
+    cBioPortal MAF files in some studies (e.g. MSK CHORD 2024) ship with
+    case-variant duplicates such as `Comments` / `comments`. The first
+    occurrence keeps its original casing; subsequent collisions append
+    `_2`, `_3`, etc., based on lower-cased identity.
+    """
+    seen: dict[str, int] = {}
+    deduped: list[str] = []
+    for name in header:
+        key = name.lower()
+        seen[key] = seen.get(key, 0) + 1
+        if seen[key] == 1:
+            deduped.append(name)
+        else:
+            deduped.append(f"{name}_{seen[key]}")
+    return deduped
 
 
 def read_tsv_rows(

@@ -161,7 +161,7 @@ class TestIngestStudyDirDispatchesSeg:
             db_path=str(tmp_path / "db.duckdb"),
             schemas=("cbioportal",),
         )
-        _ingest_study_dir("msk_chord", study_dir, staging)
+        _ingest_study_dir("msk_chord", study_dir, staging, schema_name="cbioportal")
         info = staging.describe("cbioportal", "cna_segmented")
         assert "sample_id" in info.columns
         assert "seg_mean" in info.columns
@@ -183,7 +183,7 @@ class TestIngestStudyDirDispatchesSeg:
             db_path=str(tmp_path / "db.duckdb"),
             schemas=("cbioportal",),
         )
-        _ingest_study_dir("msk_chord", study_dir, staging)
+        _ingest_study_dir("msk_chord", study_dir, staging, schema_name="cbioportal")
         info = staging.describe("cbioportal", "timeline_labtest")
         assert info.columns["VALUE"].type.upper().startswith("DOUB")
         staging.close()
@@ -216,7 +216,7 @@ class TestRoundTripMixedFiles:
             db_path=str(tmp_path / "rt.duckdb"),
             schemas=("cbioportal",),
         )
-        _ingest_study_dir("msk", study_dir, staging)
+        _ingest_study_dir("msk", study_dir, staging, schema_name="cbioportal")
 
         for tbl in ("cna_segmented", "gene_panel_matrix", "timeline_labtest"):
             info = staging.describe("cbioportal", tbl)

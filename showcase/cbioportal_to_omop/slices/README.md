@@ -7,9 +7,9 @@ schema for the eval runner.
 
 | File | Schema | Role |
 |---|---|---|
-| `dev_slice.yaml` | `cbioportal_brca_tcga_pan_can_atlas_2018` (post-Phase 2) | Original BRCA dev slice |
-| `dev_slice_poc.yaml` | `cbioportal_brca_tcga_pan_can_atlas_2018` (post-Phase 2) | BRCA POC regression-guard slice — small, cheap, run on every change |
-| `holdout.yaml` | `cbioportal_brca_tcga_pan_can_atlas_2018` (post-Phase 2) | Original BRCA holdout |
+| `dev_slice.yaml` | `cbioportal_gbm_tcga_pan_can_atlas_2018` (post-Phase 2) | Original BRCA dev slice |
+| `dev_slice_poc.yaml` | `cbioportal_gbm_tcga_pan_can_atlas_2018` (post-Phase 2) | BRCA POC regression-guard slice — small, cheap, run on every change |
+| `holdout.yaml` | `cbioportal_gbm_tcga_pan_can_atlas_2018` (post-Phase 2) | Original BRCA holdout |
 | `msk_chord_dev.yaml` | `cbioportal_msk_chord_2024` | MSK CHORD 2024 dev slice (12 tables) — overlaps with few-shots intentionally |
 | `msk_chord_holdout.yaml` | `cbioportal_msk_chord_2024` | MSK CHORD 2024 holdout (9 tables) — disjoint from few-shot sources + dev |
 | `contamination_map.yaml` | n/a | Lists every table referenced by a few-shot example. Holdouts MUST NOT include any of these. |
