@@ -47,6 +47,7 @@ def _mock_connection(cursor: MagicMock) -> MagicMock:
 @pytest.fixture
 def staging(tmp_path: Path) -> Staging:
     s = Staging(str(tmp_path / "bridge.duckdb"))
+    s.execute('CREATE SCHEMA IF NOT EXISTS "cbioportal"')
     rows = pa.table({"patient_id": ["P-1", "P-2"], "age": [40, 50]})
     s.write_table(
         schema="cbioportal",
@@ -175,6 +176,7 @@ class TestCopyIntoRouting:
 class TestPushSchemasErrorHandling:
     def test_one_table_failure_continues_with_others(self, tmp_path: Path) -> None:
         staging = Staging(str(tmp_path / "errors.duckdb"))
+        staging.execute('CREATE SCHEMA IF NOT EXISTS "cbioportal"')
         for name in ["patient", "sample"]:
             staging.write_table(
                 schema="cbioportal",

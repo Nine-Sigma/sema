@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-DEFAULT_SCHEMAS: tuple[str, ...] = ("cbioportal", "ontology_omop", "vocabulary_omop")
+DEFAULT_SCHEMAS: tuple[str, ...] = ("ontology_omop", "vocabulary_omop")
 
 KNOWN_SHARED_SCHEMAS: tuple[str, ...] = ("ontology_omop", "vocabulary_omop")
 

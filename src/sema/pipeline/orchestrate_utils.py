@@ -15,6 +15,16 @@ from sema.cli_factories import (
     _get_embedder,
     _get_neo4j_driver,
 )
+from sema.engine.join_detector import JoinDetector, to_fk_assertion
+from sema.engine.join_detector_utils import (
+    enumerate_candidates_from_metadata,
+)
+from sema.engine.warehouse_lookup import (
+    WarehouseProfileLookup,
+    WarehouseSampler,
+)
+from sema.graph.join_materializer import materialize_join_paths
+from sema.graph.loader_utils import fetch_columns_by_schema
 from sema.models.config import (
     BuildConfig,
     QueryConfig,
@@ -295,6 +305,74 @@ def _embed_label_nodes(
                     match_value=node[key_spec],
                     embedding=emb_list,
                 )
+
+
+def run_fk_detection(
+    loader: Any,
+    connector: Any,
+    config: BuildConfig,
+    schemas: list[str],
+    run_id: str,
+) -> None:
+    """Detect FK candidates per schema and materialize JoinPaths.
+
+    Skips entirely when `enable_fk_detection=False`. Threshold derives
+    from `materialize_structural_fk` (0.70 if opt-in, else 0.80) so
+    Tier-3 structural-only matches stay gated by an explicit user flag.
+    The detector receives a lazy `sampler` (Tier 1 sample-set
+    verification) and a pre-built `profiles` dict for candidate columns
+    (Tier 2 cardinality verification).
+    """
+    if not config.enable_fk_detection:
+        return
+    detector = JoinDetector(
+        materialization_threshold=config.fk_materialization_threshold,
+    )
+    sampler = WarehouseSampler(
+        query_fn=connector._execute, catalog=config.catalog,
+    )
+    profile_lookup = WarehouseProfileLookup(
+        query_fn=connector._execute, catalog=config.catalog,
+    )
+    for schema in schemas:
+        columns = fetch_columns_by_schema(loader, schema)
+        if not columns:
+            continue
+        profiles = _prebuild_profiles_for_candidates(
+            columns, profile_lookup,
+        )
+        fks = detector.detect(
+            columns=columns, source_schema=schema,
+            profiles=profiles, sampler=sampler,
+        )
+        keep = [fk for fk in fks if detector.should_materialize(fk)]
+        if not keep:
+            continue
+        assertions = [to_fk_assertion(fk, run_id) for fk in keep]
+        groups = {
+            (a.subject_ref, a.predicate.value): [a]
+            for a in assertions
+        }
+        materialize_join_paths(
+            loader, groups, source_schema=schema,
+        )
+
+
+def _prebuild_profiles_for_candidates(
+    columns: list[Any],
+    profile_lookup: Any,
+) -> dict[tuple[str, str, str], tuple[int, int]]:
+    candidates = enumerate_candidates_from_metadata(columns)
+    keys: set[tuple[str, str, str]] = set()
+    for c in candidates:
+        keys.add((c.schema_name, c.pk_table, c.pk_column))
+        keys.add((c.schema_name, c.fk_table, c.fk_column))
+    profiles: dict[tuple[str, str, str], tuple[int, int]] = {}
+    for key in keys:
+        stats = profile_lookup(key)
+        if stats is not None:
+            profiles[key] = stats
+    return profiles
 
 
 def _retrieve_context(config: QueryConfig) -> Any:

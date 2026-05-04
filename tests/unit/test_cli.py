@@ -99,6 +99,55 @@ class TestBuildCommand:
             call_config = mock_build.call_args[0][0]
             assert call_config.catalog == "override"
 
+    def test_build_fk_detection_default_on(self, runner):
+        with patch("sema.cli.run_build") as mock_build:
+            mock_build.return_value = {
+                "tables_processed": 0, "entities_created": 0,
+                "properties_created": 0, "value_sets_created": 0,
+                "terms_created": 0, "joins_inferred": 0,
+                "confidence_distribution": {},
+            }
+            result = runner.invoke(cli, [
+                "build", "--source", "databricks", "--catalog", "test",
+            ])
+            assert result.exit_code == 0
+            call_config = mock_build.call_args[0][0]
+            assert call_config.enable_fk_detection is True
+            assert call_config.materialize_structural_fk is False
+
+    def test_build_no_enable_fk_detection_flag(self, runner):
+        with patch("sema.cli.run_build") as mock_build:
+            mock_build.return_value = {
+                "tables_processed": 0, "entities_created": 0,
+                "properties_created": 0, "value_sets_created": 0,
+                "terms_created": 0, "joins_inferred": 0,
+                "confidence_distribution": {},
+            }
+            result = runner.invoke(cli, [
+                "build", "--source", "databricks", "--catalog", "test",
+                "--no-enable-fk-detection",
+            ])
+            assert result.exit_code == 0
+            call_config = mock_build.call_args[0][0]
+            assert call_config.enable_fk_detection is False
+
+    def test_build_materialize_structural_fk_flag(self, runner):
+        with patch("sema.cli.run_build") as mock_build:
+            mock_build.return_value = {
+                "tables_processed": 0, "entities_created": 0,
+                "properties_created": 0, "value_sets_created": 0,
+                "terms_created": 0, "joins_inferred": 0,
+                "confidence_distribution": {},
+            }
+            result = runner.invoke(cli, [
+                "build", "--source", "databricks", "--catalog", "test",
+                "--materialize-structural-fk",
+            ])
+            assert result.exit_code == 0
+            call_config = mock_build.call_args[0][0]
+            assert call_config.materialize_structural_fk is True
+            assert call_config.fk_materialization_threshold == 0.70
+
 
 class TestContextCommand:
     def test_context_produces_sco_json(self, runner):

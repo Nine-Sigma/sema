@@ -392,12 +392,16 @@ def _commit_and_materialize(
         f"[{work_item.table_name}] Committing "
         f"{len(all_assertions)} assertions..."
     )
-    loader.commit_table_assertions(all_assertions)
+    loader.commit_table_assertions(
+        all_assertions, source_schema=work_item.schema,
+    )
     logger.info(
         f"[{work_item.table_name}] Materializing graph..."
     )
     from sema.graph.materializer import materialize_unified
-    materialize_unified(loader, all_assertions)
+    materialize_unified(
+        loader, all_assertions, source_schema=work_item.schema,
+    )
     logger.info(
         f"[{work_item.table_name}] Done"
     )

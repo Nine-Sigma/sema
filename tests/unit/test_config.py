@@ -187,6 +187,21 @@ class TestBuildConfig:
         config = BuildConfig.from_file(str(config_file), overrides={"catalog": "override_catalog"})
         assert config.catalog == "override_catalog"
 
+    def test_fk_detection_defaults_on(self):
+        config = BuildConfig()
+        assert config.enable_fk_detection is True
+        assert config.materialize_structural_fk is False
+
+    def test_fk_materialization_threshold_default_080(self):
+        config = BuildConfig()
+        assert config.fk_materialization_threshold == 0.80
+
+    def test_fk_materialization_threshold_drops_to_070_when_structural_opt_in(
+        self,
+    ):
+        config = BuildConfig(materialize_structural_fk=True)
+        assert config.fk_materialization_threshold == 0.70
+
 
 class TestQueryConfig:
     def test_defaults(self):

@@ -101,6 +101,9 @@ class BuildConfig(BaseSettings):
     enable_few_shot: bool = True
     enable_stage_c: bool = True
 
+    enable_fk_detection: bool = True
+    materialize_structural_fk: bool = False
+
     eval_dump_dir: str | None = None
     eval_config_label: str = "run"
     slice_tables: list[str] = []
@@ -119,6 +122,10 @@ class BuildConfig(BaseSettings):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     profiling: ProfilingConfig = Field(default_factory=ProfilingConfig)
+
+    @property
+    def fk_materialization_threshold(self) -> float:
+        return 0.70 if self.materialize_structural_fk else 0.80
 
     @classmethod
     def from_file(cls, path: str, overrides: dict[str, Any] | None = None) -> BuildConfig:
