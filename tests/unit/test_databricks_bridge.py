@@ -220,3 +220,82 @@ class TestRowCountVerification:
         assert result.rows_pushed == 2
         assert result.target_count == 99
         assert result.count_mismatch is True
+
+
+@pytest.mark.unit
+class TestUcVolumeDetection:
+    def test_is_uc_volume_path_true_for_volumes_prefix(self) -> None:
+        from sema.ingest.databricks_push_utils import is_uc_volume_path
+
+        assert is_uc_volume_path("/Volumes/workspace/default/sema_staging") is True
+        assert is_uc_volume_path("/Volumes/workspace/default/sema_staging/") is True
+
+    def test_is_uc_volume_path_false_for_other_uris(self) -> None:
+        from sema.ingest.databricks_push_utils import is_uc_volume_path
+
+        assert is_uc_volume_path("file:///tmp/foo") is False
+        assert is_uc_volume_path("s3://bucket/key") is False
+        assert is_uc_volume_path("/tmp/foo") is False
+        assert is_uc_volume_path("dbfs:/tmp/foo") is False
+
+
+@pytest.mark.unit
+class TestSizeBasedRouting:
+    def test_route_via_copy_into_when_above_threshold(self) -> None:
+        from sema.ingest.databricks_push_utils import (
+            COPY_INTO_ROW_THRESHOLD,
+            should_route_via_copy_into,
+        )
+
+        assert should_route_via_copy_into(
+            "cbioportal_msk_chord_2024", "cna",
+            row_count=COPY_INTO_ROW_THRESHOLD,
+        ) is True
+
+    def test_no_copy_into_when_below_threshold_and_not_in_allowlist(self) -> None:
+        from sema.ingest.databricks_push_utils import should_route_via_copy_into
+
+        assert should_route_via_copy_into(
+            "cbioportal_msk_chord_2024", "patient", row_count=24_950,
+        ) is False
+
+    def test_allowlist_entries_route_regardless_of_row_count(self) -> None:
+        from sema.ingest.databricks_push_utils import should_route_via_copy_into
+
+        assert should_route_via_copy_into(
+            "vocabulary_omop", "concept_ancestor", row_count=0,
+        ) is True
+
+
+@pytest.mark.unit
+class TestUcVolumeUpload:
+    def test_uc_volume_uri_uploads_via_workspace_client(self, tmp_path: Path) -> None:
+        staging = Staging(str(tmp_path / "uc.duckdb"))
+        staging.execute('CREATE SCHEMA IF NOT EXISTS "cbioportal_msk_chord_2024"')
+        rows = pa.table({"id": list(range(150_000))})
+        staging.write_table(
+            schema="cbioportal_msk_chord_2024",
+            table="cna",
+            rows=rows,
+            column_types={"id": "INTEGER"},
+            column_comments={},
+            table_comment=None,
+        )
+        cursor = _mock_cursor()
+        cursor.fetchone.return_value = (150_000,)
+        conn = _mock_connection(cursor)
+
+        ws_client = MagicMock()
+        with patch("sema.ingest.databricks_push.sql_connect", return_value=conn), \
+             patch("sema.ingest.databricks_push.WorkspaceClient", return_value=ws_client):
+            cfg = _config(cloud_uri="/Volumes/workspace/default/sema_staging")
+            bridge = Bridge(cfg, staging=staging)
+            result = bridge.push_table("cbioportal_msk_chord_2024", "cna")
+
+        assert result.mechanism == "copy_into"
+        assert ws_client.files.upload.call_count == 1
+        upload_kwargs = ws_client.files.upload.call_args.kwargs
+        assert upload_kwargs["file_path"].startswith(
+            "/Volumes/workspace/default/sema_staging/cbioportal_msk_chord_2024/cna/"
+        )
+        assert upload_kwargs["overwrite"] is True

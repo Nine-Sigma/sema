@@ -10,6 +10,8 @@ COPY_INTO_TABLES: frozenset[tuple[str, str]] = frozenset(
     }
 )
 
+COPY_INTO_ROW_THRESHOLD = 100_000
+
 DUCKDB_TO_DATABRICKS_TYPE: dict[str, str] = {
     "INTEGER": "INT",
     "BIGINT": "BIGINT",
@@ -43,8 +45,16 @@ def duckdb_to_databricks_type(duckdb_type: str) -> str:
     return DUCKDB_TO_DATABRICKS_TYPE.get(base, "STRING")
 
 
-def should_route_via_copy_into(schema: str, table: str) -> bool:
-    return (schema.lower(), table.lower()) in COPY_INTO_TABLES
+def should_route_via_copy_into(
+    schema: str, table: str, row_count: int = 0,
+) -> bool:
+    if (schema.lower(), table.lower()) in COPY_INTO_TABLES:
+        return True
+    return row_count >= COPY_INTO_ROW_THRESHOLD
+
+
+def is_uc_volume_path(uri: str) -> bool:
+    return uri.startswith("/Volumes/")
 
 
 def build_create_schema_sql(catalog: str, schema: str) -> str:

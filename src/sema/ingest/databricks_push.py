@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
 from urllib.parse import urlparse
 
 from databricks import sql as databricks_sql
+from databricks.sdk import WorkspaceClient
 
 from sema.ingest.databricks_push_utils import (
     build_copy_into_sql,
@@ -17,6 +19,7 @@ from sema.ingest.databricks_push_utils import (
     copy_into_staging_path,
     duckdb_to_databricks_type,
     format_sql_value,
+    is_uc_volume_path,
     should_route_via_copy_into,
 )
 from sema.ingest.duckdb_staging import Staging
@@ -137,7 +140,9 @@ class Bridge:
         return result
 
     def _dispatch_push(self, schema: str, table: str) -> tuple[str, int]:
-        if should_route_via_copy_into(schema, table) and self._cloud_uri:
+        row_count = self._count_source_rows(schema, table)
+        wants_copy = should_route_via_copy_into(schema, table, row_count)
+        if wants_copy and self._cloud_uri:
             try:
                 return "copy_into", self._push_via_copy_into(schema, table)
             except Exception as exc:
@@ -145,12 +150,19 @@ class Bridge:
                     "COPY INTO failed for {}.{}: {}; falling back to INSERT",
                     schema, table, exc,
                 )
-        if should_route_via_copy_into(schema, table) and not self._cloud_uri:
+        if wants_copy and not self._cloud_uri:
             logger.warning(
-                "No cloud_staging_uri configured; {}.{} will be loaded via INSERT (slow).",
-                schema, table,
+                "No cloud_staging_uri configured; {}.{} ({} rows) will be loaded "
+                "via INSERT (slow).",
+                schema, table, row_count,
             )
         return "insert", self._push_via_insert(schema, table)
+
+    def _count_source_rows(self, schema: str, table: str) -> int:
+        row = self._staging.execute(
+            f'SELECT COUNT(*) FROM "{schema}"."{table}"'
+        ).fetchone()
+        return int(row[0]) if row else 0
 
     def _recreate_target_table(self, schema: str, table: str) -> None:
         info = self._staging.describe(schema, table)
@@ -209,19 +221,44 @@ class Bridge:
 
     def _export_to_parquet(self, schema: str, table: str, staging_uri: str) -> int:
         target_dir = copy_into_staging_path(staging_uri, schema, table)
+        source = f'"{schema}"."{table}"'
+        if is_uc_volume_path(staging_uri):
+            return self._export_via_volume_upload(source, target_dir)
         local_dir = _local_path_for_uri(target_dir)
         if local_dir is not None:
             local_dir.mkdir(parents=True, exist_ok=True)
             duckdb_target = str(local_dir / "data.parquet")
         else:
             duckdb_target = target_dir.rstrip("/") + "/data.parquet"
-        source = f'"{schema}"."{table}"'
         escaped_target = duckdb_target.replace("'", "''")
         self._staging.execute(
             f"COPY (SELECT * FROM {source}) TO '{escaped_target}' (FORMAT 'parquet')"
         )
         row = self._staging.execute(f"SELECT COUNT(*) FROM {source}").fetchone()
         return int(row[0]) if row else 0
+
+    def _export_via_volume_upload(self, source: str, target_dir: str) -> int:
+        with tempfile.TemporaryDirectory() as tmp:
+            local_parquet = Path(tmp) / "data.parquet"
+            escaped_local = str(local_parquet).replace("'", "''")
+            self._staging.execute(
+                f"COPY (SELECT * FROM {source}) TO '{escaped_local}' (FORMAT 'parquet')"
+            )
+            row = self._staging.execute(f"SELECT COUNT(*) FROM {source}").fetchone()
+            row_count = int(row[0]) if row else 0
+            volume_path = target_dir.rstrip("/") + "/data.parquet"
+            with open(local_parquet, "rb") as fh:
+                self._workspace_client().files.upload(
+                    file_path=volume_path,
+                    contents=fh,
+                    overwrite=True,
+                )
+            return row_count
+
+    def _workspace_client(self) -> WorkspaceClient:
+        creds = self._config.databricks_creds
+        host = creds.host if creds.host.startswith("http") else f"https://{creds.host}"
+        return WorkspaceClient(host=host, token=creds.token.get_secret_value())
 
     def _count_target(self, schema: str, table: str) -> int:
         cursor = self._cursor()
