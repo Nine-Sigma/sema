@@ -162,7 +162,7 @@ class GraphLoader:
     def upsert_entity(
         self, name: str, description: str | None, source: str,
         confidence: float, table_name: str, schema_name: str,
-        catalog: str,
+        catalog: str, source_schema: str | None = None,
     ) -> None:
         id_ = str(uuid.uuid4())
         self._run(
@@ -174,23 +174,25 @@ class GraphLoader:
             "WITH e "
             "MERGE (t:Table {name: $table_name, "
             "schema_name: $schema_name, catalog: $catalog}) "
-            "MERGE (e)-[:ENTITY_ON_TABLE]->(t)",
+            "MERGE (e)-[link:ENTITY_ON_TABLE "
+            "{source_schema: $source_schema}]->(t)",
             name=name, description=description, source=source,
             confidence=confidence,
             resolved_at=datetime.now(timezone.utc).isoformat(),
             table_name=table_name, schema_name=schema_name,
-            catalog=catalog, id=id_,
+            catalog=catalog, id=id_, source_schema=source_schema,
         )
 
     def upsert_property(
         self, name: str, semantic_type: str, source: str,
         confidence: float, entity_name: str, column_name: str,
         table_name: str, schema_name: str, catalog: str,
+        source_schema: str | None = None,
     ) -> None:
         id_ = str(uuid.uuid4())
         self._run(
-            "MERGE (p:Property {name: $name, "
-            "entity_name: $entity_name}) "
+            "MERGE (p:Property {entity_name: $entity_name, "
+            "name: $name}) "
             "ON CREATE SET p.id = $id "
             "SET p.semantic_type = $semantic_type, "
             "p.source = $source, "
@@ -198,18 +200,20 @@ class GraphLoader:
             "p.resolved_at = $resolved_at "
             "WITH p "
             "MERGE (e:Entity {name: $entity_name}) "
-            "MERGE (e)-[:HAS_PROPERTY]->(p) "
+            "MERGE (e)-[hp:HAS_PROPERTY "
+            "{source_schema: $source_schema}]->(p) "
             "WITH p "
             "MERGE (c:Column {name: $column_name, "
             "table_name: $table_name, "
             "schema_name: $schema_name, catalog: $catalog}) "
-            "MERGE (p)-[:PROPERTY_ON_COLUMN]->(c)",
+            "MERGE (p)-[poc:PROPERTY_ON_COLUMN "
+            "{source_schema: $source_schema}]->(c)",
             name=name, semantic_type=semantic_type, source=source,
             confidence=confidence,
             resolved_at=datetime.now(timezone.utc).isoformat(),
             entity_name=entity_name, column_name=column_name,
             table_name=table_name, schema_name=schema_name,
-            catalog=catalog, id=id_,
+            catalog=catalog, id=id_, source_schema=source_schema,
         )
 
     def upsert_term(
@@ -232,62 +236,89 @@ class GraphLoader:
     def upsert_value_set(
         self, name: str, column_name: str, table_name: str,
         schema_name: str, catalog: str,
+        source_schema: str | None = None,
+        column_ref: str | None = None,
     ) -> None:
         id_ = str(uuid.uuid4())
+        ref = column_ref or (
+            f"{catalog}.{schema_name}.{table_name}.{column_name}"
+        )
         self._run(
-            "MERGE (vs:ValueSet {name: $name}) "
+            "MERGE (vs:ValueSet {column_ref: $column_ref}) "
             "ON CREATE SET vs.id = $id "
+            "SET vs.name = $name "
             "WITH vs "
             "MERGE (c:Column {name: $column_name, "
             "table_name: $table_name, "
             "schema_name: $schema_name, catalog: $catalog}) "
-            "MERGE (c)-[:HAS_VALUE_SET]->(vs)",
+            "MERGE (c)-[hvs:HAS_VALUE_SET "
+            "{source_schema: $source_schema}]->(vs)",
             name=name, column_name=column_name,
             table_name=table_name, schema_name=schema_name,
-            catalog=catalog, id=id_,
+            catalog=catalog, id=id_, column_ref=ref,
+            source_schema=source_schema,
         )
 
     def add_term_to_value_set(
         self, term_code: str, value_set_name: str,
+        source_schema: str | None = None,
     ) -> None:
         self._run(
             "MERGE (t:Term {code: $term_code}) "
             "MERGE (vs:ValueSet {name: $value_set_name}) "
-            "MERGE (t)-[:MEMBER_OF]->(vs)",
+            "MERGE (t)-[m:MEMBER_OF "
+            "{source_schema: $source_schema}]->(vs)",
             term_code=term_code, value_set_name=value_set_name,
+            source_schema=source_schema,
         )
 
     def add_term_hierarchy(
         self, parent_code: str, child_code: str,
+        source_schema: str | None = None,
     ) -> None:
         self._run(
             "MERGE (p:Term {code: $parent_code}) "
             "MERGE (c:Term {code: $child_code}) "
-            "MERGE (p)-[:PARENT_OF]->(c)",
+            "MERGE (p)-[po:PARENT_OF "
+            "{source_schema: $source_schema}]->(c)",
             parent_code=parent_code, child_code=child_code,
+            source_schema=source_schema,
         )
 
     def upsert_alias(
         self, text: str, parent_label: str, parent_name: str,
         source: str, confidence: float, is_preferred: bool = False,
         description: str | None = None,
+        source_schema: str | None = None,
+        parent_entity_name: str | None = None,
     ) -> None:
         id_ = str(uuid.uuid4())
+        if parent_label == ":Property":
+            parent_match = (
+                "MERGE (p:Property {entity_name: $parent_entity_name, "
+                "name: $parent_name})"
+            )
+        else:
+            parent_match = (
+                f"MERGE (p{parent_label} {{name: $parent_name}})"
+            )
         self._run(
-            f"MERGE (a:Alias {{text: $text}}) "
-            f"ON CREATE SET a.id = $id "
-            f"SET a.source = $source, a.confidence = $confidence, "
-            f"a.resolved_at = $resolved_at, "
-            f"a.is_preferred = $is_preferred, "
-            f"a.description = $description "
-            f"WITH a "
-            f"MERGE (p{parent_label} {{name: $parent_name}}) "
-            f"MERGE (a)-[:REFERS_TO]->(p)",
+            "MERGE (a:Alias {text: $text}) "
+            "ON CREATE SET a.id = $id "
+            "SET a.source = $source, a.confidence = $confidence, "
+            "a.resolved_at = $resolved_at, "
+            "a.is_preferred = $is_preferred, "
+            "a.description = $description "
+            "WITH a "
+            f"{parent_match} "
+            "MERGE (a)-[ref:REFERS_TO "
+            "{source_schema: $source_schema}]->(p)",
             text=text, parent_name=parent_name, source=source,
             confidence=confidence,
             resolved_at=datetime.now(timezone.utc).isoformat(),
             is_preferred=is_preferred, description=description,
-            id=id_,
+            id=id_, source_schema=source_schema,
+            parent_entity_name=parent_entity_name,
         )
 
     def upsert_join_path(
@@ -295,10 +326,12 @@ class GraphLoader:
         hop_count: int, source: str, confidence: float,
         sql_snippet: str | None = None,
         cardinality_hint: str | None = None,
+        source_schema: str | None = None,
     ) -> None:
         id_ = str(uuid.uuid4())
         self._run(
-            "MERGE (jp:JoinPath {name: $name}) "
+            "MERGE (jp:JoinPath {name: $name, "
+            "source_schema: $source_schema}) "
             "ON CREATE SET jp.id = $id "
             "SET jp.join_predicates = $join_predicates, "
             "jp.hop_count = $hop_count, jp.source = $source, "
@@ -312,53 +345,75 @@ class GraphLoader:
             confidence=confidence, sql_snippet=sql_snippet,
             cardinality_hint=cardinality_hint,
             resolved_at=datetime.now(timezone.utc).isoformat(),
-            id=id_,
+            id=id_, source_schema=source_schema,
         )
 
     def add_join_path_uses(
         self, join_path_name: str, table_ref: str,
         column_name: str | None = None,
+        source_schema: str | None = None,
     ) -> None:
+        if source_schema is None:
+            raise ValueError(
+                "add_join_path_uses requires source_schema to scope "
+                "the JoinPath match by {name, source_schema}"
+            )
         if column_name:
             self._run(
-                "MATCH (jp:JoinPath {name: $jp_name}) "
+                "MATCH (jp:JoinPath {name: $jp_name, "
+                "source_schema: $source_schema}) "
                 "MATCH (c:Column {ref: $ref}) "
-                "MERGE (jp)-[:USES]->(c)",
+                "MERGE (jp)-[u:USES "
+                "{source_schema: $source_schema}]->(c)",
                 jp_name=join_path_name, ref=table_ref,
+                source_schema=source_schema,
             )
         else:
             self._run(
-                "MATCH (jp:JoinPath {name: $jp_name}) "
+                "MATCH (jp:JoinPath {name: $jp_name, "
+                "source_schema: $source_schema}) "
                 "MATCH (t:Table {ref: $ref}) "
-                "MERGE (jp)-[:USES]->(t)",
+                "MERGE (jp)-[u:USES "
+                "{source_schema: $source_schema}]->(t)",
                 jp_name=join_path_name, ref=table_ref,
+                source_schema=source_schema,
             )
 
     def add_join_path_entity_links(
         self, join_path_name: str, from_table_ref: str,
         to_table_ref: str,
+        source_schema: str | None = None,
     ) -> None:
+        if source_schema is None:
+            raise ValueError(
+                "add_join_path_entity_links requires source_schema "
+                "to scope the JoinPath match by {name, source_schema}"
+            )
         self._run(
-            "MATCH (jp:JoinPath {name: $jp_name}) "
+            "MATCH (jp:JoinPath {name: $jp_name, "
+            "source_schema: $source_schema}) "
             "OPTIONAL MATCH (fe:Entity)-[:ENTITY_ON_TABLE]->"
             "(:Table {ref: $from_ref}) "
             "OPTIONAL MATCH (te:Entity)-[:ENTITY_ON_TABLE]->"
             "(:Table {ref: $to_ref}) "
             "FOREACH (_ IN CASE WHEN fe IS NOT NULL "
             "THEN [1] ELSE [] END | "
-            "MERGE (jp)-[:FROM_ENTITY]->(fe)) "
+            "MERGE (jp)-[fr:FROM_ENTITY "
+            "{source_schema: $source_schema}]->(fe)) "
             "FOREACH (_ IN CASE WHEN te IS NOT NULL "
             "THEN [1] ELSE [] END | "
-            "MERGE (jp)-[:TO_ENTITY]->(te))",
+            "MERGE (jp)-[to_:TO_ENTITY "
+            "{source_schema: $source_schema}]->(te))",
             jp_name=join_path_name,
             from_ref=from_table_ref,
             to_ref=to_table_ref,
+            source_schema=source_schema,
         )
 
-    def store_assertion(self, assertion: Assertion) -> None:
-        # NOTE: No longer mutating prior assertions to 'superseded'.
-        # Status transitions are now handled via StatusEvent log.
-        # Prior assertions remain as immutable history.
+    def store_assertion(
+        self, assertion: Assertion, source_schema: str | None = None,
+    ) -> None:
+        schema = source_schema or assertion.source_schema
         self._run(
             "CREATE (a:Assertion {"
             "  id: $id, subject_ref: $subject_ref,"
@@ -368,7 +423,8 @@ class GraphLoader:
             "  object_id: $object_id,"
             "  source: $source, confidence: $confidence,"
             "  status: $status, run_id: $run_id,"
-            "  observed_at: $observed_at"
+            "  observed_at: $observed_at,"
+            "  source_schema: $source_schema"
             "})",
             id=assertion.id,
             subject_ref=assertion.subject_ref,
@@ -382,16 +438,19 @@ class GraphLoader:
             status="auto",
             run_id=assertion.run_id,
             observed_at=assertion.observed_at.isoformat(),
+            source_schema=schema,
         )
 
     def batch_store_assertions(
         self, assertions: list[Assertion],
+        source_schema: str | None = None,
     ) -> None:
         for assertion in assertions:
-            self.store_assertion(assertion)
+            self.store_assertion(assertion, source_schema=source_schema)
 
     def _build_assertion_dicts(
         self, assertions: list[Assertion],
+        source_schema: str | None = None,
     ) -> list[dict[str, Any]]:
         return [
             {
@@ -407,20 +466,20 @@ class GraphLoader:
                 "status": "auto",
                 "run_id": a.run_id,
                 "observed_at": a.observed_at.isoformat(),
+                "source_schema": source_schema or a.source_schema,
             }
             for a in assertions
         ]
 
     def commit_table_assertions(
         self, assertions: list[Assertion],
+        source_schema: str | None = None,
     ) -> None:
         with self._driver.session() as session:
             tx = session.begin_transaction()
             try:
-                # NOTE: No longer mutating prior assertions to 'superseded'.
-                # Status transitions are now handled via StatusEvent log.
                 assertion_dicts = self._build_assertion_dicts(
-                    assertions
+                    assertions, source_schema=source_schema,
                 )
                 tx.run(
                     "UNWIND $assertions AS a "
@@ -436,7 +495,8 @@ class GraphLoader:
                     "  confidence: a.confidence,"
                     "  status: a.status,"
                     "  run_id: a.run_id,"
-                    "  observed_at: a.observed_at"
+                    "  observed_at: a.observed_at,"
+                    "  source_schema: a.source_schema"
                     "})",
                     assertions=assertion_dicts,
                 )
@@ -510,6 +570,31 @@ class GraphLoader:
             f"n.embedding_updated_at = $updated_at",
             match_value=match_value, embedding=embedding,
             updated_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def delete_study_scoped(self, schema_name: str) -> None:
+        """Remove every graph element stamped with this study's schema.
+
+        Edge sweep is type-agnostic (matches by `source_schema` property).
+        Assertion / JoinPath nodes are detach-deleted by `source_schema`,
+        which transitively removes provenance edges (`:SUBJECT` /
+        `:OBJECT`). Shared concept nodes (`:Entity`, `:Term`,
+        `:ValueSet`, `:Property`, `:SemanticType`) and physical nodes
+        (`:Table`, `:Column`, `:Schema`) are never touched.
+        """
+        self._run(
+            "MATCH ()-[r {source_schema: $schema}]-() DELETE r",
+            schema=schema_name,
+        )
+        self._run(
+            "MATCH (a:Assertion {source_schema: $schema}) "
+            "DETACH DELETE a",
+            schema=schema_name,
+        )
+        self._run(
+            "MATCH (jp:JoinPath {source_schema: $schema}) "
+            "DETACH DELETE jp",
+            schema=schema_name,
         )
 
     def has_assertions(self, table_ref: str) -> bool:

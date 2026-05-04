@@ -35,6 +35,7 @@ PROVENANCE_PREDICATES = frozenset({
 def materialize_unified(
     loader: GraphLoader,
     assertions: list[Assertion],
+    source_schema: str | None = None,
 ) -> None:
     """Unified materializer: single assertion-to-graph path.
 
@@ -52,21 +53,16 @@ def materialize_unified(
         by_subject[a.subject_ref].append(a)
         groups[(a.subject_ref, a.predicate.value)].append(a)
 
-    # Phase 1: Physical nodes
     upsert_physical_nodes(loader, by_subject)
     upsert_column_nodes(loader, by_subject)
-
-    # Phase 2: Semantic nodes
-    upsert_semantic_nodes(loader, by_subject, groups)
-
-    # Phase 3: Bridge edges
-    apply_resolution_edges(loader, groups)
+    upsert_semantic_nodes(
+        loader, by_subject, groups, source_schema=source_schema,
+    )
+    apply_resolution_edges(
+        loader, groups, source_schema=source_schema,
+    )
     materialize_vocabulary_edges(loader, groups)
-
-    # Phase 4: Provenance
     loader.materialize_provenance_edges(assertions)
-
-    # Phase 5: Lifecycle
     run_lifecycle_phase(loader, assertions)
 
     logger.info(
