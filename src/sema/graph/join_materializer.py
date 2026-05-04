@@ -1,6 +1,6 @@
 """Join path materialization helpers.
 
-Normalizes JOINS_TO + HAS_JOIN_EVIDENCE into JoinPath nodes.
+Normalizes JOINS_TO + HAS_JOIN_EVIDENCE + FK_TO into JoinPath nodes.
 Extracted from materializer_utils.py to keep files under 400 lines.
 """
 
@@ -8,11 +8,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sema.models.assertions import Assertion, AssertionPredicate
+from sema.graph.join_materializer_utils import normalize_fk_to_assertion
 from sema.graph.loader_utils import batch_upsert_join_paths
+from sema.models.assertions import Assertion, AssertionPredicate
 
 if TYPE_CHECKING:
     from sema.graph.loader import GraphLoader
+
+_JOIN_PREDICATES = (
+    AssertionPredicate.HAS_JOIN_EVIDENCE.value,
+    AssertionPredicate.JOINS_TO.value,
+    AssertionPredicate.FK_TO.value,
+)
 
 
 def _derive_join_path_name(
@@ -57,48 +64,64 @@ def _build_join_path_records(
 def _wire_join_path_edges(
     loader: GraphLoader,
     records: list[dict[str, Any]],
+    source_schema: str | None,
 ) -> None:
+    if source_schema is None:
+        return
     for rec in records:
         name = rec["name"]
         for jp in rec["join_predicates"]:
             if jp.get("left_table"):
-                loader.add_join_path_uses(name, jp["left_table"])
+                loader.add_join_path_uses(
+                    name, jp["left_table"],
+                    source_schema=source_schema,
+                )
             if jp.get("left_column") and jp.get("left_table"):
                 loader.add_join_path_uses(
                     name, jp["left_table"], jp["left_column"],
+                    source_schema=source_schema,
                 )
             if jp.get("right_table"):
-                loader.add_join_path_uses(name, jp["right_table"])
+                loader.add_join_path_uses(
+                    name, jp["right_table"],
+                    source_schema=source_schema,
+                )
             if jp.get("right_column") and jp.get("right_table"):
                 loader.add_join_path_uses(
                     name, jp["right_table"], jp["right_column"],
+                    source_schema=source_schema,
                 )
         if rec.get("from_table") or rec.get("to_table"):
             loader.add_join_path_entity_links(
                 name, rec.get("from_table", ""), rec.get("to_table", ""),
+                source_schema=source_schema,
             )
 
 
 def materialize_join_paths(
     loader: GraphLoader,
     groups: dict[tuple[str, str], list[Assertion]],
+    source_schema: str | None = None,
 ) -> None:
-    """Normalize JOINS_TO + HAS_JOIN_EVIDENCE into JoinPath nodes."""
+    """Normalize JOINS_TO + HAS_JOIN_EVIDENCE + FK_TO into JoinPath nodes."""
     join_groups: dict[str, list[Assertion]] = {}
     for (subj, pred), group in groups.items():
-        if pred in (
-            AssertionPredicate.HAS_JOIN_EVIDENCE.value,
-            AssertionPredicate.JOINS_TO.value,
-        ):
-            if subj in join_groups:
-                join_groups[subj].extend(group)
-            else:
-                join_groups[subj] = list(group)
+        if pred not in _JOIN_PREDICATES:
+            continue
+        normalized = (
+            [normalize_fk_to_assertion(a) for a in group]
+            if pred == AssertionPredicate.FK_TO.value
+            else list(group)
+        )
+        if subj in join_groups:
+            join_groups[subj].extend(normalized)
+        else:
+            join_groups[subj] = normalized
     records = _build_join_path_records(join_groups)
     batch = [
         {k: v for k, v in r.items()
          if k not in ("from_table", "to_table")}
         for r in records
     ]
-    batch_upsert_join_paths(loader, batch)
-    _wire_join_path_edges(loader, records)
+    batch_upsert_join_paths(loader, batch, source_schema=source_schema)
+    _wire_join_path_edges(loader, records, source_schema)
