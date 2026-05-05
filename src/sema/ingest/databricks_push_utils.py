@@ -27,6 +27,9 @@ DUCKDB_TO_DATABRICKS_TYPE: dict[str, str] = {
 }
 
 
+_FORBIDDEN_IDENT_CHARS = (";", "`", "\n", "\r", "\x00")
+
+
 def back_quote(name: str) -> str:
     return "`" + name.replace("`", "``") + "`"
 
@@ -37,6 +40,17 @@ def qualified(catalog: str, schema: str, table: str) -> str:
 
 def escape_sql_literal(value: str) -> str:
     return value.replace("'", "''")
+
+
+def validate_identifier(name: str, kind: str) -> None:
+    if not name:
+        raise ValueError(f"{kind} identifier must be non-empty")
+    for ch in _FORBIDDEN_IDENT_CHARS:
+        if ch in name:
+            raise ValueError(
+                f"{kind} identifier contains forbidden character "
+                f"{ch!r}: {name!r}"
+            )
 
 
 def duckdb_to_databricks_type(duckdb_type: str) -> str:
@@ -120,3 +134,29 @@ def build_copy_into_sql(catalog: str, schema: str, table: str, staging_uri: str)
 
 def build_count_sql(catalog: str, schema: str, table: str) -> str:
     return f"SELECT COUNT(*) FROM {qualified(catalog, schema, table)}"
+
+
+def build_alter_column_comment_sql(
+    catalog: str, schema: str, table: str, column: str, comment: str,
+) -> str:
+    validate_identifier(catalog, "catalog")
+    validate_identifier(schema, "schema")
+    validate_identifier(table, "table")
+    validate_identifier(column, "column")
+    return (
+        f"ALTER TABLE {qualified(catalog, schema, table)} "
+        f"ALTER COLUMN {back_quote(column)} "
+        f"COMMENT '{escape_sql_literal(comment)}'"
+    )
+
+
+def build_alter_table_comment_sql(
+    catalog: str, schema: str, table: str, comment: str,
+) -> str:
+    validate_identifier(catalog, "catalog")
+    validate_identifier(schema, "schema")
+    validate_identifier(table, "table")
+    return (
+        f"COMMENT ON TABLE {qualified(catalog, schema, table)} "
+        f"IS '{escape_sql_literal(comment)}'"
+    )
