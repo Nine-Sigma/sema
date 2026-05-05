@@ -156,7 +156,7 @@ class TestWorkerResourceIsolation:
                 work_item.table_name
             )
             # Track what each loader commits
-            def capture_commit(assertions):
+            def capture_commit(assertions, source_schema=None):
                 refs = [a.subject_ref for a in assertions]
                 committed_refs.append(
                     (work_item.table_name, refs)

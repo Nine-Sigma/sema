@@ -53,16 +53,33 @@ def materialize_vocabulary_edges(
 
         try:
             pk = CanonicalRef.parse(subj)
-            col_key = pk.column_key
-            ds_id = pk.datasource_id
         except ValueError:
             continue
-        if not col_key:
+        if not pk.column:
             continue
 
+        prop_group = groups.get(
+            (subj, AssertionPredicate.HAS_PROPERTY_NAME.value), [],
+        )
+        prop_winner = pick_winner(prop_group)
+        prop_name = (
+            prop_winner.payload.get("value", pk.column)
+            if prop_winner else pk.column
+        )
+
+        table_ref = subj.rsplit("/", 1)[0]
+        ent_group = groups.get(
+            (table_ref, AssertionPredicate.HAS_ENTITY_NAME.value), [],
+        )
+        ent_winner = pick_winner(ent_group)
+        entity_name = (
+            ent_winner.payload.get("value", pk.table)
+            if ent_winner else pk.table
+        )
+
         classified_edges.append({
-            "datasource_id": ds_id,
-            "column_key": col_key,
+            "entity_name": entity_name,
+            "name": prop_name,
             "vocabulary_name": vocab_name,
         })
 

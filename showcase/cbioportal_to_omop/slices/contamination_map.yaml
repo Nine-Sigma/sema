@@ -1,0 +1,26 @@
+# Contamination map: tables used as few-shot example sources.
+# Holdout slices MUST NOT include any of these tables.
+# Updated whenever new tables are referenced from
+# src/sema/engine/few_shot_healthcare_stage_{a,b,c}.py.
+#
+# Sources are referenced by table_name only — schema-agnostic, so adding
+# the same table from a different study still trips contamination.
+
+version: 1
+last_updated: "2026-04-24"
+
+contaminated_tables:
+  # Stage A few-shot sources
+  - patient
+  - sample
+  - mutation
+  - treatment
+  - structural_variant
+  - timeline_labtest
+  - timeline_surgery
+  - timeline_performance_status
+  - cna_segmented
+
+  # Stage B / Stage C additional sources (not also in Stage A)
+  - biomarker
+  - progression

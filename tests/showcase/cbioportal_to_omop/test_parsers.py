@@ -163,8 +163,22 @@ class TestTimelineParsing:
         assert set(kinds.keys()) == {"treatment", "status"}
         assert "timeline_treatment" not in kinds
 
+    def test_iter_timeline_files_accepts_hyphen_in_kind(self, tmp_path: Path) -> None:
+        _write(tmp_path / "data_timeline_ca_15-3_labs.txt", "PATIENT_ID\n")
+        _write(tmp_path / "data_timeline_ca_19-9_labs.txt", "PATIENT_ID\n")
+
+        kinds = {kind for kind, _ in iter_timeline_files(tmp_path)}
+        assert kinds == {"ca_15-3_labs", "ca_19-9_labs"}
+
     def test_iter_timeline_files_returns_empty_when_no_files(self, tmp_path: Path) -> None:
         assert list(iter_timeline_files(tmp_path)) == []
+
+    def test_timeline_table_name_sanitizes_hyphen(self) -> None:
+        from showcase.cbioportal_to_omop.parsers import timeline_table_name
+
+        assert timeline_table_name("treatment") == "timeline_treatment"
+        assert timeline_table_name("ca_15-3_labs") == "timeline_ca_15_3_labs"
+        assert timeline_table_name("ca_19-9_labs") == "timeline_ca_19_9_labs"
 
 
 @pytest.mark.unit
@@ -198,7 +212,7 @@ class TestFetchStudyFiles:
         study_dir.mkdir(parents=True)
         (study_dir / ".done").touch()
 
-        with patch("showcase.cbioportal_to_omop.parsers.urlopen") as mock_urlopen:
+        with patch("showcase.cbioportal_to_omop.cbioportal_fetch_utils.urlopen") as mock_urlopen:
             result = fetch_study_files("brca_tcga", cache_dir=cache)
             mock_urlopen.assert_not_called()
         assert result == study_dir
@@ -230,7 +244,7 @@ class TestFetchStudyFiles:
             download_responses.append(dl)
 
         urlopen_mock = MagicMock(side_effect=[api_resp, *download_responses])
-        with patch("showcase.cbioportal_to_omop.parsers.urlopen", urlopen_mock):
+        with patch("showcase.cbioportal_to_omop.cbioportal_fetch_utils.urlopen", urlopen_mock):
             result = fetch_study_files("brca_tcga", cache_dir=cache)
 
         downloaded = {p.name for p in result.iterdir() if p.is_file() and p.name != ".done"}

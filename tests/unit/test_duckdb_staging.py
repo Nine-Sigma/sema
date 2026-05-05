@@ -11,7 +11,9 @@ from sema.ingest.duckdb_staging import Staging
 @pytest.fixture
 def staging(tmp_path: Path) -> Staging:
     db_path = tmp_path / "test.duckdb"
-    return Staging(str(db_path))
+    s = Staging(str(db_path))
+    s.execute('CREATE SCHEMA IF NOT EXISTS "cbioportal"')
+    return s
 
 
 @pytest.mark.unit
@@ -24,9 +26,9 @@ class TestStagingSchemaLifecycle:
 
         assert db_path.exists()
         schemas = staging.list_schemas()
-        assert "cbioportal" in schemas
         assert "ontology_omop" in schemas
         assert "vocabulary_omop" in schemas
+        assert "cbioportal" not in schemas
 
     def test_expands_home_in_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
@@ -38,7 +40,7 @@ class TestStagingSchemaLifecycle:
         db_path = tmp_path / "reopen.duckdb"
         Staging(str(db_path)).close()
         reopened = Staging(str(db_path))
-        assert "cbioportal" in reopened.list_schemas()
+        assert "ontology_omop" in reopened.list_schemas()
 
 
 @pytest.mark.unit

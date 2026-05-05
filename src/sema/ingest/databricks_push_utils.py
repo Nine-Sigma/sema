@@ -10,6 +10,8 @@ COPY_INTO_TABLES: frozenset[tuple[str, str]] = frozenset(
     }
 )
 
+COPY_INTO_ROW_THRESHOLD = 100_000
+
 DUCKDB_TO_DATABRICKS_TYPE: dict[str, str] = {
     "INTEGER": "INT",
     "BIGINT": "BIGINT",
@@ -25,6 +27,9 @@ DUCKDB_TO_DATABRICKS_TYPE: dict[str, str] = {
 }
 
 
+_FORBIDDEN_IDENT_CHARS = (";", "`", "\n", "\r", "\x00")
+
+
 def back_quote(name: str) -> str:
     return "`" + name.replace("`", "``") + "`"
 
@@ -37,14 +42,33 @@ def escape_sql_literal(value: str) -> str:
     return value.replace("'", "''")
 
 
+def validate_identifier(name: str, kind: str) -> None:
+    if not name:
+        raise ValueError(f"{kind} identifier must be non-empty")
+    for ch in _FORBIDDEN_IDENT_CHARS:
+        if ch in name:
+            raise ValueError(
+                f"{kind} identifier contains forbidden character "
+                f"{ch!r}: {name!r}"
+            )
+
+
 def duckdb_to_databricks_type(duckdb_type: str) -> str:
     upper = duckdb_type.strip().upper()
     base = re.sub(r"\s*\([^)]+\)", "", upper)
     return DUCKDB_TO_DATABRICKS_TYPE.get(base, "STRING")
 
 
-def should_route_via_copy_into(schema: str, table: str) -> bool:
-    return (schema.lower(), table.lower()) in COPY_INTO_TABLES
+def should_route_via_copy_into(
+    schema: str, table: str, row_count: int = 0,
+) -> bool:
+    if (schema.lower(), table.lower()) in COPY_INTO_TABLES:
+        return True
+    return row_count >= COPY_INTO_ROW_THRESHOLD
+
+
+def is_uc_volume_path(uri: str) -> bool:
+    return uri.startswith("/Volumes/")
 
 
 def build_create_schema_sql(catalog: str, schema: str) -> str:
@@ -110,3 +134,29 @@ def build_copy_into_sql(catalog: str, schema: str, table: str, staging_uri: str)
 
 def build_count_sql(catalog: str, schema: str, table: str) -> str:
     return f"SELECT COUNT(*) FROM {qualified(catalog, schema, table)}"
+
+
+def build_alter_column_comment_sql(
+    catalog: str, schema: str, table: str, column: str, comment: str,
+) -> str:
+    validate_identifier(catalog, "catalog")
+    validate_identifier(schema, "schema")
+    validate_identifier(table, "table")
+    validate_identifier(column, "column")
+    return (
+        f"ALTER TABLE {qualified(catalog, schema, table)} "
+        f"ALTER COLUMN {back_quote(column)} "
+        f"COMMENT '{escape_sql_literal(comment)}'"
+    )
+
+
+def build_alter_table_comment_sql(
+    catalog: str, schema: str, table: str, comment: str,
+) -> str:
+    validate_identifier(catalog, "catalog")
+    validate_identifier(schema, "schema")
+    validate_identifier(table, "table")
+    return (
+        f"COMMENT ON TABLE {qualified(catalog, schema, table)} "
+        f"IS '{escape_sql_literal(comment)}'"
+    )

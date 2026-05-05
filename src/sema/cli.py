@@ -21,6 +21,7 @@ from sema.pipeline.orchestrate import (
 )
 from sema.cli_ingest import ingest as _ingest_group, push_cmd as _push_cmd
 from sema.cli_eval import eval_group as _eval_group
+from sema.cli_utils import build_config_from_args as _build_config_from_args
 
 
 @click.group()
@@ -43,74 +44,6 @@ def cli() -> None:
     logging.getLogger("databricks.sql").setLevel(logging.WARNING)
 
 
-def _build_config_from_args(
-    *,
-    source: str | None,
-    catalog: str | None,
-    schemas: str | None,
-    table_pattern: str | None,
-    domain: str | None,
-    table_workers: int | None,
-    neo4j_uri: str | None,
-    neo4j_user: str | None,
-    neo4j_password: str | None,
-    llm_provider: str | None,
-    llm_model: str | None,
-    llm_timeout: int | None,
-    config_file: str | None,
-    skip_embeddings: bool,
-    resume: bool,
-    verbose: bool,
-) -> BuildConfig:
-    """Assemble a :class:`BuildConfig` from CLI arguments."""
-    overrides: dict[str, Any] = {}
-    if source is not None:
-        overrides["source"] = source
-    if catalog is not None:
-        overrides["catalog"] = catalog
-    if schemas is not None:
-        overrides["schemas"] = [s.strip() for s in schemas.split(",")]
-    if table_pattern is not None:
-        overrides["table_pattern"] = table_pattern
-    if domain is not None:
-        overrides["domain"] = domain
-        overrides["domain_from_cli"] = True
-    if table_workers is not None:
-        overrides["table_workers"] = table_workers
-    if skip_embeddings:
-        overrides["skip_embeddings"] = True
-    if resume:
-        overrides["resume"] = True
-    if verbose:
-        overrides["verbose"] = True
-
-    if config_file:
-        build_config = BuildConfig.from_file(config_file, overrides=overrides)
-    else:
-        build_config = BuildConfig(**overrides)
-
-    if neo4j_uri is not None:
-        build_config.neo4j = Neo4jConfig(
-            uri=neo4j_uri,
-            user=neo4j_user or build_config.neo4j.user,
-            password=neo4j_password or build_config.neo4j.password,  # type: ignore[arg-type]
-        )
-
-    llm_overrides: dict[str, Any] = {}
-    if llm_provider is not None:
-        llm_overrides["provider"] = llm_provider
-    if llm_model is not None:
-        llm_overrides["model"] = llm_model
-    if llm_timeout is not None:
-        llm_overrides["request_timeout"] = llm_timeout
-    if llm_overrides:
-        build_config.llm = build_config.llm.model_copy(
-            update=llm_overrides,
-        )
-
-    return build_config
-
-
 @cli.command()
 @click.option("--source", default="databricks", help="Data source connector type")
 @click.option("--catalog", default=None, help="Catalog name to extract from")
@@ -127,6 +60,15 @@ def _build_config_from_args(
 @click.option("--config", "config_file", default=None, help="Path to config YAML file")
 @click.option("--skip-embeddings", is_flag=True, default=False, help="Create indexes only, skip embedding computation")
 @click.option("--resume", is_flag=True, default=False, help="Skip tables that already have assertions in the graph")
+@click.option(
+    "--enable-fk-detection/--no-enable-fk-detection",
+    "enable_fk_detection", default=True,
+    help="Run the FK detector after extraction (default: on)",
+)
+@click.option(
+    "--materialize-structural-fk", is_flag=True, default=False,
+    help="Lower materialization threshold to 0.70 so Tier-3 (name+type only) FK candidates promote to JoinPath nodes",
+)
 @click.option("--verbose", is_flag=True, default=False, help="Enable verbose output")
 def build(
     source: str | None,
@@ -144,6 +86,8 @@ def build(
     config_file: str | None,
     skip_embeddings: bool,
     resume: bool,
+    enable_fk_detection: bool,
+    materialize_structural_fk: bool,
     verbose: bool,
 ) -> None:
     """Build the knowledge graph from a data source."""
@@ -155,7 +99,10 @@ def build(
         neo4j_password=neo4j_password, llm_provider=llm_provider,
         llm_model=llm_model, llm_timeout=llm_timeout,
         config_file=config_file,
-        skip_embeddings=skip_embeddings, resume=resume, verbose=verbose,
+        skip_embeddings=skip_embeddings, resume=resume,
+        enable_fk_detection=enable_fk_detection,
+        materialize_structural_fk=materialize_structural_fk,
+        verbose=verbose,
     )
     try:
         report = run_build(build_config)

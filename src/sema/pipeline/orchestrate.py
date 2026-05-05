@@ -25,6 +25,7 @@ from sema.pipeline.orchestrate_utils import (
     _retrieve_context,
     _spawn_workers,
     _spawn_workers_parallel,
+    run_fk_detection,
 )
 
 
@@ -60,6 +61,9 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     if not work_items:
         driver.close()
         return aggregate_report([])
+
+    for schema in sorted({wi.schema for wi in work_items}):
+        loader.delete_study_scoped(schema)
 
     circuit_breaker = CircuitBreaker(
         failure_threshold=config.circuit_breaker_threshold,
@@ -107,6 +111,11 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     )
 
     report = _collect_results(results)
+
+    schemas = sorted({wi.schema for wi in work_items})
+    run_fk_detection(
+        loader, discovery_connector, config, schemas, run_id=run_id,
+    )
 
     _compute_embeddings(config, loader, skip_embeddings=config.skip_embeddings)
 

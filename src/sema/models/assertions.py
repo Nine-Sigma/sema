@@ -37,6 +37,7 @@ class AssertionPredicate(str, Enum):
     HAS_JOIN_EVIDENCE = "has_join_evidence"
     ENTITY_ON_TABLE = "entity_on_table"
     PROPERTY_ON_COLUMN = "property_on_column"
+    FK_TO = "fk_to"
 
 
 class AssertionStatus(str, Enum):
@@ -64,3 +65,4 @@ class Assertion(BaseModel):
     status: AssertionStatus = AssertionStatus.AUTO
     run_id: str
     observed_at: datetime
+    source_schema: str | None = None

@@ -101,6 +101,9 @@ class BuildConfig(BaseSettings):
     enable_few_shot: bool = True
     enable_stage_c: bool = True
 
+    enable_fk_detection: bool = True
+    materialize_structural_fk: bool = False
+
     eval_dump_dir: str | None = None
     eval_config_label: str = "run"
     slice_tables: list[str] = []
@@ -120,6 +123,10 @@ class BuildConfig(BaseSettings):
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     profiling: ProfilingConfig = Field(default_factory=ProfilingConfig)
 
+    @property
+    def fk_materialization_threshold(self) -> float:
+        return 0.70 if self.materialize_structural_fk else 0.80
+
     @classmethod
     def from_file(cls, path: str, overrides: dict[str, Any] | None = None) -> BuildConfig:
         with open(path) as f:
@@ -133,9 +140,7 @@ class IngestDatabricksTargetConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="INGEST_DATABRICKS_")
 
     catalog: str = "workspace"
-    schemas: list[str] = Field(
-        default_factory=lambda: ["cbioportal", "ontology_omop", "vocabulary_omop"]
-    )
+    schemas: list[str] = Field(default_factory=list)
 
 
 class IngestOmopConfig(BaseSettings):

@@ -133,6 +133,7 @@ def upsert_column_nodes(
 def upsert_entities(
     loader: GraphLoader,
     groups: dict[tuple[str, str], list[Assertion]],
+    source_schema: str | None = None,
 ) -> None:
     entity_groups = {
         subj: group
@@ -150,13 +151,11 @@ def upsert_entities(
             "description": winner.payload.get("description"),
             "source": winner.source,
             "confidence": winner.confidence,
-            "datasource_id": pk.datasource_id,
-            "table_key": pk.table_key,
             "table_name": pk.table,
             "schema_name": pk.schema or "",
             "catalog": pk.catalog_or_db,
         })
-    batch_upsert_entities(loader, batch)
+    batch_upsert_entities(loader, batch, source_schema=source_schema)
 
 
 def _resolve_property_details(
@@ -200,9 +199,6 @@ def _resolve_property_details(
         "source": winner.source,
         "confidence": winner.confidence,
         "entity_name": entity_name,
-        "datasource_id": pk.datasource_id,
-        "table_key": pk.table_key,
-        "column_key": pk.column_key,
         "column_name": pk.column,
         "table_name": pk.table,
         "schema_name": pk.schema or "",
@@ -213,6 +209,7 @@ def _resolve_property_details(
 def upsert_properties(
     loader: GraphLoader,
     groups: dict[tuple[str, str], list[Assertion]],
+    source_schema: str | None = None,
 ) -> None:
     prop_groups = {
         subj: group
@@ -224,12 +221,20 @@ def upsert_properties(
         details = _resolve_property_details(col_ref, group, groups)
         if details:
             batch.append(details)
-    batch_upsert_properties(loader, batch)
+    batch_upsert_properties(loader, batch, source_schema=source_schema)
+
+
+def _column_ref(pk: Any) -> str:
+    return (
+        f"{pk.catalog_or_db}.{pk.schema or ''}"
+        f".{pk.table}.{pk.column}"
+    )
 
 
 def upsert_decoded_values(
     loader: GraphLoader,
     groups: dict[tuple[str, str], list[Assertion]],
+    source_schema: str | None = None,
 ) -> None:
     decoded_groups: dict[str, list[Assertion]] = defaultdict(list)
     for (subj, pred), group in groups.items():
@@ -247,10 +252,10 @@ def upsert_decoded_values(
         if not pk.column:
             continue
         vs_name = f"{pk.table}_{pk.column}_values"
+        ref = _column_ref(pk)
         vs_batch.append({
             "name": vs_name,
-            "datasource_id": pk.datasource_id,
-            "column_key": pk.column_key,
+            "column_ref": ref,
             "column_name": pk.column, "table_name": pk.table,
             "schema_name": pk.schema or "", "catalog": pk.catalog_or_db,
         })
@@ -266,9 +271,13 @@ def upsert_decoded_values(
                 "vocabulary_name": vs_name,
                 "source": a.source, "confidence": a.confidence,
             })
-            loader.add_term_to_value_set(raw, vs_name)
+            loader.add_term_to_value_set(
+                raw, vs_name, source_schema=source_schema,
+            )
 
-    batch_upsert_value_sets(loader, vs_batch)
+    batch_upsert_value_sets(
+        loader, vs_batch, source_schema=source_schema,
+    )
     batch_upsert_terms(loader, term_batch)
 
 
@@ -284,6 +293,7 @@ def _collect_alias_batch(
         return [], ":Entity"
     batch: list[dict[str, Any]] = []
 
+    parent_entity_name: str | None = None
     if pk.column:
         prop_group = groups.get(
             (subject_ref, AssertionPredicate.HAS_PROPERTY_NAME.value), [],
@@ -294,7 +304,16 @@ def _collect_alias_batch(
             if prop_winner else pk.column
         )
         parent_label = ":Property"
-        target_key = pk.column_key or subject_ref
+        target_key = subject_ref
+        table_ref = subject_ref.rsplit("/", 1)[0]
+        ent_group = groups.get(
+            (table_ref, AssertionPredicate.HAS_ENTITY_NAME.value), [],
+        )
+        ent_winner = pick_winner(ent_group)
+        parent_entity_name = (
+            ent_winner.payload.get("value", pk.table)
+            if ent_winner else pk.table
+        )
     else:
         entity_group = groups.get(
             (subject_ref, AssertionPredicate.HAS_ENTITY_NAME.value), [],
@@ -305,7 +324,7 @@ def _collect_alias_batch(
             if entity_winner else pk.table
         )
         parent_label = ":Entity"
-        target_key = pk.table_key
+        target_key = subject_ref
 
     for a in group:
         if a.status in (
@@ -316,6 +335,7 @@ def _collect_alias_batch(
             "text": a.payload.get("value", ""),
             "target_key": target_key,
             "parent_name": parent_name,
+            "parent_entity_name": parent_entity_name,
             "source": a.source, "confidence": a.confidence,
             "is_preferred": a.payload.get("is_preferred", False),
             "description": a.payload.get("description"),
@@ -327,6 +347,7 @@ def _collect_alias_batch(
 def upsert_aliases(
     loader: GraphLoader,
     groups: dict[tuple[str, str], list[Assertion]],
+    source_schema: str | None = None,
 ) -> None:
     alias_groups = {
         subj: group
@@ -348,26 +369,34 @@ def upsert_aliases(
         else:
             property_aliases.extend(batch)
 
-    batch_upsert_aliases(loader, entity_aliases, ":Entity")
-    batch_upsert_aliases(loader, property_aliases, ":Property")
+    batch_upsert_aliases(
+        loader, entity_aliases, ":Entity",
+        source_schema=source_schema,
+    )
+    batch_upsert_aliases(
+        loader, property_aliases, ":Property",
+        source_schema=source_schema,
+    )
 
 
 def upsert_semantic_nodes(
     loader: GraphLoader,
     by_subject: dict[str, list[Assertion]],
     groups: dict[tuple[str, str], list[Assertion]],
+    source_schema: str | None = None,
 ) -> None:
-    upsert_entities(loader, groups)
-    upsert_properties(loader, groups)
-    upsert_decoded_values(loader, groups)
-    upsert_aliases(loader, groups)
+    upsert_entities(loader, groups, source_schema=source_schema)
+    upsert_properties(loader, groups, source_schema=source_schema)
+    upsert_decoded_values(loader, groups, source_schema=source_schema)
+    upsert_aliases(loader, groups, source_schema=source_schema)
     from sema.graph.join_materializer import materialize_join_paths
-    materialize_join_paths(loader, groups)
+    materialize_join_paths(loader, groups, source_schema=source_schema)
 
 
 def apply_resolution_edges(
     loader: GraphLoader,
     groups: dict[tuple[str, str], list[Assertion]],
+    source_schema: str | None = None,
 ) -> None:
     for (subj, pred), group in groups.items():
         if pred == AssertionPredicate.PARENT_OF.value:
@@ -379,6 +408,7 @@ def apply_resolution_edges(
                 loader.add_term_hierarchy(
                     parent_code=a.payload.get("parent", ""),
                     child_code=a.payload.get("child", ""),
+                    source_schema=source_schema,
                 )
 
 

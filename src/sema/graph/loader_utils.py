@@ -2,6 +2,12 @@
 
 Each function takes a ``loader`` (GraphLoader) as its first argument and
 delegates to ``loader._run`` for Cypher execution.
+
+Study-derived edges (`:ENTITY_ON_TABLE`, `:HAS_PROPERTY`,
+`:PROPERTY_ON_COLUMN`, `:HAS_VALUE_SET`, `:REFERS_TO`) include
+`source_schema` IN THE MERGE MATCH KEY so two studies emitting the same
+logical edge produce two distinct relationships, each independently
+scoped-deletable.
 """
 from __future__ import annotations
 
@@ -10,69 +16,109 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from sema.models.extraction import ExtractedColumn
+
 if TYPE_CHECKING:
     from sema.graph.loader import GraphLoader
 
 
+_FETCH_COLUMNS_QUERY = (
+    "MATCH (c:Column) WHERE c.schema_name = $schema_name "
+    "RETURN c.name AS name, c.table_name AS table_name, "
+    "c.catalog AS catalog, c.schema_name AS schema_name, "
+    "c.data_type AS data_type, c.nullable AS nullable, "
+    "c.comment AS comment"
+)
+
+
+def fetch_columns_by_schema(
+    loader: GraphLoader, schema_name: str,
+) -> list[ExtractedColumn]:
+    rows = loader._run_read(
+        _FETCH_COLUMNS_QUERY, schema_name=schema_name,
+    )
+    return [
+        ExtractedColumn(
+            name=row["name"],
+            table_name=row["table_name"],
+            catalog=row.get("catalog", ""),
+            schema=row["schema_name"],
+            data_type=row.get("data_type", "UNKNOWN"),
+            nullable=bool(row.get("nullable", True)),
+            comment=row.get("comment"),
+        )
+        for row in rows
+    ]
+
+
+def _annotate_rows(
+    items: list[dict[str, Any]],
+    source_schema: str | None,
+) -> list[dict[str, Any]]:
+    resolved_at = datetime.now(timezone.utc).isoformat()
+    return [
+        {
+            **item,
+            "resolved_at": resolved_at,
+            "id": str(uuid.uuid4()),
+            "source_schema": source_schema,
+        }
+        for item in items
+    ]
+
+
 def batch_upsert_entities(
-    loader: GraphLoader, entities: list[dict[str, Any]],
+    loader: GraphLoader,
+    entities: list[dict[str, Any]],
+    source_schema: str | None = None,
 ) -> None:
     if not entities:
         return
-    resolved_at = datetime.now(timezone.utc).isoformat()
-    rows = [
-        {**e, "resolved_at": resolved_at, "id": str(uuid.uuid4())}
-        for e in entities
-    ]
+    rows = _annotate_rows(entities, source_schema)
     loader._run(
         "UNWIND $rows AS r "
-        "MERGE (e:Entity {datasource_id: r.datasource_id, "
-        "table_key: r.table_key}) "
+        "MERGE (e:Entity {name: r.name}) "
         "ON CREATE SET e.id = r.id "
-        "SET e.name = r.name, "
-        "e.description = r.description, e.source = r.source, "
+        "SET e.description = r.description, e.source = r.source, "
         "e.confidence = r.confidence, "
         "e.status = 'ACTIVE', "
         "e.resolved_at = r.resolved_at "
         "WITH e, r "
         "MERGE (t:Table {name: r.table_name, "
         "schema_name: r.schema_name, catalog: r.catalog}) "
-        "MERGE (e)-[:ENTITY_ON_TABLE]->(t)",
+        "MERGE (e)-[link:ENTITY_ON_TABLE "
+        "{source_schema: r.source_schema}]->(t)",
         rows=rows,
     )
 
 
 def batch_upsert_properties(
-    loader: GraphLoader, properties: list[dict[str, Any]],
+    loader: GraphLoader,
+    properties: list[dict[str, Any]],
+    source_schema: str | None = None,
 ) -> None:
     if not properties:
         return
-    resolved_at = datetime.now(timezone.utc).isoformat()
-    rows = [
-        {**p, "resolved_at": resolved_at, "id": str(uuid.uuid4())}
-        for p in properties
-    ]
+    rows = _annotate_rows(properties, source_schema)
     loader._run(
         "UNWIND $rows AS r "
-        "MERGE (p:Property {datasource_id: r.datasource_id, "
-        "column_key: r.column_key}) "
+        "MERGE (p:Property {entity_name: r.entity_name, name: r.name}) "
         "ON CREATE SET p.id = r.id "
-        "SET p.name = r.name, "
-        "p.entity_name = r.entity_name, "
-        "p.semantic_type = r.semantic_type, "
+        "SET p.semantic_type = r.semantic_type, "
         "p.source = r.source, "
         "p.confidence = r.confidence, "
         "p.status = 'ACTIVE', "
         "p.resolved_at = r.resolved_at "
         "WITH p, r "
-        "MERGE (e:Entity {datasource_id: r.datasource_id, "
-        "table_key: r.table_key}) "
-        "MERGE (e)-[:HAS_PROPERTY]->(p) "
+        "MERGE (e:Entity {name: r.entity_name}) "
+        "MERGE (e)-[hp:HAS_PROPERTY "
+        "{source_schema: r.source_schema}]->(p) "
         "WITH p, r "
         "MERGE (c:Column {name: r.column_name, "
         "table_name: r.table_name, "
         "schema_name: r.schema_name, catalog: r.catalog}) "
-        "MERGE (p)-[:PROPERTY_ON_COLUMN]->(c)",
+        "MERGE (p)-[poc:PROPERTY_ON_COLUMN "
+        "{source_schema: r.source_schema}]->(c)",
         rows=rows,
     )
 
@@ -89,11 +135,11 @@ def batch_upsert_terms(
     ]
     loader._run(
         "UNWIND $rows AS r "
-        "MERGE (t:Term {vocabulary_name: r.vocabulary_name, "
-        "code: r.code}) "
+        "MERGE (t:Term {code: r.code}) "
         "ON CREATE SET t.id = r.id "
         "SET t.label = r.label, t.source = r.source, "
         "t.confidence = r.confidence, "
+        "t.vocabulary_name = r.vocabulary_name, "
         "t.status = 'ACTIVE', "
         "t.resolved_at = r.resolved_at",
         rows=rows,
@@ -104,42 +150,46 @@ def batch_upsert_aliases(
     loader: GraphLoader,
     aliases: list[dict[str, Any]],
     parent_label: str,
+    source_schema: str | None = None,
 ) -> None:
     if not aliases:
         return
-    resolved_at = datetime.now(timezone.utc).isoformat()
-    rows = [
-        {**a, "resolved_at": resolved_at, "id": str(uuid.uuid4())}
-        for a in aliases
-    ]
+    rows = _annotate_rows(aliases, source_schema)
+    if parent_label == ":Property":
+        parent_match = (
+            "MERGE (p:Property {entity_name: r.parent_entity_name, "
+            "name: r.parent_name})"
+        )
+    else:
+        parent_match = f"MERGE (p{parent_label} {{name: r.parent_name}})"
     loader._run(
-        f"UNWIND $rows AS r "
-        f"MERGE (a:Alias {{target_key: r.target_key, text: r.text}}) "
-        f"ON CREATE SET a.id = r.id "
-        f"SET a.source = r.source, a.confidence = r.confidence, "
-        f"a.resolved_at = r.resolved_at, "
-        f"a.status = 'ACTIVE', "
-        f"a.is_preferred = r.is_preferred, "
-        f"a.description = r.description "
-        f"WITH a, r "
-        f"MERGE (p{parent_label} {{name: r.parent_name}}) "
-        f"MERGE (a)-[:REFERS_TO]->(p)",
+        "UNWIND $rows AS r "
+        "MERGE (a:Alias {target_key: r.target_key, text: r.text}) "
+        "ON CREATE SET a.id = r.id "
+        "SET a.source = r.source, a.confidence = r.confidence, "
+        "a.resolved_at = r.resolved_at, "
+        "a.status = 'ACTIVE', "
+        "a.is_preferred = r.is_preferred, "
+        "a.description = r.description "
+        "WITH a, r "
+        f"{parent_match} "
+        "MERGE (a)-[ref:REFERS_TO "
+        "{source_schema: r.source_schema}]->(p)",
         rows=rows,
     )
 
 
 def batch_upsert_value_sets(
-    loader: GraphLoader, value_sets: list[dict[str, Any]],
+    loader: GraphLoader,
+    value_sets: list[dict[str, Any]],
+    source_schema: str | None = None,
 ) -> None:
     if not value_sets:
         return
-    rows = [
-        {**vs, "id": str(uuid.uuid4())} for vs in value_sets
-    ]
+    rows = _annotate_rows(value_sets, source_schema)
     loader._run(
         "UNWIND $rows AS r "
-        "MERGE (vs:ValueSet {datasource_id: r.datasource_id, "
-        "column_key: r.column_key}) "
+        "MERGE (vs:ValueSet {column_ref: r.column_ref}) "
         "ON CREATE SET vs.id = r.id "
         "SET vs.name = r.name, "
         "vs.status = 'ACTIVE' "
@@ -147,13 +197,16 @@ def batch_upsert_value_sets(
         "MERGE (c:Column {name: r.column_name, "
         "table_name: r.table_name, "
         "schema_name: r.schema_name, catalog: r.catalog}) "
-        "MERGE (c)-[:HAS_VALUE_SET]->(vs)",
+        "MERGE (c)-[hvs:HAS_VALUE_SET "
+        "{source_schema: r.source_schema}]->(vs)",
         rows=rows,
     )
 
 
 def batch_upsert_join_paths(
-    loader: GraphLoader, join_paths: list[dict[str, Any]],
+    loader: GraphLoader,
+    join_paths: list[dict[str, Any]],
+    source_schema: str | None = None,
 ) -> None:
     if not join_paths:
         return
@@ -163,6 +216,7 @@ def batch_upsert_join_paths(
             **jp,
             "resolved_at": resolved_at,
             "id": str(uuid.uuid4()),
+            "source_schema": source_schema,
             "join_predicates_json": json.dumps(
                 jp["join_predicates"]
             ),
@@ -171,12 +225,10 @@ def batch_upsert_join_paths(
     ]
     loader._run(
         "UNWIND $rows AS r "
-        "MERGE (jp:JoinPath {datasource_id: r.datasource_id, "
-        "from_table: r.from_table, to_table: r.to_table, "
-        "join_columns_hash: r.join_columns_hash}) "
+        "MERGE (jp:JoinPath {name: r.name, "
+        "source_schema: r.source_schema}) "
         "ON CREATE SET jp.id = r.id "
-        "SET jp.name = r.name, "
-        "jp.join_predicates = r.join_predicates_json, "
+        "SET jp.join_predicates = r.join_predicates_json, "
         "jp.hop_count = r.hop_count, "
         "jp.source = r.source, "
         "jp.confidence = r.confidence, "
@@ -218,8 +270,7 @@ def batch_create_classified_as(
         return
     loader._run(
         "UNWIND $rows AS r "
-        "MATCH (p:Property {datasource_id: r.datasource_id, "
-        "column_key: r.column_key}) "
+        "MATCH (p:Property {entity_name: r.entity_name, name: r.name}) "
         "MERGE (v:Vocabulary {name: r.vocabulary_name}) "
         "MERGE (p)-[:CLASSIFIED_AS]->(v)",
         rows=edges,
@@ -235,8 +286,7 @@ def batch_create_in_vocabulary(
         return
     loader._run(
         "UNWIND $rows AS r "
-        "MATCH (t:Term {vocabulary_name: r.vocabulary_name, "
-        "code: r.code}) "
+        "MATCH (t:Term {code: r.code}) "
         "MERGE (v:Vocabulary {name: r.vocabulary_name}) "
         "MERGE (t)-[:IN_VOCABULARY]->(v)",
         rows=edges,

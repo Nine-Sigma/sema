@@ -442,6 +442,7 @@ class TestApplyResolutionEdges:
         apply_resolution_edges(loader, groups)
         loader.add_term_hierarchy.assert_called_once_with(
             parent_code="NEOPLASM", child_code="CARCINOMA",
+            source_schema=None,
         )
 
     def test_skips_rejected_hierarchy(self):

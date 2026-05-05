@@ -1,25 +1,30 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Iterator
-from urllib.request import Request, urlopen
 
 import pyarrow as pa
 
+from showcase.cbioportal_to_omop.cbioportal_fetch_utils import (
+    fetch_study_files,
+)
+
 from showcase.cbioportal_to_omop.cbioportal_utils import (
     DOWNLOAD_EXACT_FILENAMES,
+    DOWNLOAD_EXTENSIONS,
     DOWNLOAD_PREFIXES,
     EXCLUDED_DOWNLOAD_PREFIXES,
-    GITHUB_API_TEMPLATE,
-    MEDIA_URL_TEMPLATE,
-    RAW_URL_TEMPLATE,
+    SEG_COLUMN_TYPES,
     SKIP_FILENAME_PATTERNS,
     TIMELINE_PATTERN,
     ClinicalHeader,
     cbioportal_type_to_duckdb,
     cna_long_format_rows,
+    dedupe_header_case_insensitive,
+    gene_panel_long_rows,
+    is_lab_timeline_header,
     maf_column_type,
+    normalize_seg_header,
     parse_clinical_header,
     read_clinical_data_rows,
     read_header_block,
@@ -28,7 +33,11 @@ from showcase.cbioportal_to_omop.cbioportal_utils import (
     sv_column_type,
 )
 from sema.ingest.duckdb_staging import Staging
+from sema.ingest.naming import sanitize_schema_name
+from sema.ingest.study_registry import StudyRegistry
 from sema.log import logger
+
+CBIOPORTAL_SCHEMA_PREFIX = "cbioportal"
 
 __all__ = [
     "ClinicalHeader",
@@ -39,75 +48,25 @@ __all__ = [
     "parse_clinical_header",
     "parse_cna_file",
     "parse_gene_panel_matrix",
+    "parse_lab_timeline",
     "parse_maf",
     "parse_resource_file",
+    "parse_segmented_cna",
     "parse_sv_file",
     "parse_timeline_file",
+    "timeline_table_name",
 ]
-
-
-def fetch_study_files(study_id: str, cache_dir: Path) -> Path:
-    study_cache = cache_dir / study_id
-    done_marker = study_cache / ".done"
-    if done_marker.exists():
-        logger.info("Using cached cBioPortal study files at {}", study_cache)
-        return study_cache
-    study_cache.mkdir(parents=True, exist_ok=True)
-    entries = _list_study_entries(study_id)
-    downloaded = 0
-    for entry in entries:
-        if entry.get("type") != "file":
-            continue
-        name = entry["name"]
-        if not _should_download(name):
-            continue
-        _fetch_lfs_or_raw(study_id, name, study_cache / name)
-        downloaded += 1
-    done_marker.touch()
-    logger.info("Fetched {} cBioPortal files for {}", downloaded, study_id)
-    return study_cache
-
-
-def _fetch_lfs_or_raw(study_id: str, filename: str, target: Path) -> None:
-    media_url = MEDIA_URL_TEMPLATE.format(study_id=study_id, filename=filename)
-    try:
-        _download_url_to(media_url, target)
-        return
-    except Exception as media_err:
-        logger.debug("media URL failed for {}: {}; falling back to raw", filename, media_err)
-    raw_url = RAW_URL_TEMPLATE.format(study_id=study_id, filename=filename)
-    _download_url_to(raw_url, target)
-
-
-def _list_study_entries(study_id: str) -> list[dict[str, str]]:
-    url = GITHUB_API_TEMPLATE.format(study_id=study_id)
-    req = Request(url, headers={"Accept": "application/vnd.github+json"})
-    with urlopen(req) as resp:
-        data: bytes = resp.read()
-    parsed = json.loads(data.decode("utf-8"))
-    if not isinstance(parsed, list):
-        raise RuntimeError(f"Unexpected GitHub API response for {study_id}: {parsed!r}")
-    return parsed
 
 
 def _should_download(filename: str) -> bool:
     lowered = filename.lower()
     if filename in DOWNLOAD_EXACT_FILENAMES:
         return True
+    if any(lowered.endswith(ext) for ext in DOWNLOAD_EXTENSIONS):
+        return True
     if any(lowered.startswith(p) for p in EXCLUDED_DOWNLOAD_PREFIXES):
         return False
     return any(filename.startswith(p) for p in DOWNLOAD_PREFIXES)
-
-
-def _download_url_to(url: str, target: Path) -> None:
-    logger.info("Downloading {} -> {}", url, target)
-    with urlopen(url) as resp:
-        with target.open("wb") as out:
-            while True:
-                chunk = resp.read(1024 * 1024)
-                if not chunk:
-                    break
-                out.write(chunk)
 
 
 def parse_clinical_file(
@@ -143,6 +102,7 @@ def _clinical_column_comments(header: ClinicalHeader) -> dict[str, str]:
 
 def parse_maf(path: Path) -> tuple[pa.Table, dict[str, str], dict[str, str]]:
     column_names, data_rows, _ = read_tsv_rows(path, skip_comment_prefix=True)
+    column_names = dedupe_header_case_insensitive(column_names)
     column_types = {name: maf_column_type(name) for name in column_names}
     return rows_to_arrow(column_names, data_rows, column_types), column_types, {}
 
@@ -192,13 +152,44 @@ def parse_cna_file(
 def parse_gene_panel_matrix(
     path: Path,
 ) -> tuple[pa.Table, dict[str, str], dict[str, str]]:
-    column_names, data_rows, _ = read_tsv_rows(path, skip_comment_prefix=True)
-    column_types = {name: "VARCHAR" for name in column_names}
+    header, data_rows, _ = read_tsv_rows(path, skip_comment_prefix=True)
+    long_header, long_rows = gene_panel_long_rows(header, data_rows)
+    column_types = {name: "VARCHAR" for name in long_header}
+    rows_as_str: list[list[str]] = [
+        ["" if v is None else str(v) for v in row]
+        for row in long_rows
+    ]
     return (
-        rows_to_arrow(column_names, data_rows, column_types),
+        rows_to_arrow(long_header, rows_as_str, column_types),
         column_types,
         {},
     )
+
+
+def parse_segmented_cna(
+    path: Path,
+) -> tuple[pa.Table, dict[str, str], dict[str, str]]:
+    header, data_rows, _ = read_tsv_rows(path, skip_comment_prefix=True)
+    normalized = normalize_seg_header(header)
+    column_types = {
+        name: SEG_COLUMN_TYPES.get(name, "VARCHAR") for name in normalized
+    }
+    return (
+        rows_to_arrow(normalized, data_rows, column_types),
+        column_types,
+        {},
+    )
+
+
+def parse_lab_timeline(
+    path: Path,
+) -> tuple[pa.Table, dict[str, str], dict[str, str]]:
+    column_names, data_rows, _ = read_tsv_rows(path, skip_comment_prefix=True)
+    column_types: dict[str, str] = {name: "VARCHAR" for name in column_names}
+    for name in column_names:
+        if name.upper() == "VALUE":
+            column_types[name] = "DOUBLE"
+    return rows_to_arrow(column_names, data_rows, column_types), column_types, {}
 
 
 def parse_resource_file(
@@ -222,6 +213,10 @@ def iter_timeline_files(directory: Path) -> Iterator[tuple[str, Path]]:
             yield match.group("kind"), entry
 
 
+def timeline_table_name(kind: str) -> str:
+    return f"timeline_{kind.replace('-', '_')}"
+
+
 def _list_skipped_files(directory: Path) -> list[Path]:
     skipped: list[Path] = []
     for entry in sorted(directory.iterdir()):
@@ -242,33 +237,73 @@ def ingest_study(
     staging: Staging,
     cache_dir: Path,
 ) -> None:
+    schema_name = sanitize_schema_name(CBIOPORTAL_SCHEMA_PREFIX, study_id)
+    StudyRegistry(staging).register(
+        schema_name=schema_name,
+        original_study_id=study_id,
+        source_type="cbioportal",
+    )
+    staging.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema_name}"')
     study_dir = fetch_study_files(study_id, cache_dir)
-    _ingest_study_dir(study_id, study_dir, staging)
+    _ingest_study_dir(study_id, study_dir, staging, schema_name=schema_name)
 
 
-def _ingest_study_dir(study_id: str, study_dir: Path, staging: Staging) -> None:
+def _ingest_study_dir(
+    study_id: str,
+    study_dir: Path,
+    staging: Staging,
+    schema_name: str,
+) -> None:
     for skipped in _list_skipped_files(study_dir):
         logger.info("Skipping unsupported cBioPortal file: {}", skipped.name)
 
-    _try_ingest_clinical(study_dir, staging, "data_clinical_patient.txt", "patient")
-    _try_ingest_clinical(study_dir, staging, "data_clinical_sample.txt", "sample")
-    _try_ingest_maf(study_dir, staging)
-    _try_ingest_fixed_files(study_dir, staging)
+    _try_ingest_clinical(
+        study_dir, staging, "data_clinical_patient.txt", "patient",
+        schema_name=schema_name,
+    )
+    _try_ingest_clinical(
+        study_dir, staging, "data_clinical_sample.txt", "sample",
+        schema_name=schema_name,
+    )
+    _try_ingest_maf(study_dir, staging, schema_name=schema_name)
+    _try_ingest_fixed_files(study_dir, staging, schema_name=schema_name)
+    _try_ingest_seg_files(study_dir, staging, schema_name=schema_name)
     _ingest_prefix_matched_files(
         study_dir, staging,
         prefix="data_resource_", parser=parse_resource_file,
+        schema_name=schema_name,
     )
     _ingest_prefix_matched_files(
         study_dir, staging,
         prefix="data_clinical_supp_", parser=parse_clinical_file,
         uses_clinical_comments=True,
+        schema_name=schema_name,
     )
-    _ingest_timelines(study_dir, staging)
+    _ingest_timelines(study_dir, staging, schema_name=schema_name)
     logger.info("Finished ingesting cBioPortal study {}", study_id)
 
 
+def _try_ingest_seg_files(
+    study_dir: Path, staging: Staging, schema_name: str,
+) -> None:
+    seg_files = sorted(study_dir.glob("*.seg"))
+    if not seg_files:
+        return
+    for seg in seg_files:
+        rows, column_types, _ = parse_segmented_cna(seg)
+        staging.write_table(
+            schema=schema_name,
+            table="cna_segmented",
+            rows=rows,
+            column_types=column_types,
+            column_comments={},
+            table_comment=f"cBioPortal segmented CNA from {seg.name}",
+        )
+
+
 def _try_ingest_clinical(
-    study_dir: Path, staging: Staging, filename: str, table: str
+    study_dir: Path, staging: Staging, filename: str, table: str,
+    schema_name: str,
 ) -> None:
     path = study_dir / filename
     if not path.exists():
@@ -276,7 +311,7 @@ def _try_ingest_clinical(
         return
     rows, column_types, column_comments = parse_clinical_file(path)
     staging.write_table(
-        schema="cbioportal",
+        schema=schema_name,
         table=table,
         rows=rows,
         column_types=column_types,
@@ -302,7 +337,9 @@ _PARSERS_BY_FILENAME = {
 }
 
 
-def _try_ingest_fixed_files(study_dir: Path, staging: Staging) -> None:
+def _try_ingest_fixed_files(
+    study_dir: Path, staging: Staging, schema_name: str,
+) -> None:
     for filename, table_name, comment in _SIMPLE_FIXED_FILES:
         path = study_dir / filename
         if not path.exists():
@@ -310,7 +347,7 @@ def _try_ingest_fixed_files(study_dir: Path, staging: Staging) -> None:
         parser = _PARSERS_BY_FILENAME[filename]
         rows, column_types, _ = parser(path)
         staging.write_table(
-            schema="cbioportal",
+            schema=schema_name,
             table=table_name,
             rows=rows,
             column_types=column_types,
@@ -326,6 +363,7 @@ def _ingest_prefix_matched_files(
     prefix: str,
     parser: Any,
     uses_clinical_comments: bool = False,
+    schema_name: str,
 ) -> None:
     for entry in sorted(study_dir.iterdir()):
         if not (entry.is_file() and entry.name.startswith(prefix)):
@@ -337,7 +375,7 @@ def _ingest_prefix_matched_files(
         rows, column_types = result[0], result[1]
         comments = result[2] if uses_clinical_comments else {}
         staging.write_table(
-            schema="cbioportal",
+            schema=schema_name,
             table=table_name,
             rows=rows,
             column_types=column_types,
@@ -346,13 +384,15 @@ def _ingest_prefix_matched_files(
         )
 
 
-def _try_ingest_maf(study_dir: Path, staging: Staging) -> None:
+def _try_ingest_maf(
+    study_dir: Path, staging: Staging, schema_name: str,
+) -> None:
     for candidate in ("data_mutations.txt", "data_mutations_extended.txt"):
         path = study_dir / candidate
         if path.exists():
             rows, column_types, _ = parse_maf(path)
             staging.write_table(
-                schema="cbioportal",
+                schema=schema_name,
                 table="mutation",
                 rows=rows,
                 column_types=column_types,
@@ -363,20 +403,36 @@ def _try_ingest_maf(study_dir: Path, staging: Staging) -> None:
     logger.info("cBioPortal MAF missing in {}, skipping", study_dir.name)
 
 
-def _ingest_timelines(study_dir: Path, staging: Staging) -> None:
+def _ingest_timelines(
+    study_dir: Path, staging: Staging, schema_name: str,
+) -> None:
     timelines = list(iter_timeline_files(study_dir))
     if not timelines:
         logger.info("No cBioPortal timeline files present in {}", study_dir.name)
         return
     for kind, path in timelines:
-        rows, column_types, _ = parse_timeline_file(path)
+        parser = _select_timeline_parser(path)
+        rows, column_types, _ = parser(path)
+        table = timeline_table_name(kind)
         staging.write_table(
-            schema="cbioportal",
-            table=f"timeline_{kind}",
+            schema=schema_name,
+            table=table,
             rows=rows,
             column_types=column_types,
             column_comments={},
-            table_comment=f"cBioPortal timeline_{kind} from {path.name}",
+            table_comment=f"cBioPortal {table} from {path.name}",
         )
+
+
+def _select_timeline_parser(path: Path) -> Any:
+    header_lines = read_header_block(path, max_lines=4)
+    for line in header_lines:
+        if line.startswith("#"):
+            continue
+        column_names = line.rstrip("\n").split("\t")
+        if is_lab_timeline_header(column_names):
+            return parse_lab_timeline
+        return parse_timeline_file
+    return parse_timeline_file
 
 

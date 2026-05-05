@@ -47,6 +47,30 @@ class Staging:
         ).fetchall()
         return [r[0] for r in rows]
 
+    def list_registered_schemas(self) -> list[str]:
+        from sema.ingest.duckdb_staging_utils import KNOWN_SHARED_SCHEMAS
+
+        names: set[str] = set(KNOWN_SHARED_SCHEMAS)
+        registry_exists = self._conn.execute(
+            "SELECT count(*) FROM duckdb_tables() "
+            "WHERE schema_name = '_sema' AND table_name = '_sema_study_registry'"
+        ).fetchone()
+        if registry_exists and registry_exists[0]:
+            rows = self._conn.execute(
+                'SELECT schema_name FROM "_sema"."_sema_study_registry"'
+            ).fetchall()
+            for row in rows:
+                names.add(row[0])
+        return sorted(names)
+
+    def list_all_schemas(self) -> list[str]:
+        from sema.ingest.duckdb_staging_utils import SYSTEM_SCHEMAS
+
+        rows = self._conn.execute(
+            "SELECT schema_name FROM information_schema.schemata"
+        ).fetchall()
+        return sorted(r[0] for r in rows if r[0] not in SYSTEM_SCHEMAS)
+
     def drop_table(self, schema: str, table: str) -> None:
         self._conn.execute(f"DROP TABLE IF EXISTS {qualified(schema, table)}")
 

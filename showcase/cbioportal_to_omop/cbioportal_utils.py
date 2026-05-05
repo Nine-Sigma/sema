@@ -46,6 +46,28 @@ DOWNLOAD_EXACT_FILENAMES: frozenset[str] = frozenset({
     "data_gene_panel_matrix.txt",
 })
 
+DOWNLOAD_EXTENSIONS: tuple[str, ...] = (".seg",)
+
+LAB_TIMELINE_REQUIRED_COLUMNS: frozenset[str] = frozenset({"TEST", "VALUE", "UNITS"})
+
+SEG_COLUMN_RENAMES: dict[str, str] = {
+    "ID": "sample_id",
+    "chrom": "chrom",
+    "loc.start": "loc_start",
+    "loc.end": "loc_end",
+    "num.mark": "num_mark",
+    "seg.mean": "seg_mean",
+}
+
+SEG_COLUMN_TYPES: dict[str, str] = {
+    "sample_id": "VARCHAR",
+    "chrom": "VARCHAR",
+    "loc_start": "BIGINT",
+    "loc_end": "BIGINT",
+    "num_mark": "BIGINT",
+    "seg_mean": "DOUBLE",
+}
+
 DOWNLOAD_PREFIXES: tuple[str, ...] = (
     "data_clinical_",
     "data_timeline_",
@@ -72,7 +94,7 @@ SKIP_FILENAME_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^data_rppa.*\.txt$"),
 )
 
-TIMELINE_PATTERN = re.compile(r"^data_timeline_(?P<kind>[a-zA-Z0-9_]+)\.txt$")
+TIMELINE_PATTERN = re.compile(r"^data_timeline_(?P<kind>[a-zA-Z0-9_-]+)\.txt$")
 
 
 @dataclass
@@ -124,6 +146,47 @@ def sv_column_type(name: str) -> str:
     return "VARCHAR"
 
 
+def normalize_seg_header(header: list[str]) -> list[str]:
+    return [SEG_COLUMN_RENAMES.get(h.strip(), h.strip().replace(".", "_")) for h in header]
+
+
+def gene_panel_long_rows(
+    header: list[str], data_rows: list[list[str]],
+) -> tuple[list[str], list[list[str | None]]]:
+    """Pivot gene panel matrix from wide (sample × assay) to long.
+
+    Wide:  SAMPLE_ID | mutations | cna | sv ...
+    Long:  sample_id, panel_id, assay  (one row per non-blank cell)
+    """
+    if not header:
+        raise ValueError("gene_panel_matrix header is empty")
+    sample_col = _find_sample_column_index(header)
+    out_header = ["sample_id", "panel_id", "assay"]
+    out_rows: list[list[str | None]] = []
+    for row in data_rows:
+        sample = row[sample_col] if sample_col < len(row) else ""
+        for idx, col_name in enumerate(header):
+            if idx == sample_col:
+                continue
+            value = row[idx].strip() if idx < len(row) and row[idx] else ""
+            if not value:
+                continue
+            out_rows.append([sample, value, col_name])
+    return out_header, out_rows
+
+
+def _find_sample_column_index(header: list[str]) -> int:
+    for i, name in enumerate(header):
+        if name.strip().lower() in {"sample_id", "sample id"}:
+            return i
+    return 0
+
+
+def is_lab_timeline_header(column_names: list[str]) -> bool:
+    upper = {c.upper() for c in column_names}
+    return LAB_TIMELINE_REQUIRED_COLUMNS.issubset(upper)
+
+
 def cna_long_format_rows(
     header: list[str], data_rows: list[list[str]],
 ) -> tuple[list[str], list[list[str | None]]]:
@@ -169,6 +232,27 @@ def _identify_cna_gene_columns(header: list[str]) -> dict[str, int]:
 
 def open_text_defensive(path: Path) -> IO[str]:
     return path.open("r", encoding="utf-8", errors="replace")
+
+
+def dedupe_header_case_insensitive(header: list[str]) -> list[str]:
+    """Suffix duplicate column names so DuckDB's case-insensitive identifier
+    rule does not reject the CREATE TABLE.
+
+    cBioPortal MAF files in some studies (e.g. MSK CHORD 2024) ship with
+    case-variant duplicates such as `Comments` / `comments`. The first
+    occurrence keeps its original casing; subsequent collisions append
+    `_2`, `_3`, etc., based on lower-cased identity.
+    """
+    seen: dict[str, int] = {}
+    deduped: list[str] = []
+    for name in header:
+        key = name.lower()
+        seen[key] = seen.get(key, 0) + 1
+        if seen[key] == 1:
+            deduped.append(name)
+        else:
+            deduped.append(f"{name}_{seen[key]}")
+    return deduped
 
 
 def read_tsv_rows(

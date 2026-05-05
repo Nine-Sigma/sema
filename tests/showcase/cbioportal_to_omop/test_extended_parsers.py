@@ -110,9 +110,9 @@ class TestParseGenePanelMatrix:
             "SAMPLE-2\tIMPACT410\tIMPACT410\tIMPACT410\n",
         )
         rows, types, _ = parse_gene_panel_matrix(path)
-        assert rows.num_rows == 2
-        assert "SAMPLE_ID" in rows.column_names
-        assert types["mutations"] == "VARCHAR"
+        assert set(rows.column_names) == {"sample_id", "panel_id", "assay"}
+        assert rows.num_rows == 6  # 2 samples × 3 assays
+        assert types["assay"] == "VARCHAR"
 
 
 class TestParseResourceFile:
@@ -192,7 +192,7 @@ class TestIngestStudyDirWiringNewTables:
             db_path=str(tmp_path / "db.duckdb"),
             schemas=("cbioportal",),
         )
-        _ingest_study_dir("test_study", study_dir, staging)
+        _ingest_study_dir("test_study", study_dir, staging, schema_name="cbioportal")
         for tbl in (
             "structural_variant", "cna", "gene_panel_matrix",
             "resource_definition", "resource_patient",
@@ -200,3 +200,35 @@ class TestIngestStudyDirWiringNewTables:
             info = staging.describe("cbioportal", tbl)
             assert info.columns, f"{tbl} should have columns"
         staging.close()
+
+
+class TestParseMafCaseInsensitiveDedupe:
+    def test_duplicate_columns_are_suffixed(self, tmp_path: Path) -> None:
+        from showcase.cbioportal_to_omop.parsers import parse_maf
+
+        path = _write(
+            tmp_path / "data_mutations.txt",
+            "Hugo_Symbol\tComments\tcomments\tCOMMENTS\tcDNA_Change\tcdna_change\n"
+            "TP53\ta\tb\tc\tCGA\tcga\n",
+        )
+        rows, types, _ = parse_maf(path)
+        cols = list(types.keys())
+        assert cols.count("Comments") == 1
+        assert "comments_2" in cols
+        assert "COMMENTS_3" in cols
+        assert "cDNA_Change" in cols
+        assert "cdna_change_2" in cols
+        assert rows.num_rows == 1
+
+    def test_first_occurrence_keeps_original_casing(self, tmp_path: Path) -> None:
+        from showcase.cbioportal_to_omop.parsers import parse_maf
+
+        path = _write(
+            tmp_path / "data_mutations.txt",
+            "Hugo_Symbol\ttranscript\tTranscript\n"
+            "TP53\tNM_1\tNM_2\n",
+        )
+        _, types, _ = parse_maf(path)
+        cols = list(types.keys())
+        assert "transcript" in cols
+        assert "Transcript_2" in cols

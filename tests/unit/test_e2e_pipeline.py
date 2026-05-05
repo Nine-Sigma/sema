@@ -142,7 +142,7 @@ class TestConcurrentMultipleTables:
             ]
             loader = MagicMock()
 
-            def capture(assertions):
+            def capture(assertions, source_schema=None):
                 committed_counts.append(len(assertions))
             loader.commit_table_assertions.side_effect = capture
 

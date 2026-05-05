@@ -223,12 +223,27 @@ class TestJoinPathOperations:
             "t1/c1=t2/c2",
             from_table_ref="databricks://ws/cat/sch/t1",
             to_table_ref="databricks://ws/cat/sch/t2",
+            source_schema="sch",
         )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
         assert "FROM_ENTITY" in cypher
         assert "TO_ENTITY" in cypher
         assert "ENTITY_ON_TABLE" in cypher
+
+    def test_add_join_path_entity_links_requires_source_schema(
+        self, loader,
+    ):
+        with pytest.raises(ValueError, match="source_schema"):
+            loader.add_join_path_entity_links(
+                "t1/c1=t2/c2",
+                from_table_ref="t1",
+                to_table_ref="t2",
+            )
+
+    def test_add_join_path_uses_requires_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            loader.add_join_path_uses("jp", "t1")
 
 
 class TestAssertionStorage:

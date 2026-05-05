@@ -1,0 +1,56 @@
+# MSK CHORD 2024 holdout slice — 9 tables disjoint from dev + few-shot sources.
+#
+# Holdout reserves tables NOT used as few-shot sources (per
+# contamination_map.yaml) AND NOT in the dev slice. Used for unbiased
+# evaluation of the pipeline's ability to generalize.
+#
+# Adjust this list once MSK CHORD has actually been ingested and the real
+# table inventory is known. The names below are speculative based on
+# typical cBioPortal study layouts — names that don't materialize in the
+# DuckDB schema after ingest will simply produce no rows in the slice run.
+
+version: 1
+created: "2026-04-24"
+catalog: workspace
+schema: cbioportal_msk_chord_2024
+
+tables:
+  - table_name: timeline_radiation_therapy
+    reason: "Radiation timeline; not used as few-shot source"
+    failure_mode: encoded_categorical
+    tier: standard
+
+  - table_name: timeline_specimen_collection
+    reason: "Specimen sampling timeline; not seeded by few-shots"
+    failure_mode: encoded_categorical
+    tier: standard
+
+  - table_name: timeline_sequencing
+    reason: "Sequencing event timeline; new shape for the eval"
+    failure_mode: encoded_categorical
+    tier: standard
+
+  - table_name: timeline_diagnosis
+    reason: "Diagnosis timeline events"
+    failure_mode: mixed_semantic_types
+    tier: standard
+
+  - table_name: timeline_brain_imaging
+    reason: "Sub-modality imaging timeline; modality-specific"
+    failure_mode: encoded_categorical
+    tier: standard
+
+  - table_name: resource_definition
+    reason: "Resource metadata; non-clinical entity"
+    failure_mode: non_clinical_entity
+    tier: edge
+
+  - table_name: resource_patient
+    reason: "Resource-to-patient bridge"
+    failure_mode: identifier_only
+    tier: edge
+
+  - table_name: clinical_supp_panel
+    reason: "Supplemental clinical attributes (panel-specific)"
+    failure_mode: mixed_semantic_types
+    tier: standard
