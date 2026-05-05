@@ -9,6 +9,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from sema.engine.semantic_utils import (
+    LLMAttempt,
+    hash_prompt,
+    stringify_response,
+)
 from sema.engine.stage_utils import (
     PromptLayers,
     build_stage_a_prompt,
@@ -22,7 +27,7 @@ from sema.engine.stage_utils import (
     sanitize_column_name,
     should_trigger_stage_c,
 )
-from sema.llm_client import LLMStageError
+from sema.llm_client import LLMStageError, StageBFailureError
 from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
@@ -68,12 +73,51 @@ class SemanticEngine:
         column_batch_size: int = 25,
         domain_context: DomainContext | None = None,
         prompt_layers: PromptLayers | None = None,
+        capture_llm_attempts: bool = False,
+        metadata_tier: str = "rich",
+        partial_coverage_floor: float = 0.60,
     ) -> None:
         self._llm_client = llm_client
         self._run_id = run_id or str(uuid.uuid4())
         self._column_batch_size = column_batch_size
         self._domain_context = domain_context
         self._layers = prompt_layers or PromptLayers()
+        self._capture_attempts = capture_llm_attempts
+        self._llm_attempts: list[LLMAttempt] = []
+        self._metadata_tier = metadata_tier
+        self._partial_coverage_floor = partial_coverage_floor
+
+    def snapshot_llm_attempts(self) -> list[LLMAttempt]:
+        """Return a shallow copy of the per-table attempt buffer."""
+        return list(self._llm_attempts)
+
+    def _record_attempt(
+        self,
+        stage: str,
+        prompt: str,
+        batch_index: int | None,
+    ) -> LLMAttempt | None:
+        if not self._capture_attempts:
+            return None
+        attempt = LLMAttempt(
+            stage=stage,
+            batch_index=batch_index,
+            prompt_text=prompt,
+            prompt_hash=hash_prompt(prompt),
+            raw_response=None,
+            parsed_ok=False,
+        )
+        self._llm_attempts.append(attempt)
+        return attempt
+
+    def _finalize_attempt(
+        self, attempt: LLMAttempt | None, parsed_ok: bool,
+    ) -> None:
+        if attempt is None:
+            return
+        raw = getattr(self._llm_client, "last_response", None)
+        attempt.raw_response = stringify_response(raw)
+        attempt.parsed_ok = parsed_ok
 
     def run_stage_a(
         self, table_metadata: dict[str, Any],
@@ -91,12 +135,23 @@ class SemanticEngine:
             table_metadata, domain_context=self._domain_context,
             layers=self._layers,
         )
-        return self._llm_client.invoke(  # type: ignore[no-any-return]
-            prompt,
-            StageAResult,
-            table_ref=table_ref,
-            stage_name="L2 stage_a",
-        )
+        attempt = self._record_attempt("L2 stage_a", prompt, None)
+        try:
+            result = self._llm_client.invoke(
+                prompt,
+                StageAResult,
+                table_ref=table_ref,
+                stage_name="L2 stage_a",
+            )
+        except LLMStageError as exc:
+            self._finalize_attempt(attempt, parsed_ok=False)
+            exc.llm_attempts = self.snapshot_llm_attempts()
+            raise
+        except Exception:
+            self._finalize_attempt(attempt, parsed_ok=False)
+            raise
+        self._finalize_attempt(attempt, parsed_ok=True)
+        return result  # type: ignore[no-any-return]
 
     def _invoke_stage_b_batch(
         self,
@@ -104,18 +159,29 @@ class SemanticEngine:
         batch: list[dict[str, Any]],
         stage_a: StageAResult,
         table_ref: str,
+        batch_index: int | None = None,
     ) -> StageBBatchResult:
         prompt = build_stage_b_prompt(
             table_metadata, batch, stage_a,
             domain_context=self._domain_context,
             layers=self._layers,
         )
-        result: StageBBatchResult = self._llm_client.invoke(
-            prompt,
-            StageBBatchResult,
-            table_ref=table_ref,
-            stage_name="L2 stage_b",
-        )
+        attempt = self._record_attempt("L2 stage_b", prompt, batch_index)
+        try:
+            result: StageBBatchResult = self._llm_client.invoke(
+                prompt,
+                StageBBatchResult,
+                table_ref=table_ref,
+                stage_name="L2 stage_b",
+            )
+        except LLMStageError as exc:
+            self._finalize_attempt(attempt, parsed_ok=False)
+            exc.llm_attempts = self.snapshot_llm_attempts()
+            raise
+        except Exception:
+            self._finalize_attempt(attempt, parsed_ok=False)
+            raise
+        self._finalize_attempt(attempt, parsed_ok=True)
         for c in result.columns:
             c.column = sanitize_column_name(c.column)
         return result
@@ -126,6 +192,7 @@ class SemanticEngine:
         batch: list[dict[str, Any]],
         stage_a: StageAResult,
         table_ref: str,
+        batch_index: int = 0,
     ) -> tuple[list[StageBBatchResult], list[dict[str, Any]], int, int]:
         """Run a batch with bounded recovery: retry once, split once.
 
@@ -137,22 +204,22 @@ class SemanticEngine:
         try:
             result = self._invoke_stage_b_batch(
                 table_metadata, batch, stage_a, table_ref,
+                batch_index=batch_index,
             )
             return [result], [], retries, splits
         except LLMStageError:
             pass
 
-        # Retry once
         retries += 1
         try:
             result = self._invoke_stage_b_batch(
                 table_metadata, batch, stage_a, table_ref,
+                batch_index=batch_index,
             )
             return [result], [], retries, splits
         except LLMStageError:
             pass
 
-        # Split into two halves — no further recovery on sub-batches
         if len(batch) < 2:
             return [], batch, retries, splits
 
@@ -164,6 +231,7 @@ class SemanticEngine:
             try:
                 r = self._invoke_stage_b_batch(
                     table_metadata, half, stage_a, table_ref,
+                    batch_index=batch_index,
                 )
                 results.append(r)
             except LLMStageError:
@@ -185,6 +253,7 @@ class SemanticEngine:
         try:
             result = self._invoke_stage_b_batch(
                 table_metadata, crit_batch, stage_a, table_ref,
+                batch_index=None,
             )
             remaining = [c for c in failed_cols if c["name"] not in critical]
             return [result], remaining
@@ -214,13 +283,16 @@ class SemanticEngine:
         total_splits = 0
         rescues_used = 0
 
+        batch_idx = 0
         for i in range(0, len(columns), self._column_batch_size):
             batch = columns[i:i + self._column_batch_size]
             results, failed, retries, splits = (
                 self._run_batch_with_recovery(
                     table_metadata, batch, stage_a, table_ref,
+                    batch_index=batch_idx,
                 )
             )
+            batch_idx += 1
             all_batches.extend(results)
             all_failed.extend(failed)
             total_retries += retries
@@ -282,6 +354,8 @@ class SemanticEngine:
             raw_coverage=raw_cov,
             critical_coverage=crit_cov,
             unresolved=unresolved,
+            metadata_tier=self._metadata_tier,
+            partial_coverage_floor=self._partial_coverage_floor,
         )
 
         return StageBResult(
@@ -359,6 +433,7 @@ class SemanticEngine:
             domain_context=self._domain_context,
             layers=self._layers,
         )
+        attempt = self._record_attempt("L2 stage_c", prompt, None)
         try:
             batch_result = self._llm_client.invoke(
                 prompt,
@@ -366,16 +441,18 @@ class SemanticEngine:
                 table_ref=table_ref,
                 stage_name="L2 stage_c",
             )
-            for cr in batch_result.columns:
-                results[cr.column] = cr
-        except LLMStageError:
-            # Fallback: try per-column on batch failure
+        except LLMStageError as exc:
+            self._finalize_attempt(attempt, parsed_ok=False)
+            exc.llm_attempts = self.snapshot_llm_attempts()
             for entry in prompt_input:
                 col_name = entry["column"]
                 single_prompt = build_stage_c_prompt(
                     [entry], stage_a,
                     domain_context=self._domain_context,
                     layers=self._layers,
+                )
+                single_attempt = self._record_attempt(
+                    "L2 stage_c", single_prompt, None,
                 )
                 try:
                     cr = self._llm_client.invoke(
@@ -384,12 +461,19 @@ class SemanticEngine:
                         table_ref=table_ref,
                         stage_name="L2 stage_c",
                     )
-                    results[cr.column] = cr
                 except LLMStageError:
+                    self._finalize_attempt(single_attempt, parsed_ok=False)
                     logger.warning(
                         f"Stage C failed for {col_name} "
                         f"in {table_ref}"
                     )
+                    continue
+                self._finalize_attempt(single_attempt, parsed_ok=True)
+                results[cr.column] = cr
+            return results
+        self._finalize_attempt(attempt, parsed_ok=True)
+        for cr in batch_result.columns:
+            results[cr.column] = cr
         return results
 
     def interpret_table_staged(
@@ -417,6 +501,7 @@ class SemanticEngine:
         """Same as `interpret_table_staged` plus per-stage metrics."""
         import time
 
+        self._llm_attempts = []
         metrics = StageMetrics()
         original_invoke = self._llm_client.invoke
 
@@ -447,12 +532,16 @@ class SemanticEngine:
                     "table_ref",
                     f"unity://{table_metadata.get('table_name', 'unknown')}",
                 )
-                raise LLMStageError(
+                raise StageBFailureError(
                     table_ref=table_ref,
                     stage_name="L2 stage_b",
                     step_errors=[("stage_b", ValueError(
                         f"B_FAILED: raw={stage_b.raw_coverage.pct}"
                     ))],
+                    stage_a=stage_a,
+                    stage_b=stage_b,
+                    metrics=metrics,
+                    llm_attempts=self.snapshot_llm_attempts(),
                 )
 
             start = time.monotonic_ns()

@@ -65,6 +65,7 @@ _KEY_PATTERN = re.compile(
 )
 
 _RAW_COVERAGE_THRESHOLD = 0.75
+_DEFAULT_PARTIAL_COVERAGE_FLOOR = 0.60
 
 
 # -- Shared formatting helpers ---------------------------------------------
@@ -426,13 +427,26 @@ def determine_b_status(
     raw_coverage: StageBCoverage,
     critical_coverage: StageBCoverage,
     unresolved: list[UnresolvedColumn],
+    metadata_tier: str = "rich",
+    partial_coverage_floor: float = _DEFAULT_PARTIAL_COVERAGE_FLOOR,
 ) -> Literal["B_SUCCESS", "B_PARTIAL", "B_FAILED"]:
-    """Determine Stage B outcome from coverage metrics."""
+    """Determine Stage B outcome from coverage metrics.
+
+    Tier-keyed `B_PARTIAL` admission floor:
+      - `rich` keeps the existing 0.75 floor.
+      - `sparse` / `name_only` lower the floor to `partial_coverage_floor`
+        (default 0.60), reflecting that the LLM had degraded inputs.
+    `B_SUCCESS` and the critical-coverage floor are unchanged.
+    """
     if critical_coverage.total > 0 and critical_coverage.pct < 1.0:
         return "B_FAILED"
     if raw_coverage.pct >= 1.0 and not unresolved:
         return "B_SUCCESS"
-    if raw_coverage.pct >= _RAW_COVERAGE_THRESHOLD:
+    if metadata_tier == "rich":
+        floor = _RAW_COVERAGE_THRESHOLD
+    else:
+        floor = partial_coverage_floor
+    if raw_coverage.pct >= floor:
         return "B_PARTIAL"
     return "B_FAILED"
 

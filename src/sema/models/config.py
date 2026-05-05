@@ -117,6 +117,13 @@ class BuildConfig(BaseSettings):
     circuit_breaker_timeout: int = 60
     circuit_breaker_success_threshold: int = 2
 
+    partial_coverage_floor: float = 0.60
+    metadata_rich_column_comment_floor: float = 0.60
+
+    quality_budget_max_failure_rate: float = 0.30
+    quality_budget_max_non_contributing_rate: float = 0.40
+    quality_budget_min_processed: int = 5
+
     databricks: DatabricksConfig = Field(default_factory=DatabricksConfig)
     neo4j: Neo4jConfig = Field(default_factory=Neo4jConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)

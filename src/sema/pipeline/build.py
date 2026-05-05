@@ -60,6 +60,9 @@ class TableResult:
 
     skip_reason: str | None = None
 
+    partial: bool = False
+    metadata_tier: str | None = None
+
     @classmethod
     def success(
         cls,
@@ -67,6 +70,8 @@ class TableResult:
         entities: int = 0,
         properties: int = 0,
         terms: int = 0,
+        partial: bool = False,
+        metadata_tier: str | None = None,
     ) -> TableResult:
         return cls(
             table_ref=table_ref,
@@ -74,17 +79,21 @@ class TableResult:
             entities_created=entities,
             properties_created=properties,
             terms_created=terms,
+            partial=partial,
+            metadata_tier=metadata_tier,
         )
 
     @classmethod
     def failed(
-        cls, table_ref: str, stage: str, error: str
+        cls, table_ref: str, stage: str, error: str,
+        metadata_tier: str | None = None,
     ) -> TableResult:
         return cls(
             table_ref=table_ref,
             status="failed",
             failed_stage=stage,
             error_message=error,
+            metadata_tier=metadata_tier,
         )
 
     @classmethod
@@ -150,7 +159,9 @@ def _try_resume(
     stored_dicts = loader.load_assertions(work_item.fqn)
     stored_assertions = _reconstruct_assertions(stored_dicts)
     from sema.graph.materializer import materialize_unified
-    materialize_unified(loader, stored_assertions)
+    materialize_unified(
+        loader, stored_assertions, source_schema=work_item.schema,
+    )
     return TableResult.skipped(work_item.fqn, "resume: assertions exist")
 
 
@@ -167,6 +178,8 @@ def process_table(
     prompt_layers: Any = None,
     eval_dump_dir: str | None = None,
     eval_config_label: str = "run",
+    partial_coverage_floor: float = 0.60,
+    metadata_rich_column_comment_floor: float = 0.60,
 ) -> TableResult:
     """Process a single table through all pipeline stages."""
     if resume:
@@ -181,19 +194,51 @@ def process_table(
             vocab_workers=vocab_workers,
             domain_context=domain_context,
             prompt_layers=prompt_layers,
+            eval_dump_dir=eval_dump_dir,
+            partial_coverage_floor=partial_coverage_floor,
+            metadata_rich_column_comment_floor=(
+                metadata_rich_column_comment_floor
+            ),
         )
         if isinstance(result, TableResult):
             return result
         all_assertions, staged_output = result
     except CircuitOpenError as e:
         logger.warning(f"Table {work_item.fqn} skipped (circuit open): {e}")
-        return TableResult.failed(work_item.fqn, "circuit_breaker", str(e))
+        tier = getattr(e, "metadata_tier", None)
+        _write_failure_artifact(
+            e, work_item.fqn, "circuit_breaker",
+            eval_dump_dir, eval_config_label, run_id,
+            metadata_tier=tier,
+        )
+        return TableResult.failed(
+            work_item.fqn, "circuit_breaker", str(e),
+            metadata_tier=tier,
+        )
     except LLMStageError as e:
         logger.warning(f"Table {work_item.fqn} failed: {e}")
-        return TableResult.failed(work_item.fqn, e.stage_name, str(e))
+        tier = getattr(e, "metadata_tier", None)
+        _write_failure_artifact(
+            e, work_item.fqn, e.stage_name,
+            eval_dump_dir, eval_config_label, run_id,
+            metadata_tier=tier,
+        )
+        return TableResult.failed(
+            work_item.fqn, e.stage_name, str(e),
+            metadata_tier=tier,
+        )
     except Exception as e:
         logger.warning(f"Table {work_item.fqn} failed: {e}")
-        return TableResult.failed(work_item.fqn, "unknown", str(e))
+        tier = getattr(e, "metadata_tier", None)
+        _write_failure_artifact(
+            e, work_item.fqn, "unknown",
+            eval_dump_dir, eval_config_label, run_id,
+            metadata_tier=tier,
+        )
+        return TableResult.failed(
+            work_item.fqn, "unknown", str(e),
+            metadata_tier=tier,
+        )
 
     if eval_dump_dir:
         _dump_for_eval(
@@ -202,12 +247,57 @@ def process_table(
         )
 
     entity_count, prop_count, term_count = _count_results(all_assertions)
+    tier = getattr(staged_output, "metadata_tier", None)
+    is_partial = bool(
+        getattr(staged_output, "stage_b", None)
+        and getattr(staged_output.stage_b, "status", None) == "B_PARTIAL"
+    )
+    if is_partial and tier is not None:
+        raw_pct = getattr(
+            staged_output.stage_b.raw_coverage, "pct", 0.0,
+        )
+        logger.warning(
+            f"partial commit: table_ref={work_item.fqn} "
+            f"tier={tier} raw_coverage={raw_pct:.4f}"
+        )
     return TableResult.success(
         work_item.fqn,
         entities=entity_count,
         properties=prop_count,
         terms=term_count,
+        partial=is_partial,
+        metadata_tier=tier,
     )
+
+
+def _write_failure_artifact(
+    exc: BaseException,
+    table_ref: str,
+    failure_stage: str,
+    eval_dump_dir: str | None,
+    label: str,
+    run_id: str,
+    metadata_tier: str | None = None,
+) -> None:
+    """Best-effort failure artifact write — never raises."""
+    if not eval_dump_dir:
+        return
+    try:
+        from sema.eval.failure_artifact import dump_table_failure_artifact
+
+        dump_table_failure_artifact(
+            exc=exc,
+            table_ref=table_ref,
+            label=label,
+            output_dir=eval_dump_dir,
+            run_id=run_id,
+            failure_stage=failure_stage,
+            metadata_tier=metadata_tier,
+        )
+    except Exception as e:
+        logger.warning(
+            f"Failure-artifact write failed for {table_ref}: {e}"
+        )
 
 
 def _dump_for_eval(
@@ -251,17 +341,26 @@ def aggregate_report(
     """Aggregate TableResult list into a build report."""
     report: dict[str, Any] = {
         "tables_processed": 0,
+        "tables_succeeded_full": 0,
+        "tables_succeeded_partial": 0,
         "entities_created": 0,
         "properties_created": 0,
         "terms_created": 0,
         "tables_failed": 0,
         "tables_skipped": 0,
         "failed_tables": [],
+        "metadata_tier_counts": {"rich": 0, "sparse": 0, "name_only": 0},
     }
 
     for r in results:
+        if r.metadata_tier in report["metadata_tier_counts"]:
+            report["metadata_tier_counts"][r.metadata_tier] += 1
         if r.status == "success":
             report["tables_processed"] += 1
+            if r.partial:
+                report["tables_succeeded_partial"] += 1
+            else:
+                report["tables_succeeded_full"] += 1
             report["entities_created"] += r.entities_created
             report["properties_created"] += r.properties_created
             report["terms_created"] += r.terms_created
@@ -271,6 +370,7 @@ def aggregate_report(
                 "table": r.table_ref,
                 "stage": r.failed_stage,
                 "error": r.error_message,
+                "metadata_tier": r.metadata_tier,
             })
         elif r.status == "skipped":
             report["tables_skipped"] += 1

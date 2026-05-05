@@ -110,7 +110,9 @@ def _run_extraction(
 class _StagedOutput:
     """Carries staged intermediates for enriched vocab context."""
 
-    __slots__ = ("stage_a", "stage_b", "status", "telemetry")
+    __slots__ = (
+        "stage_a", "stage_b", "status", "telemetry", "metadata_tier",
+    )
 
     def __init__(
         self,
@@ -118,11 +120,13 @@ class _StagedOutput:
         stage_b: StageBResult,
         status: StageStatus,
         telemetry: Any = None,
+        metadata_tier: str | None = None,
     ) -> None:
         self.stage_a = stage_a
         self.stage_b = stage_b
         self.status = status
         self.telemetry = telemetry
+        self.metadata_tier = metadata_tier
 
 
 def _run_semantic_interpretation(
@@ -133,6 +137,9 @@ def _run_semantic_interpretation(
     column_batch_size: int,
     domain_context: DomainContext | None = None,
     prompt_layers: Any = None,
+    capture_llm_attempts: bool = False,
+    metadata_tier: str = "rich",
+    partial_coverage_floor: float = 0.60,
 ) -> tuple[list[Assertion], _StagedOutput]:
     from sema.engine.semantic import SemanticEngine
 
@@ -147,6 +154,9 @@ def _run_semantic_interpretation(
         column_batch_size=column_batch_size,
         domain_context=domain_context,
         prompt_layers=prompt_layers,
+        capture_llm_attempts=capture_llm_attempts,
+        metadata_tier=metadata_tier,
+        partial_coverage_floor=partial_coverage_floor,
     )
 
     assertions, stage_a, stage_b, c_results, metrics = (
@@ -174,7 +184,8 @@ def _run_semantic_interpretation(
         f"coverage: {tel.raw_coverage_pct:.0%})"
     )
     return assertions, _StagedOutput(
-        stage_a, stage_b, status, telemetry=tel,
+        stage_a, stage_b, status,
+        telemetry=tel, metadata_tier=metadata_tier,
     )
 
 
@@ -467,6 +478,9 @@ def _run_pipeline_stages(
     vocab_workers: int = 8,
     domain_context: DomainContext | None = None,
     prompt_layers: Any = None,
+    eval_dump_dir: str | None = None,
+    partial_coverage_floor: float = 0.60,
+    metadata_rich_column_comment_floor: float = 0.60,
 ) -> tuple[list[Assertion], _StagedOutput] | Any:
     """Run all pipeline stages for a single table.
 
@@ -490,12 +504,28 @@ def _run_pipeline_stages(
             work_item.fqn, "no table metadata"
         )
 
-    semantic_assertions, staged_output = _run_semantic_interpretation(
-        table_meta, work_item, llm_client, run_id,
-        column_batch_size,
-        domain_context=domain_context,
-        prompt_layers=prompt_layers,
+    from sema.engine.metadata_tier import classify_metadata_tier
+    tier = classify_metadata_tier(
+        table_meta,
+        rich_floor=metadata_rich_column_comment_floor,
     )
+
+    try:
+        semantic_assertions, staged_output = _run_semantic_interpretation(
+            table_meta, work_item, llm_client, run_id,
+            column_batch_size,
+            domain_context=domain_context,
+            prompt_layers=prompt_layers,
+            capture_llm_attempts=bool(eval_dump_dir),
+            metadata_tier=tier,
+            partial_coverage_floor=partial_coverage_floor,
+        )
+    except BaseException as exc:
+        try:
+            exc.metadata_tier = tier  # type: ignore[attr-defined]
+        except (AttributeError, TypeError):
+            pass
+        raise
     all_assertions.extend(semantic_assertions)
 
     vocab_assertions = _run_vocabulary_alignment(

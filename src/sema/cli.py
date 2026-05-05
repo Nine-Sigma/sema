@@ -69,6 +69,10 @@ def cli() -> None:
     "--materialize-structural-fk", is_flag=True, default=False,
     help="Lower materialization threshold to 0.70 so Tier-3 (name+type only) FK candidates promote to JoinPath nodes",
 )
+@click.option(
+    "--no-quality-budget", is_flag=True, default=False,
+    help="Disable both run-level quality budget triggers (graph-health and run-reliability)",
+)
 @click.option("--verbose", is_flag=True, default=False, help="Enable verbose output")
 def build(
     source: str | None,
@@ -88,6 +92,7 @@ def build(
     resume: bool,
     enable_fk_detection: bool,
     materialize_structural_fk: bool,
+    no_quality_budget: bool,
     verbose: bool,
 ) -> None:
     """Build the knowledge graph from a data source."""
@@ -104,6 +109,9 @@ def build(
         materialize_structural_fk=materialize_structural_fk,
         verbose=verbose,
     )
+    if no_quality_budget:
+        build_config.quality_budget_max_failure_rate = 1.0
+        build_config.quality_budget_max_non_contributing_rate = 1.0
     try:
         report = run_build(build_config)
         click.echo("\nBuild Report")
@@ -125,6 +133,10 @@ def build(
             else:
                 click.echo(f"  {label}: {value}")
     except Exception as e:
+        from sema.pipeline.quality_budget import QualityBudgetExceeded
+        if isinstance(e, QualityBudgetExceeded):
+            click.echo(f"Quality budget exceeded: {e}", err=True)
+            sys.exit(7)
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
