@@ -57,3 +57,10 @@ class StudyRegistry:
             f"SELECT schema_name FROM {_QUALIFIED} ORDER BY schema_name"
         ).fetchall()
         return [r[0] for r in rows]
+
+    def find_schema_for_study(self, study_id: str) -> str | None:
+        row = self._staging.execute(
+            f"SELECT schema_name FROM {_QUALIFIED} WHERE original_study_id = ?",
+            [study_id],
+        ).fetchone()
+        return row[0] if row else None
