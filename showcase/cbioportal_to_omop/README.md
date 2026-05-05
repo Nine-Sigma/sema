@@ -11,6 +11,7 @@ End-to-end demo of the sema pipeline:
 
 - `parsers.py` — cBioPortal source parsers (clinical, MAF, SV, CNA, gene panel matrix, resources, timelines)
 - `cbioportal_utils.py` — download/type/IO helpers for `parsers.py`
+- `comment_extract.py` — pure metadata-only walker that returns per-table `ParsedTableComments` for the cBioPortal cache; used by both the `sema ingest recover-comments` command and the DuckDB rename migration
 - `slices/dev_slice.yaml` — 13-table dev slice for prompt tuning
 - `slices/dev_slice_poc.yaml` — 12-table subset matching the current Databricks POC ingest
 - `slices/holdout.yaml` — 10-table held-out slice for bias checks
@@ -75,6 +76,36 @@ deprecation window. To migrate a local DuckDB staging file, run:
 uv run python scripts/migrate_cbioportal_to_namespaced.py \
     --duckdb-path ~/.sema/poc.duckdb \
     --study-id gbm_tcga_pan_can_atlas_2018
+```
+
+The DuckDB rename emulator (CREATE TABLE … AS SELECT \*) drops column and
+table comments. The migration script now re-applies parser-extracted
+comments after each table rebuild when the local source cache
+(`IngestConfig.cache_dir / <study_id>`) is present. When the cache is
+absent, the migration logs a WARN and the operator can restore comments
+later via `sema ingest recover-comments`.
+
+### Recovering lost column / table comments
+
+`sema ingest recover-comments` re-parses cBioPortal source files for a
+study and applies `ALTER TABLE … ALTER COLUMN … COMMENT '…'` /
+`COMMENT ON TABLE … IS '…'` to the corresponding namespaced Databricks
+schema. It does NOT re-stage data, is idempotent (skips columns that
+already have a comment), and supports `--dry-run` and `--json`.
+
+```bash
+# Dry-run to inspect the SQL plan
+uv run sema ingest recover-comments \
+    --study gbm_tcga_pan_can_atlas_2018 --dry-run --json
+
+# Apply
+uv run sema ingest recover-comments --study gbm_tcga_pan_can_atlas_2018
+
+# Bypass the registry entirely
+uv run sema ingest recover-comments \
+    --source-cache /path/to/cache \
+    --target-catalog workspace \
+    --target-schema cbioportal_x
 ```
 
 ## Packaging note
