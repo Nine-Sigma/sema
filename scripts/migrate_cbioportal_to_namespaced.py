@@ -15,10 +15,16 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Callable
 
 import click
 
+from sema.ingest.comment_recovery import ParsedTableComments
 from sema.ingest.duckdb_staging import Staging
+from sema.ingest.duckdb_staging_utils import (
+    build_column_comment_sql,
+    build_table_comment_sql,
+)
 from sema.ingest.naming import sanitize_schema_name
 from sema.ingest.study_registry import StudyCollisionError, StudyRegistry
 from sema.log import logger
@@ -26,6 +32,8 @@ from sema.models.config import IngestConfig
 
 LEGACY_SCHEMA = "cbioportal"
 PREFIX = "cbioportal"
+
+CommentSource = Callable[[str], ParsedTableComments]
 
 
 def _has_schema(staging: Staging, name: str) -> bool:
@@ -36,12 +44,19 @@ def _has_schema(staging: Staging, name: str) -> bool:
     return bool(row and row[0])
 
 
-def _rename_schema(staging: Staging, src: str, dst: str) -> None:
+def _rename_schema(
+    staging: Staging,
+    src: str,
+    dst: str,
+    *,
+    comment_source: CommentSource | None = None,
+) -> None:
     """DuckDB has no ALTER SCHEMA RENAME — emulate via copy + drop.
 
-    Uses CREATE TABLE ... AS to preserve column types; column comments and
-    table comments do not survive the rebuild but are recoverable from
-    sema's catalog metadata.
+    `comment_source` is an optional callable that returns
+    `ParsedTableComments` for a given table name. When provided, parser
+    comments are re-applied after each `CREATE TABLE ... AS SELECT *`
+    so the rename round-trip preserves comments.
     """
     staging.execute(f'CREATE SCHEMA IF NOT EXISTS "{dst}"')
     rows = staging.execute(
@@ -54,7 +69,62 @@ def _rename_schema(staging: Staging, src: str, dst: str) -> None:
             f'CREATE TABLE "{dst}"."{table}" AS SELECT * FROM "{src}"."{table}"'
         )
         staging.execute(f'DROP TABLE "{src}"."{table}"')
+        _reapply_comments(staging, dst, table, comment_source)
     staging.execute(f'DROP SCHEMA "{src}"')
+
+
+def _reapply_comments(
+    staging: Staging, schema: str, table: str,
+    comment_source: CommentSource | None,
+) -> None:
+    if comment_source is None:
+        return
+    try:
+        parsed = comment_source(table)
+    except Exception as err:  # noqa: BLE001
+        logger.warning(
+            "Comment source unavailable for {}.{}: {}; "
+            "run `sema ingest recover-comments` to restore later.",
+            schema, table, err,
+        )
+        return
+    for column, comment in parsed.column_comments.items():
+        if comment:
+            staging.execute(
+                build_column_comment_sql(schema, table, column, comment)
+            )
+    if parsed.table_comment:
+        staging.execute(
+            build_table_comment_sql(schema, table, parsed.table_comment)
+        )
+
+
+def _default_comment_source(
+    cache_dir: Path, study_id: str,
+) -> CommentSource | None:
+    study_dir = cache_dir / study_id
+    if not study_dir.exists():
+        logger.warning(
+            "cBioPortal source cache not found at {}; migration will run "
+            "without comments. Run `sema ingest recover-comments --study {}` "
+            "later to restore.",
+            study_dir, study_id,
+        )
+        return None
+    try:
+        from showcase.cbioportal_to_omop.comment_extract import (
+            extract_study_comments,
+        )
+    except ImportError as err:
+        logger.warning(
+            "showcase parser not importable ({}); skipping comment recovery.",
+            err,
+        )
+        return None
+    parsed = extract_study_comments(study_dir)
+    return lambda table: parsed.get(
+        table, ParsedTableComments(table_comment=None, column_comments={})
+    )
 
 
 def _resolve_target(study_id: str) -> str:
@@ -131,7 +201,13 @@ def main(duckdb_path: str | None, study_id: str, dry_run: bool) -> None:
             )
             return
 
-        _rename_schema(staging, LEGACY_SCHEMA, target_schema)
+        comment_source = _default_comment_source(
+            Path(config.cache_dir).expanduser(), study_id,
+        )
+        _rename_schema(
+            staging, LEGACY_SCHEMA, target_schema,
+            comment_source=comment_source,
+        )
         _backfill_registry(staging, target_schema, study_id)
         logger.info("Migration complete: {} -> {}", LEGACY_SCHEMA, target_schema)
     finally:
