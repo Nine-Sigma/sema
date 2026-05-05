@@ -258,7 +258,10 @@ class TestRetryLogic:
 
         llm.invoke.side_effect = invoke_side_effect
 
-        client = LLMClient(llm, retry_max_attempts=3, retry_base_delay=0.01)
+        client = LLMClient(
+            llm, retry_max_attempts=3, retry_base_delay=0.01,
+            rate_limit_base_delay=0.01,
+        )
         result = client.invoke("prompt", TableSummary)
         assert result.entity_name == "Patient"
         assert call_count[0] == 2
@@ -316,7 +319,10 @@ class TestRetryLogic:
         rate_error.status_code = 429
         llm.invoke.side_effect = rate_error
 
-        client = LLMClient(llm, retry_max_attempts=3, retry_base_delay=0.01)
+        client = LLMClient(
+            llm, retry_max_attempts=3, retry_base_delay=0.01,
+            rate_limit_base_delay=0.01,
+        )
         with pytest.raises(LLMStageError):
             client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
         assert llm.invoke.call_count == 3  # 3 attempts in step 2 (no structured output)
@@ -327,14 +333,13 @@ class TestRetryLogic:
 # ---------------------------------------------------------------------------
 
 class TestBackoffTiming:
-    def test_exponential_delay_pattern(self):
+    def test_exponential_delay_pattern_for_non_rate_limit_transient(self):
         llm = MagicMock(spec=["invoke"])
-        rate_error = Exception("rate limit")
-        rate_error.status_code = 429
-        llm.invoke.side_effect = rate_error
+        server_error = Exception("internal server error")
+        server_error.status_code = 500
+        llm.invoke.side_effect = server_error
 
         sleep_times = []
-        original_sleep = time.sleep
         with patch("sema.llm_client.time.sleep") as mock_sleep:
             mock_sleep.side_effect = lambda t: sleep_times.append(t)
             client = LLMClient(
@@ -344,16 +349,15 @@ class TestBackoffTiming:
             with pytest.raises(LLMStageError):
                 client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
 
-        # 2 sleeps (between attempt 1→2 and 2→3)
         assert len(sleep_times) == 2
-        assert sleep_times[0] == pytest.approx(2.0, abs=0.1)  # base * 2^0
-        assert sleep_times[1] == pytest.approx(4.0, abs=0.1)  # base * 2^1
+        assert sleep_times[0] == pytest.approx(2.0, abs=0.1)
+        assert sleep_times[1] == pytest.approx(4.0, abs=0.1)
 
-    def test_jitter_within_range(self):
+    def test_jitter_within_range_for_non_rate_limit_transient(self):
         llm = MagicMock(spec=["invoke"])
-        rate_error = Exception("rate limit")
-        rate_error.status_code = 429
-        llm.invoke.side_effect = rate_error
+        server_error = Exception("internal server error")
+        server_error.status_code = 500
+        llm.invoke.side_effect = server_error
 
         sleep_times = []
         with patch("sema.llm_client.time.sleep") as mock_sleep:
@@ -366,10 +370,108 @@ class TestBackoffTiming:
                 client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
 
         assert len(sleep_times) == 2
-        # First delay: 2.0 ± 0.5 → [1.5, 2.5]
         assert 1.5 <= sleep_times[0] <= 2.5
-        # Second delay: 4.0 ± 0.5 → [3.5, 4.5]
         assert 3.5 <= sleep_times[1] <= 4.5
+
+    def test_rate_limit_uses_long_backoff_schedule(self):
+        llm = MagicMock(spec=["invoke"])
+        rate_error = Exception("REQUEST_LIMIT_EXCEEDED: rate limit")
+        rate_error.status_code = 429
+        llm.invoke.side_effect = rate_error
+
+        sleep_times = []
+        with patch("sema.llm_client.time.sleep") as mock_sleep:
+            mock_sleep.side_effect = lambda t: sleep_times.append(t)
+            client = LLMClient(
+                llm, retry_max_attempts=3, retry_base_delay=2.0,
+                retry_multiplier=2.0, retry_jitter=0.0,
+            )
+            with pytest.raises(LLMStageError):
+                client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
+
+        assert len(sleep_times) == 2
+        assert sleep_times[0] >= 10.0
+        assert sleep_times[1] >= 30.0
+
+
+@pytest.mark.unit
+class TestRateLimitClassification:
+    def test_request_limit_exceeded_message_classified_as_rate_limit(self):
+        from sema.llm_client import _is_rate_limit_error
+
+        err = Exception("REQUEST_LIMIT_EXCEEDED: Exceeded workspace tokens/min")
+        assert _is_rate_limit_error(err) is True
+
+    def test_429_status_code_classified_as_rate_limit(self):
+        from sema.llm_client import _is_rate_limit_error
+
+        err = Exception("nope")
+        err.status_code = 429
+        assert _is_rate_limit_error(err) is True
+
+    def test_500_not_classified_as_rate_limit(self):
+        from sema.llm_client import _is_rate_limit_error
+
+        err = Exception("internal server error")
+        err.status_code = 500
+        assert _is_rate_limit_error(err) is False
+
+
+@pytest.mark.unit
+class TestCircuitBreakerInteraction:
+    def test_pure_rate_limit_failure_does_not_record_circuit_breaker_failure(self):
+        llm = MagicMock(spec=["invoke"])
+        rate_error = Exception("REQUEST_LIMIT_EXCEEDED")
+        rate_error.status_code = 429
+        llm.invoke.side_effect = rate_error
+        breaker = MagicMock()
+        breaker.check.return_value = None
+
+        with patch("sema.llm_client.time.sleep"):
+            client = LLMClient(
+                llm, retry_max_attempts=2, retry_base_delay=0.01,
+                circuit_breaker=breaker,
+            )
+            with pytest.raises(LLMStageError):
+                client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
+
+        breaker.record_failure.assert_not_called()
+
+    def test_non_rate_limit_failure_still_records_circuit_breaker_failure(self):
+        llm = MagicMock(spec=["invoke"])
+        server_error = Exception("internal server error")
+        server_error.status_code = 500
+        llm.invoke.side_effect = server_error
+        breaker = MagicMock()
+        breaker.check.return_value = None
+
+        with patch("sema.llm_client.time.sleep"):
+            client = LLMClient(
+                llm, retry_max_attempts=2, retry_base_delay=0.01,
+                circuit_breaker=breaker,
+            )
+            with pytest.raises(LLMStageError):
+                client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
+
+        breaker.record_failure.assert_called_once()
+
+    def test_success_records_circuit_breaker_success(self):
+        llm = MagicMock(spec=["invoke"])
+        response = MagicMock()
+        response.content = '{"entity_name": "Patient"}'
+        llm.invoke.return_value = response
+        breaker = MagicMock()
+        breaker.check.return_value = None
+
+        client = LLMClient(
+            llm, retry_max_attempts=1, retry_base_delay=0.01,
+            circuit_breaker=breaker,
+        )
+        result = client.invoke("prompt", TableSummary)
+
+        assert result.entity_name == "Patient"
+        breaker.record_success.assert_called_once()
+        breaker.record_failure.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -383,7 +485,10 @@ class TestConfigurableRetry:
         rate_error.status_code = 429
         llm.invoke.side_effect = rate_error
 
-        client = LLMClient(llm, retry_max_attempts=5, retry_base_delay=0.01)
+        client = LLMClient(
+            llm, retry_max_attempts=5, retry_base_delay=0.01,
+            rate_limit_base_delay=0.01,
+        )
         with pytest.raises(LLMStageError):
             client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
         assert llm.invoke.call_count == 5
@@ -394,7 +499,10 @@ class TestConfigurableRetry:
         rate_error.status_code = 429
         llm.invoke.side_effect = rate_error
 
-        client = LLMClient(llm, retry_max_attempts=1, retry_base_delay=0.01)
+        client = LLMClient(
+            llm, retry_max_attempts=1, retry_base_delay=0.01,
+            rate_limit_base_delay=0.01,
+        )
         with pytest.raises(LLMStageError):
             client.invoke("prompt", TableSummary, table_ref="ref", stage_name="test")
         assert llm.invoke.call_count == 1

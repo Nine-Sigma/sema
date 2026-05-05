@@ -89,6 +89,9 @@ class LLMStageError(Exception):
 TRANSIENT_STATUS_CODES: Final[frozenset[int]] = frozenset({429, 500, 502, 503, 504})
 NON_RETRYABLE_STATUS_CODES: Final[frozenset[int]] = frozenset({401, 403})
 
+RATE_LIMIT_BASE_DELAY: Final[float] = 10.0
+RATE_LIMIT_MULTIPLIER: Final[float] = 3.0
+
 
 def _is_transient_error(exc: Exception) -> bool:
     status = getattr(exc, "status_code", None) or getattr(exc, "http_status", None)
@@ -100,6 +103,23 @@ def _is_transient_error(exc: Exception) -> bool:
     if any(kw in msg for kw in ("rate limit", "timeout", "429", "too many requests")):
         return True
     return False
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    status = getattr(exc, "status_code", None) or getattr(exc, "http_status", None)
+    if status is not None and int(status) == 429:
+        return True
+    msg = str(exc).lower()
+    return any(
+        kw in msg
+        for kw in ("rate limit", "429", "too many requests", "request_limit_exceeded")
+    )
+
+
+def _all_step_errors_rate_limited(stage_err: "LLMStageError") -> bool:
+    if not stage_err.step_errors:
+        return False
+    return all(_is_rate_limit_error(err) for _, err in stage_err.step_errors)
 
 
 def parse_llm_response(raw: str, schema: type[T]) -> T:
@@ -158,6 +178,8 @@ class LLMClient:
         retry_base_delay: float = 2.0,
         retry_multiplier: float = 2.0,
         retry_jitter: float = 0.5,
+        rate_limit_base_delay: float = RATE_LIMIT_BASE_DELAY,
+        rate_limit_multiplier: float = RATE_LIMIT_MULTIPLIER,
         use_structured_output: str = "auto",
         circuit_breaker: Any | None = None,
     ):
@@ -166,6 +188,8 @@ class LLMClient:
         self._retry_base_delay = retry_base_delay
         self._retry_multiplier = retry_multiplier
         self._retry_jitter = retry_jitter
+        self._rate_limit_base_delay = rate_limit_base_delay
+        self._rate_limit_multiplier = rate_limit_multiplier
         self._circuit_breaker = circuit_breaker
 
         self._supports_structured = resolve_structured_support(
@@ -200,8 +224,10 @@ class LLMClient:
             result = self._invoke_fallback_chain(
                 prompt, schema, table_ref, stage_name, simplified_prompt,
             )
-        except LLMStageError:
-            if self._circuit_breaker is not None:
+        except LLMStageError as stage_err:
+            if self._circuit_breaker is not None and not _all_step_errors_rate_limited(
+                stage_err,
+            ):
                 self._circuit_breaker.record_failure()
             self._record_stats(start, prompt, "")
             raise
@@ -330,7 +356,13 @@ class LLMClient:
                 last_error = e
                 if not _is_transient_error(e) or attempt == self._retry_max_attempts - 1:
                     raise
-                delay = self._retry_base_delay * (self._retry_multiplier ** attempt)
+                if _is_rate_limit_error(e):
+                    base = self._rate_limit_base_delay
+                    mult = self._rate_limit_multiplier
+                else:
+                    base = self._retry_base_delay
+                    mult = self._retry_multiplier
+                delay = base * (mult ** attempt)
                 jitter = random.uniform(-self._retry_jitter, self._retry_jitter)
                 sleep_time = max(0, delay + jitter)
                 logger.debug(
