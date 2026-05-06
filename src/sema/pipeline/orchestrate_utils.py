@@ -129,6 +129,10 @@ def _spawn_workers_parallel(
             prompt_layers=layers,
             eval_dump_dir=config.eval_dump_dir,
             eval_config_label=config.eval_config_label,
+            partial_coverage_floor=config.partial_coverage_floor,
+            metadata_rich_column_comment_floor=(
+                config.metadata_rich_column_comment_floor
+            ),
         )
 
     with ThreadPoolExecutor(
@@ -198,6 +202,10 @@ def _spawn_workers(
             prompt_layers=layers,
             eval_dump_dir=config.eval_dump_dir,
             eval_config_label=config.eval_config_label,
+            partial_coverage_floor=config.partial_coverage_floor,
+            metadata_rich_column_comment_floor=(
+                config.metadata_rich_column_comment_floor
+            ),
         )
         _log_result(result, f"    ", config.verbose)
         results.append(result)

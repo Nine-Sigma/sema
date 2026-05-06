@@ -542,3 +542,289 @@ class TestLLMStageError:
 
         generic_err = Exception("something else")
         assert _is_transient_error(generic_err) is False
+
+
+# ---------------------------------------------------------------------------
+# Service-health classification tests (Section 1 — opt-in breaker semantics)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestServiceHealthClassification:
+    def test_http_503_is_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = Exception("Service Unavailable")
+        err.status_code = 503
+        assert _is_service_health_failure(err) is True
+
+    def test_http_500_is_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = Exception("Internal Server Error")
+        err.status_code = 500
+        assert _is_service_health_failure(err) is True
+
+    def test_http_502_is_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = Exception("Bad Gateway")
+        err.status_code = 502
+        assert _is_service_health_failure(err) is True
+
+    def test_http_504_is_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = Exception("Gateway Timeout")
+        err.status_code = 504
+        assert _is_service_health_failure(err) is True
+
+    def test_http_429_is_not_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = Exception("Too Many Requests")
+        err.status_code = 429
+        assert _is_service_health_failure(err) is False
+
+    def test_rate_limit_message_is_not_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = Exception("REQUEST_LIMIT_EXCEEDED: tokens/min")
+        assert _is_service_health_failure(err) is False
+
+    def test_json_decode_error_is_not_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = json.JSONDecodeError("bad json", "", 0)
+        assert _is_service_health_failure(err) is False
+
+    def test_pydantic_validation_error_is_not_service_health(self):
+        from pydantic import ValidationError as PydValidationError
+        from sema.llm_client import _is_service_health_failure
+
+        class _S(BaseModel):
+            x: int
+        try:
+            _S.model_validate({"x": "not-an-int"})
+        except PydValidationError as exc:
+            assert _is_service_health_failure(exc) is False
+            return
+        pytest.fail("ValidationError should have been raised")
+
+    def test_value_error_no_json_found_is_not_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = ValueError("No JSON found in LLM response: ...")
+        assert _is_service_health_failure(err) is False
+
+    def test_value_error_could_not_parse_is_not_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = ValueError("Could not parse LLM response into TableSummary: ...")
+        assert _is_service_health_failure(err) is False
+
+    def test_value_error_b_failed_is_not_service_health_defensive(self):
+        """Defensive: B_FAILED ValueError currently does not flow through
+        LLMClient.invoke (raised at semantic.py:450, outside invoke).
+        If a future refactor routes it through, the breaker must not trip."""
+        from sema.llm_client import _is_service_health_failure
+        err = ValueError("B_FAILED: raw=0.65")
+        assert _is_service_health_failure(err) is False
+
+    def test_unknown_exception_is_not_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = RuntimeError("something unexpected")
+        assert _is_service_health_failure(err) is False
+
+    def test_connection_error_is_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = ConnectionError("Connection refused")
+        assert _is_service_health_failure(err) is True
+
+    def test_timeout_error_is_service_health(self):
+        from sema.llm_client import _is_service_health_failure
+        err = TimeoutError("socket read timed out")
+        assert _is_service_health_failure(err) is True
+
+
+@pytest.mark.unit
+class TestCircuitBreakerOptInService:
+    """Section 1: breaker only records service-health failures.
+
+    The cascade-pollution path is per-batch invokes inside
+    `_invoke_stage_b_batch`: content failures from `LLMClient.invoke`."""
+
+    def _client_for(self, llm, breaker):
+        return LLMClient(
+            llm, retry_max_attempts=1, retry_base_delay=0.01,
+            circuit_breaker=breaker,
+        )
+
+    def test_503_step_error_records_breaker(self):
+        llm = MagicMock(spec=["invoke"])
+        err = Exception("Service Unavailable")
+        err.status_code = 503
+        llm.invoke.side_effect = err
+        breaker = MagicMock()
+        breaker.check.return_value = None
+
+        with patch("sema.llm_client.time.sleep"):
+            client = self._client_for(llm, breaker)
+            with pytest.raises(LLMStageError):
+                client.invoke(
+                    "p", TableSummary, table_ref="r", stage_name="s",
+                )
+        breaker.record_failure.assert_called_once()
+
+    def test_429_step_error_does_not_record(self):
+        llm = MagicMock(spec=["invoke"])
+        err = Exception("rate limit")
+        err.status_code = 429
+        llm.invoke.side_effect = err
+        breaker = MagicMock()
+        breaker.check.return_value = None
+
+        with patch("sema.llm_client.time.sleep"):
+            client = self._client_for(llm, breaker)
+            with pytest.raises(LLMStageError):
+                client.invoke(
+                    "p", TableSummary, table_ref="r", stage_name="s",
+                )
+        breaker.record_failure.assert_not_called()
+
+    def test_json_decode_step_error_does_not_record(self):
+        """Per-batch content-failure storm must not trip the breaker."""
+        llm = MagicMock(spec=["invoke"])
+        response = MagicMock()
+        response.content = "not valid json at all"
+        llm.invoke.return_value = response
+        breaker = MagicMock()
+        breaker.check.return_value = None
+
+        client = self._client_for(llm, breaker)
+        with pytest.raises(LLMStageError):
+            client.invoke(
+                "p", TableSummary, table_ref="r", stage_name="s",
+            )
+        breaker.record_failure.assert_not_called()
+
+    def test_value_error_no_json_does_not_record(self):
+        llm = MagicMock(spec=["invoke"])
+        response = MagicMock()
+        response.content = "i cannot help with that request"
+        llm.invoke.return_value = response
+        breaker = MagicMock()
+        breaker.check.return_value = None
+
+        client = self._client_for(llm, breaker)
+        with pytest.raises(LLMStageError):
+            client.invoke(
+                "p", TableSummary, table_ref="r", stage_name="s",
+            )
+        breaker.record_failure.assert_not_called()
+
+    def test_mixed_503_and_json_decode_records(self):
+        """When step_errors carry [(structured, JSONDecodeError),
+        (plain, 503)], the breaker SHALL record because at least one is
+        service-health."""
+        llm = MagicMock()
+        structured_llm = MagicMock()
+        structured_llm.invoke.side_effect = json.JSONDecodeError(
+            "bad", "", 0,
+        )
+        llm.with_structured_output.return_value = structured_llm
+
+        err503 = Exception("Service Unavailable")
+        err503.status_code = 503
+        llm.invoke.side_effect = err503
+
+        breaker = MagicMock()
+        breaker.check.return_value = None
+
+        with patch("sema.llm_client.time.sleep"):
+            client = LLMClient(
+                llm, retry_max_attempts=1, retry_base_delay=0.01,
+                use_structured_output="true",
+                circuit_breaker=breaker,
+            )
+            with pytest.raises(LLMStageError):
+                client.invoke(
+                    "p", TableSummary, table_ref="r", stage_name="s",
+                )
+        breaker.record_failure.assert_called_once()
+
+    def test_unknown_exception_does_not_record(self):
+        llm = MagicMock(spec=["invoke"])
+        llm.invoke.side_effect = RuntimeError("mystery")
+        breaker = MagicMock()
+        breaker.check.return_value = None
+
+        client = self._client_for(llm, breaker)
+        with pytest.raises(LLMStageError):
+            client.invoke(
+                "p", TableSummary, table_ref="r", stage_name="s",
+            )
+        breaker.record_failure.assert_not_called()
+
+    def test_b_failed_synthetic_value_error_does_not_record_defensive(self):
+        """Defensive: synthetic `B_FAILED` `LLMStageError` currently never
+        flows through `LLMClient.invoke` (raised at semantic.py:450,
+        outside invoke). If a future refactor routes it through, the
+        breaker SHALL still not trip on the contained ValueError."""
+        from sema.llm_client import _is_service_health_failure
+
+        synthetic = ValueError("B_FAILED: raw=0.65")
+        assert _is_service_health_failure(synthetic) is False
+
+        stage_err = LLMStageError(
+            table_ref="r",
+            stage_name="L2 stage_b",
+            step_errors=[("stage_b", synthetic)],
+        )
+        assert all(
+            not _is_service_health_failure(e)
+            for _, e in stage_err.step_errors
+        )
+
+
+@pytest.mark.unit
+class TestRetryPolicyUnchanged:
+    """Section 1.5: keep retry-backoff selection independent of breaker
+    classification — a service-health 503 still uses the retry backoff
+    schedule, not the rate-limit one."""
+
+    def test_503_uses_short_retry_backoff_not_rate_limit_schedule(self):
+        llm = MagicMock(spec=["invoke"])
+        err = Exception("Service Unavailable")
+        err.status_code = 503
+        llm.invoke.side_effect = err
+
+        sleep_times: list[float] = []
+        with patch("sema.llm_client.time.sleep") as mock_sleep:
+            mock_sleep.side_effect = lambda t: sleep_times.append(t)
+            client = LLMClient(
+                llm, retry_max_attempts=3, retry_base_delay=2.0,
+                retry_multiplier=2.0, retry_jitter=0.0,
+                rate_limit_base_delay=10.0,
+            )
+            with pytest.raises(LLMStageError):
+                client.invoke(
+                    "p", TableSummary, table_ref="r", stage_name="s",
+                )
+
+        assert len(sleep_times) == 2
+        # Short retry schedule, not the long rate-limit one
+        assert sleep_times[0] == pytest.approx(2.0, abs=0.1)
+        assert sleep_times[1] == pytest.approx(4.0, abs=0.1)
+
+    def test_429_still_uses_long_rate_limit_backoff(self):
+        llm = MagicMock(spec=["invoke"])
+        err = Exception("rate limit")
+        err.status_code = 429
+        llm.invoke.side_effect = err
+
+        sleep_times: list[float] = []
+        with patch("sema.llm_client.time.sleep") as mock_sleep:
+            mock_sleep.side_effect = lambda t: sleep_times.append(t)
+            client = LLMClient(
+                llm, retry_max_attempts=3, retry_base_delay=2.0,
+                rate_limit_base_delay=10.0, retry_jitter=0.0,
+            )
+            with pytest.raises(LLMStageError):
+                client.invoke(
+                    "p", TableSummary, table_ref="r", stage_name="s",
+                )
+
+        assert len(sleep_times) == 2
+        assert sleep_times[0] >= 10.0
+        assert sleep_times[1] >= 30.0

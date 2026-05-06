@@ -62,8 +62,9 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         driver.close()
         return aggregate_report([])
 
-    for schema in sorted({wi.schema for wi in work_items}):
-        loader.delete_study_scoped(schema)
+    if not config.resume:
+        for schema in sorted({wi.schema for wi in work_items}):
+            loader.delete_study_scoped(schema)
 
     circuit_breaker = CircuitBreaker(
         failure_threshold=config.circuit_breaker_threshold,
@@ -109,6 +110,13 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         loader, run_id,
         domain_context=domain_context,
     )
+
+    from sema.pipeline.quality_budget import enforce_quality_budget
+    try:
+        enforce_quality_budget(results, config)
+    except Exception:
+        driver.close()
+        raise
 
     report = _collect_results(results)
 
