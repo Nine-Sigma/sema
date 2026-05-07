@@ -145,6 +145,28 @@ class TestUpsertSemanticNodes:
         assert "IMPLEMENTED_BY" not in cypher
         assert "ON CREATE SET" in cypher
 
+    def test_upsert_property_stamps_implicit_entity_role(
+        self, loader, mock_driver,
+    ):
+        _, session = mock_driver
+        loader.upsert_property(
+            "Diagnosis Type", semantic_type="categorical",
+            source="llm", confidence=0.8,
+            entity_name="Cancer Diagnosis",
+            column_name="dx_type_cd",
+            table_name="cancer_diagnosis",
+            schema_name="clinical", catalog="cdm",
+        )
+        cypher = session.run.call_args[0][0]
+        merge_idx = cypher.index("MERGE (e:Entity {name: $entity_name})")
+        has_property_idx = cypher.index("HAS_PROPERTY")
+        entity_block = cypher[merge_idx:has_property_idx]
+        assert "e.model_role = coalesce(e.model_role, 'SOURCE')" in entity_block
+        assert (
+            "e.source_id = coalesce(e.source_id, $source_schema, $source)"
+            in entity_block
+        )
+
     def test_upsert_term(self, loader, mock_driver):
         _, session = mock_driver
         loader.upsert_term(
@@ -156,6 +178,22 @@ class TestUpsertSemanticNodes:
         assert "MERGE" in cypher
         assert ":Term" in cypher
         assert "ON CREATE SET" in cypher
+
+    def test_upsert_term_stamps_source_id_from_schema(
+        self, loader, mock_driver,
+    ):
+        _, session = mock_driver
+        loader.upsert_term(
+            "CRC", "Colorectal Cancer", source="llm",
+            confidence=0.85, source_schema="cbioportal_brca",
+        )
+        cypher = session.run.call_args[0][0]
+        params = session.run.call_args[1]
+        assert (
+            "t.source_id = coalesce(t.source_id, $source_schema, $source)"
+            in cypher
+        )
+        assert params["source_schema"] == "cbioportal_brca"
 
     def test_upsert_value_set(self, loader, mock_driver):
         _, session = mock_driver

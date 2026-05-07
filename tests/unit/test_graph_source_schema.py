@@ -14,6 +14,7 @@ from sema.graph.loader_utils import (
     batch_upsert_entities,
     batch_upsert_join_paths,
     batch_upsert_properties,
+    batch_upsert_terms,
     batch_upsert_value_sets,
 )
 from sema.models.assertions import (
@@ -132,6 +133,45 @@ class TestEdgeStamping:
         assert "HAS_PROPERTY" in cypher
         assert "PROPERTY_ON_COLUMN" in cypher
         assert cypher.count("source_schema: r.source_schema") == 2
+
+    def test_batch_upsert_properties_stamps_implicit_entity_role(
+        self, loader,
+    ):
+        loader._run = MagicMock()
+        batch_upsert_properties(
+            loader, [self._row()], source_schema=SCHEMA_BRCA,
+        )
+        cypher = loader._run.call_args[0][0]
+        assert "MERGE (e:Entity {name: r.entity_name})" in cypher
+        merge_idx = cypher.index("MERGE (e:Entity {name: r.entity_name})")
+        has_property_idx = cypher.index("HAS_PROPERTY")
+        entity_block = cypher[merge_idx:has_property_idx]
+        assert "e.model_role = coalesce(e.model_role, 'SOURCE')" in entity_block
+        assert (
+            "e.source_id = coalesce(e.source_id, r.source_schema, r.source)"
+            in entity_block
+        )
+
+    def test_batch_upsert_terms_stamps_source_id_from_schema(
+        self, loader,
+    ):
+        loader._run = MagicMock()
+        batch_upsert_terms(
+            loader,
+            [{
+                "code": "0", "label": "neutral",
+                "vocabulary_name": "cna_call",
+                "source": "llm_interpretation", "confidence": 0.9,
+            }],
+            source_schema=SCHEMA_BRCA,
+        )
+        cypher = loader._run.call_args[0][0]
+        assert (
+            "t.source_id = coalesce(t.source_id, r.source_schema, r.source)"
+            in cypher
+        )
+        rows = loader._run.call_args[1]["rows"]
+        assert rows[0]["source_schema"] == SCHEMA_BRCA
 
     def test_has_value_set_stamped(self, loader):
         loader._run = MagicMock()

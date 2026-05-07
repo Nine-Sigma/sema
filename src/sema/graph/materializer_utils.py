@@ -278,7 +278,7 @@ def upsert_decoded_values(
     batch_upsert_value_sets(
         loader, vs_batch, source_schema=source_schema,
     )
-    batch_upsert_terms(loader, term_batch)
+    batch_upsert_terms(loader, term_batch, source_schema=source_schema)
 
 
 def _collect_alias_batch(

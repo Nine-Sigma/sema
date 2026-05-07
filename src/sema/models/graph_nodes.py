@@ -2,9 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from sema.models.planner._enums import ModelRole, TargetArtifactKind
+from sema.models.planner._role_validation import (
+    require_kind_matches_role,
+    require_role_identifier,
+)
 
 
 class SemanticType(str, Enum):
@@ -63,6 +69,16 @@ class Entity(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     resolved_at: datetime | None = None
     embedding_updated_at: datetime | None = None
+    model_role: ModelRole = ModelRole.SOURCE
+    source_id: str | None = None
+    target_model_id: str | None = None
+    kind: TargetArtifactKind | None = None
+
+    @model_validator(mode="after")
+    def _validate_role(self) -> Self:
+        require_role_identifier(self.model_role, self.source_id, self.target_model_id)
+        require_kind_matches_role(self.model_role, self.kind)
+        return self
 
 
 class Property(BaseModel):
@@ -74,6 +90,14 @@ class Property(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     resolved_at: datetime | None = None
     embedding_updated_at: datetime | None = None
+    model_role: ModelRole = ModelRole.SOURCE
+    source_id: str | None = None
+    target_model_id: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_role(self) -> Self:
+        require_role_identifier(self.model_role, self.source_id, self.target_model_id)
+        return self
 
 
 class Metric(BaseModel):
@@ -96,6 +120,14 @@ class Term(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     resolved_at: datetime | None = None
     embedding_updated_at: datetime | None = None
+    model_role: ModelRole = ModelRole.SOURCE
+    source_id: str | None = None
+    target_model_id: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_role(self) -> Self:
+        require_role_identifier(self.model_role, self.source_id, self.target_model_id)
+        return self
 
 
 class ValueSet(BaseModel):

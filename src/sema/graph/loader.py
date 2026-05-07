@@ -137,9 +137,10 @@ class GraphLoader:
 
     def batch_upsert_terms(
         self, terms: list[dict[str, Any]],
+        source_schema: str | None = None,
     ) -> None:
         from sema.graph import loader_utils as _lu
-        _lu.batch_upsert_terms(self, terms)
+        _lu.batch_upsert_terms(self, terms, source_schema=source_schema)
 
     def batch_upsert_aliases(
         self, aliases: list[dict[str, Any]], parent_label: str,
@@ -170,7 +171,9 @@ class GraphLoader:
             "ON CREATE SET e.id = $id "
             "SET e.description = $description, e.source = $source, "
             "e.confidence = $confidence, "
-            "e.resolved_at = $resolved_at "
+            "e.resolved_at = $resolved_at, "
+            "e.model_role = coalesce(e.model_role, 'SOURCE'), "
+            "e.source_id = coalesce(e.source_id, $source_schema, $source) "
             "WITH e "
             "MERGE (t:Table {name: $table_name, "
             "schema_name: $schema_name, catalog: $catalog}) "
@@ -197,9 +200,13 @@ class GraphLoader:
             "SET p.semantic_type = $semantic_type, "
             "p.source = $source, "
             "p.confidence = $confidence, "
-            "p.resolved_at = $resolved_at "
+            "p.resolved_at = $resolved_at, "
+            "p.model_role = coalesce(p.model_role, 'SOURCE'), "
+            "p.source_id = coalesce(p.source_id, $source_schema, $source) "
             "WITH p "
             "MERGE (e:Entity {name: $entity_name}) "
+            "SET e.model_role = coalesce(e.model_role, 'SOURCE'), "
+            "e.source_id = coalesce(e.source_id, $source_schema, $source) "
             "MERGE (e)-[hp:HAS_PROPERTY "
             "{source_schema: $source_schema}]->(p) "
             "WITH p "
@@ -219,6 +226,7 @@ class GraphLoader:
     def upsert_term(
         self, code: str, label: str, source: str,
         confidence: float,
+        source_schema: str | None = None,
     ) -> None:
         id_ = str(uuid.uuid4())
         self._run(
@@ -226,11 +234,13 @@ class GraphLoader:
             "ON CREATE SET t.id = $id "
             "SET t.label = $label, t.source = $source, "
             "t.confidence = $confidence, "
-            "t.resolved_at = $resolved_at",
+            "t.resolved_at = $resolved_at, "
+            "t.model_role = coalesce(t.model_role, 'SOURCE'), "
+            "t.source_id = coalesce(t.source_id, $source_schema, $source)",
             code=code, label=label, source=source,
             confidence=confidence,
             resolved_at=datetime.now(timezone.utc).isoformat(),
-            id=id_,
+            id=id_, source_schema=source_schema,
         )
 
     def upsert_value_set(
