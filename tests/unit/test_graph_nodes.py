@@ -111,6 +111,7 @@ class TestSemanticNodes:
             source="llm_interpretation",
             confidence=0.75,
             resolved_at=datetime.now(timezone.utc),
+            source_id="cbio",
         )
         assert e.id == "ent-1"
         assert e.name == "Cancer Diagnosis"
@@ -124,11 +125,14 @@ class TestSemanticNodes:
             source="test",
             confidence=0.9,
             embedding_updated_at=now,
+            source_id="test",
         )
         assert e.embedding_updated_at == now
 
     def test_entity_embedding_updated_at_default_none(self):
-        e = Entity(id="ent-3", name="Test", source="test", confidence=0.9)
+        e = Entity(
+            id="ent-3", name="Test", source="test", confidence=0.9, source_id="test"
+        )
         assert e.embedding_updated_at is None
 
     def test_property_has_id(self):
@@ -138,6 +142,7 @@ class TestSemanticNodes:
             semantic_type=SemanticType.CATEGORICAL,
             source="llm_interpretation",
             confidence=0.8,
+            source_id="cbio",
         )
         assert p.id == "prop-1"
         assert p.semantic_type == SemanticType.CATEGORICAL
@@ -150,6 +155,7 @@ class TestSemanticNodes:
             source="test",
             confidence=0.9,
             embedding_updated_at=datetime.now(timezone.utc),
+            source_id="test",
         )
         assert p.embedding_updated_at is not None
 
@@ -198,6 +204,7 @@ class TestSemanticNodes:
             label="Colorectal Cancer",
             source="llm_interpretation",
             confidence=0.85,
+            source_id="cbio",
         )
         assert t.id == "term-1"
         assert t.code == "CRC"
@@ -210,6 +217,7 @@ class TestSemanticNodes:
             source="test",
             confidence=0.9,
             embedding_updated_at=datetime.now(timezone.utc),
+            source_id="test",
         )
         assert t.embedding_updated_at is not None
 
@@ -402,6 +410,7 @@ class TestJsonSerialization:
             source="test",
             confidence=0.9,
             resolved_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            source_id="test",
         )
         data = e.model_dump(mode="json")
         roundtrip = Entity.model_validate(data)

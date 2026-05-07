@@ -82,7 +82,9 @@ def batch_upsert_entities(
         "SET e.description = r.description, e.source = r.source, "
         "e.confidence = r.confidence, "
         "e.status = 'ACTIVE', "
-        "e.resolved_at = r.resolved_at "
+        "e.resolved_at = r.resolved_at, "
+        "e.model_role = coalesce(e.model_role, 'SOURCE'), "
+        "e.source_id = coalesce(e.source_id, r.source_schema, r.source) "
         "WITH e, r "
         "MERGE (t:Table {name: r.table_name, "
         "schema_name: r.schema_name, catalog: r.catalog}) "
@@ -108,9 +110,13 @@ def batch_upsert_properties(
         "p.source = r.source, "
         "p.confidence = r.confidence, "
         "p.status = 'ACTIVE', "
-        "p.resolved_at = r.resolved_at "
+        "p.resolved_at = r.resolved_at, "
+        "p.model_role = coalesce(p.model_role, 'SOURCE'), "
+        "p.source_id = coalesce(p.source_id, r.source_schema, r.source) "
         "WITH p, r "
         "MERGE (e:Entity {name: r.entity_name}) "
+        "SET e.model_role = coalesce(e.model_role, 'SOURCE'), "
+        "e.source_id = coalesce(e.source_id, r.source_schema, r.source) "
         "MERGE (e)-[hp:HAS_PROPERTY "
         "{source_schema: r.source_schema}]->(p) "
         "WITH p, r "
@@ -125,12 +131,18 @@ def batch_upsert_properties(
 
 def batch_upsert_terms(
     loader: GraphLoader, terms: list[dict[str, Any]],
+    source_schema: str | None = None,
 ) -> None:
     if not terms:
         return
     resolved_at = datetime.now(timezone.utc).isoformat()
     rows = [
-        {**t, "resolved_at": resolved_at, "id": str(uuid.uuid4())}
+        {
+            **t,
+            "resolved_at": resolved_at,
+            "id": str(uuid.uuid4()),
+            "source_schema": source_schema,
+        }
         for t in terms
     ]
     loader._run(
@@ -141,7 +153,9 @@ def batch_upsert_terms(
         "t.confidence = r.confidence, "
         "t.vocabulary_name = r.vocabulary_name, "
         "t.status = 'ACTIVE', "
-        "t.resolved_at = r.resolved_at",
+        "t.resolved_at = r.resolved_at, "
+        "t.model_role = coalesce(t.model_role, 'SOURCE'), "
+        "t.source_id = coalesce(t.source_id, r.source_schema, r.source)",
         rows=rows,
     )
 
