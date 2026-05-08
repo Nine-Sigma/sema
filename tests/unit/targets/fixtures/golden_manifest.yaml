@@ -1,0 +1,162 @@
+manifest_version: 1
+descriptor:
+  target_model_id: golden-target
+  target_model_version: "1.0.0"
+  display_name: Golden Compliance Target
+  owner: ontology-team@example.com
+  vocabulary_release: golden-vocab-2026-q1
+vocabularies:
+  - name: GENDER_CV
+    source: INLINE
+  - name: SNOMED
+    source: EXTERNAL
+terms:
+  - vocabulary: GENDER_CV
+    code: M
+    display: Male
+  - vocabulary: GENDER_CV
+    code: F
+    display: Female
+entities:
+  - qualified_name: omop.person
+    kind: TABLE_ROW
+    properties:
+      - name: person_id
+        type: integer
+        nullable: false
+      - name: gender_concept_id
+        type: integer
+        nullable: false
+        synonyms: [sex, gender_identity]
+        vocabulary_binding:
+          vocabulary: GENDER_CV
+          domain: Gender
+          require_standard: true
+    obligation:
+      required_fields: [person_id, gender_concept_id]
+      primary_key: NATURAL_KEY
+      domain_constraints:
+        - property_name: gender_concept_id
+          domain_id: Gender
+    context_card:
+      card_version: "1.0.0"
+      description: OMOP person table; one row per individual.
+      examples: ["Sample person row"]
+      obligation_summary: Required PK plus gender concept.
+  - qualified_name: omop.observation
+    kind: TABLE_ROW
+    properties:
+      - name: observation_id
+        type: integer
+        nullable: false
+      - name: person_id
+        type: integer
+        nullable: false
+      - name: source_value
+        type: string
+        nullable: true
+        vocabulary_binding:
+          vocabulary: SNOMED
+          domain: Observation
+    obligation:
+      required_fields: [observation_id, person_id]
+      primary_key: NATURAL_KEY
+      foreign_keys:
+        - referenced_entity: omop.person
+          join_keys: [["person_id", "person_id"]]
+    context_card:
+      card_version: "1.0.0"
+      description: OMOP observation table; one row per observation event.
+  - qualified_name: omop.measurement
+    kind: TABLE_ROW
+    properties:
+      - name: measurement_id
+        type: integer
+        nullable: false
+      - name: person_id
+        type: integer
+        nullable: false
+      - name: value_as_number
+        type: double
+        nullable: true
+    obligation:
+      required_fields: [measurement_id, person_id]
+      primary_key: NATURAL_KEY
+      foreign_keys:
+        - referenced_entity: omop.person
+          join_keys: [["person_id", "person_id"]]
+  - qualified_name: acris.LLC
+    kind: GRAPH_NODE
+    properties:
+      - name: name
+        type: string
+        nullable: false
+    obligation:
+      required_fields: [name]
+      primary_key: NATURAL_KEY
+  - qualified_name: acris.Property
+    kind: GRAPH_NODE
+    properties:
+      - name: address
+        type: string
+        nullable: false
+    obligation:
+      required_fields: [address]
+      primary_key: NATURAL_KEY
+  - qualified_name: match.Identity
+    kind: GRAPH_NODE
+    properties:
+      - name: name
+        type: string
+        nullable: false
+    obligation:
+      required_fields: [name]
+      primary_key: NATURAL_KEY
+  - qualified_name: acris.OWNS
+    kind: GRAPH_EDGE
+    endpoints:
+      subject:
+        target_entity: acris.LLC
+        cardinality: one
+        nullable: false
+      object:
+        target_entity: acris.Property
+        cardinality: one
+        nullable: false
+    properties:
+      - name: valid_from
+        type: date
+        nullable: false
+      - name: valid_to
+        type: date
+        nullable: true
+    obligation:
+      required_fields: [subject, object, valid_from]
+      primary_key: NATURAL_KEY
+      minimum_viable_row:
+        op: AND
+        clauses:
+          - kind: presence
+            field: subject
+          - kind: presence
+            field: object
+          - kind: presence
+            field: valid_from
+    context_card:
+      card_version: "1.0.0"
+      description: Ownership edge between LLC and Property with temporal validity.
+  - qualified_name: match.SAME_AS
+    kind: GRAPH_EDGE
+    endpoints:
+      subject:
+        target_entity: match.Identity
+        cardinality: one
+        nullable: false
+      object:
+        target_entity: match.Identity
+        cardinality: one
+        nullable: false
+    properties: []
+    obligation:
+      required_fields: [subject, object]
+      primary_key: NATURAL_KEY
