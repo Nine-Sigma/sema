@@ -29,6 +29,8 @@ dependencies = [
     "loguru>=0.7.3",
     "duckdb>=1.0.0",
     "pyarrow>=14.0.0",
+    "pyyaml>=6.0",
+    "packaging>=24.0",
 ]
 
 [project.scripts]
