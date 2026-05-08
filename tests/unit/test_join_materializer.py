@@ -74,16 +74,6 @@ def test_materialize_threads_source_schema_to_batch():
             assert call.kwargs.get("source_schema") == SCHEMA
 
 
-def test_materialize_skips_edge_writes_when_source_schema_missing():
-    """Edge writes require source_schema; skip if absent (legacy)."""
-    loader = MagicMock()
-    a = _join_assertion()
-    groups = {(a.subject_ref, a.predicate.value): [a]}
-    materialize_join_paths(loader, groups)
-    loader.add_join_path_uses.assert_not_called()
-    loader.add_join_path_entity_links.assert_not_called()
-
-
 def _fk_to_assertion(tier: int = 1, confidence: float = 0.95) -> Assertion:
     candidate = FKCandidate(
         pk_table="patient", pk_column="patient_id",

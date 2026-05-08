@@ -363,3 +363,108 @@ class TestScopedDelete:
         ):
             assert f"DELETE n.{shared}" not in joined
             assert f"DETACH DELETE {shared}" not in joined
+
+
+class TestSourceSchemaFailFast:
+    """Every loader API that writes a study-scoped relationship MUST raise
+    `ValueError` when called with `source_schema=None`. Failing at the API
+    boundary is more debuggable than letting Neo4j reject the MERGE with
+    a cryptic null-property error.
+    """
+
+    def test_upsert_entity_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            loader.upsert_entity(
+                "E", description=None, source="s", confidence=0.9,
+                table_name="t", schema_name="sch", catalog="c",
+            )
+
+    def test_upsert_property_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            loader.upsert_property(
+                "P", semantic_type="categorical", source="s",
+                confidence=0.9, entity_name="E", column_name="col",
+                table_name="t", schema_name="sch", catalog="c",
+            )
+
+    def test_upsert_value_set_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            loader.upsert_value_set(
+                "vs", column_name="col", table_name="t",
+                schema_name="sch", catalog="c",
+            )
+
+    def test_add_term_to_value_set_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            loader.add_term_to_value_set("CRC", "dx_types")
+
+    def test_add_term_hierarchy_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            loader.add_term_hierarchy("CRC", "COAD")
+
+    def test_upsert_alias_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            loader.upsert_alias(
+                "syn", parent_label=":Entity", parent_name="E",
+                source="s", confidence=0.9,
+            )
+
+    def test_upsert_join_path_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            loader.upsert_join_path(
+                name="t1=t2", join_predicates=[{"on_column": "id"}],
+                hop_count=1, source="s", confidence=0.9,
+            )
+
+    def test_batch_upsert_entities_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            batch_upsert_entities(
+                loader, [{"name": "E", "table_name": "t",
+                          "schema_name": "sch", "catalog": "c",
+                          "source": "s", "confidence": 0.9}],
+            )
+
+    def test_batch_upsert_properties_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            batch_upsert_properties(
+                loader, [{"entity_name": "E", "name": "P",
+                          "column_name": "c", "table_name": "t",
+                          "schema_name": "sch", "catalog": "cat",
+                          "source": "s", "confidence": 0.9,
+                          "semantic_type": "x"}],
+            )
+
+    def test_batch_upsert_aliases_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            batch_upsert_aliases(
+                loader,
+                [{"parent_name": "E", "text": "syn", "source": "s",
+                  "confidence": 0.9, "target_key": "k"}],
+                parent_label=":Entity",
+            )
+
+    def test_batch_upsert_value_sets_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            batch_upsert_value_sets(
+                loader, [{"name": "vs", "column_name": "c",
+                          "table_name": "t", "schema_name": "sch",
+                          "catalog": "cat"}],
+            )
+
+    def test_batch_upsert_join_paths_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            batch_upsert_join_paths(
+                loader, [{"name": "t1=t2",
+                          "join_predicates": [{"on_column": "id"}],
+                          "hop_count": 1, "source": "s",
+                          "confidence": 0.9}],
+            )
+
+    def test_empty_batches_skip_validation(self, loader):
+        # Empty inputs should be a no-op; validation only matters when
+        # rows are actually about to be written.
+        batch_upsert_entities(loader, [])
+        batch_upsert_properties(loader, [])
+        batch_upsert_aliases(loader, [], parent_label=":Entity")
+        batch_upsert_value_sets(loader, [])
+        batch_upsert_join_paths(loader, [])

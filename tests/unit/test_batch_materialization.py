@@ -86,7 +86,8 @@ def test_unwind_entities_single_query() -> None:
         for i in range(3)
     ]
 
-    loader.batch_upsert_entities(entities)
+    from sema.graph.loader_utils import batch_upsert_entities
+    batch_upsert_entities(loader, entities, source_schema="clinical")
 
     loader._run.assert_called_once()
     cypher_arg = loader._run.call_args[0][0]
@@ -116,7 +117,8 @@ def test_unwind_properties_single_query() -> None:
         for i in range(3)
     ]
 
-    loader.batch_upsert_properties(properties)
+    from sema.graph.loader_utils import batch_upsert_properties
+    batch_upsert_properties(loader, properties, source_schema="clinical")
 
     loader._run.assert_called_once()
     cypher_arg = loader._run.call_args[0][0]
@@ -148,9 +150,10 @@ def test_batch_materialization_matches_individual() -> None:
     ]
 
     for e in entities:
-        individual_loader.upsert_entity(**e)
+        individual_loader.upsert_entity(**e, source_schema="clinical")
 
-    batch_loader.batch_upsert_entities(entities)
+    from sema.graph.loader_utils import batch_upsert_entities
+    batch_upsert_entities(batch_loader, entities, source_schema="clinical")
 
     individual_calls = individual_loader._run.call_args_list
     batch_call = batch_loader._run.call_args_list

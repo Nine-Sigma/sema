@@ -20,10 +20,12 @@ def loaded_graph(clean_neo4j):
     loader.upsert_table("cancer_diagnosis", "clinical", "cdm")
     loader.upsert_entity("Cancer Diagnosis", description="Primary dx",
                         source="llm", confidence=0.8,
-                        table_name="cancer_diagnosis", schema_name="clinical", catalog="cdm")
+                        table_name="cancer_diagnosis", schema_name="clinical", catalog="cdm",
+                        source_schema="clinical")
     loader.upsert_term("CRC", "Colorectal Cancer", source="llm", confidence=0.85)
     loader.upsert_alias("colon cancer", parent_label=":Entity",
-                       parent_name="Cancer Diagnosis", source="llm", confidence=0.8)
+                       parent_name="Cancer Diagnosis", source="llm", confidence=0.8,
+                       source_schema="clinical")
     return clean_neo4j, loader
 
 

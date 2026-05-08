@@ -63,6 +63,22 @@ def parse_ref_any(ref: str) -> tuple[str, str, str, str | None]:
     return pk.catalog_or_db, pk.schema or "", pk.table, pk.column
 
 
+def _strip_column_suffix(col_ref: str, column: str | None) -> str:
+    """Drop a trailing `.<column>` or `/<column>` suffix to get the table ref.
+
+    Required because `unity://cat.schema.table.column` (dots) and
+    `databricks://ws/cat/sch/tbl/col` (slashes) use different separators;
+    a naive `rsplit("/", 1)` mishandles unity-style refs.
+    """
+    if not column:
+        return col_ref
+    for sep in (".", "/"):
+        suffix = f"{sep}{column}"
+        if col_ref.endswith(suffix):
+            return col_ref[: -len(suffix)]
+    return col_ref
+
+
 
 def upsert_physical_nodes(
     loader: GraphLoader,
@@ -182,7 +198,7 @@ def _resolve_property_details(
         if type_winner else "free_text"
     )
 
-    table_ref = col_ref.rsplit("/", 1)[0] if pk.column else col_ref
+    table_ref = _strip_column_suffix(col_ref, pk.column)
 
     entity_group = groups.get(
         (table_ref, AssertionPredicate.HAS_ENTITY_NAME.value), [],
@@ -243,6 +259,7 @@ def upsert_decoded_values(
 
     vs_batch: list[dict[str, Any]] = []
     term_batch: list[dict[str, Any]] = []
+    member_writes: list[tuple[str, str]] = []
 
     for col_ref, decoded in decoded_groups.items():
         try:
@@ -271,14 +288,19 @@ def upsert_decoded_values(
                 "vocabulary_name": vs_name,
                 "source": a.source, "confidence": a.confidence,
             })
-            loader.add_term_to_value_set(
-                raw, vs_name, source_schema=source_schema,
-            )
+            member_writes.append((raw, vs_name))
 
+    # ValueSet must MERGE on column_ref BEFORE add_term_to_value_set MERGEs
+    # by name; otherwise the by-name MERGE creates a duplicate node with
+    # no column_ref, then the by-column_ref MERGE creates a second.
     batch_upsert_value_sets(
         loader, vs_batch, source_schema=source_schema,
     )
     batch_upsert_terms(loader, term_batch, source_schema=source_schema)
+    for raw, vs_name in member_writes:
+        loader.add_term_to_value_set(
+            raw, vs_name, source_schema=source_schema,
+        )
 
 
 def _collect_alias_batch(
