@@ -340,6 +340,9 @@ def query(
         sys.exit(1)
 
 
+from sema.cli_target import target_group as _target_group
+
 cli.add_command(_ingest_group, name="ingest")
 cli.add_command(_push_cmd, name="push")
 cli.add_command(_eval_group, name="eval")
+cli.add_command(_target_group, name="target")
