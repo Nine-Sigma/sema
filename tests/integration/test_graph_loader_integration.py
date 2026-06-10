@@ -100,48 +100,14 @@ class TestUpsertIdempotency:
         assert node["n"]["comment"] == "Updated"
 
 
-class TestAssertionSupersession:
-    def test_new_assertion_supersedes_old(self, loader, clean_neo4j):
-        old = _make_assertion("ref://col", AssertionPredicate.HAS_LABEL,
-                             {"value": "Old"}, run_id="run-1")
-        loader.store_assertion(old)
-
-        new = _make_assertion("ref://col", AssertionPredicate.HAS_LABEL,
-                             {"value": "New"}, run_id="run-2")
-        loader.store_assertion(new)
-
-        with clean_neo4j.session() as s:
-            results = list(s.run(
-                "MATCH (a:Assertion) WHERE a.subject_ref = 'ref://col' "
-                "RETURN a.status AS status, a.run_id AS run_id "
-                "ORDER BY a.run_id"
-            ))
-        assert len(results) == 2
-        assert results[0]["status"] == "superseded"
-        assert results[0]["run_id"] == "run-1"
-        assert results[1]["status"] == "auto"
-        assert results[1]["run_id"] == "run-2"
-
-    def test_pinned_assertion_not_superseded(self, loader, clean_neo4j):
-        pinned = _make_assertion("ref://col", AssertionPredicate.HAS_LABEL,
-                                {"value": "Pinned"}, run_id="run-1",
-                                status=AssertionStatus.PINNED)
-        loader.store_assertion(pinned)
-
-        new = _make_assertion("ref://col", AssertionPredicate.HAS_LABEL,
-                             {"value": "New"}, run_id="run-2")
-        loader.store_assertion(new)
-
-        with clean_neo4j.session() as s:
-            results = list(s.run(
-                "MATCH (a:Assertion) WHERE a.subject_ref = 'ref://col' "
-                "RETURN a.status AS status, a.run_id AS run_id "
-                "ORDER BY a.run_id"
-            ))
-        assert len(results) == 2
-        # Pinned stays pinned
-        assert results[0]["status"] == "pinned"
-        assert results[1]["status"] == "auto"
+class TestAssertionStorage:
+    """Assertions are immutable post-store. Pin/accept/reject lifecycle is
+    StatusEvent-driven and tested at `tests/unit/test_winner_selection.py`
+    and `tests/unit/test_status_store.py`. The mutation-based supersession
+    integration tests were retired alongside the immutability contract
+    captured in `test_no_supersession_mutation_on_store` /
+    `test_no_supersession_mutations`.
+    """
 
     def test_different_sources_coexist(self, loader, clean_neo4j):
         a1 = _make_assertion("ref://col", AssertionPredicate.HAS_LABEL,
@@ -158,22 +124,6 @@ class TestAssertionSupersession:
             ).single()["c"]
         assert count == 2
 
-    def test_human_override_preserved_across_rebuild(self, loader, clean_neo4j):
-        accepted = _make_assertion("ref://col", AssertionPredicate.HAS_LABEL,
-                                  {"value": "Accepted"}, run_id="run-1",
-                                  status=AssertionStatus.ACCEPTED)
-        loader.store_assertion(accepted)
-
-        new = _make_assertion("ref://col", AssertionPredicate.HAS_LABEL,
-                             {"value": "New"}, run_id="run-2")
-        loader.store_assertion(new)
-
-        with clean_neo4j.session() as s:
-            results = list(s.run(
-                "MATCH (a:Assertion) WHERE a.subject_ref = 'ref://col' "
-                "RETURN a.status AS status ORDER BY a.run_id"
-            ))
-        assert results[0]["status"] == "accepted"  # preserved
 
 
 class TestJoinPaths:
@@ -186,6 +136,7 @@ class TestJoinPaths:
             join_predicates=[{"from_table": "tbl1", "to_table": "tbl2", "on_column": "patient_id"}],
             hop_count=1,
             source="heuristic", confidence=0.8,
+            source_schema="schema",
         )
         assert _count(clean_neo4j, "JoinPath") == 1
 

@@ -120,6 +120,7 @@ class TestUpsertSemanticNodes:
             source="llm", confidence=0.8,
             table_name="cancer_diagnosis",
             schema_name="clinical", catalog="cdm",
+            source_schema="clinical",
         )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
@@ -138,6 +139,7 @@ class TestUpsertSemanticNodes:
             column_name="dx_type_cd",
             table_name="cancer_diagnosis",
             schema_name="clinical", catalog="cdm",
+            source_schema="clinical",
         )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
@@ -156,6 +158,7 @@ class TestUpsertSemanticNodes:
             column_name="dx_type_cd",
             table_name="cancer_diagnosis",
             schema_name="clinical", catalog="cdm",
+            source_schema="clinical",
         )
         cypher = session.run.call_args[0][0]
         merge_idx = cypher.index("MERGE (e:Entity {name: $entity_name})")
@@ -201,6 +204,7 @@ class TestUpsertSemanticNodes:
             "oncotree_types", column_name="dx_type_cd",
             table_name="cancer_diagnosis",
             schema_name="clinical", catalog="cdm",
+            source_schema="clinical",
         )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
@@ -219,6 +223,7 @@ class TestAliasOperations:
             source="llm", confidence=0.8,
             is_preferred=False,
             description="Common name",
+            source_schema="clinical",
         )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
@@ -246,12 +251,25 @@ class TestJoinPathOperations:
                 "operator": "=",
             }],
             hop_count=1, source="heuristic", confidence=0.85,
+            source_schema="sch",
         )
         session.run.assert_called()
         cypher = session.run.call_args[0][0]
         assert "MERGE" in cypher
         assert ":JoinPath" in cypher
         assert "ON CREATE SET" in cypher
+
+    def test_upsert_join_path_rejects_missing_source_schema(self, loader):
+        with pytest.raises(ValueError, match="source_schema"):
+            loader.upsert_join_path(
+                name="t1/c1=t2/c2",
+                join_predicates=[{
+                    "left_table": "t1", "left_column": "c1",
+                    "right_table": "t2", "right_column": "c2",
+                    "operator": "=",
+                }],
+                hop_count=1, source="heuristic", confidence=0.85,
+            )
 
     def test_add_join_path_entity_links(
         self, loader, mock_driver,

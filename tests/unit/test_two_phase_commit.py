@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 pytestmark = pytest.mark.unit
 
 from sema.graph.loader import GraphLoader
+from sema.graph.materializer import materialize_unified
 from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
@@ -217,7 +218,7 @@ class TestMaterializeTableGraph:
             ),
         ]
 
-        loader.materialize_table_graph(assertions)
+        materialize_unified(loader, assertions, source_schema="sch")
 
         # Check that MERGE calls were made
         cypher_calls = [
@@ -262,7 +263,7 @@ class TestMaterializeTableGraph:
             ),
         ]
 
-        loader.materialize_table_graph(assertions)
+        materialize_unified(loader, assertions, source_schema="sch")
         assert driver.session.call_count >= 1
 
 
@@ -300,7 +301,7 @@ class TestMaterializationIdempotency:
                     source="llm_interpretation",
                 ),
             ]
-            loader.materialize_table_graph(assertions)
+            materialize_unified(loader, assertions, source_schema="sch")
             calls_per_run.append(session_mock.run.call_count)
 
         assert calls_per_run[0] == calls_per_run[1]
