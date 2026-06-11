@@ -14,6 +14,7 @@ from sema.graph.materializer_utils import (
     upsert_physical_nodes as _upsert_physical_nodes,
     upsert_semantic_nodes as _upsert_semantic_nodes,
 )
+from sema.graph.retry_utils import run_with_retry, statement_summary
 from sema.graph.term_identity_utils import term_namespace
 from sema.models.assertions import (
     Assertion,
@@ -29,13 +30,19 @@ class GraphLoader:
         self._driver = driver
 
     def _run(self, cypher: str, **params: Any) -> None:
-        with self._driver.session() as session:
-            session.run(cypher, **params)
+        def op() -> None:
+            with self._driver.session() as session:
+                session.run(cypher, **params)
+
+        run_with_retry(op, statement_summary(cypher))
 
     def _run_read(self, cypher: str, **params: Any) -> list[dict[str, Any]]:
-        with self._driver.session() as session:
-            result = session.run(cypher, **params)
-            return [dict(record) for record in result]
+        def op() -> list[dict[str, Any]]:
+            with self._driver.session() as session:
+                result = session.run(cypher, **params)
+                return [dict(record) for record in result]
+
+        return run_with_retry(op, statement_summary(cypher))
 
     def upsert_datasource(
         self, id: str, ref: str, platform: str, workspace: str,
