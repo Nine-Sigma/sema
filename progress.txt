@@ -1,0 +1,43 @@
+# Ralph Progress Log
+Started: Wed Jun 10 20:58:03 EDT 2026
+---
+
+## Codebase Patterns
+- Assertion construction has ~9 call sites across 6 engine files, each via a local
+  `_make_assertion` helper. To touch ALL assertions at once, use a Pydantic
+  `@model_validator(mode="after")` on `Assertion` (src/sema/models/assertions.py) —
+  it is the single choke point. Do NOT edit each call site.
+- Name/alias text for HAS_ENTITY_NAME / HAS_PROPERTY_NAME / HAS_ALIAS / HAS_SYNONYM
+  lives in `payload["value"]`. Entity/Property/Term MERGE keys in
+  loader_utils.batch_upsert_* are built from these values, so anything affecting the
+  value affects graph node identity.
+- `loader._run(query, rows=rows)` — UNWIND-style batch calls pass `rows` as a KWARG,
+  not positional. Mock side_effects must accept `rows=` to capture batch payloads.
+- Pure helpers that the models layer must import (e.g. normalize_utils) must have NO
+  sema imports, to avoid an engine->models import cycle. engine/__init__.py is empty
+  so `from sema.engine.normalize_utils import ...` is cycle-safe.
+- Quality gate for THIS repo: `uv run pytest` + `uv run mypy src/sema/`. Coverage
+  baseline ~90%. ruff has ~64 pre-existing errors in untouched files — keep YOUR
+  files ruff-clean but the broad `ruff check src/sema/` is not green on this branch.
+- test_code_standards.py enforces <=400-line files / <=60-line funcs via a frozen
+  allowlist+ratchet; new files must comply or the suite fails.
+
+## [2026-06-10 21:07] - US-001
+- Normalize entity/property/alias names at the assertion boundary so whitespace and
+  unicode variants of one name cannot fragment into separate graph nodes (finding N).
+- Added `normalize_name(text)` in NEW src/sema/engine/normalize_utils.py (pure stdlib:
+  unicode NFC, collapse internal whitespace runs, strip; case preserved; idempotent).
+- Added `@model_validator(mode="after")` `_normalize_name_payload` on `Assertion`
+  (src/sema/models/assertions.py) normalizing `payload["value"]` only for the four
+  name predicates — single choke point, no per-call-site edits.
+- Tests: NEW tests/unit/test_normalize_utils.py (14 tests) — helper unit tests,
+  per-predicate construction normalization, non-name predicate untouched, missing-key
+  safety, and a loader-mocked test proving two whitespace/NFD-variant entity names
+  collapse to one MERGE key (`name`).
+- Checks: 1527 passed; mypy clean; coverage 90% (both touched files 100%).
+- **Learnings for future iterations:**
+  - See Codebase Patterns above (Assertion choke point, payload["value"], rows kwarg,
+    import-cycle avoidance, repo quality gate).
+  - The Assertion validator mutates `self.payload` in place under mode="after"; this is
+    idempotent so re-validation from dict is safe.
+---
