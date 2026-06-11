@@ -84,8 +84,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "NEW src/sema/graph/retry_utils.py: run_with_retry(operation, summary, sleep=None) retries neo4j.exceptions.TransientError with exponential backoff (BASE_RETRY_DELAY_SECONDS=0.2 * 2**(attempt-1)); module-level MAX_RETRY_ATTEMPTS=3. ClientError is NOT caught so it propagates immediately. Each retry + final exhaustion logged via sema.log (loguru) logger with statement summary and attempt number. statement_summary(cypher) truncates to first line/80 chars. Sleep injectable via sleep param; loader path uses module-level _sleep() patchable in tests (monkeypatch sema.graph.retry_utils._sleep). Wired into GraphLoader._run AND _run_read (loader.py) — both wrap their session work in a local op() closure passed to run_with_retry, so all batch UNWIND helpers (loader_utils routes through loader._run/_run_read) inherit retry. Tests: NEW tests/unit/test_retry_utils.py (9): helper-level (2 transient then success in 3 attempts, persistent raises after MAX, ClientError 1 call no retry, exponential delays, summary truncation) and loader-level with mocked driver (_run + _run_read retry, persistent raise, ClientError immediate). No real sleeps (injected/patched). 1571 passed, mypy clean, coverage 90% (retry_utils 96%)."
     },
     {
       "id": "US-006",

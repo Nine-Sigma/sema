@@ -147,3 +147,33 @@ Started: Wed Jun 10 20:58:03 EDT 2026
   - deprecate_stale_vocabularies keeps the original `if not active_names: return`
     guard: a build with zero vocab matches must not deprecate every vocabulary.
 ---
+
+## [2026-06-11 01:45] - US-005
+- Retry transient Neo4j errors during materialization so MERGE deadlocks on
+  shared nodes (default table_workers=4) retry with backoff instead of failing
+  the table (finding E).
+- NEW src/sema/graph/retry_utils.py: run_with_retry(operation, summary, sleep=None)
+  retries neo4j.exceptions.TransientError with exponential backoff
+  (BASE_RETRY_DELAY_SECONDS=0.2 * 2**(attempt-1)), MAX_RETRY_ATTEMPTS=3. ClientError
+  is not caught -> propagates immediately. Each retry + exhaustion logged via
+  sema.log (loguru) logger with statement summary + attempt number.
+  statement_summary(cypher) = first line, truncated.
+- Wired into GraphLoader._run AND _run_read (loader.py): each wraps its session
+  work in a local op() closure passed to run_with_retry. All loader_utils batch
+  UNWIND helpers route through loader._run/_run_read, so they inherit retry.
+- Sleep is injectable (sleep param) for direct helper tests; the loader path uses
+  module-level _sleep() which tests monkeypatch (sema.graph.retry_utils._sleep) so
+  there are NO real sleeps in unit tests.
+- Tests: NEW tests/unit/test_retry_utils.py (9). 1571 passed, mypy clean,
+  coverage 90% (retry_utils 96%).
+- **Learnings for future iterations:**
+  - GraphLoader._run/_run_read are the two execution choke points; wrapping them
+    covers every batch helper in loader_utils.py (all route through them). No need
+    to touch individual batch functions for cross-cutting execution concerns.
+  - For injectable sleep that's also patchable from the loader path (which can't
+    pass a sleep arg), use a module-level _sleep() referenced by name inside
+    run_with_retry; tests monkeypatch sema.graph.retry_utils._sleep. The default-arg
+    `time.sleep` trick would NOT be patchable this way.
+  - neo4j.exceptions: TransientError = retryable (deadlock/lock), ClientError =
+    not retryable (syntax/constraint). Catch only TransientError.
+---
