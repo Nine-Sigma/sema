@@ -199,6 +199,7 @@ def _build_ancestry(
             code=c.get("code", ""),
             label=c.get("label", ""),
             parent_code=c.get("parent_code"),
+            vocabulary=c.get("vocabulary"),
         )
         for c in ancestry_candidates
     ]
@@ -232,26 +233,35 @@ def _build_metrics(
 def _build_governed_values(
     candidate_set: SemanticCandidateSet,
 ) -> list[GovernedValue]:
+    """Group value candidates per column, keeping vocabulary and
+    ambiguity apart so alternatives never merge into one value list."""
     value_candidates = [
         c for c in candidate_set.candidates if c.get("type") == "value"
     ]
-    value_groups: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    GroupKey = tuple[str, str, str, str, bool]
+    value_groups: dict[GroupKey, list[dict[str, str]]] = {}
     for vc in value_candidates:
         key = (
             vc.get("property_name", ""),
             vc.get("column", ""),
             vc.get("table", ""),
+            vc.get("vocabulary") or "",
+            bool(vc.get("ambiguous")),
         )
         value_groups.setdefault(key, []).append(
             {"code": vc.get("code", ""), "label": vc.get("label", "")}
         )
 
     governed_values: list[GovernedValue] = []
-    for (prop_name, col, tbl), values in value_groups.items():
+    for (prop_name, col, tbl, vocab, ambiguous), values in (
+        value_groups.items()
+    ):
         governed_values.append(GovernedValue(
             property_name=prop_name,
             column=col,
             table=tbl,
             values=values,
+            vocabulary=vocab or None,
+            ambiguous=ambiguous,
         ))
     return governed_values

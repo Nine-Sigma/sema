@@ -16,6 +16,11 @@ from sema.pipeline.dedup_utils import (
     normalize_vector_hit as _normalize_vector_hit,
     tokenize_query,
 )
+from sema.pipeline.term_expansion_utils import (
+    _expand_ancestry,
+    _expand_term_governed_values,
+    _expand_term_hit,
+)
 
 if TYPE_CHECKING:
     from sema.pipeline.retrieval import RetrievalEngine
@@ -23,6 +28,9 @@ if TYPE_CHECKING:
 __all__ = [
     "_dedup_artifacts",
     "_dedup_seeds",
+    "_expand_ancestry",
+    "_expand_term_governed_values",
+    "_expand_term_hit",
     "_normalize_vector_hit",
     "merge_and_rank_candidates",
     "tokenize_query",
@@ -117,29 +125,6 @@ def _expand_metrics(
     return metrics
 
 
-def _expand_ancestry(
-    engine: RetrievalEngine,
-    names_or_codes: list[str],
-    vocabulary_name: str | None = None,
-) -> list[dict[str, Any]]:
-    """Expand Term ancestry via PARENT_OF traversal.
-
-    Accepts term codes with optional vocabulary scope.
-    """
-    ancestry: list[dict[str, Any]] = []
-    for code in names_or_codes:
-        try:
-            results = engine._run_query(
-                CypherQueries.expand_ancestry(),
-                code=code,
-                vocabulary_name=vocabulary_name,
-            )
-            ancestry.extend(results)
-        except Exception:
-            pass
-    return ancestry
-
-
 def _expand_property_hit(
     engine: RetrievalEngine, hit: dict[str, Any]
 ) -> list[dict[str, Any]]:
@@ -204,146 +189,6 @@ def _expand_property_hit(
             })
 
     return results
-
-
-def _expand_term_hit(
-    engine: RetrievalEngine, hit: dict[str, Any]
-) -> list[dict[str, Any]]:
-    """Expand a Term vector hit using graph edges.
-
-    Term identity is {vocabulary_name, code}. When the hit's vocabulary
-    is unknown and the code exists in several vocabularies, one
-    candidate is emitted per vocabulary, each expanded within its own
-    vocabulary — retrieval never silently picks among alternatives;
-    downstream ranking (or a council) selects.
-    """
-    code = hit.get("code", hit.get("name", ""))
-    label = hit.get("label", "")
-    results: list[dict[str, Any]] = []
-    for vocab in _term_vocabularies(engine, hit, code):
-        results.extend(
-            _expand_term_for_vocab(engine, hit, code, label, vocab)
-        )
-    return results
-
-
-def _term_vocabularies(
-    engine: RetrievalEngine, hit: dict[str, Any], code: str,
-) -> list[str | None]:
-    """Vocabularies the hit's term may belong to; [None] when unknown.
-
-    A None entry keeps the legacy unscoped expansion for hits whose
-    vocabulary cannot be resolved (e.g. pre-composite-key graphs).
-    """
-    vocabulary_name = hit.get("vocabulary_name", "")
-    if vocabulary_name:
-        return [vocabulary_name]
-    if not code:
-        return [None]
-    try:
-        rows = engine._run_query(
-            CypherQueries.find_vocabularies_for_term(), code=code,
-        )
-    except Exception:
-        return [None]
-    names = [
-        r.get("vocabulary_name") for r in rows
-        if r.get("vocabulary_name")
-    ]
-    return list(names) or [None]
-
-
-def _expand_term_for_vocab(
-    engine: RetrievalEngine,
-    hit: dict[str, Any],
-    code: str,
-    label: str,
-    vocab: str | None,
-) -> list[dict[str, Any]]:
-    """One term candidate plus its vocabulary-scoped expansions."""
-    hit_confidence = hit.get("confidence", 0.5)
-    hit_status = hit.get("status", "auto")
-
-    term_candidate: dict[str, Any] = {
-        "type": "term",
-        "code": code,
-        "label": label,
-        "score": hit.get("final_score", 0.0),
-        "source": "retrieval",
-        "status": hit_status,
-        "confidence": hit_confidence,
-        "confidence_policy": "semantic",
-    }
-    if vocab:
-        term_candidate["vocabulary"] = vocab
-
-    results: list[dict[str, Any]] = [term_candidate]
-    if not code:
-        return results
-
-    # Term→MEMBER_OF→ValueSet←HAS_VALUE_SET←Column
-    results.extend(
-        _expand_term_governed_values(
-            engine, code, hit_status, hit_confidence,
-            vocabulary_name=vocab,
-        )
-    )
-
-    for a in _expand_ancestry(engine, [code], vocabulary_name=vocab):
-        results.append({
-            "type": "ancestry",
-            "code": a.get("code", ""),
-            "label": a.get("label", ""),
-            "vocabulary": a.get("vocabulary_name", vocab),
-            "parent_code": a.get("parent_code", code),
-            "source": "retrieval_ancestry",
-            "status": hit_status,
-            "confidence": hit_confidence,
-            "confidence_policy": "semantic",
-        })
-    return results
-
-
-def _expand_term_governed_values(
-    engine: RetrievalEngine,
-    code: str,
-    status: str,
-    confidence: float,
-    vocabulary_name: str | None = None,
-) -> list[dict[str, Any]]:
-    """Traverse Term→MEMBER_OF→ValueSet←HAS_VALUE_SET←Column.
-
-    Filters by vocabulary when known: Term codes are unique only within
-    a vocabulary, so an unscoped match can cross vocabularies.
-    """
-    try:
-        vs_results = engine._run_query(
-            CypherQueries.find_value_sets_for_term(),
-            code=code,
-            vocabulary_name=vocabulary_name or None,
-        )
-    except Exception:
-        return []
-
-    values: list[dict[str, Any]] = []
-    for vs in vs_results:
-        col = vs.get("column_name", "")
-        table = vs.get("table_name", "")
-        if not col or not table:
-            continue
-        values.append({
-            "type": "value",
-            "property_name": col,
-            "column": col,
-            "table": table,
-            "code": code,
-            "label": code,
-            "source": "retrieval_term_expansion",
-            "status": status,
-            "confidence": confidence,
-            "confidence_policy": "semantic",
-        })
-    return values
 
 
 def _expand_alias_hit(

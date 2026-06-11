@@ -260,6 +260,45 @@ class TestBuildSqlPrompt:
         prompt = build_sql_prompt(sample_sco, "test")
         assert "ONLY" in prompt
 
+    def test_ambiguous_values_render_as_alternatives(self, sample_sco):
+        sample_sco.governed_values = [
+            GovernedValue(
+                property_name="gender", column="gender",
+                table="patient",
+                values=[{"code": "M", "label": "Male"}],
+                vocabulary="Gender", ambiguous=True,
+            ),
+            GovernedValue(
+                property_name="state", column="state",
+                table="address",
+                values=[{"code": "M", "label": "Mississippi"}],
+                vocabulary="State", ambiguous=True,
+            ),
+        ]
+        prompt = build_sql_prompt(sample_sco, "male patients")
+        assert "AMBIGUOUS" in prompt
+        assert "Gender" in prompt
+        assert "State" in prompt
+
+    def test_ambiguous_values_excluded_from_exact_filter_section(
+        self, sample_sco,
+    ):
+        sample_sco.governed_values = [
+            GovernedValue(
+                property_name="gender", column="gender",
+                table="patient",
+                values=[{"code": "M", "label": "Male"}],
+                vocabulary="Gender", ambiguous=True,
+            ),
+        ]
+        prompt = build_sql_prompt(sample_sco, "male patients")
+        assert "use these exact values" not in prompt
+
+    def test_unambiguous_values_unaffected(self, sample_sco):
+        prompt = build_sql_prompt(sample_sco, "stage 3 patients")
+        assert "use these exact values" in prompt
+        assert "AMBIGUOUS" not in prompt
+
     def test_prompt_budget_truncation(self):
         many_values = [
             {"code": f"VAL_{i}", "label": f"Value {i}"}

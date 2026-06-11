@@ -61,6 +61,8 @@ class GovernedValue(BaseModel):
     column: str
     table: str
     values: list[dict[str, str]] = Field(default_factory=list)
+    vocabulary: str | None = None
+    ambiguous: bool = False
 
 
 class ResolvedMetric(BaseModel):
@@ -85,6 +87,7 @@ class AncestryTerm(BaseModel):
     code: str
     label: str
     parent_code: str | None = None
+    vocabulary: str | None = None
 
 
 class SemanticCandidateSet(BaseModel):
