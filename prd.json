@@ -150,8 +150,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Removed the `if not config.resume:` guard around the schema-wipe loop in src/sema/pipeline/orchestrate.py run_build, so loader.delete_study_scoped(schema) now runs for EVERY distinct work-item schema before _spawn_workers (which invokes materialize_unified via process_table/_try_resume) for both fresh and resume builds. Resume reloads the full assertion set (build._try_resume -> load_assertions -> materialize_unified), so delete-then-rewrite is safe and clears edges from tables removed since a failed run (finding L). Cleanup of an absent study is a harmless no-op (delete MATCHes nothing). Resume still skips re-extraction/LLM (gating lives in process_table, unchanged). Tests: rewrote TestResumeGating in tests/unit/test_orchestrate_resume_gating.py — test_resume_true_wipes_each_schema_before_workers (delete called once per distinct schema AND before workers spawn, via _spawn_workers side_effect observing loader.delete_study_scoped.called), test_resume_false_wipes_each_schema_once (unchanged), test_resume_true_absent_study_cleanup_is_no_op (has_assertions=False fresh-resume still gets one cleanup call, run completes without error). 1592 passed, 1 skipped; mypy clean; coverage 90%."
     },
     {
       "id": "US-010",

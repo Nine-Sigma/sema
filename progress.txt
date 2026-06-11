@@ -276,3 +276,35 @@ Started: Wed Jun 10 20:58:03 EDT 2026
     DETACH/DELETE of an alias removes its REFERS_TO edge and can orphan the
     target concept node, which the concept pass then collects.
 ---
+
+## [2026-06-11 04:15] - US-009
+- Resume now runs study-scoped cleanup before re-materialization (finding L).
+  Previously the schema-wipe loop in orchestrate.run_build was gated behind
+  `if not config.resume:`, so a resumed build never cleared its prior graph
+  writes — edges from tables removed since a failed run persisted.
+- Fix: removed the `if not config.resume:` guard so
+  `loader.delete_study_scoped(schema)` runs for every distinct work-item
+  schema before `_spawn_workers` for BOTH fresh and resume builds. Resume
+  reloads the full assertion set (build._try_resume -> load_assertions ->
+  materialize_unified), so delete-then-rewrite is safe; cleanup of an absent
+  study is a no-op (delete MATCHes nothing).
+- Resume's re-extraction/LLM skip is unaffected — that gating lives in
+  process_table (resume short-circuit), not in run_build's cleanup loop.
+- Files changed: edited src/sema/pipeline/orchestrate.py; rewrote
+  TestResumeGating in tests/unit/test_orchestrate_resume_gating.py (the two
+  resume-true tests flipped from assert_not_called to: called once per
+  distinct schema + before workers spawn, and absent-study no-op).
+- Checks: 1592 passed, 1 skipped; mypy clean; coverage 90%.
+- **Learnings for future iterations:**
+  - run_build's pre-worker `delete_study_scoped` loop and process_table's
+    resume short-circuit are SEPARATE concerns: the loop decides whether the
+    graph is wiped first; the short-circuit decides whether LLM/extraction
+    re-runs. US-009 only touched the loop. Don't conflate them.
+  - materialize_unified is reached via process_table (fresh: _run_pipeline_
+    stages; resume: _try_resume), both inside _spawn_workers. So any
+    "before any materialize_unified" ordering is satisfied by acting before
+    _spawn_workers in run_build.
+  - To assert call ORDERING in run_build tests, give the patched
+    `_spawn_workers` a side_effect that records `loader.delete_study_scoped
+    .called` and returns the results list (not return_value).
+---
