@@ -183,8 +183,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added abstract execute_query(query) -> list[tuple] to the Connector ABC (src/sema/connectors/base.py); DatabricksConnector.execute_query delegates to existing _execute. FK sampler/profile lookup in orchestrate_utils.run_fk_detection now wire query_fn=connector.execute_query (was connector._execute, private). discover_tables/extract_table lifted onto the ABC as default methods raising NotImplementedError (TYPE_CHECKING import of TableWorkItem from databricks to avoid runtime cycle; base uses `from __future__ import annotations`) so orchestration type hints can be Connector and mypy strict passes. Type hints switched DatabricksConnector/Any -> Connector at: orchestrate_utils._register_datasource/_discover_tables/run_fk_detection; build.process_table; build_utils._run_extraction/_run_pipeline_stages. DatabricksConnector is now constructed in EXACTLY ONE place: DatabricksConnectorFactory.create() (build.py:130) — orchestrate.run_build's discovery_connector now comes from connector_factory.create() (the duplicate later factory construction removed). Removed a now-unused `# type: ignore[no-any-return]` in _discover_tables (return type became concrete). No new connector implementations: StubConnector test stub (no Databricks imports) proves orchestration accepts any Connector. Tests: NEW tests/unit/test_connector_abstraction.py (3: abstract-instantiation guard, stub execute_query, run_fk_detection wires public execute_query into both WarehouseSampler+WarehouseProfileLookup); updated test_connector_base.FakeConnector (+execute_query) and added TestExecuteQuery delegation test in test_databricks_connector.py. 1613 passed, 1 skipped; mypy clean; coverage 90%. base.py 123 lines; orchestrate_utils.py 412 / build_utils.py 540 (pre-existing >400, type-hint-only edits, not grown)."
     },
     {
       "id": "US-012",

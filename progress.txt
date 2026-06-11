@@ -345,3 +345,45 @@ Started: Wed Jun 10 20:58:03 EDT 2026
     embedding_utils.py + the test file but never committed the source/test —
     check `git status` vs anatomy.md if entries look pre-populated.
 ---
+
+## [2026-06-11 04:55] - US-011
+- Pipeline now programs against the Connector ABC, not the concrete
+  DatabricksConnector (finding G).
+- Added abstract `execute_query(query) -> list[tuple]` to Connector
+  (src/sema/connectors/base.py); DatabricksConnector.execute_query delegates
+  to existing private _execute. FK sampler/profile lookup in
+  orchestrate_utils.run_fk_detection now wire query_fn=connector.execute_query
+  (was connector._execute, a private internal).
+- Lifted discover_tables/extract_table onto the ABC as default methods
+  (raise NotImplementedError, like the DTO methods) so orchestration type
+  hints can be Connector and mypy strict passes. base.py TYPE_CHECKING-imports
+  TableWorkItem from databricks (base has `from __future__ import annotations`,
+  so the hint is a string -> no runtime import cycle).
+- Type hints DatabricksConnector/Any -> Connector at: orchestrate_utils.
+  _register_datasource/_discover_tables/run_fk_detection; build.process_table;
+  build_utils._run_extraction/_run_pipeline_stages.
+- DatabricksConnector constructed in EXACTLY ONE place now:
+  DatabricksConnectorFactory.create() (build.py). orchestrate.run_build's
+  discovery_connector comes from connector_factory.create(); the duplicate
+  later factory construction was removed.
+- Files changed: edited base.py, databricks.py, orchestrate.py,
+  orchestrate_utils.py, build.py, build_utils.py; NEW tests/unit/
+  test_connector_abstraction.py (3); edited test_connector_base.py
+  (FakeConnector +execute_query) and test_databricks_connector.py
+  (TestExecuteQuery delegation).
+- Checks: 1613 passed, 1 skipped; mypy clean; coverage 90%.
+- **Learnings for future iterations:**
+  - The Connector ABC is the contract for orchestration. New connector
+    methods that orchestration calls must live on the ABC (abstract if every
+    connector must implement, or a NotImplementedError default if optional)
+    or `connector: Connector` type hints fail mypy strict. execute_query is
+    abstract; discover_tables/extract_table are NotImplementedError defaults
+    (so the minimal FakeConnector test stub need not implement them).
+  - When you give a `connector: Connector` param a real method on the ABC,
+    a previously-needed `# type: ignore[no-any-return]` at the call site can
+    become unused — mypy flags it. Remove the stale ignore.
+  - DatabricksConnector.__init__ connects to Databricks, so unit tests build
+    it via the test_databricks_connector.py `connector` fixture
+    (patch sema.connectors.databricks.sql_connect). A non-Databricks stub
+    subclass of Connector is the way to test orchestration generically.
+---
