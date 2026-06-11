@@ -188,11 +188,15 @@ class CypherQueries:
         )
 
     @staticmethod
-    def find_vocabulary_for_term() -> str:
+    def find_vocabularies_for_term() -> str:
+        # Codes are unique only within a vocabulary, so this returns ALL
+        # vocabularies for a code: the caller decides how to handle
+        # ambiguity instead of the database picking one arbitrarily.
         return (
             "MATCH (t:Term {code: $code})"
             "-[:IN_VOCABULARY]->(v:Vocabulary) "
-            "RETURN v.name AS vocabulary_name LIMIT 1"
+            "RETURN DISTINCT v.name AS vocabulary_name "
+            "ORDER BY vocabulary_name"
         )
 
     @staticmethod

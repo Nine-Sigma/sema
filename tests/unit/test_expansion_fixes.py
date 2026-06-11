@@ -54,6 +54,44 @@ class TestTermGovernedValues:
         values = [r for r in results if r["type"] == "value"]
         assert len(values) == 0
 
+    def test_ambiguous_code_emits_one_candidate_per_vocabulary(
+        self, mock_engine,
+    ) -> None:
+        """A hit with no vocabulary whose code exists in several
+        vocabularies must surface ALL of them as distinct candidates —
+        retrieval never silently picks; downstream ranking selects."""
+        governed_calls: list = []
+
+        def run_query(query, **params):
+            if "IN_VOCABULARY" in query and "$code" in query:
+                return [
+                    {"vocabulary_name": "Gender"},
+                    {"vocabulary_name": "State"},
+                ]
+            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+                governed_calls.append(params.get("vocabulary_name"))
+            return []
+
+        mock_engine._run_query.side_effect = run_query
+        hit = {"code": "M", "label": "M", "final_score": 0.9}
+        results = _expand_term_hit(mock_engine, hit)
+        terms = [r for r in results if r["type"] == "term"]
+        assert {t.get("vocabulary") for t in terms} == {
+            "Gender", "State",
+        }
+        # Each alternative's expansion is scoped to its own vocabulary.
+        assert sorted(governed_calls) == ["Gender", "State"]
+
+    def test_unknown_vocabulary_keeps_single_unscoped_candidate(
+        self, mock_engine,
+    ) -> None:
+        mock_engine._run_query.return_value = []
+        hit = {"code": "M", "label": "M", "final_score": 0.9}
+        results = _expand_term_hit(mock_engine, hit)
+        terms = [r for r in results if r["type"] == "term"]
+        assert len(terms) == 1
+        assert "vocabulary" not in terms[0]
+
     def test_governed_values_scoped_to_hit_vocabulary(
         self, mock_engine,
     ) -> None:

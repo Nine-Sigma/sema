@@ -211,13 +211,56 @@ def _expand_term_hit(
 ) -> list[dict[str, Any]]:
     """Expand a Term vector hit using graph edges.
 
-    Traverses: Vocabulary (IN_VOCABULARY), ValueSets (MEMBER_OF),
-    associated Columns, ancestry (PARENT_OF*1..3).
+    Term identity is {vocabulary_name, code}. When the hit's vocabulary
+    is unknown and the code exists in several vocabularies, one
+    candidate is emitted per vocabulary, each expanded within its own
+    vocabulary — retrieval never silently picks among alternatives;
+    downstream ranking (or a council) selects.
     """
-    results: list[dict[str, Any]] = []
     code = hit.get("code", hit.get("name", ""))
     label = hit.get("label", "")
+    results: list[dict[str, Any]] = []
+    for vocab in _term_vocabularies(engine, hit, code):
+        results.extend(
+            _expand_term_for_vocab(engine, hit, code, label, vocab)
+        )
+    return results
+
+
+def _term_vocabularies(
+    engine: RetrievalEngine, hit: dict[str, Any], code: str,
+) -> list[str | None]:
+    """Vocabularies the hit's term may belong to; [None] when unknown.
+
+    A None entry keeps the legacy unscoped expansion for hits whose
+    vocabulary cannot be resolved (e.g. pre-composite-key graphs).
+    """
     vocabulary_name = hit.get("vocabulary_name", "")
+    if vocabulary_name:
+        return [vocabulary_name]
+    if not code:
+        return [None]
+    try:
+        rows = engine._run_query(
+            CypherQueries.find_vocabularies_for_term(), code=code,
+        )
+    except Exception:
+        return [None]
+    names = [
+        r.get("vocabulary_name") for r in rows
+        if r.get("vocabulary_name")
+    ]
+    return list(names) or [None]
+
+
+def _expand_term_for_vocab(
+    engine: RetrievalEngine,
+    hit: dict[str, Any],
+    code: str,
+    label: str,
+    vocab: str | None,
+) -> list[dict[str, Any]]:
+    """One term candidate plus its vocabulary-scoped expansions."""
     hit_confidence = hit.get("confidence", 0.5)
     hit_status = hit.get("status", "auto")
 
@@ -231,56 +274,33 @@ def _expand_term_hit(
         "confidence": hit_confidence,
         "confidence_policy": "semantic",
     }
+    if vocab:
+        term_candidate["vocabulary"] = vocab
 
-    # Try to get vocabulary via IN_VOCABULARY
-    if vocabulary_name:
-        term_candidate["vocabulary"] = vocabulary_name
-    elif code:
-        try:
-            vocab_results = engine._run_query(
-                CypherQueries.find_vocabulary_for_term(),
-                code=code,
-            )
-            if vocab_results:
-                term_candidate["vocabulary"] = vocab_results[0].get(
-                    "vocabulary_name"
-                )
-        except Exception:
-            pass
-
-    results.append(term_candidate)
-
-    # Term identity is {vocabulary_name, code}: scope expansions to the
-    # hit's vocabulary so a Gender "M" never pulls a State "M".
-    vocab = term_candidate.get("vocabulary")
+    results: list[dict[str, Any]] = [term_candidate]
+    if not code:
+        return results
 
     # Term→MEMBER_OF→ValueSet←HAS_VALUE_SET←Column
-    if code:
-        results.extend(
-            _expand_term_governed_values(
-                engine, code, hit_status, hit_confidence,
-                vocabulary_name=vocab,
-            )
+    results.extend(
+        _expand_term_governed_values(
+            engine, code, hit_status, hit_confidence,
+            vocabulary_name=vocab,
         )
+    )
 
-    # Expand ancestry from term code (vocabulary-scoped)
-    if code:
-        ancestry = _expand_ancestry(
-            engine, [code], vocabulary_name=vocab,
-        )
-        for a in ancestry:
-            results.append({
-                "type": "ancestry",
-                "code": a.get("code", ""),
-                "label": a.get("label", ""),
-                "vocabulary": a.get("vocabulary_name", vocab),
-                "parent_code": a.get("parent_code", code),
-                "source": "retrieval_ancestry",
-                "status": hit_status,
-                "confidence": hit_confidence,
-                "confidence_policy": "semantic",
-            })
-
+    for a in _expand_ancestry(engine, [code], vocabulary_name=vocab):
+        results.append({
+            "type": "ancestry",
+            "code": a.get("code", ""),
+            "label": a.get("label", ""),
+            "vocabulary": a.get("vocabulary_name", vocab),
+            "parent_code": a.get("parent_code", code),
+            "source": "retrieval_ancestry",
+            "status": hit_status,
+            "confidence": hit_confidence,
+            "confidence_policy": "semantic",
+        })
     return results
 
 

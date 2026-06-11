@@ -66,10 +66,16 @@ class TestLookupQueries:
         assert "t.vocabulary_name = $vocabulary_name" in q
         assert "$vocabulary_name IS NULL" in q
 
-    def test_find_vocabulary_for_term(self) -> None:
-        q = CypherQueries.find_vocabulary_for_term()
+    def test_find_vocabularies_for_term(self) -> None:
+        # Returns ALL vocabularies for a code, deterministically ordered:
+        # duplicate codes are legitimate under {vocabulary_name, code}
+        # identity, so the lookup must never silently pick one.
+        q = CypherQueries.find_vocabularies_for_term()
         assert "IN_VOCABULARY" in q
         assert "$code" in q
+        assert "LIMIT" not in q
+        assert "DISTINCT" in q
+        assert "ORDER BY" in q
 
     def test_dereference_alias(self) -> None:
         q = CypherQueries.dereference_alias()
