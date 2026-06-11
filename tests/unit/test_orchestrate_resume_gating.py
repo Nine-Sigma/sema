@@ -1,6 +1,8 @@
 """Resume cleanup (US-009): the schema-wipe loop runs for BOTH a fresh
 build and a --resume build, so a resumed study's prior graph writes are
-cleared before re-materialization (finding L)."""
+cleared before re-materialization (finding L). A resume build preserves
+:Assertion nodes — they are the resume cache process_table reads, so
+deleting them would silently turn every resume into a full rebuild."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -123,6 +125,9 @@ class TestResumeGating:
         )
         assert called_schemas == ["sch1", "sch2"]
         assert observed["deleted_before_workers"] is True
+        # Resume cleanup must NOT delete the :Assertion resume cache.
+        for c in loader.delete_study_scoped.call_args_list:
+            assert c.kwargs.get("preserve_assertions") is True
 
     def test_resume_false_wipes_each_schema_once(self, loader_and_driver):
         driver, loader = loader_and_driver
@@ -173,6 +178,9 @@ class TestResumeGating:
             c.args[0] for c in loader.delete_study_scoped.call_args_list
         )
         assert called_schemas == ["sch1", "sch2"]
+        # Fresh builds delete :Assertion nodes too (full wipe).
+        for c in loader.delete_study_scoped.call_args_list:
+            assert c.kwargs.get("preserve_assertions") is False
 
     def test_resume_true_absent_study_cleanup_is_no_op(
         self, loader_and_driver,
@@ -225,7 +233,9 @@ class TestResumeGating:
             from sema.pipeline.orchestrate import run_build
             run_build(cfg)
 
-        loader.delete_study_scoped.assert_called_once_with("sch1")
+        loader.delete_study_scoped.assert_called_once_with(
+            "sch1", preserve_assertions=True,
+        )
 
 
 class TestProcessTableResumeWithAssertions:

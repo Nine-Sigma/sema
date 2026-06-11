@@ -2,7 +2,10 @@
 
 A later table's materialization must never deprecate vocabularies an
 earlier table introduced (finding D). Deprecation now runs once at the
-orchestrator over the union of every table's active vocabularies.
+orchestrator over the union of every table's active vocabularies, and
+is scoped to the schemas this build fully covered: a sliced build, a
+failed table, or another study's vocabularies must never be deprecated
+by this run.
 """
 from __future__ import annotations
 
@@ -13,6 +16,7 @@ import pytest
 
 from sema.graph.lifecycle_utils import (
     active_vocab_names,
+    covered_schemas,
     deprecate_stale_from_results,
     deprecate_stale_vocabularies,
 )
@@ -68,17 +72,73 @@ class TestActiveVocabNames:
 class TestDeprecateStaleVocabularies:
     def test_no_op_when_empty(self) -> None:
         loader = MagicMock()
-        deprecate_stale_vocabularies(loader, set())
+        deprecate_stale_vocabularies(loader, set(), {"sch"})
+        loader._run.assert_not_called()
+
+    def test_no_op_when_no_schemas(self) -> None:
+        loader = MagicMock()
+        deprecate_stale_vocabularies(loader, {"ICD-10"}, set())
         loader._run.assert_not_called()
 
     def test_runs_with_active_names(self) -> None:
         loader = MagicMock()
-        deprecate_stale_vocabularies(loader, {"ICD-10"})
+        deprecate_stale_vocabularies(loader, {"ICD-10"}, {"sch"})
         loader._run.assert_called_once()
         call = loader._run.call_args
         query = call.args[0]
         assert "DEPRECATED" in query
         assert "ICD-10" in call.kwargs["active_names"]
+        assert "sch" in call.kwargs["schemas"]
+
+    def test_query_is_scoped_to_covered_schemas(self) -> None:
+        """The deprecation MATCH must require an edge inside the covered
+        schemas AND no edge outside them, so a vocabulary another study
+        still uses is never deprecated by this build."""
+        loader = MagicMock()
+        deprecate_stale_vocabularies(loader, {"ICD-10"}, {"sch"})
+        query = loader._run.call_args.args[0]
+        assert "IN_VOCABULARY" in query
+        assert "CLASSIFIED_AS" in query
+        assert "$schemas" in query
+        assert "NOT EXISTS" in query
+
+
+class TestCoveredSchemas:
+    def _wi(self, fqn: str, schema: str) -> MagicMock:
+        wi = MagicMock()
+        wi.fqn = fqn
+        wi.schema = schema
+        return wi
+
+    def test_all_success_covers_all_schemas(self) -> None:
+        from sema.pipeline.build import TableResult
+
+        work_items = [self._wi("A", "sch1"), self._wi("B", "sch2")]
+        results = [
+            TableResult.success("A"), TableResult.success("B"),
+        ]
+        assert covered_schemas(work_items, results) == {"sch1", "sch2"}
+
+    def test_failed_table_excludes_its_schema(self) -> None:
+        from sema.pipeline.build import TableResult
+
+        work_items = [
+            self._wi("A", "sch1"), self._wi("B", "sch1"),
+            self._wi("C", "sch2"),
+        ]
+        results = [
+            TableResult.success("A"),
+            TableResult.failed("B", "stage", "boom"),
+            TableResult.success("C"),
+        ]
+        assert covered_schemas(work_items, results) == {"sch2"}
+
+    def test_skipped_resume_table_still_covered(self) -> None:
+        from sema.pipeline.build import TableResult
+
+        work_items = [self._wi("A", "sch1")]
+        results = [TableResult.skipped("A", "resume: assertions exist")]
+        assert covered_schemas(work_items, results) == {"sch1"}
 
 
 class TestMaterializeUnifiedNoPerTableLifecycle:
@@ -95,6 +155,13 @@ class TestMaterializeUnifiedNoPerTableLifecycle:
         assert not any("DEPRECATED" in q for q in queries)
 
 
+def _work_item(fqn: str, schema: str) -> MagicMock:
+    wi = MagicMock()
+    wi.fqn = fqn
+    wi.schema = schema
+    return wi
+
+
 class TestOrchestratorRunsLifecycleOnce:
     def test_union_keeps_every_tables_vocab(self) -> None:
         from sema.pipeline.build import TableResult
@@ -103,8 +170,9 @@ class TestOrchestratorRunsLifecycleOnce:
             TableResult.success("A", active_vocabularies=["X"]),
             TableResult.success("B", active_vocabularies=["Y"]),
         ]
+        work_items = [_work_item("A", "sch1"), _work_item("B", "sch1")]
         loader = MagicMock()
-        deprecate_stale_from_results(loader, results)
+        deprecate_stale_from_results(loader, results, work_items)
         loader._run.assert_called_once()
         active = loader._run.call_args.kwargs["active_names"]
         assert set(active) == {"X", "Y"}
@@ -113,7 +181,47 @@ class TestOrchestratorRunsLifecycleOnce:
         from sema.pipeline.build import TableResult
 
         loader = MagicMock()
-        deprecate_stale_from_results(loader, [TableResult.success("A")])
+        deprecate_stale_from_results(
+            loader, [TableResult.success("A")],
+            [_work_item("A", "sch1")],
+        )
+        loader._run.assert_not_called()
+
+    def test_partial_coverage_is_no_op(self) -> None:
+        """A sliced or pattern-filtered build never deprecates: tables
+        outside the slice share schemas with the slice, so absence from
+        this run's active set proves nothing."""
+        from sema.pipeline.build import TableResult
+
+        loader = MagicMock()
+        deprecate_stale_from_results(
+            loader,
+            [TableResult.success("A", active_vocabularies=["X"])],
+            [_work_item("A", "sch1")],
+            full_coverage=False,
+        )
+        loader._run.assert_not_called()
+
+    def test_failed_table_excludes_schema_from_deprecation(self) -> None:
+        from sema.pipeline.build import TableResult
+
+        results = [
+            TableResult.success("A", active_vocabularies=["X"]),
+            TableResult.failed("B", "stage", "boom"),
+        ]
+        work_items = [_work_item("A", "sch1"), _work_item("B", "sch2")]
+        loader = MagicMock()
+        deprecate_stale_from_results(loader, results, work_items)
+        loader._run.assert_called_once()
+        assert loader._run.call_args.kwargs["schemas"] == ["sch1"]
+
+    def test_all_schemas_failed_is_no_op(self) -> None:
+        from sema.pipeline.build import TableResult
+
+        results = [TableResult.failed("A", "stage", "boom")]
+        work_items = [_work_item("A", "sch1")]
+        loader = MagicMock()
+        deprecate_stale_from_results(loader, results, work_items)
         loader._run.assert_not_called()
 
 

@@ -54,6 +54,33 @@ class TestTermGovernedValues:
         values = [r for r in results if r["type"] == "value"]
         assert len(values) == 0
 
+    def test_governed_values_scoped_to_hit_vocabulary(
+        self, mock_engine,
+    ) -> None:
+        """Term identity is {vocabulary_name, code}: a Gender 'M' hit
+        must not pull value sets from a State vocabulary's 'M'."""
+        captured: dict = {}
+
+        def run_query(query, **params):
+            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+                captured["query"] = query
+                captured["params"] = params
+                return [
+                    {"column_name": "gender",
+                     "table_name": "patient",
+                     "value_set_name": "gender_values"},
+                ]
+            return []
+
+        mock_engine._run_query.side_effect = run_query
+        hit = {
+            "code": "M", "label": "Male",
+            "vocabulary_name": "Gender", "final_score": 0.9,
+        }
+        _expand_term_hit(mock_engine, hit)
+        assert captured["params"].get("vocabulary_name") == "Gender"
+        assert "$vocabulary_name" in captured["query"]
+
 
 class TestAliasDispatch:
     def test_alias_to_property_dispatches(

@@ -250,16 +250,20 @@ def _expand_term_hit(
 
     results.append(term_candidate)
 
+    # Term identity is {vocabulary_name, code}: scope expansions to the
+    # hit's vocabulary so a Gender "M" never pulls a State "M".
+    vocab = term_candidate.get("vocabulary")
+
     # Term→MEMBER_OF→ValueSet←HAS_VALUE_SET←Column
     if code:
         results.extend(
             _expand_term_governed_values(
                 engine, code, hit_status, hit_confidence,
+                vocabulary_name=vocab,
             )
         )
 
     # Expand ancestry from term code (vocabulary-scoped)
-    vocab = term_candidate.get("vocabulary")
     if code:
         ancestry = _expand_ancestry(
             engine, [code], vocabulary_name=vocab,
@@ -285,12 +289,18 @@ def _expand_term_governed_values(
     code: str,
     status: str,
     confidence: float,
+    vocabulary_name: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Traverse Term→MEMBER_OF→ValueSet←HAS_VALUE_SET←Column."""
+    """Traverse Term→MEMBER_OF→ValueSet←HAS_VALUE_SET←Column.
+
+    Filters by vocabulary when known: Term codes are unique only within
+    a vocabulary, so an unscoped match can cross vocabularies.
+    """
     try:
         vs_results = engine._run_query(
             CypherQueries.find_value_sets_for_term(),
             code=code,
+            vocabulary_name=vocabulary_name or None,
         )
     except Exception:
         return []

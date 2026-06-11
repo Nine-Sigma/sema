@@ -177,6 +177,8 @@ class CypherQueries:
             "MATCH (t:Term)-[:MEMBER_OF]->(vs:ValueSet)"
             "<-[:HAS_VALUE_SET]-(c:Column) "
             "WHERE t.code = $code "
+            "AND (t.vocabulary_name = $vocabulary_name "
+            "OR $vocabulary_name IS NULL) "
             "OPTIONAL MATCH (c)-[:IN_TABLE]->(tbl:Table) "
             "RETURN vs.name AS value_set_name, "
             "c.name AS column_name, "

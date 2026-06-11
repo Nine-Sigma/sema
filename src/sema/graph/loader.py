@@ -584,25 +584,32 @@ class GraphLoader:
             updated_at=datetime.now(timezone.utc).isoformat(),
         )
 
-    def delete_study_scoped(self, schema_name: str) -> None:
+    def delete_study_scoped(
+        self, schema_name: str, preserve_assertions: bool = False,
+    ) -> None:
         """Remove every graph element stamped with this study's schema.
 
         Edge sweep matches by `source_schema`; `:Assertion` / `:JoinPath`
         nodes are detach-deleted, transitively removing provenance edges.
-        Shared concept and physical nodes keep their content, but elements
-        left with no relationships — orphaned `:Alias` and edge-less concept
-        nodes — are then garbage-collected (`delete_orphaned_nodes`, J/H).
+        With ``preserve_assertions`` (resume builds), `:Assertion` nodes
+        survive: they are the resume cache ``process_table`` reads to skip
+        completed tables, and re-materialization rebuilds their provenance
+        edges. Shared concept and physical nodes keep their content, but
+        elements left with no relationships — orphaned `:Alias` and
+        edge-less concept nodes — are then garbage-collected
+        (`delete_orphaned_nodes`, J/H).
         """
         from sema.graph import loader_utils as _lu
         self._run(
             "MATCH ()-[r {source_schema: $schema}]-() DELETE r",
             schema=schema_name,
         )
-        self._run(
-            "MATCH (a:Assertion {source_schema: $schema}) "
-            "DETACH DELETE a",
-            schema=schema_name,
-        )
+        if not preserve_assertions:
+            self._run(
+                "MATCH (a:Assertion {source_schema: $schema}) "
+                "DETACH DELETE a",
+                schema=schema_name,
+            )
         self._run(
             "MATCH (jp:JoinPath {source_schema: $schema}) "
             "DETACH DELETE jp",

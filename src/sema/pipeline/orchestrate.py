@@ -63,12 +63,15 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         return aggregate_report([])
 
     # Clean each study's prior graph writes before re-materialization, for
-    # both fresh and resume builds (finding L). Resume reloads the full
-    # assertion set, so delete-then-rewrite is safe and prevents edges from
-    # tables removed since a failed run from persisting. Cleanup of an absent
-    # study is a no-op.
+    # both fresh and resume builds (finding L). Resume preserves :Assertion
+    # nodes — they are the cache process_table reads to skip completed
+    # tables, and per-table re-materialization runs AFTER this cleanup, so
+    # deleting them here would silently turn every resume into a full
+    # rebuild. Cleanup of an absent study is a no-op.
     for schema in sorted({wi.schema for wi in work_items}):
-        loader.delete_study_scoped(schema)
+        loader.delete_study_scoped(
+            schema, preserve_assertions=config.resume,
+        )
 
     circuit_breaker = CircuitBreaker(
         failure_threshold=config.circuit_breaker_threshold,
@@ -122,7 +125,10 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     report = _collect_results(results)
 
     from sema.graph.lifecycle_utils import deprecate_stale_from_results
-    deprecate_stale_from_results(loader, results)
+    deprecate_stale_from_results(
+        loader, results, work_items,
+        full_coverage=not (config.slice_tables or config.table_pattern),
+    )
 
     schemas = sorted({wi.schema for wi in work_items})
     run_fk_detection(

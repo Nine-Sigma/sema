@@ -59,6 +59,13 @@ class TestLookupQueries:
         assert "HAS_VALUE_SET" in q
         assert "$code" in q
 
+    def test_find_value_sets_for_term_scoped_to_vocabulary(self) -> None:
+        # Term identity is {vocabulary_name, code}; the lookup filters
+        # by vocabulary when known and stays unfiltered when unknown.
+        q = CypherQueries.find_value_sets_for_term()
+        assert "t.vocabulary_name = $vocabulary_name" in q
+        assert "$vocabulary_name IS NULL" in q
+
     def test_find_vocabulary_for_term(self) -> None:
         q = CypherQueries.find_vocabulary_for_term()
         assert "IN_VOCABULARY" in q

@@ -364,3 +364,27 @@ class TestScopedDelete:
         ):
             assert f"DELETE n.{shared}" not in joined
             assert f"DETACH DELETE {shared}" not in joined
+
+    def test_preserve_assertions_keeps_assertion_nodes(
+        self, loader, mock_driver,
+    ):
+        """Resume builds preserve :Assertion nodes — they are the resume
+        cache process_table reads to skip completed tables."""
+        _, session = mock_driver
+        loader.delete_study_scoped(
+            SCHEMA_BRCA, preserve_assertions=True,
+        )
+        calls = [c[0][0] for c in session.run.call_args_list]
+        assert not any(
+            "MATCH (a:Assertion {source_schema: $schema})" in c
+            for c in calls
+        )
+        assert any(
+            "MATCH ()-[r {source_schema: $schema}]-() DELETE r" in c
+            for c in calls
+        )
+        assert any(
+            "MATCH (jp:JoinPath {source_schema: $schema})" in c
+            and "DETACH DELETE jp" in c
+            for c in calls
+        )
