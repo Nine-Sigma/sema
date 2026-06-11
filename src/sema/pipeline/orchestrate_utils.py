@@ -286,25 +286,28 @@ def _embed_label_nodes(
     key_spec: str | tuple[str, ...],
     nodes: list[dict[str, Any]],
 ) -> None:
+    from sema.engine.embedding_utils import (
+        description_hash,
+        select_stale_nodes,
+    )
     from sema.engine.embeddings import build_embedding_text
 
+    texts = [build_embedding_text(label.lower(), **node) for node in nodes]
+    stale = select_stale_nodes(nodes, texts)
+
     max_batch = 64
-    texts = [
-        build_embedding_text(label.lower(), **node) for node in nodes
-    ]
-
-    for start in range(0, len(nodes), max_batch):
-        batch_texts = texts[start : start + max_batch]
-        batch_nodes = nodes[start : start + max_batch]
-        embeddings = engine.embed_batch(batch_texts)
-
-        for node, embedding in zip(batch_nodes, embeddings):
+    for start in range(0, len(stale), max_batch):
+        batch = stale[start : start + max_batch]
+        embeddings = engine.embed_batch([text for _, text in batch])
+        for (node, text), embedding in zip(batch, embeddings):
             emb_list = list(embedding)
+            d_hash = description_hash(text)
             if isinstance(key_spec, tuple):
                 loader.set_property_embedding(
                     name=node[key_spec[0]],
                     entity_name=node[key_spec[1]],
                     embedding=emb_list,
+                    description_hash=d_hash,
                 )
             else:
                 loader.set_embedding(
@@ -312,6 +315,7 @@ def _embed_label_nodes(
                     match_prop=key_spec,
                     match_value=node[key_spec],
                     embedding=emb_list,
+                    description_hash=d_hash,
                 )
 
 

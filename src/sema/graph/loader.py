@@ -556,27 +556,31 @@ class GraphLoader:
 
     def set_property_embedding(
         self, name: str, entity_name: str,
-        embedding: list[float],
+        embedding: list[float], description_hash: str = "",
     ) -> None:
         self._run(
             "MATCH (n:Property {name: $name, "
             "entity_name: $entity_name}) "
             "SET n.embedding = $embedding, "
-            "n.embedding_updated_at = $updated_at",
+            "n.embedding_updated_at = $updated_at, "
+            "n.description_hash = $description_hash",
             name=name, entity_name=entity_name,
-            embedding=embedding,
+            embedding=embedding, description_hash=description_hash,
             updated_at=datetime.now(timezone.utc).isoformat(),
         )
 
     def set_embedding(
         self, label: str, match_prop: str,
         match_value: str, embedding: list[float],
+        description_hash: str = "",
     ) -> None:
         self._run(
             f"MATCH (n:{label} {{{match_prop}: $match_value}}) "
             f"SET n.embedding = $embedding, "
-            f"n.embedding_updated_at = $updated_at",
+            f"n.embedding_updated_at = $updated_at, "
+            f"n.description_hash = $description_hash",
             match_value=match_value, embedding=embedding,
+            description_hash=description_hash,
             updated_at=datetime.now(timezone.utc).isoformat(),
         )
 

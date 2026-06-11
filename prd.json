@@ -166,8 +166,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "NEW src/sema/engine/embedding_utils.py (pure stdlib, no sema imports): description_hash(text)=sha256 hex of embedded text; needs_reembedding(node, text) True when node has no/empty embedding OR stored description_hash != hash(current text); select_stale_nodes(nodes, texts) pairs only stale (node, text). _embed_label_nodes (orchestrate_utils.py) now builds texts via build_embedding_text, filters to select_stale_nodes, batches+embeds ONLY stale nodes, and passes description_hash(text) to the writer — unchanged nodes are never re-embedded (embed_batch not called). Write path: GraphLoader.set_embedding and set_property_embedding (loader.py) gained description_hash: str = '' param and SET n.description_hash = $description_hash in the SAME statement as n.embedding, so hash+vector are written atomically. Hashing/selection helpers live in embedding_utils.py (the relevant *_utils.py). Tests: NEW tests/unit/test_embedding_change_detection.py (17): hash semantics, needs_reembedding cases (missing/empty embedding, changed hash, present-embedding-missing-hash, unchanged skip), select_stale_nodes filtering, _embed_label_nodes change-detection (unchanged not re-embedded, changed re-embedded+writes new hash, missing-embedding re-embedded, Property composite-key writes hash, mixed only-stale embedded), and loader write-path asserting description_hash in same statement for both set_embedding/set_property_embedding. 1609 passed, 1 skipped; mypy clean; coverage 90% (embedding_utils 100%). loader.py 664, orchestrate_utils.py 411 (pre-existing >400, grew +4)."
     },
     {
       "id": "US-011",

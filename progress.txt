@@ -308,3 +308,40 @@ Started: Wed Jun 10 20:58:03 EDT 2026
     `_spawn_workers` a side_effect that records `loader.delete_study_scoped
     .called` and returns the results list (not return_value).
 ---
+
+## [2026-06-11 22:07] - US-010
+- Re-embed nodes whose description changed (finding M). Embeddings were
+  computed once post-build with NO change detection, so a later study
+  overwriting a shared node's description left a stale vector.
+- NEW src/sema/engine/embedding_utils.py (pure stdlib, no sema imports):
+  description_hash(text)=sha256 hex of the embedded text;
+  needs_reembedding(node, text) True when node has no/empty embedding OR
+  stored description_hash != hash(current text); select_stale_nodes(nodes,
+  texts) returns only the (node, text) pairs that need re-embedding.
+- _embed_label_nodes (orchestrate_utils.py) now filters to select_stale_nodes
+  BEFORE batching, so unchanged nodes never hit engine.embed_batch; it passes
+  description_hash(text) through to the writer.
+- Write path: GraphLoader.set_embedding / set_property_embedding (loader.py)
+  gained `description_hash: str = ""` and write `n.description_hash =
+  $description_hash` in the SAME SET statement as n.embedding — vector + hash
+  written atomically.
+- Files changed: NEW embedding_utils.py, tests/unit/
+  test_embedding_change_detection.py (17); edited orchestrate_utils.py,
+  loader.py.
+- Checks: 1609 passed, 1 skipped; mypy clean; coverage 90% (embedding_utils
+  100%). loader.py 664, orchestrate_utils.py 411 (both grew +4; orchestrate_
+  utils was already >400, growth kept minimal — single function, no new
+  helper func).
+- **Learnings for future iterations:**
+  - query_nodes_by_label returns properties(n), so the stored embedding and
+    description_hash come back on each node dict for free — change detection
+    needs no extra query, just compare node["description_hash"] to a fresh
+    hash of build_embedding_text(label.lower(), **node).
+  - The embedded TEXT (build_embedding_text) is what gets hashed, NOT the raw
+    description — for Entity/Property/Metric that's "name - description", for
+    Term it's label/code, for Alias it's text. Hashing the text means ANY
+    field feeding the embedding (name OR description) triggers re-embed.
+  - A prior incomplete attempt had already added the anatomy.md entries for
+    embedding_utils.py + the test file but never committed the source/test —
+    check `git status` vs anatomy.md if entries look pre-populated.
+---
