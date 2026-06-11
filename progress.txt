@@ -3,6 +3,17 @@ Started: Wed Jun 10 20:58:03 EDT 2026
 ---
 
 ## Codebase Patterns
+- NEW unit test files MUST set `pytestmark = pytest.mark.unit` (pyproject addopts is
+  `-m unit`). Without it the file is silently DESELECTED — `uv run pytest <file>` shows
+  "N deselected / 0 selected" and the tests never run (and coverage of the code under
+  test looks 0%). All tests/unit/*.py peers declare it after imports.
+- Per-table vs once-per-build phases: `materialize_unified` (src/sema/graph/materializer.py)
+  runs PER TABLE inside process_table AND in _try_resume. Anything that must reason over
+  ALL tables (e.g. vocabulary deprecation) must NOT live there — carry per-table facts on
+  TableResult (src/sema/pipeline/build.py) and run the global step once in
+  orchestrate.run_build after _collect_results. TableResult.active_vocabularies is the
+  example (US-004); _try_resume must also populate such fields or resumed tables drop out
+  of the union.
 - Assertion construction has ~9 call sites across 6 engine files, each via a local
   `_make_assertion` helper. To touch ALL assertions at once, use a Pydantic
   `@model_validator(mode="after")` on `Assertion` (src/sema/models/assertions.py) —
@@ -108,4 +119,31 @@ Started: Wed Jun 10 20:58:03 EDT 2026
     populates all fields. No separate ON CREATE SET for the guarded fields needed.
   - loader.py single-row upsert_term/entity/property methods were NOT touched
     (out of scope per US-003 AC; batch path only).
+---
+
+## [2026-06-10 21:55] - US-004
+- Run vocabulary lifecycle once per build over the union of all tables' active
+  vocabularies, not per table, so table 2 can't deprecate vocabularies table 1
+  introduced (finding D).
+- NEW src/sema/graph/lifecycle_utils.py: active_vocab_names(assertions),
+  deprecate_stale_vocabularies(loader, active_names) (no-op on empty set),
+  deprecate_stale_from_results(loader, results) (unions each result's
+  active_vocabularies, deprecates once).
+- Removed run_lifecycle_phase from materializer_utils.py (449->420) and its call
+  from materializer.py materialize_unified (now 4 phases; docstring updated).
+- TableResult gained active_vocabularies (field default_factory=list); success()
+  and skipped() accept it. process_table populates from all_assertions; _try_resume
+  populates from stored assertions (resume contributes to the union).
+- orchestrate.run_build calls deprecate_stale_from_results(loader, results) once
+  after _collect_results.
+- Files changed: NEW lifecycle_utils.py, tests/unit/test_vocab_lifecycle.py; edited
+  materializer.py, materializer_utils.py, build.py, orchestrate.py,
+  tests/unit/test_materializer_utils.py (removed old TestRunLifecyclePhase).
+- Checks: 1562 passed, 1 skipped; mypy clean; coverage 90% (lifecycle_utils 100%).
+- **Learnings for future iterations:**
+  - See Codebase Patterns (pytest unit marker gotcha; per-table vs once-per-build).
+  - The union helper went in lifecycle_utils (71 lines), NOT orchestrate_utils
+    (already 407 lines, >400) — don't grow files already over the limit.
+  - deprecate_stale_vocabularies keeps the original `if not active_names: return`
+    guard: a build with zero vocab matches must not deprecate every vocabulary.
 ---

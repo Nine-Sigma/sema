@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 from sema.models.assertions import Assertion
 from sema.graph.materializer_utils import (
     apply_resolution_edges,
-    run_lifecycle_phase,
     upsert_column_nodes,
     upsert_physical_nodes,
     upsert_semantic_nodes,
@@ -39,13 +38,17 @@ def materialize_unified(
 ) -> None:
     """Unified materializer: single assertion-to-graph path.
 
-    Executes 5 ordered phases:
+    Executes 4 ordered phases:
       1. Physical nodes (DataSource, Catalog, Schema, Table, Column)
       2. Semantic nodes (Entity, Property, Vocabulary, Term, ValueSet,
          Alias, JoinPath)
       3. Bridge edges (CLASSIFIED_AS, IN_VOCABULARY, PARENT_OF)
       4. Directed provenance (Assertion SUBJECT/OBJECT edges)
-      5. Lifecycle (deprecate stale non-anchored nodes)
+
+    Vocabulary lifecycle (deprecating stale vocabularies) is NOT run
+    here: it runs once per build over the union of every table's active
+    vocabularies (see sema.graph.lifecycle_utils), so a later table can
+    never deprecate vocabularies an earlier table introduced.
     """
     by_subject: dict[str, list[Assertion]] = defaultdict(list)
     groups: dict[tuple[str, str], list[Assertion]] = defaultdict(list)
@@ -63,7 +66,6 @@ def materialize_unified(
     )
     materialize_vocabulary_edges(loader, groups)
     loader.materialize_provenance_edges(assertions)
-    run_lifecycle_phase(loader, assertions)
 
     logger.info(
         "Unified materialization complete: %d assertions processed",

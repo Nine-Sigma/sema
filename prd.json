@@ -67,8 +67,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "NEW src/sema/graph/lifecycle_utils.py: active_vocab_names(assertions) (active VOCABULARY_MATCH values), deprecate_stale_vocabularies(loader, active_names) (no-op on empty set so a zero-vocab build never deprecates everything; sorted active_names), deprecate_stale_from_results(loader, results) (unions each result's active_vocabularies and deprecates once). run_lifecycle_phase REMOVED from materializer_utils.py (shrank 449->420) and its call removed from materializer.py materialize_unified (now 4 phases; docstring notes lifecycle moved to orchestrator). TableResult gained active_vocabularies: list[str] = field(default_factory=list); success()/skipped() accept it. process_table sets it from active_vocab_names(all_assertions); _try_resume sets it from stored assertions so resumed tables still contribute to the union (resume case covered). orchestrate.run_build calls deprecate_stale_from_results(loader, results) once after _collect_results. Helper put in lifecycle_utils (71 lines) not orchestrate_utils to avoid growing that already-407-line file. Tests: NEW tests/unit/test_vocab_lifecycle.py (8): active_vocab_names filtering, deprecate no-op/runs, materialize_unified issues no DEPRECATED query, union keeps every table's vocab, no-op union, resume result carries vocab. Old TestRunLifecyclePhase removed from test_materializer_utils.py. 1562 passed, mypy clean, coverage 90% (lifecycle_utils 100%)."
     },
     {
       "id": "US-005",

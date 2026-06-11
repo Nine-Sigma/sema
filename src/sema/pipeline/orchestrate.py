@@ -120,6 +120,9 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
 
     report = _collect_results(results)
 
+    from sema.graph.lifecycle_utils import deprecate_stale_from_results
+    deprecate_stale_from_results(loader, results)
+
     schemas = sorted({wi.schema for wi in work_items})
     run_fk_detection(
         loader, discovery_connector, config, schemas, run_id=run_id,

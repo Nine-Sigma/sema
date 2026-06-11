@@ -418,31 +418,3 @@ def apply_resolution_edges(
                     source_schema=source_schema,
                     vocabulary_name=vocab,
                 )
-
-
-
-def run_lifecycle_phase(
-    loader: GraphLoader,
-    assertions: list[Assertion],
-) -> None:
-    """Deprecate non-anchored nodes that lost all supporting assertions."""
-    active_vocabs: set[str] = set()
-    for a in assertions:
-        if (
-            a.predicate == AssertionPredicate.VOCABULARY_MATCH
-            and a.status not in (
-                AssertionStatus.REJECTED, AssertionStatus.SUPERSEDED,
-            )
-        ):
-            vocab_name = a.payload.get("value")
-            if vocab_name:
-                active_vocabs.add(vocab_name)
-
-    if active_vocabs:
-        loader._run(
-            "MATCH (v:Vocabulary) "
-            "WHERE v.status = 'ACTIVE' "
-            "AND NOT v.name IN $active_names "
-            "SET v.status = 'DEPRECATED'",
-            active_names=list(active_vocabs),
-        )

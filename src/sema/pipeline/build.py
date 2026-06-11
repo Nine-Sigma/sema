@@ -19,6 +19,7 @@ from sema.connectors.databricks import (
 from sema.engine.semantic import SemanticEngine
 from sema.engine.vocabulary import VocabularyEngine
 from sema.graph.loader import GraphLoader
+from sema.graph.lifecycle_utils import active_vocab_names
 from sema.circuit_breaker import CircuitOpenError
 from sema.llm_client import LLMClient, LLMStageError
 from sema.models.assertions import (
@@ -63,6 +64,8 @@ class TableResult:
     partial: bool = False
     metadata_tier: str | None = None
 
+    active_vocabularies: list[str] = field(default_factory=list)
+
     @classmethod
     def success(
         cls,
@@ -72,6 +75,7 @@ class TableResult:
         terms: int = 0,
         partial: bool = False,
         metadata_tier: str | None = None,
+        active_vocabularies: list[str] | None = None,
     ) -> TableResult:
         return cls(
             table_ref=table_ref,
@@ -81,6 +85,7 @@ class TableResult:
             terms_created=terms,
             partial=partial,
             metadata_tier=metadata_tier,
+            active_vocabularies=active_vocabularies or [],
         )
 
     @classmethod
@@ -97,11 +102,15 @@ class TableResult:
         )
 
     @classmethod
-    def skipped(cls, table_ref: str, reason: str) -> TableResult:
+    def skipped(
+        cls, table_ref: str, reason: str,
+        active_vocabularies: list[str] | None = None,
+    ) -> TableResult:
         return cls(
             table_ref=table_ref,
             status="skipped",
             skip_reason=reason,
+            active_vocabularies=active_vocabularies or [],
         )
 
 
@@ -162,7 +171,10 @@ def _try_resume(
     materialize_unified(
         loader, stored_assertions, source_schema=work_item.schema,
     )
-    return TableResult.skipped(work_item.fqn, "resume: assertions exist")
+    return TableResult.skipped(
+        work_item.fqn, "resume: assertions exist",
+        active_vocabularies=sorted(active_vocab_names(stored_assertions)),
+    )
 
 
 def process_table(
@@ -267,6 +279,7 @@ def process_table(
         terms=term_count,
         partial=is_partial,
         metadata_tier=tier,
+        active_vocabularies=sorted(active_vocab_names(all_assertions)),
     )
 
 
