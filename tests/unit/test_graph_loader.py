@@ -328,10 +328,8 @@ class TestProvenanceEdges:
         assertion = Assertion(
             id="a-prov",
             subject_ref="databricks://ws/cdm/clinical/tbl",
-            subject_id="ent-1",
             predicate=AssertionPredicate.HAS_ENTITY_NAME,
             payload={"value": "Test"},
-            object_id="tbl-1",
             source="llm_interpretation",
             confidence=0.9,
             run_id="run-1",
@@ -340,6 +338,25 @@ class TestProvenanceEdges:
         loader.materialize_provenance_edges([assertion])
         calls = [str(c) for c in session.run.call_args_list]
         assert any("SUBJECT" in c for c in calls)
+        assert any(":Table" in c for c in calls)
+
+    def test_join_evidence_creates_object_edge(
+        self, loader, mock_driver,
+    ):
+        _, session = mock_driver
+        assertion = Assertion(
+            id="a-join",
+            subject_ref="databricks://ws/cdm/clinical/orders/customer_id",
+            predicate=AssertionPredicate.HAS_JOIN_EVIDENCE,
+            payload={"value": "fk"},
+            object_ref="databricks://ws/cdm/clinical/customers/id",
+            source="llm_interpretation",
+            confidence=0.9,
+            run_id="run-1",
+            observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+        loader.materialize_provenance_edges([assertion])
+        calls = [str(c) for c in session.run.call_args_list]
         assert any("OBJECT" in c for c in calls)
 
     def test_skips_structural_predicates(

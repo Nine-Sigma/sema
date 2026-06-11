@@ -535,27 +535,8 @@ class GraphLoader:
     def materialize_provenance_edges(
         self, assertions: list[Assertion],
     ) -> None:
-        provenance_predicates = {
-            "has_entity_name", "has_property_name", "has_alias",
-            "has_semantic_type", "has_decoded_value",
-            "vocabulary_match", "parent_of", "has_join_evidence",
-        }
-        for a in assertions:
-            if a.predicate.value not in provenance_predicates:
-                continue
-            self._run(
-                "MATCH (assertion:Assertion {id: $a_id}) "
-                "MATCH (n) WHERE n.id = $subject_id "
-                "MERGE (assertion)-[:SUBJECT]->(n)",
-                a_id=a.id, subject_id=a.subject_id,
-            )
-            if a.object_id:
-                self._run(
-                    "MATCH (assertion:Assertion {id: $a_id}) "
-                    "MATCH (n) WHERE n.id = $object_id "
-                    "MERGE (assertion)-[:OBJECT]->(n)",
-                    a_id=a.id, object_id=a.object_id,
-                )
+        from sema.graph import provenance_utils as _pu
+        _pu.materialize_provenance_edges(self, assertions)
 
     def materialize_table_graph(
         self, assertions: list[Assertion],

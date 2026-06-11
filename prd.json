@@ -103,8 +103,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "NEW src/sema/graph/provenance_utils.py. Mechanism (documented in module docstring): resolve subject_ref/object_ref to the physical :Table/:Column MERGE key via CanonicalRef.parse (the SAME key physical nodes are upserted on), then MERGE SUBJECT/OBJECT edges. Chose subject_ref resolution over populating subject_id/object_id because node ids are random UUIDs assigned at materialization time — unknowable when the assertion is created; subject_ref is the stable identity. Critical gotcha: connector emits column refs as {fqn}/{column} (slash) but L2/stage_utils emits {table_ref}.{column} (dot) — CanonicalRef.parse normalizes both, so raw-string ref equality would have silently missed every column. Edges batched via UNWIND, one statement per role(SUBJECT/OBJECT)+label(Table/Column), never per-assertion. Guard: provenance-predicate filter + skip unparseable refs with debug log (no unguarded null-MATCH round-trips). loader.materialize_provenance_edges now delegates (loader.py shrank); dead subject_id null-MATCH path deleted. subject_id/object_id Assertion fields left as stored vestigial schema (always None) — out of scope to remove. bug-239 updated to FIXED. Tests: NEW tests/unit/test_provenance_edges.py (10) + updated TestProvenanceEdges in test_graph_loader.py to the new mechanism (added join-evidence OBJECT-edge test). 1581 passed, 1 skipped; mypy clean; coverage 90% (provenance_utils 100%)."
     },
     {
       "id": "US-007",
