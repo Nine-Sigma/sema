@@ -85,3 +85,27 @@ Started: Wed Jun 10 20:58:03 EDT 2026
     add_term_hierarchy) are still used by integration tests + resolution_utils; keep
     them working with sentinel-default vocabulary_name.
 ---
+
+## [2026-06-10 21:45] - US-003
+- Order-independent shared-node writes: description/source/confidence on
+  :Entity/:Property/:Term update only when incoming confidence strictly exceeds
+  stored, so build order can't decide a shared node's content (finding C).
+- NEW in src/sema/graph/loader_utils.py: UNSET_CONFIDENCE=-1.0,
+  confidence_wins(incoming, stored), _confidence_guard(alias) (Cypher predicate),
+  _guarded_set(alias, fields) (CASE WHEN win THEN r.f ELSE alias.f END joiner).
+- batch_upsert_entities/properties/terms now do
+  `WITH <alias>, r, <guard> AS win SET <guarded>, ...` after `ON CREATE SET id`.
+  Guarded: description/semantic_type/label, source, confidence, resolved_at.
+  status stays unconditional ACTIVE; model_role/source_id keep coalesce.
+- Tests: NEW tests/unit/test_confidence_guard.py (11). 1556 passed, mypy clean,
+  coverage 90%, loader_utils.py 338 lines (<400).
+- **Learnings for future iterations:**
+  - Cypher SET evaluates all RHS against pre-SET node state, so a single
+    `WITH ... <guard> AS win` computed before the SET lets every CASE reference
+    the OLD confidence consistently — guard once, reuse via the `win` var.
+  - On a freshly MERGE-created node, `coalesce(alias.confidence, -1.0)` = -1.0
+    (ON CREATE only set id), so `r.confidence > -1.0` is true and ON CREATE still
+    populates all fields. No separate ON CREATE SET for the guarded fields needed.
+  - loader.py single-row upsert_term/entity/property methods were NOT touched
+    (out of scope per US-003 AC; batch path only).
+---

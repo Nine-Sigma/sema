@@ -23,6 +23,31 @@ if TYPE_CHECKING:
     from sema.graph.loader import GraphLoader
 
 
+UNSET_CONFIDENCE = -1.0
+
+
+def confidence_wins(incoming: float, stored: float | None) -> bool:
+    """Incoming write overwrites a shared node only if strictly more confident.
+
+    Equal confidence keeps the existing value, so the final state of a node
+    shared across studies is independent of build/write order (finding C).
+    """
+    return incoming > (stored if stored is not None else UNSET_CONFIDENCE)
+
+
+def _confidence_guard(alias: str) -> str:
+    """Cypher boolean: incoming confidence strictly beats the stored value."""
+    return f"r.confidence > coalesce({alias}.confidence, {UNSET_CONFIDENCE})"
+
+
+def _guarded_set(alias: str, fields: list[str]) -> str:
+    """Build SET assignments that only apply when `win` is true."""
+    return ", ".join(
+        f"{alias}.{f} = CASE WHEN win THEN r.{f} ELSE {alias}.{f} END"
+        for f in fields
+    )
+
+
 _FETCH_COLUMNS_QUERY = (
     "MATCH (c:Column) WHERE c.schema_name = $schema_name "
     "RETURN c.name AS name, c.table_name AS table_name, "
@@ -76,14 +101,16 @@ def batch_upsert_entities(
     if not entities:
         return
     rows = _annotate_rows(entities, source_schema)
+    guarded = _guarded_set(
+        "e", ["description", "source", "confidence", "resolved_at"],
+    )
     loader._run(
         "UNWIND $rows AS r "
         "MERGE (e:Entity {name: r.name}) "
         "ON CREATE SET e.id = r.id "
-        "SET e.description = r.description, e.source = r.source, "
-        "e.confidence = r.confidence, "
+        f"WITH e, r, {_confidence_guard('e')} AS win "
+        f"SET {guarded}, "
         "e.status = 'ACTIVE', "
-        "e.resolved_at = r.resolved_at, "
         "e.model_role = coalesce(e.model_role, 'SOURCE'), "
         "e.source_id = coalesce(e.source_id, r.source_schema, r.source) "
         "WITH e, r "
@@ -103,15 +130,16 @@ def batch_upsert_properties(
     if not properties:
         return
     rows = _annotate_rows(properties, source_schema)
+    guarded = _guarded_set(
+        "p", ["semantic_type", "source", "confidence", "resolved_at"],
+    )
     loader._run(
         "UNWIND $rows AS r "
         "MERGE (p:Property {entity_name: r.entity_name, name: r.name}) "
         "ON CREATE SET p.id = r.id "
-        "SET p.semantic_type = r.semantic_type, "
-        "p.source = r.source, "
-        "p.confidence = r.confidence, "
+        f"WITH p, r, {_confidence_guard('p')} AS win "
+        f"SET {guarded}, "
         "p.status = 'ACTIVE', "
-        "p.resolved_at = r.resolved_at, "
         "p.model_role = coalesce(p.model_role, 'SOURCE'), "
         "p.source_id = coalesce(p.source_id, r.source_schema, r.source) "
         "WITH p, r "
@@ -147,14 +175,16 @@ def batch_upsert_terms(
         }
         for t in terms
     ]
+    guarded = _guarded_set(
+        "t", ["label", "source", "confidence", "resolved_at"],
+    )
     loader._run(
         "UNWIND $rows AS r "
         "MERGE (t:Term {vocabulary_name: r.vocabulary_name, code: r.code}) "
         "ON CREATE SET t.id = r.id "
-        "SET t.label = r.label, t.source = r.source, "
-        "t.confidence = r.confidence, "
+        f"WITH t, r, {_confidence_guard('t')} AS win "
+        f"SET {guarded}, "
         "t.status = 'ACTIVE', "
-        "t.resolved_at = r.resolved_at, "
         "t.model_role = coalesce(t.model_role, 'SOURCE'), "
         "t.source_id = coalesce(t.source_id, r.source_schema, r.source)",
         rows=rows,

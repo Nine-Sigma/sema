@@ -50,8 +50,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "NEW helpers in src/sema/graph/loader_utils.py: UNSET_CONFIDENCE=-1.0 sentinel, confidence_wins(incoming, stored) (strictly-greater wins; equal keeps existing; None stored treated as sentinel), _confidence_guard(alias) -> Cypher 'r.confidence > coalesce(<alias>.confidence, -1.0)', _guarded_set(alias, fields) -> comma-joined 'CASE WHEN win THEN r.<f> ELSE <alias>.<f> END'. batch_upsert_entities/properties/terms now insert 'WITH <alias>, r, <guard> AS win' after ON CREATE SET, then guard description/source/confidence/resolved_at (label for Term, semantic_type for Property). On a freshly created node <alias>.confidence is null -> coalesce->-1.0 -> win true, so ON CREATE still sets all fields. status stays unconditional 'ACTIVE'; model_role and source_id keep their coalesce behavior. Final node state is now order-independent. Tests: NEW tests/unit/test_confidence_guard.py (11): confidence_wins semantics, order-independence simulation (forward==backward==max), structural guard presence per function, source_id coalesce preserved. 1556 passed, mypy clean, coverage 90%, loader_utils.py 338 lines."
     },
     {
       "id": "US-004",
