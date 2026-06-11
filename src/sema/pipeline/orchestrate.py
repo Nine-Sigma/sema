@@ -39,7 +39,6 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     table_workers controls parallelism (default 1 = sequential).
     """
     from sema.circuit_breaker import CircuitBreaker
-    from sema.connectors.databricks import DatabricksConnector
     from sema.graph.loader import GraphLoader
     from sema.pipeline.build import (
         DatabricksConnectorFactory,
@@ -52,9 +51,10 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     driver = _get_neo4j_driver(config.neo4j)
     loader = GraphLoader(driver)
 
-    discovery_connector = DatabricksConnector(
+    connector_factory = DatabricksConnectorFactory(
         config=config.databricks, profiling=config.profiling,
     )
+    discovery_connector = connector_factory.create()
     _register_datasource(discovery_connector, loader)
     work_items = _discover_tables(discovery_connector, config)
 
@@ -76,9 +76,6 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         success_threshold=config.circuit_breaker_success_threshold,
     )
 
-    connector_factory = DatabricksConnectorFactory(
-        config=config.databricks, profiling=config.profiling,
-    )
     llm_factory = LLMClientFactory(
         llm_factory=lambda: _get_llm(config.llm),
         retry_max_attempts=config.retry_max_attempts,

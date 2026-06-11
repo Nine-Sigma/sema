@@ -15,6 +15,7 @@ from sema.cli_factories import (
     _get_embedder,
     _get_neo4j_driver,
 )
+from sema.connectors.base import Connector
 from sema.engine.join_detector import JoinDetector, to_fk_assertion
 from sema.engine.join_detector_utils import (
     enumerate_candidates_from_metadata,
@@ -34,7 +35,7 @@ from sema.pipeline.context import prune_to_sco
 from sema.pipeline.retrieval import RetrievalEngine
 
 
-def _register_datasource(connector: Any, loader: Any) -> None:
+def _register_datasource(connector: Connector, loader: Any) -> None:
     """Create or update the DataSource node for the given connector."""
     import uuid
     ref, platform, workspace = connector.get_datasource_ref()
@@ -47,7 +48,7 @@ def _register_datasource(connector: Any, loader: Any) -> None:
 
 
 def _discover_tables(
-    connector: Any,
+    connector: Connector,
     config: BuildConfig,
 ) -> list[Any]:
     if config.verbose:
@@ -63,7 +64,7 @@ def _discover_tables(
         )
     if config.verbose:
         click.echo(f"  Found {len(work_items)} tables")
-    return work_items  # type: ignore[no-any-return]
+    return work_items
 
 
 def _filter_work_items_to_slice(
@@ -321,7 +322,7 @@ def _embed_label_nodes(
 
 def run_fk_detection(
     loader: Any,
-    connector: Any,
+    connector: Connector,
     config: BuildConfig,
     schemas: list[str],
     run_id: str,
@@ -341,10 +342,10 @@ def run_fk_detection(
         materialization_threshold=config.fk_materialization_threshold,
     )
     sampler = WarehouseSampler(
-        query_fn=connector._execute, catalog=config.catalog,
+        query_fn=connector.execute_query, catalog=config.catalog,
     )
     profile_lookup = WarehouseProfileLookup(
-        query_fn=connector._execute, catalog=config.catalog,
+        query_fn=connector.execute_query, catalog=config.catalog,
     )
     for schema in schemas:
         columns = fetch_columns_by_schema(loader, schema)

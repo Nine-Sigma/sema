@@ -23,10 +23,8 @@ from sema.models.stages import (
 )
 
 if TYPE_CHECKING:
-    from sema.connectors.databricks import (
-        DatabricksConnector,
-        TableWorkItem,
-    )
+    from sema.connectors.base import Connector
+    from sema.connectors.databricks import TableWorkItem
     from sema.engine.semantic import SemanticEngine
     from sema.graph.loader import GraphLoader
     from sema.llm_client import LLMClient
@@ -89,7 +87,7 @@ def _build_table_metadata(
 
 def _run_extraction(
     work_item: TableWorkItem,
-    connector: DatabricksConnector,
+    connector: Connector,
 ) -> tuple[list[Assertion], int]:
     logger.info(
         f"[{work_item.table_name}] Extracting metadata..."
@@ -470,7 +468,7 @@ def _reconstruct_assertions(
 
 def _run_pipeline_stages(
     work_item: TableWorkItem,
-    connector: DatabricksConnector,
+    connector: Connector,
     llm_client: LLMClient,
     loader: GraphLoader,
     run_id: str,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sema.models.assertions import Assertion
 from sema.models.extraction import (
@@ -12,6 +12,9 @@ from sema.models.extraction import (
     ExtractedTag,
     ExtractedTopValues,
 )
+
+if TYPE_CHECKING:
+    from sema.connectors.databricks import TableWorkItem
 
 
 class Connector(ABC):
@@ -55,6 +58,31 @@ class Connector(ABC):
         workspace — workspace identifier, e.g. the host name
         """
         ...
+
+    @abstractmethod
+    def execute_query(self, query: str) -> list[tuple[Any, ...]]:
+        """Run a read query and return result rows.
+
+        Public entry point for warehouse-backed lookups (FK sampling,
+        cardinality profiling). Implementations encapsulate their own
+        cursor/connection handling.
+        """
+        ...
+
+    # --- Per-table orchestration contract ---
+
+    def discover_tables(
+        self,
+        catalog: str,
+        schemas: list[str] | None = None,
+        table_pattern: str | None = None,
+    ) -> list[TableWorkItem]:
+        """Discover tables as lightweight work items. Override in connectors."""
+        raise NotImplementedError
+
+    def extract_table(self, work_item: TableWorkItem) -> list[Assertion]:
+        """Extract metadata + profiling for a single table. Override."""
+        raise NotImplementedError
 
     # --- DTO-based extraction (new connector contract) ---
 

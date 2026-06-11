@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from sema.log import logger
+from sema.connectors.base import Connector
 from sema.connectors.databricks import (
     DatabricksConnector,
     TableWorkItem,
@@ -179,7 +180,7 @@ def _try_resume(
 
 def process_table(
     work_item: TableWorkItem,
-    connector: DatabricksConnector,
+    connector: Connector,
     llm_client: LLMClient,
     loader: GraphLoader,
     run_id: str,
