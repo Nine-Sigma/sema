@@ -62,9 +62,13 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         driver.close()
         return aggregate_report([])
 
-    if not config.resume:
-        for schema in sorted({wi.schema for wi in work_items}):
-            loader.delete_study_scoped(schema)
+    # Clean each study's prior graph writes before re-materialization, for
+    # both fresh and resume builds (finding L). Resume reloads the full
+    # assertion set, so delete-then-rewrite is safe and prevents edges from
+    # tables removed since a failed run from persisting. Cleanup of an absent
+    # study is a no-op.
+    for schema in sorted({wi.schema for wi in work_items}):
+        loader.delete_study_scoped(schema)
 
     circuit_breaker = CircuitBreaker(
         failure_threshold=config.circuit_breaker_threshold,
