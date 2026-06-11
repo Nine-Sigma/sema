@@ -310,14 +310,20 @@ def batch_create_classified_as(
     loader: GraphLoader,
     edges: list[dict[str, Any]],
 ) -> None:
-    """Create (Property)-[:CLASSIFIED_AS]->(Vocabulary) edges."""
+    """Create (Property)-[:CLASSIFIED_AS]->(Vocabulary) edges.
+
+    ``source_schema`` is in the MERGE key so two studies asserting the same
+    Property->Vocabulary association produce two edges, each independently
+    deletable by ``delete_study_scoped`` (finding K).
+    """
     if not edges:
         return
     loader._run(
         "UNWIND $rows AS r "
         "MATCH (p:Property {entity_name: r.entity_name, name: r.name}) "
         "MERGE (v:Vocabulary {name: r.vocabulary_name}) "
-        "MERGE (p)-[:CLASSIFIED_AS]->(v)",
+        "MERGE (p)-[:CLASSIFIED_AS "
+        "{source_schema: r.source_schema}]->(v)",
         rows=edges,
     )
 
@@ -326,13 +332,19 @@ def batch_create_in_vocabulary(
     loader: GraphLoader,
     edges: list[dict[str, Any]],
 ) -> None:
-    """Create (Term)-[:IN_VOCABULARY]->(Vocabulary) edges."""
+    """Create (Term)-[:IN_VOCABULARY]->(Vocabulary) edges.
+
+    ``source_schema`` is in the MERGE key so two studies asserting the same
+    Term->Vocabulary association produce two edges, each independently
+    deletable by ``delete_study_scoped`` (finding K).
+    """
     if not edges:
         return
     loader._run(
         "UNWIND $rows AS r "
         "MATCH (t:Term {vocabulary_name: r.vocabulary_name, code: r.code}) "
         "MERGE (v:Vocabulary {name: r.vocabulary_name}) "
-        "MERGE (t)-[:IN_VOCABULARY]->(v)",
+        "MERGE (t)-[:IN_VOCABULARY "
+        "{source_schema: r.source_schema}]->(v)",
         rows=edges,
     )

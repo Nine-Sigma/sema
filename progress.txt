@@ -218,3 +218,30 @@ Started: Wed Jun 10 20:58:03 EDT 2026
     behavior (object_id present -> OBJECT edge). Post-fix, OBJECT only fires from
     object_ref (join/maps predicates), so those tests had to be rewritten.
 ---
+
+## [2026-06-11 03:10] - US-007
+- Add source_schema to IN_VOCABULARY and CLASSIFIED_AS edges so a study's
+  vocabulary-association edges are deleted when the study is deleted (finding K).
+  Previously these two edge types carried no source_schema and survived
+  delete_study_scoped (which sweeps edges by that property).
+- batch_create_classified_as / batch_create_in_vocabulary (loader_utils.py) now
+  MERGE the relationship with {source_schema: r.source_schema} in the key,
+  matching the HAS_VALUE_SET / MEMBER_OF pattern.
+- source_schema threaded: materializer.materialize_unified already had it ->
+  passed to materialize_vocabulary_edges(loader, groups, source_schema=) ->
+  added to each classified_edges dict and into _collect_in_vocabulary_edges(
+  groups, source_schema) -> each in_vocab_edges dict.
+- Files changed: edited loader_utils.py, vocabulary_materializer.py,
+  materializer.py; NEW tests/unit/test_vocab_edge_scoping.py (5).
+- Checks: 1586 passed, 1 skipped; mypy clean; coverage 90%.
+- **Learnings for future iterations:**
+  - delete_study_scoped is purely property-driven: any edge type that should be
+    study-scoped just needs a `source_schema` property on the relationship (in
+    its MERGE key so two studies = two edges). No deletion-side code change
+    needed — the type-agnostic `MATCH ()-[r {source_schema:$schema}]-()` sweep
+    already covers it.
+  - source_schema flows top-down: materialize_unified(source_schema) is the
+    origin; phase functions (apply_resolution_edges, materialize_vocabulary_edges)
+    each take it and stamp it onto their edge-row dicts. When adding a new
+    study-scoped edge, thread the param through, don't reach for a global.
+---

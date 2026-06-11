@@ -118,8 +118,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "batch_create_classified_as and batch_create_in_vocabulary (src/sema/graph/loader_utils.py) now MERGE their CLASSIFIED_AS / IN_VOCABULARY edge with {source_schema: r.source_schema} in the relationship key, mirroring HAS_VALUE_SET/MEMBER_OF, so two studies asserting the same Property->Vocabulary or Term->Vocabulary association produce two distinct edges each deletable by delete_study_scoped (which sweeps `MATCH ()-[r {source_schema:$schema}]-() DELETE r`). source_schema is threaded from materialize_unified -> materialize_vocabulary_edges(loader, groups, source_schema=) -> classified_edges dicts + _collect_in_vocabulary_edges(groups, source_schema) -> in_vocab_edges dicts. Tests: NEW tests/unit/test_vocab_edge_scoping.py (5): MERGE-key presence for both edge types, two-study two-row batches, and materialize_vocabulary_edges threading source_schema into both edge collections. 1586 passed, 1 skipped; mypy clean; coverage 90% (loader_utils 97%, vocabulary_materializer 95%). loader_utils.py 350 lines, vocabulary_materializer.py 134 lines (both <400)."
     },
     {
       "id": "US-008",

@@ -34,8 +34,13 @@ def _pick_winner_fn() -> Any:
 def materialize_vocabulary_edges(
     loader: GraphLoader,
     groups: dict[tuple[str, str], list[Assertion]],
+    source_schema: str | None = None,
 ) -> None:
-    """Materialize CLASSIFIED_AS and IN_VOCABULARY edges."""
+    """Materialize CLASSIFIED_AS and IN_VOCABULARY edges.
+
+    Both edge types carry ``source_schema`` so they are scoped to the study
+    that asserted them and removed by ``delete_study_scoped`` (finding K).
+    """
     pick_winner = _pick_winner_fn()
     classified_edges: list[dict[str, Any]] = []
     vocab_names: set[str] = set()
@@ -81,6 +86,7 @@ def materialize_vocabulary_edges(
             "entity_name": entity_name,
             "name": prop_name,
             "vocabulary_name": vocab_name,
+            "source_schema": source_schema,
         })
 
     if vocab_names:
@@ -90,12 +96,13 @@ def materialize_vocabulary_edges(
 
     batch_create_classified_as(loader, classified_edges)
 
-    in_vocab_edges = _collect_in_vocabulary_edges(groups)
+    in_vocab_edges = _collect_in_vocabulary_edges(groups, source_schema)
     batch_create_in_vocabulary(loader, in_vocab_edges)
 
 
 def _collect_in_vocabulary_edges(
     groups: dict[tuple[str, str], list[Assertion]],
+    source_schema: str | None = None,
 ) -> list[dict[str, Any]]:
     """Collect Term -> Vocabulary edges from decoded values."""
     from sema.graph.materializer_utils import pick_winner
@@ -122,5 +129,6 @@ def _collect_in_vocabulary_edges(
             if code:
                 edges.append({
                     "vocabulary_name": vocab_name, "code": code,
+                    "source_schema": source_schema,
                 })
     return edges

@@ -64,7 +64,7 @@ def materialize_unified(
     apply_resolution_edges(
         loader, groups, source_schema=source_schema,
     )
-    materialize_vocabulary_edges(loader, groups)
+    materialize_vocabulary_edges(loader, groups, source_schema=source_schema)
     loader.materialize_provenance_edges(assertions)
 
     logger.info(
