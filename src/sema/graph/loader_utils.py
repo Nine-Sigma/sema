@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from sema.graph.term_identity_utils import term_namespace
 from sema.models.extraction import ExtractedColumn
 
 if TYPE_CHECKING:
@@ -139,6 +140,7 @@ def batch_upsert_terms(
     rows = [
         {
             **t,
+            "vocabulary_name": term_namespace(t.get("vocabulary_name")),
             "resolved_at": resolved_at,
             "id": str(uuid.uuid4()),
             "source_schema": source_schema,
@@ -147,11 +149,10 @@ def batch_upsert_terms(
     ]
     loader._run(
         "UNWIND $rows AS r "
-        "MERGE (t:Term {code: r.code}) "
+        "MERGE (t:Term {vocabulary_name: r.vocabulary_name, code: r.code}) "
         "ON CREATE SET t.id = r.id "
         "SET t.label = r.label, t.source = r.source, "
         "t.confidence = r.confidence, "
-        "t.vocabulary_name = r.vocabulary_name, "
         "t.status = 'ACTIVE', "
         "t.resolved_at = r.resolved_at, "
         "t.model_role = coalesce(t.model_role, 'SOURCE'), "
@@ -300,7 +301,7 @@ def batch_create_in_vocabulary(
         return
     loader._run(
         "UNWIND $rows AS r "
-        "MATCH (t:Term {code: r.code}) "
+        "MATCH (t:Term {vocabulary_name: r.vocabulary_name, code: r.code}) "
         "MERGE (v:Vocabulary {name: r.vocabulary_name}) "
         "MERGE (t)-[:IN_VOCABULARY]->(v)",
         rows=edges,

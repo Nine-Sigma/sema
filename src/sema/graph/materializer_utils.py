@@ -22,6 +22,10 @@ from sema.graph.loader_utils import (
     batch_upsert_terms,
     batch_upsert_value_sets,
 )
+from sema.graph.term_vocab_utils import (
+    resolve_term_vocab,
+    term_vocab_for_subject,
+)
 from sema.models.constants import source_precedence
 from sema.models.physical_key import CanonicalRef
 
@@ -252,6 +256,7 @@ def upsert_decoded_values(
         if not pk.column:
             continue
         vs_name = f"{pk.table}_{pk.column}_values"
+        term_vocab = resolve_term_vocab(col_ref, groups, vs_name)
         ref = _column_ref(pk)
         vs_batch.append({
             "name": vs_name,
@@ -268,11 +273,12 @@ def upsert_decoded_values(
             label = a.payload.get("label", raw)
             term_batch.append({
                 "code": raw, "label": label,
-                "vocabulary_name": vs_name,
+                "vocabulary_name": term_vocab,
                 "source": a.source, "confidence": a.confidence,
             })
             loader.add_term_to_value_set(
                 raw, vs_name, source_schema=source_schema,
+                vocabulary_name=term_vocab,
             )
 
     batch_upsert_value_sets(
@@ -400,6 +406,7 @@ def apply_resolution_edges(
 ) -> None:
     for (subj, pred), group in groups.items():
         if pred == AssertionPredicate.PARENT_OF.value:
+            vocab = term_vocab_for_subject(subj, groups)
             for a in group:
                 if a.status in (
                     AssertionStatus.REJECTED, AssertionStatus.SUPERSEDED,
@@ -409,6 +416,7 @@ def apply_resolution_edges(
                     parent_code=a.payload.get("parent", ""),
                     child_code=a.payload.get("child", ""),
                     source_schema=source_schema,
+                    vocabulary_name=vocab,
                 )
 
 

@@ -34,8 +34,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "NEW src/sema/graph/term_identity_utils.py (pure stdlib: UNSCOPED_VOCAB='_unscoped' sentinel + term_namespace()). NEW src/sema/graph/term_vocab_utils.py (resolve_term_vocab / term_vocab_for_subject: namespace a column's terms by matched vocabulary, else value-set name; lazy pick_winner import avoids cycle). Composite key {vocabulary_name, code} applied at every :Term MERGE/MATCH-by-code site: loader_utils.batch_upsert_terms (MERGE), loader_utils.batch_create_in_vocabulary (MATCH), loader.upsert_term/add_term_to_value_set/add_term_hierarchy (each gained optional vocabulary_name param, sentinel default). materializer_utils.upsert_decoded_values + apply_resolution_edges thread the resolved namespace so value-set membership, IN_VOCABULARY edges, and hierarchy all MATCH the same Term node. queries.py find_vocabulary_for_term left MATCH-by-code by design (read path answering 'which vocab holds this code'; cannot pre-filter by vocab). queries.py lines 18/30/127/177/212 match :Term without code key — unaffected. delete_study_scoped deletes by source_schema, not by Term code — unaffected. No :Term(code) uniqueness constraint exists (planner_migrations.py only has term_model_role_exists existence constraint) — verified, skipped per AC. Tests: NEW tests/unit/test_term_identity.py (18). 1545 passed, mypy clean, coverage 90%."
     },
     {
       "id": "US-003",

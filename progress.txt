@@ -20,7 +20,16 @@ Started: Wed Jun 10 20:58:03 EDT 2026
   baseline ~90%. ruff has ~64 pre-existing errors in untouched files — keep YOUR
   files ruff-clean but the broad `ruff check src/sema/` is not green on this branch.
 - test_code_standards.py enforces <=400-line files / <=60-line funcs via a frozen
-  allowlist+ratchet; new files must comply or the suite fails.
+  allowlist+ratchet; new files must comply or the suite fails. (As of US-002 the .py
+  is gone — only a stale .pyc remains — so the ratchet is NOT currently enforced, but
+  still honor <=400/<=60 and never grow loader.py(661)/materializer_utils.py(440).)
+- :Term identity is the composite key {vocabulary_name, code} (US-002). The namespace
+  is NEVER null: vocabulary-less terms use UNSCOPED_VOCAB='_unscoped'
+  (src/sema/graph/term_identity_utils.py: term_namespace()). A column's decoded terms
+  are namespaced by their MATCHED vocabulary if a VOCABULARY_MATCH exists, else by the
+  value-set name `{table}_{column}_values` (src/sema/graph/term_vocab_utils.py). Any
+  NEW site that MERGEs/MATCHes a :Term MUST supply the same namespace the term was
+  created with, or the MATCH silently misses (e.g. IN_VOCABULARY/MEMBER_OF edges).
 
 ## [2026-06-10 21:07] - US-001
 - Normalize entity/property/alias names at the assertion boundary so whitespace and
@@ -40,4 +49,39 @@ Started: Wed Jun 10 20:58:03 EDT 2026
     import-cycle avoidance, repo quality gate).
   - The Assertion validator mutates `self.payload` in place under mode="after"; this is
     idempotent so re-validation from dict is safe.
+---
+
+## [2026-06-10 21:30] - US-002
+- Key :Term identity on {vocabulary_name, code} so unrelated codes in different
+  vocabularies (M=Male vs M=Mississippi) never collapse into one node (finding B).
+- NEW src/sema/graph/term_identity_utils.py: UNSCOPED_VOCAB sentinel + term_namespace()
+  (pure stdlib, no sema imports — cycle-safe).
+- NEW src/sema/graph/term_vocab_utils.py: resolve_term_vocab / term_vocab_for_subject
+  resolve a column's term namespace (matched vocab else value-set name); lazy
+  pick_winner import avoids the materializer cycle.
+- Composite key applied at every :Term MERGE/MATCH-by-code site:
+  loader_utils.batch_upsert_terms (MERGE), loader_utils.batch_create_in_vocabulary
+  (MATCH), loader.upsert_term / add_term_to_value_set / add_term_hierarchy (each gained
+  an optional vocabulary_name param defaulting to the sentinel).
+- materializer_utils.upsert_decoded_values + apply_resolution_edges thread the resolved
+  namespace into term upsert, value-set membership, and hierarchy so all three MATCH
+  the same Term node; IN_VOCABULARY edges already use the real vocab name.
+- queries.py find_vocabulary_for_term intentionally left MATCH-by-code (read path that
+  answers "which vocab holds this code"; can't pre-filter by vocab). Other queries.py
+  :Term matches don't key on code. delete_study_scoped deletes by source_schema only.
+- No :Term(code) uniqueness constraint exists (planner_migrations has only the
+  term_model_role_exists existence constraint) — verified absent, skipped per AC.
+- Files changed: NEW term_identity_utils.py, term_vocab_utils.py,
+  tests/unit/test_term_identity.py; edited loader_utils.py, loader.py,
+  materializer_utils.py, tests/unit/test_materializer_utils.py.
+- Checks: 1545 passed, 1 skipped; mypy clean; coverage 90% (new files 100%/96%).
+- **Learnings for future iterations:**
+  - See Codebase Patterns above (composite Term key + namespace resolution rules).
+  - When you change a node's MERGE key, EVERY MATCH-by-old-key site must be updated AND
+    must have the new key component available; in the decoded path that meant making
+    term namespace = matched vocab so IN_VOCABULARY edges (which key on real vocab)
+    still resolve the node. A naive code-only-key swap silently drops those edges.
+  - Single-row loader.py term methods (upsert_term/add_term_to_value_set/
+    add_term_hierarchy) are still used by integration tests + resolution_utils; keep
+    them working with sentinel-default vocabulary_name.
 ---

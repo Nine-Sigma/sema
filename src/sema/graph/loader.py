@@ -14,6 +14,7 @@ from sema.graph.materializer_utils import (
     upsert_physical_nodes as _upsert_physical_nodes,
     upsert_semantic_nodes as _upsert_semantic_nodes,
 )
+from sema.graph.term_identity_utils import term_namespace
 from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
@@ -227,10 +228,11 @@ class GraphLoader:
         self, code: str, label: str, source: str,
         confidence: float,
         source_schema: str | None = None,
+        vocabulary_name: str | None = None,
     ) -> None:
         id_ = str(uuid.uuid4())
         self._run(
-            "MERGE (t:Term {code: $code}) "
+            "MERGE (t:Term {vocabulary_name: $vocabulary_name, code: $code}) "
             "ON CREATE SET t.id = $id "
             "SET t.label = $label, t.source = $source, "
             "t.confidence = $confidence, "
@@ -241,6 +243,7 @@ class GraphLoader:
             confidence=confidence,
             resolved_at=datetime.now(timezone.utc).isoformat(),
             id=id_, source_schema=source_schema,
+            vocabulary_name=term_namespace(vocabulary_name),
         )
 
     def upsert_value_set(
@@ -272,27 +275,34 @@ class GraphLoader:
     def add_term_to_value_set(
         self, term_code: str, value_set_name: str,
         source_schema: str | None = None,
+        vocabulary_name: str | None = None,
     ) -> None:
         self._run(
-            "MERGE (t:Term {code: $term_code}) "
+            "MERGE (t:Term {vocabulary_name: $vocabulary_name, "
+            "code: $term_code}) "
             "MERGE (vs:ValueSet {name: $value_set_name}) "
             "MERGE (t)-[m:MEMBER_OF "
             "{source_schema: $source_schema}]->(vs)",
             term_code=term_code, value_set_name=value_set_name,
             source_schema=source_schema,
+            vocabulary_name=term_namespace(vocabulary_name),
         )
 
     def add_term_hierarchy(
         self, parent_code: str, child_code: str,
         source_schema: str | None = None,
+        vocabulary_name: str | None = None,
     ) -> None:
         self._run(
-            "MERGE (p:Term {code: $parent_code}) "
-            "MERGE (c:Term {code: $child_code}) "
+            "MERGE (p:Term {vocabulary_name: $vocabulary_name, "
+            "code: $parent_code}) "
+            "MERGE (c:Term {vocabulary_name: $vocabulary_name, "
+            "code: $child_code}) "
             "MERGE (p)-[po:PARENT_OF "
             "{source_schema: $source_schema}]->(c)",
             parent_code=parent_code, child_code=child_code,
             source_schema=source_schema,
+            vocabulary_name=term_namespace(vocabulary_name),
         )
 
     def upsert_alias(
