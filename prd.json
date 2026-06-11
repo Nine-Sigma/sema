@@ -134,8 +134,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "NEW helper delete_orphaned_nodes(loader) in src/sema/graph/loader_utils.py (the single entry point, called by loader.delete_study_scoped after its three scoped-delete _run calls; loader.py stays ~660 lines, helper logic extracted not inlined). Sweeps in two ordered passes: (1) `MATCH (a:Alias) WHERE NOT (a)-[:REFERS_TO]->() DELETE a` removes aliases whose only REFERS_TO edge was just deleted (finding J); (2) for each of _ORPHAN_CONCEPT_LABELS = Entity/Property/Term/Vocabulary/ValueSet, `MATCH (n:Label) WHERE NOT (n)--() DELETE n` removes edge-less concept nodes (finding H). Aliases dropped FIRST so a freed target concept node becomes orphan-eligible in the concept sweep. The `NOT (n)--()` guard is the two-study safety: a shared node still referenced by a surviving study has edges, so it is untouched. delete_study_scoped docstring updated. Tests: NEW tests/unit/test_orphan_cleanup.py (8: alias guard present + never-unconditional, each concept label swept, concept deletion always guarded, ordering edge-sweep<alias<concept, helper entry-point) + NEW TestOrphanCleanupOnDelete integration class in tests/integration/test_multi_study_lifecycle.py (sole-study delete strands nothing incl. an :Alias; two-study delete keeps shared Entity/Term). Updated TestScopedDelete.test_delete_runs_three_queries to only assert the schema kwarg on schema-bearing queries (orphan GC queries are global, no schema param). 1592 passed, 1 skipped; mypy clean; coverage 90% (loader_utils 97%). loader_utils.py 373 lines (<400)."
     },
     {
       "id": "US-009",

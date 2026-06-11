@@ -348,3 +348,26 @@ def batch_create_in_vocabulary(
         "{source_schema: r.source_schema}]->(v)",
         rows=edges,
     )
+
+
+_ORPHAN_CONCEPT_LABELS = ("Entity", "Property", "Term", "Vocabulary", "ValueSet")
+
+
+def delete_orphaned_nodes(loader: GraphLoader) -> None:
+    """Garbage-collect graph elements stranded by a study deletion.
+
+    Run AFTER ``delete_study_scoped`` removes a study's edges. An ``:Alias``
+    keeps ``source_schema`` only on its ``REFERS_TO`` edge (finding J), so the
+    node itself survives the edge sweep — delete it once it has no remaining
+    ``REFERS_TO``. Concept nodes are shared and intentionally never study-scoped
+    (finding H); delete one only when it has no relationships at all, so any
+    node still referenced by a surviving study is untouched. Aliases are dropped
+    first because that can free their target concept node to be swept too.
+    """
+    loader._run(
+        "MATCH (a:Alias) WHERE NOT (a)-[:REFERS_TO]->() DELETE a",
+    )
+    for label in _ORPHAN_CONCEPT_LABELS:
+        loader._run(
+            f"MATCH (n:{label}) WHERE NOT (n)--() DELETE n",
+        )

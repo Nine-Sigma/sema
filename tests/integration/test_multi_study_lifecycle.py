@@ -266,3 +266,48 @@ class TestPriorEdgesRemovedOnRebuild:
             s=SCHEMA_A,
         )
         assert after_delete == 0
+
+
+class TestOrphanCleanupOnDelete:
+    """US-008 (findings J/H): deleting the last study leaves no stranded
+    `:Alias` and no edge-less concept nodes; shared nodes kept by a survivor."""
+
+    def test_sole_study_delete_strands_nothing(self, loader, clean_neo4j):
+        _seed_study(
+            loader, SCHEMA_A, "patient",
+            entity="Patient", property_name="hugo_symbol",
+            term_code="HGNC:TP53", run_id="run-A",
+        )
+        loader.upsert_alias(
+            text="subject", parent_label=":Entity", parent_name="Patient",
+            source="test", confidence=0.9, source_schema=SCHEMA_A,
+        )
+        assert _count(clean_neo4j, "MATCH (a:Alias) RETURN count(a) AS c") == 1
+
+        loader.delete_study_scoped(SCHEMA_A)
+
+        for label in ("Alias", "Entity", "Property", "Term", "ValueSet"):
+            assert _count(
+                clean_neo4j, f"MATCH (n:{label}) RETURN count(n) AS c",
+            ) == 0, f"orphaned :{label} should be swept"
+
+    def test_shared_nodes_survive_when_one_study_deleted(
+        self, loader, clean_neo4j,
+    ):
+        _seed_study(
+            loader, SCHEMA_A, "patient",
+            entity="Patient", property_name="hugo_symbol",
+            term_code="HGNC:TP53", run_id="run-A",
+        )
+        _seed_study(
+            loader, SCHEMA_B, "patient",
+            entity="Patient", property_name="hugo_symbol",
+            term_code="HGNC:TP53", run_id="run-B",
+        )
+
+        loader.delete_study_scoped(SCHEMA_A)
+
+        for label in ("Entity", "Term"):
+            assert _count(
+                clean_neo4j, f"MATCH (n:{label}) RETURN count(n) AS c",
+            ) >= 1, f"shared :{label} referenced by survivor must remain"

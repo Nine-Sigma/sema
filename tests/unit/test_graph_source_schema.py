@@ -347,7 +347,8 @@ class TestScopedDelete:
             for c in calls
         )
         for c in session.run.call_args_list:
-            assert c[1]["schema"] == SCHEMA_BRCA
+            if "schema" in c[1]:
+                assert c[1]["schema"] == SCHEMA_BRCA
 
     def test_delete_does_not_touch_shared_concept_nodes(
         self, loader, mock_driver,

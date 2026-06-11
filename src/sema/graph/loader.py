@@ -583,13 +583,13 @@ class GraphLoader:
     def delete_study_scoped(self, schema_name: str) -> None:
         """Remove every graph element stamped with this study's schema.
 
-        Edge sweep is type-agnostic (matches by `source_schema` property).
-        Assertion / JoinPath nodes are detach-deleted by `source_schema`,
-        which transitively removes provenance edges (`:SUBJECT` /
-        `:OBJECT`). Shared concept nodes (`:Entity`, `:Term`,
-        `:ValueSet`, `:Property`, `:SemanticType`) and physical nodes
-        (`:Table`, `:Column`, `:Schema`) are never touched.
+        Edge sweep matches by `source_schema`; `:Assertion` / `:JoinPath`
+        nodes are detach-deleted, transitively removing provenance edges.
+        Shared concept and physical nodes keep their content, but elements
+        left with no relationships — orphaned `:Alias` and edge-less concept
+        nodes — are then garbage-collected (`delete_orphaned_nodes`, J/H).
         """
+        from sema.graph import loader_utils as _lu
         self._run(
             "MATCH ()-[r {source_schema: $schema}]-() DELETE r",
             schema=schema_name,
@@ -604,6 +604,7 @@ class GraphLoader:
             "DETACH DELETE jp",
             schema=schema_name,
         )
+        _lu.delete_orphaned_nodes(self)
 
     def has_assertions(self, table_ref: str) -> bool:
         table_ref_slash = table_ref + "/"

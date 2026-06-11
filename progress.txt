@@ -245,3 +245,34 @@ Started: Wed Jun 10 20:58:03 EDT 2026
     each take it and stamp it onto their edge-row dicts. When adding a new
     study-scoped edge, thread the param through, don't reach for a global.
 ---
+
+## [2026-06-11 03:45] - US-008
+- Complete study deletion: GC orphaned :Alias nodes (finding J) and edge-less
+  concept nodes (finding H) left behind by delete_study_scoped.
+- NEW helper delete_orphaned_nodes(loader) in src/sema/graph/loader_utils.py —
+  ONE entry point, called by loader.delete_study_scoped after its three scoped
+  deletes. Two ordered passes: (1) `MATCH (a:Alias) WHERE NOT (a)-[:REFERS_TO]->()
+  DELETE a`; (2) for each Entity/Property/Term/Vocabulary/ValueSet
+  `MATCH (n:Label) WHERE NOT (n)--() DELETE n`. Aliases first so a freed target
+  concept node becomes orphan-eligible in the concept sweep.
+- The `NOT (n)--()` / `NOT (a)-[:REFERS_TO]->()` guard IS the two-study safety: a
+  shared node still referenced by a surviving study has edges -> untouched.
+- loader.py kept ~660 lines (logic extracted to loader_utils, only a delegating
+  call + trimmed docstring added). loader_utils.py 373 lines (<400).
+- Files changed: edited loader.py, loader_utils.py; NEW tests/unit/
+  test_orphan_cleanup.py (8); edited tests/integration/test_multi_study_lifecycle.py
+  (NEW TestOrphanCleanupOnDelete) and tests/unit/test_graph_source_schema.py
+  (TestScopedDelete schema-kwarg assertion now scoped to schema-bearing queries).
+- Checks: 1592 passed, 1 skipped; mypy clean; coverage 90% (loader_utils 97%).
+- **Learnings for future iterations:**
+  - delete_study_scoped deletes edges by source_schema but NOT the nodes those
+    edges hung off. Any node type that can be left edge-less (Alias, shared
+    concept nodes) needs an explicit orphan sweep AFTER the edge delete.
+  - Orphan GC queries are GLOBAL (no source_schema param) — they delete any
+    edge-less node, which is only possible because the just-run edge sweep freed
+    it. The pre-existing TestScopedDelete asserted EVERY delete call carried a
+    `schema` kwarg; that assertion had to be narrowed to schema-bearing queries.
+  - Order matters: drop orphan aliases BEFORE the concept sweep, because
+    DETACH/DELETE of an alias removes its REFERS_TO edge and can orphan the
+    target concept node, which the concept pass then collects.
+---
