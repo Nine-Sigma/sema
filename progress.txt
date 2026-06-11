@@ -387,3 +387,29 @@ Started: Wed Jun 10 20:58:03 EDT 2026
     (patch sema.connectors.databricks.sql_connect). A non-Databricks stub
     subclass of Connector is the way to test orchestration generically.
 ---
+
+## [2026-06-11 22:40] - US-012
+- Marked fixed findings in docs/architecture/data-unification-analysis.md so the
+  doc stays a trustworthy map of remaining gaps (A and F stay open).
+- Section 5: one-line `**Fixed:**` note added under findings B, C, D, E, G, I, J,
+  K, L, M, N (plus H, whose orphan-node/stale-scalar parts map to US-008/US-003),
+  each naming the implementing mechanism + story. Original analysis text untouched.
+- Section 6: recs 2-5 and 8-13 marked `— Done` with their story IDs; rec 7 marked
+  `— Partially done` (Connector ABC wired in US-011, second connector still open);
+  recs 1 (entity resolution) and 6 (cross-study join inference, #31) left open.
+- Section 7: verdict paragraph rewritten to the post-fix state — wiring gaps I–N
+  and order-dependence bugs B/C/D/E/G closed; A and F are the two remaining gaps.
+- Files changed: edited docs/architecture/data-unification-analysis.md (gitignored
+  — not committed), prd.json (US-012 passes:true), progress.txt.
+- Checks: 1613 passed, 1 skipped; mypy clean; coverage 90%.
+- **Learnings for future iterations:**
+  - `docs/` is GITIGNORED (.gitignore:42). The data-unification-analysis.md the
+    PRD points at is NOT tracked — edits live on disk only. Doc-only stories can't
+    `git add` it (needs -f, which fights the repo's intent); commit just prd.json
+    + progress.txt, like every prior "docs:" commit on this branch.
+  - When a finding has sub-parts split across stories (H = orphan nodes via US-008
+    + stale scalars subsumed by US-003's order-independence), say so explicitly in
+    the Fixed note rather than forcing it onto one story.
+  - Rec 7 (Connector ABC + second connector) is only half-done by US-011 (ABC
+    wired, no second connector) — mark such items "Partially done", not "Done".
+---

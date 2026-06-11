@@ -199,8 +199,8 @@
         "uv run mypy src/sema/ passes (typecheck)"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Documentation-only (docs/architecture/data-unification-analysis.md is gitignored — edits live on disk, not in git; prior docs stories committed only prd.json+progress.txt). Section 5: added a one-line '**Fixed:**' note to findings B, C, D, E, G, I, J, K, L, M, N (and H, whose two parts map to US-003+US-008) naming the implementing mechanism/story; original analysis text untouched. A and F left open (no Fixed note). Section 6: recommendations 2,3,4,5,8,9,10,11,12,13 marked '— Done' with the story; rec 7 marked '— Partially done' (ABC wired US-011, second connector still open); rec 1 (entity resolution) and rec 6 (cross-study join inference #31) left open. Section 7 verdict rewritten to the post-fix state: wiring gaps I–N closed + order-dependence bugs (B/C/D/E/G) closed, leaving A (entity resolution) and F (cross-study joins) as the two remaining high-impact gaps. Checks: 1613 passed, 1 skipped; mypy clean; coverage 90%."
     }
   ]
 }
