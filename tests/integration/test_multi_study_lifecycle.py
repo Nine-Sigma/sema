@@ -311,3 +311,79 @@ class TestOrphanCleanupOnDelete:
             assert _count(
                 clean_neo4j, f"MATCH (n:{label}) RETURN count(n) AS c",
             ) >= 1, f"shared :{label} referenced by survivor must remain"
+
+
+class TestDuplicateCodeValueSetScoping:
+    """Term identity is {vocabulary_name, code}: a Gender 'M' lookup
+    must never return value sets governed by a State 'M'."""
+
+    def _seed_term_value_set(
+        self, loader: GraphLoader, *, vocab: str, code: str,
+        column: str, table: str, value_set: str,
+    ) -> None:
+        catalog = "workspace"
+        loader.upsert_table(table, SCHEMA_A, catalog)
+        loader.upsert_column(
+            column, table, SCHEMA_A, catalog, data_type="STRING",
+        )
+        loader.upsert_term(
+            code=code, label=code, source="test", confidence=0.95,
+            vocabulary_name=vocab,
+        )
+        loader.upsert_value_set(
+            name=value_set, column_name=column, table_name=table,
+            schema_name=SCHEMA_A, catalog=catalog,
+            source_schema=SCHEMA_A,
+        )
+        loader.add_term_to_value_set(
+            term_code=code, value_set_name=value_set,
+            source_schema=SCHEMA_A, vocabulary_name=vocab,
+        )
+
+    def _seed_duplicate_code(self, loader: GraphLoader) -> None:
+        self._seed_term_value_set(
+            loader, vocab="Gender", code="M", column="gender",
+            table="patient", value_set="gender_values",
+        )
+        self._seed_term_value_set(
+            loader, vocab="State", code="M", column="state",
+            table="address", value_set="state_values",
+        )
+
+    def test_two_terms_exist_for_duplicate_code(
+        self, loader, clean_neo4j,
+    ):
+        self._seed_duplicate_code(loader)
+        assert _count(
+            clean_neo4j,
+            "MATCH (t:Term {code: 'M'}) RETURN count(t) AS c",
+        ) == 2
+
+    def test_scoped_lookup_does_not_cross_vocabularies(
+        self, loader, clean_neo4j,
+    ):
+        from sema.graph.queries import CypherQueries
+
+        self._seed_duplicate_code(loader)
+        with clean_neo4j.session() as s:
+            rows = s.run(
+                CypherQueries.find_value_sets_for_term(),
+                code="M", vocabulary_name="Gender",
+            ).data()
+        assert {r["column_name"] for r in rows} == {"gender"}
+        assert {r["value_set_name"] for r in rows} == {"gender_values"}
+
+    def test_unscoped_lookup_returns_both_vocabularies(
+        self, loader, clean_neo4j,
+    ):
+        """vocabulary_name=None keeps the legacy unfiltered behavior
+        for hits whose vocabulary could not be resolved."""
+        from sema.graph.queries import CypherQueries
+
+        self._seed_duplicate_code(loader)
+        with clean_neo4j.session() as s:
+            rows = s.run(
+                CypherQueries.find_value_sets_for_term(),
+                code="M", vocabulary_name=None,
+            ).data()
+        assert {r["column_name"] for r in rows} == {"gender", "state"}
