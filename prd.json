@@ -69,8 +69,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Harness: src/sema/eval/mapping_goldset_utils.py (frozen §1.5(f) math: derive_zone/classify_cell/ConfusionMatrix incl mapped_precision/recall/auto_resolution_rate/no_map_accuracy-separate) + mapping_goldset.py (load_gold_set, GoldSet labelled/unlabelled accounting, score() at distinct-code/row-weighted/per-bucket). Artifact tests/data/gold/oncotree_condition_slice0.jsonl scaffolds all 64 distinct ONCOTREE_CODE (gbm_tcga_pan_can_atlas_2018 + msk_chord_2024 sample tables; documented enumeration query) with row_count filled. HUMAN GATE: 0/64 hand-labelled (gold_label=UNLABELLED) — Ralph did NOT invent labels (would make US-012 circular); remainder surfaced via GoldSet.unlabelled_codes(). 29 hermetic unit tests assert exact §1.5 values; skip-guarded integration test confirms 64/64 coverage + row_count match vs live poc.duckdb. No resolver shipped. mypy clean, coverage 93% (98% new modules)."
     },
     {
       "id": "US-004",

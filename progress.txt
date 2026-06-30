@@ -21,6 +21,16 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   materializer_utils.py.
 - Coverage gate >= 85% (`uv run pytest --cov=sema --cov-report=term-missing`); repo
   currently ~93%.
+- ONCOTREE_CODE source-of-truth: `cbioportal_<study>.sample.ONCOTREE_CODE` only (2
+  studies in ~/.sema/poc.duckdb). Discover studies via information_schema.columns
+  (column_name='ONCOTREE_CODE' AND table_name='sample'); 64 distinct codes.
+- §1.5(f) metric math is FROZEN in src/sema/eval/mapping_goldset_utils.py (US-002):
+  derive_zone/classify_cell/ConfusionMatrix. US-012 MUST reuse it (no re-derived
+  math). Recall denominator includes Zone-2 recall_miss (reduces to the doc's
+  TP/(TP+WRONG+FN) when no Zone-2 predictions exist).
+- Gold-set artifact tests/data/gold/oncotree_condition_slice0.jsonl: gold_concept_id
+  is an EXTERNAL ORACLE (human/crosswalk), never Sema's resolver. Codes awaiting the
+  human gate use gold_label=UNLABELLED (excluded from scoring, surfaced separately).
 
 ---
 
@@ -92,4 +102,57 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   - Denylist matching is plain substring per line over *.py only; manifests
     (*.yaml) are never scanned, so OMOP literals in authored manifests are fine.
   - DCO: commits on this branch carry a `Signed-off-by:` trailer (git commit -s).
+---
+
+## 2026-06-30 - US-002 (Slice-0 gold set + mapping eval harness)
+- Shipped the §1.5(f) confusion-matrix eval harness + the gold-set scaffold.
+  NO resolver (per AC) — only the metric module and the artifact.
+- NEW src/sema/eval/mapping_goldset_utils.py: frozen home of the metric math —
+  GoldLabel{RESOLVED,NO_MAP,UNLABELLED}, ResolutionStatus, Zone (derived §1.5(c)),
+  GoldRow/Decision dataclasses, derive_zone(), classify_cell() (tp/wrong/fn/
+  recall_miss/tn/fp_map/na), ConfusionMatrix with mapped_precision/mapped_recall/
+  auto_resolution_rate/no_map_accuracy (None on empty denom), frequency_bucket().
+- NEW src/sema/eval/mapping_goldset.py: load_gold_set (JSONL), GoldSet
+  (labelled/unlabelled accounting = the human gate), score() ->
+  GoldSetReport at distinct-code, row-weighted, and per-frequency-bucket
+  granularity; distinct_oncotree_sql()/discover_oncotree_schemas()/
+  enumerate_distinct_codes() for live enumeration + scaffolding.
+- NEW tests/data/gold/oncotree_condition_slice0.jsonl: 64 distinct ONCOTREE_CODE
+  rows (gbm_tcga_pan_can_atlas_2018 + msk_chord_2024 `sample` tables, 25,632 src
+  rows total). gold_label=UNLABELLED, gold_concept_id=null, row_count from the
+  documented query, notes per code. HUMAN-LABEL GATE: 0/64 labelled — Ralph did
+  NOT invent labels (auto-labelling would make US-012 circular). The unlabelled
+  remainder is surfaced by GoldSet.unlabelled_codes(); completing 100%
+  distinct-code coverage is the human gate US-012 acceptance depends on.
+- NEW tests/unit/test_mapping_goldset.py (29 hermetic tests): the synthetic
+  gold+decision set computes to the exact §1.5 values (precision 0.6, recall 0.6,
+  auto_res 5/7, no_map_acc 0.5 reported SEPARATELY); NO_MAP-for-real-concept = FN
+  (never dropped); NO_MAP-for-NO_MAP = TN; Zone-2 = recall_miss.
+- NEW tests/integration/test_mapping_goldset_coverage.py (skip-guarded on
+  ~/.sema/poc.duckdb): asserts the gold set covers every observed code (no drift)
+  and row_counts match live data. Ran live: 2 passed (64/64 covered).
+- Quality: uv run pytest 1944 passed / 1 skipped; mypy clean (178 files);
+  coverage 93% repo, 98% on the two new modules.
+- **Learnings for future iterations:**
+  - ONCOTREE_CODE lives ONLY in `cbioportal_<study>.sample.ONCOTREE_CODE` (2
+    studies in poc.duckdb: gbm_tcga_pan_can_atlas_2018, msk_chord_2024); 64
+    distinct non-empty codes, 25,632 rows. There is NO `cbioportal_*` named table
+    other than per-study schemas — discover via information_schema.columns on
+    column_name='ONCOTREE_CODE' AND table_name='sample'.
+  - eval/ is ALLOWLISTED by the R29 guard (US-001), so OncoTree/cbioportal
+    literals are FINE in eval modules, tests, and the gold artifact. The guard
+    only scans *.py under engine core paths; JSONL/data files are never scanned.
+  - §1.5(f) recall is subtly under-specified: the doc formula TP/(TP+WRONG+FN)
+    omits Zone-2 ("recall miss"). I implemented the full gold-RESOLVED
+    denominator TP/(TP+WRONG+FN+recall_miss) so a Zone-2 prediction lowers recall
+    per the prose; when recall_miss=0 (the common Slice-0 case) it reduces
+    EXACTLY to the documented formula. US-012 must reuse this module's math, not
+    re-derive it.
+  - FP_map arises ONLY for gold=NO_MAP (a Zone-1 prediction); a Zone-1 wrong
+    concept for gold=RESOLVED is WRONG, not FP_map. no_map_accuracy = TN/(TN+
+    FP_map) and is reported SEPARATELY — never folded into the mapped_* metrics.
+  - GoldLabel.UNLABELLED is a third sentinel (beyond the §1.5 RESOLVED|NO_MAP)
+    representing "scaffolded, awaiting the human oracle". score() excludes these
+    and lists them in GoldSetReport.unscored_unlabelled so they can never be
+    silently scored as labelled.
 ---
