@@ -1,3 +1,64 @@
 # Ralph Progress Log
-Started: Tue Jun 30 14:14:58 EDT 2026
+Started: Tue Jun 30 14:37:57 EDT 2026
+---
+
+## Codebase Patterns
+- New unit test files under tests/unit/ MUST declare `pytestmark = pytest.mark.unit`
+  (pyproject addopts = `-m unit`); without it the file is silently deselected (0 run).
+- pytest defaults to unit only. Mark integration/e2e with `pytest.mark.integration`/`e2e`
+  and skip-guard on the live resource (~/.sema/poc.duckdb, Neo4j, Databricks creds).
+- mypy is strict (pyproject [tool.mypy] strict=true). Type hints everywhere; run
+  `uv run mypy src/sema/` before committing.
+- R29 boundary: src/sema/engine/ (and the generic spine) must contain NO OMOP/OncoTree
+  literals (OncoTree/oncotree/cBioPortal/cbio, "Maps to", standard_concept,
+  condition_occurrence, concept_id). Domain-specific vocab knowledge belongs OUTSIDE
+  engine core as data (e.g. src/sema/models/vocab_knowledge.py); OMOP specifics live in
+  authored manifests (targets/manifests/*.yaml) and policy modules. The migration check
+  lives in tests/unit/test_engine_coupling.py (US-001 will formalize the full guard).
+- The targets/ framework (PR #109, ea2aed7) is MERGED to main and R29-clean. Build on it
+  (load_target, ManifestTargetAdapter, materializer -> Neo4j/InMemory, `sema target load`);
+  do NOT reimplement loaders/materializers. Do NOT grow/refactor loader.py or
+  materializer_utils.py.
+- Coverage gate >= 85% (`uv run pytest --cov=sema --cov-report=term-missing`); repo
+  currently ~93%.
+
+---
+
+## 2026-06-30 - US-000 (R29 baseline migration)
+- Neutralized the 4 known OMOP/OncoTree leaks in src/sema/engine/ so the R29 denylist
+  returns EMPTY against engine core, clearing the way for the US-001 guard.
+- TDD: wrote tests/unit/test_engine_coupling.py first (case-explicit denylist scan of
+  engine core + a scanner sanity test on a seeded literal); confirmed it failed on the
+  4 real leaks (5 hits — "cBioPortal" matches both cBioPortal and cBio), then fixed.
+- Per-file neutralization (3 generalized in place, 1 relocated):
+  - engine/domain_prompts.py:83 — GENERALIZED: "Cancer classification systems (OncoTree,
+    ICD-O)" -> "Cancer classification/morphology systems (ICD-O and similar)". The hint
+    already instructs naming families not specific ontologies; prompt-text only.
+  - engine/few_shot_healthcare.py:3 — GENERALIZED: docstring "sourced from cBioPortal
+    analyst questions" -> "sourced from oncology warehouse analyst questions".
+  - engine/few_shot_healthcare_stage_a.py:31 — GENERALIZED: few-shot column
+    `oncotree_code` -> `cancer_type_code` (still a realistic cancer-type code column).
+  - engine/vocabulary_utils.py:182 — RELOCATED: moved the HIERARCHICAL_VOCABULARIES
+    frozenset (the only set carrying "oncotree") to a new allowlisted home,
+    src/sema/models/vocab_knowledge.py, and imported it back. Behavior preserved exactly
+    (still re-exported as vocabulary_utils.HIERARCHICAL_VOCABULARIES). NON_HIERARCHICAL_TYPES
+    stayed (no leak).
+- Files changed: NEW src/sema/models/vocab_knowledge.py, NEW
+  tests/unit/test_engine_coupling.py; EDIT engine/domain_prompts.py,
+  engine/few_shot_healthcare.py, engine/few_shot_healthcare_stage_a.py,
+  engine/vocabulary_utils.py.
+- Quality: `uv run pytest` 1911 passed / 1 skipped; `uv run mypy src/sema/` clean;
+  coverage 93% (vocab_knowledge.py + test_engine_coupling.py both 100%).
+- NOTE (per AC): PR #109 (ea2aed7) is MERGED to main with the R29-clean targets/
+  framework; US-004/US-007 BUILD ON it — no recovery, no reimplementation.
+- **Learnings for future iterations:**
+  - The denylist scanner uses case-explicit substrings; "cBioPortal" yields two hits
+    (cBioPortal + cBio) — expect N>4 violation rows for the 4 source leaks. US-001's
+    formalized guard should keep the casing explicit (the AC forbids casing bypass).
+  - No test asserted "oncotree" membership in HIERARCHICAL_VOCABULARIES, so relocation
+    was safe; the only consumer is engine/vocabulary_utils.should_infer_hierarchy.
+  - .wolf/anatomy.md and .wolf/memory.md are auto-maintained by OpenWolf hooks on
+    file create/edit — no manual anatomy/memory updates needed this iteration.
+  - engine/vocabulary_utils.py uses stdlib `logging`, not loguru (pre-existing); left
+    as-is to keep the change focused.
 ---

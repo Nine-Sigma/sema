@@ -28,7 +28,7 @@ HEALTHCARE_STAGE_A: list[dict[str, Any]] = [
             "columns": "sample_id (STRING), patient_id (STRING), "
             "cancer_type (STRING), cancer_type_detailed (STRING), "
             "sample_type (STRING), tmb (DOUBLE), msi_type (STRING), "
-            "oncotree_code (STRING), sample_class (STRING)",
+            "cancer_type_code (STRING), sample_class (STRING)",
         },
         "output": {
             "primary_entity": "Biospecimen/Sample",

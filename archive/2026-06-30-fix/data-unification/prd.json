@@ -21,8 +21,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "Neutralized 4 engine-core leaks (domain_prompts, few_shot_healthcare, few_shot_healthcare_stage_a generalized; vocabulary_utils HIERARCHICAL_VOCABULARIES relocated to models/vocab_knowledge.py). tests/unit/test_engine_coupling.py scans engine core with a case-explicit denylist -> EMPTY. PR #109 (ea2aed7) targets/ framework confirmed MERGED/R29-clean."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-001",
