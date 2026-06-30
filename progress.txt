@@ -155,6 +155,25 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   STRUCTURAL_PRECISION_CAVEAT is always emitted (Slice-0 ~100% precision is a property of
   the deterministic exact-code walk, not the product). report.as_dict() = JSON (verdict +
   coverage + thresholds + 3-granularity metrics + caveat); human_summary() = text.
+- US-012A local fit chain (src/sema/pipeline/fit_slice0.py:run_fit + fit_slice0_utils.py +
+  cli_fit.py:`sema fit`): the canonical way to run the WHOLE spine on DuckDB with no
+  Databricks/Neo4j. run_fit is GENERIC (in pipeline/, not R29-scanned, but names no domain
+  literal) and takes a FitRequest data bundle; it threads resolve_and_store (US-006) ->
+  VocabLookupProducer.produce (US-009) -> Slice0PlanAssembler.assemble (US-008) ->
+  TransformCompiler.compile+execute (US-010) -> run_staging_qa (US-011) -> build_mapping_report
+  (US-012). KEY: the producer needs a graph session; for a DuckDB-only run pass the
+  `_RecordingSession` (records cypher, no Neo4j) so the assertion/FieldMap projection is still
+  exercised. CONSUME the TARGET binding by reading the authored manifest via
+  ManifestTargetAdapter.load_vocabulary_bindings(TargetPropertyRef) — do NOT re-run
+  load_target/materializer; then resolve_policy(binding) -> ResolverPolicy. The plan obligation
+  required_fields MUST equal the producer's target_property_ref (single-field) or coverage
+  FAILs — don't reuse the 3-field make_slice0_staging_obligation here. Use ONE read-write DuckDB
+  conn for vocab(read)/value-mapping-store(sema_resolve)/staging(sema_staging) so the compiled
+  LEFT JOIN sees the source table natively; the value-mapping store + staging live in distinct
+  schemas so they coexist on one connection. Build a VocabStore on a shared conn with
+  VocabStore(conn, schema=OMOP_VOCAB_SCHEMA, namespace="vocabulary_omop"). Live tests copy the
+  source study into a temp work DuckDB (ATTACH poc READ_ONLY + CREATE TABLE AS) so poc.duckdb is
+  never mutated.
 
 ---
 
@@ -756,4 +775,55 @@ Started: Tue Jun 30 14:37:57 EDT 2026
     is the same reasoning as US-011's staging QA.
   - US-013 reuses this report at full Databricks coverage; it asserts the thresholds only
     when coverage==1.0 (the live test branches on report.coverage_fraction).
+---
+
+## 2026-06-30 - US-012A (DuckDB end-to-end smoke: full spine, no Databricks)
+- Wired the whole Slice-0 spine into `sema fit`, so interface drift between the
+  independently-built units (US-006..US-012) is caught locally before the live
+  Databricks gate (US-013). Chain: resolve -> produce -> assemble -> compile ->
+  staging-write -> Gate D-lite QA -> eval. No Databricks objects written.
+- NEW src/sema/pipeline/fit_slice0.py (run_fit, 100% cov): GENERIC orchestration
+  taking a FitRequest data bundle; `_RecordingSession` stands in for a Neo4j
+  session so the US-009 producer's MappingAssertion/FieldMap projection runs
+  without a graph dependency. resolve_and_store remains the SOLE value-mapping
+  store writer; the producer/compiler/QA/eval only READ.
+- NEW src/sema/pipeline/fit_slice0_utils.py (94% cov): build_slice0_fit_request
+  CONSUMES the TARGET binding from the authored manifest via
+  ManifestTargetAdapter.load_vocabulary_bindings (does NOT re-run load_target);
+  resolve_policy(binding) -> ResolverPolicy. discover_study/enumerate_source read
+  the study from DuckDB. The plan obligation requires exactly the producer's
+  target_property_ref (single-field) so §1.5(e) coverage PASSES.
+- NEW src/sema/cli_fit.py (`sema fit`, 86% cov): one read-write DuckDB conn for
+  vocab(read)/store/staging; VocabStore(conn, schema=OMOP_VOCAB_SCHEMA,
+  namespace="vocabulary_omop"); echoes a JSON summary (rows_staged, gate_d_lite,
+  eval). Registered via cli.add_command(_fit_cmd, name="fit").
+- TDD: tests/unit/test_fit_slice0.py (9, FakeVocabStore + temp DuckDB) written
+  first, failed ModuleNotFoundError, then implemented; tests/unit/test_cli_fit.py
+  (3: registration/help, missing-duckdb exit 2, and a synthetic all-VARCHAR OMOP
+  fixture exercising the full CLI _run). Live: tests/integration/test_fit_slice0_live.py
+  (skip-guarded poc.duckdb): copies the study into a temp work db (poc.duckdb
+  never mutated), runs run_fit, asserts staging row count == source row count,
+  Gate D-lite PASS, report produced, store cols == §1.5(a) FROZEN_COLUMNS, and
+  RESOLVED-but-NULL == 0. Ran live: 1 passed.
+- Quality: uv run pytest 2095 passed / 1 skipped; mypy clean (205 files); R29
+  guard clean; coverage 93% repo.
+- **Learnings for future iterations:**
+  - The producer (US-009) requires a graph session; for a DuckDB-only chain pass
+    the _RecordingSession (in fit_slice0.py) instead of standing up Neo4j — the
+    assertion/FieldMap shapes are still exercised, the cypher is just recorded.
+  - `sema fit` consumes the TARGET binding by READING the manifest
+    (ManifestTargetAdapter.load_vocabulary_bindings), NOT by re-materializing the
+    graph. That keeps the local gate free of a Neo4j dependency while honoring
+    "consume the already-loaded target". US-013 reuses this exact CLI surface
+    with the Databricks backend (no new chain logic).
+  - One DuckDB connection serves vocab(read)/value-mapping-store(sema_resolve)/
+    staging(sema_staging): distinct schemas coexist, and the compiled LEFT JOIN
+    resolves the source table natively (no cross-ATTACH qualification needed).
+    Live tests instead copy the source into a temp work db to keep poc.duckdb
+    pristine.
+  - Coverage matching is exact-string (§1.5(e)): the fit plan's obligation must
+    require the SAME ref the producer/assembler stamps on the FieldMap
+    (target.stage.<property>). Do NOT drop in make_slice0_staging_obligation here
+    (3 required fields) — the single VOCAB_LOOKUP FieldMap wouldn't cover the
+    resolver_policy_ref/vocab_release fields and the plan would FAIL.
 ---
