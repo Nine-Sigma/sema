@@ -72,6 +72,7 @@ class TestGuardedCypher:
             [{"name": "Patient", "description": "d", "source": "llm",
               "confidence": 0.9, "table_name": "t", "schema_name": "s",
               "catalog": "c"}],
+            source_schema="s",
         )
         cypher = loader._run.call_args[0][0]
         assert "ON CREATE SET e.id = r.id" in cypher
@@ -86,6 +87,7 @@ class TestGuardedCypher:
             [{"name": "age", "entity_name": "Patient", "semantic_type": "int",
               "source": "llm", "confidence": 0.9, "column_name": "age",
               "table_name": "t", "schema_name": "s", "catalog": "c"}],
+            source_schema="s",
         )
         cypher = loader._run.call_args[0][0]
         assert f"coalesce(p.confidence, {UNSET_CONFIDENCE})" in cypher
@@ -111,6 +113,7 @@ class TestGuardedCypher:
             [{"name": "Patient", "description": "d", "source": "llm",
               "confidence": 0.9, "table_name": "t", "schema_name": "s",
               "catalog": "c"}],
+            source_schema="s",
         )
         cypher = loader._run.call_args[0][0]
         assert (

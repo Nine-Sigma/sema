@@ -48,6 +48,14 @@ _ASSERTION_UPSERT_CYPHER = (
 )
 
 
+def _require_source_schema(method: str, source_schema: str | None) -> None:
+    if source_schema is None:
+        raise ValueError(
+            f"{method} requires source_schema; the relationship MERGE key "
+            f"includes source_schema for multi-study isolation"
+        )
+
+
 class GraphLoader:
     def __init__(self, driver: Any) -> None:
         self._driver = driver
@@ -177,48 +185,12 @@ class GraphLoader:
             schema_name=schema_name, catalog=catalog,
         )
 
-    def batch_upsert_entities(
-        self, entities: list[dict[str, Any]],
-    ) -> None:
-        from sema.graph import loader_utils as _lu
-        _lu.batch_upsert_entities(self, entities)
-
-    def batch_upsert_properties(
-        self, properties: list[dict[str, Any]],
-    ) -> None:
-        from sema.graph import loader_utils as _lu
-        _lu.batch_upsert_properties(self, properties)
-
-    def batch_upsert_terms(
-        self, terms: list[dict[str, Any]],
-        source_schema: str | None = None,
-    ) -> None:
-        from sema.graph import loader_utils as _lu
-        _lu.batch_upsert_terms(self, terms, source_schema=source_schema)
-
-    def batch_upsert_aliases(
-        self, aliases: list[dict[str, Any]], parent_label: str,
-    ) -> None:
-        from sema.graph import loader_utils as _lu
-        _lu.batch_upsert_aliases(self, aliases, parent_label)
-
-    def batch_upsert_value_sets(
-        self, value_sets: list[dict[str, Any]],
-    ) -> None:
-        from sema.graph import loader_utils as _lu
-        _lu.batch_upsert_value_sets(self, value_sets)
-
-    def batch_upsert_join_paths(
-        self, join_paths: list[dict[str, Any]],
-    ) -> None:
-        from sema.graph import loader_utils as _lu
-        _lu.batch_upsert_join_paths(self, join_paths)
-
     def upsert_entity(
         self, name: str, description: str | None, source: str,
         confidence: float, table_name: str, schema_name: str,
         catalog: str, source_schema: str | None = None,
     ) -> None:
+        _require_source_schema("upsert_entity", source_schema)
         id_ = str(uuid.uuid4())
         self._run(
             "MERGE (e:Entity {name: $name}) "
@@ -246,6 +218,7 @@ class GraphLoader:
         table_name: str, schema_name: str, catalog: str,
         source_schema: str | None = None,
     ) -> None:
+        _require_source_schema("upsert_property", source_schema)
         id_ = str(uuid.uuid4())
         self._run(
             "MERGE (p:Property {entity_name: $entity_name, "
@@ -305,6 +278,7 @@ class GraphLoader:
         source_schema: str | None = None,
         column_ref: str | None = None,
     ) -> None:
+        _require_source_schema("upsert_value_set", source_schema)
         id_ = str(uuid.uuid4())
         ref = column_ref or (
             f"{catalog}.{schema_name}.{table_name}.{column_name}"
@@ -340,6 +314,7 @@ class GraphLoader:
         name-keyed node distinct from the column_ref node that HAS_VALUE_SET
         points at. Production always passes ``value_set_ref``.
         """
+        _require_source_schema("add_term_to_value_set", source_schema)
         if value_set_ref is not None:
             vs_clause = (
                 "MERGE (vs:ValueSet {column_ref: $value_set_ref}) "
@@ -364,6 +339,7 @@ class GraphLoader:
         source_schema: str | None = None,
         vocabulary_name: str | None = None,
     ) -> None:
+        _require_source_schema("add_term_hierarchy", source_schema)
         self._run(
             "MERGE (p:Term {vocabulary_name: $vocabulary_name, "
             "code: $parent_code}) "
@@ -383,6 +359,7 @@ class GraphLoader:
         source_schema: str | None = None,
         parent_entity_name: str | None = None,
     ) -> None:
+        _require_source_schema("upsert_alias", source_schema)
         id_ = str(uuid.uuid4())
         if parent_label == ":Property":
             parent_match = (
@@ -419,6 +396,7 @@ class GraphLoader:
         cardinality_hint: str | None = None,
         source_schema: str | None = None,
     ) -> None:
+        _require_source_schema("upsert_join_path", source_schema)
         id_ = str(uuid.uuid4())
         self._run(
             "MERGE (jp:JoinPath {name: $name, "
@@ -444,11 +422,7 @@ class GraphLoader:
         column_name: str | None = None,
         source_schema: str | None = None,
     ) -> None:
-        if source_schema is None:
-            raise ValueError(
-                "add_join_path_uses requires source_schema to scope "
-                "the JoinPath match by {name, source_schema}"
-            )
+        _require_source_schema("add_join_path_uses", source_schema)
         if column_name:
             self._run(
                 "MATCH (jp:JoinPath {name: $jp_name, "
@@ -475,11 +449,7 @@ class GraphLoader:
         to_table_ref: str,
         source_schema: str | None = None,
     ) -> None:
-        if source_schema is None:
-            raise ValueError(
-                "add_join_path_entity_links requires source_schema "
-                "to scope the JoinPath match by {name, source_schema}"
-            )
+        _require_source_schema("add_join_path_entity_links", source_schema)
         self._run(
             "MATCH (jp:JoinPath {name: $jp_name, "
             "source_schema: $source_schema}) "
@@ -560,13 +530,6 @@ class GraphLoader:
     ) -> None:
         from sema.graph import provenance_utils as _pu
         _pu.materialize_provenance_edges(self, assertions)
-
-    def materialize_table_graph(
-        self, assertions: list[Assertion],
-    ) -> None:
-        """Legacy entry point — delegates to unified materializer."""
-        from sema.graph.materializer import materialize_unified
-        materialize_unified(self, assertions)
 
     def query_nodes_by_label(
         self, label: str,

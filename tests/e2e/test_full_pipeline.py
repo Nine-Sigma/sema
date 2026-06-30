@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 
 pytestmark = pytest.mark.e2e
 
-from sema.engine.structural import StructuralEngine
 from sema.engine.semantic import SemanticEngine
 from sema.engine.vocabulary import VocabularyEngine
 from sema.engine.embeddings import EmbeddingEngine, build_embedding_text
@@ -103,9 +102,11 @@ def built_graph(clean_neo4j):
     loader = GraphLoader(clean_neo4j)
     extraction_assertions = _make_extraction_assertions()
 
-    # L1: Structural
-    structural = StructuralEngine(loader)
-    structural.process(extraction_assertions)
+    # L1: Structural — materialize raw extraction assertions through the
+    # canonical production path (replaces the retired StructuralEngine).
+    materialize_unified(
+        loader, extraction_assertions, source_schema="clinical",
+    )
 
     # L2: Semantic (mocked LLM)
     llm_response = _mock_llm_response()
@@ -143,7 +144,11 @@ def built_graph(clean_neo4j):
     )
 
     # Materialization
-    materialize_unified(loader, semantic_assertions + vocab_assertions)
+    materialize_unified(
+        loader,
+        semantic_assertions + vocab_assertions,
+        source_schema="clinical",
+    )
 
     # Embeddings
     emb_engine = EmbeddingEngine(model=FakeEmbedder(), loader=loader)

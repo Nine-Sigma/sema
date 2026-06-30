@@ -240,7 +240,7 @@ class TestMemberOfValueSetIdentity:
 
     def test_links_by_name_in_legacy_fallback(self, loader_with_session):
         loader, session = loader_with_session
-        loader.add_term_to_value_set("M", "dx_types")
+        loader.add_term_to_value_set("M", "dx_types", source_schema="sch")
         cypher = session.run.call_args[0][0]
         assert "MERGE (vs:ValueSet {name: $value_set_name})" in cypher
 

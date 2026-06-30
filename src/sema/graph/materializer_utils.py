@@ -67,6 +67,22 @@ def parse_ref_any(ref: str) -> tuple[str, str, str, str | None]:
     return pk.catalog_or_db, pk.schema or "", pk.table, pk.column
 
 
+def _strip_column_suffix(col_ref: str, column: str | None) -> str:
+    """Drop a trailing `.<column>` or `/<column>` suffix to get the table ref.
+
+    Required because `unity://cat.schema.table.column` (dots) and
+    `databricks://ws/cat/sch/tbl/col` (slashes) use different separators;
+    a naive `rsplit("/", 1)` mishandles unity-style refs.
+    """
+    if not column:
+        return col_ref
+    for sep in (".", "/"):
+        suffix = f"{sep}{column}"
+        if col_ref.endswith(suffix):
+            return col_ref[: -len(suffix)]
+    return col_ref
+
+
 
 def upsert_physical_nodes(
     loader: GraphLoader,
@@ -186,7 +202,7 @@ def _resolve_property_details(
         if type_winner else "free_text"
     )
 
-    table_ref = col_ref.rsplit("/", 1)[0] if pk.column else col_ref
+    table_ref = _strip_column_suffix(col_ref, pk.column)
 
     entity_group = groups.get(
         (table_ref, AssertionPredicate.HAS_ENTITY_NAME.value), [],
@@ -283,8 +299,10 @@ def upsert_decoded_values(
             })
 
     # Upsert canonical ValueSet/Term nodes (which own `id`/status via their
-    # ON CREATE SET) BEFORE creating MEMBER_OF edges. Otherwise the edge's
-    # MERGE would create those nodes first, leaving them without ids.
+    # ON CREATE SET) BEFORE creating MEMBER_OF edges. The edges match the
+    # ValueSet on column_ref (via value_set_ref), so the canonical
+    # column_ref node must exist first — otherwise the edge MERGE would
+    # create nodes without ids.
     batch_upsert_value_sets(
         loader, vs_batch, source_schema=source_schema,
     )

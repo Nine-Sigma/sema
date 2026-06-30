@@ -148,7 +148,8 @@ class TestSingleRowTermMethods:
     def test_add_term_to_value_set_composite_key(self, driver_loader):
         loader, session = driver_loader
         loader.add_term_to_value_set(
-            "M", "sex_values", vocabulary_name="sex_values",
+            "M", "sex_values", source_schema="sch",
+            vocabulary_name="sex_values",
         )
         cypher = session.run.call_args[0][0]
         params = session.run.call_args[1]
@@ -161,7 +162,8 @@ class TestSingleRowTermMethods:
     def test_add_term_hierarchy_composite_key(self, driver_loader):
         loader, session = driver_loader
         loader.add_term_hierarchy(
-            "NEOPLASM", "CARCINOMA", vocabulary_name="ICD",
+            "NEOPLASM", "CARCINOMA", source_schema="sch",
+            vocabulary_name="ICD",
         )
         cypher = session.run.call_args[0][0]
         params = session.run.call_args[1]
@@ -229,7 +231,7 @@ class TestDecodedValuesNamespacing:
         original = mu.batch_upsert_terms
         mu.batch_upsert_terms = capture
         try:
-            upsert_decoded_values(loader, groups)
+            upsert_decoded_values(loader, groups, source_schema="sch")
         finally:
             mu.batch_upsert_terms = original
 
@@ -262,7 +264,7 @@ class TestDecodedValuesNamespacing:
         original = mu.batch_upsert_terms
         mu.batch_upsert_terms = capture
         try:
-            upsert_decoded_values(loader, groups)
+            upsert_decoded_values(loader, groups, source_schema="sch")
         finally:
             mu.batch_upsert_terms = original
 

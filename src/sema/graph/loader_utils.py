@@ -93,6 +93,14 @@ def _annotate_rows(
     ]
 
 
+def _require_source_schema(method: str, source_schema: str | None) -> None:
+    if source_schema is None:
+        raise ValueError(
+            f"{method} requires source_schema; the relationship MERGE key "
+            f"includes source_schema for multi-study isolation"
+        )
+
+
 def batch_upsert_entities(
     loader: GraphLoader,
     entities: list[dict[str, Any]],
@@ -100,6 +108,7 @@ def batch_upsert_entities(
 ) -> None:
     if not entities:
         return
+    _require_source_schema("batch_upsert_entities", source_schema)
     rows = _annotate_rows(entities, source_schema)
     guarded = _guarded_set(
         "e", ["description", "source", "confidence", "resolved_at"],
@@ -129,6 +138,7 @@ def batch_upsert_properties(
 ) -> None:
     if not properties:
         return
+    _require_source_schema("batch_upsert_properties", source_schema)
     rows = _annotate_rows(properties, source_schema)
     guarded = _guarded_set(
         "p", ["semantic_type", "source", "confidence", "resolved_at"],
@@ -199,6 +209,7 @@ def batch_upsert_aliases(
 ) -> None:
     if not aliases:
         return
+    _require_source_schema("batch_upsert_aliases", source_schema)
     rows = _annotate_rows(aliases, source_schema)
     if parent_label == ":Property":
         parent_match = (
@@ -231,6 +242,7 @@ def batch_upsert_value_sets(
 ) -> None:
     if not value_sets:
         return
+    _require_source_schema("batch_upsert_value_sets", source_schema)
     rows = _annotate_rows(value_sets, source_schema)
     loader._run(
         "UNWIND $rows AS r "
@@ -255,6 +267,7 @@ def batch_upsert_join_paths(
 ) -> None:
     if not join_paths:
         return
+    _require_source_schema("batch_upsert_join_paths", source_schema)
     resolved_at = datetime.now(timezone.utc).isoformat()
     rows = [
         {

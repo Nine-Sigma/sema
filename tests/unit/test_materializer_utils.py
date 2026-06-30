@@ -26,6 +26,8 @@ from sema.graph.materializer_utils import (
 
 REF_TABLE = "databricks://ws/cdm/clinical/patients"
 REF_COL = "databricks://ws/cdm/clinical/patients/patient_id"
+UNITY_TABLE = "unity://cdm.clinical.cancer_diagnosis"
+UNITY_COL = "unity://cdm.clinical.cancer_diagnosis.dx_type_cd"
 
 
 def _assertion(
@@ -110,6 +112,55 @@ class TestParseRefAny:
         assert schema == "clinical"
         assert table == "patients"
         assert column == "patient_id"
+
+
+class TestResolvePropertyDetailsUnityRef:
+    """Regression: `_resolve_property_details` must derive the table_ref
+    correctly for unity:// (dot-separated) and databricks:// (slash-
+    separated) URIs alike. A `rsplit("/", 1)` on a unity URI splits at the
+    `://` and produces a useless table_ref, which then fails to match the
+    HAS_ENTITY_NAME assertion and silently falls back to the parsed table
+    name — yielding two Entity nodes (one from the renamed entity, one
+    from the table-name fallback).
+    """
+
+    def test_finds_entity_via_unity_dotted_ref(self):
+        prop = _assertion(
+            ref=UNITY_COL,
+            predicate=AssertionPredicate.HAS_PROPERTY_NAME.value,
+            value={"value": "Diagnosis Type"},
+        )
+        entity = _assertion(
+            ref=UNITY_TABLE,
+            predicate=AssertionPredicate.HAS_ENTITY_NAME.value,
+            value={"value": "Cancer Diagnosis"},
+        )
+        groups = {
+            (UNITY_COL, AssertionPredicate.HAS_PROPERTY_NAME.value): [prop],
+            (UNITY_TABLE, AssertionPredicate.HAS_ENTITY_NAME.value): [entity],
+        }
+        result = _resolve_property_details(UNITY_COL, [prop], groups)
+        assert result is not None
+        assert result["entity_name"] == "Cancer Diagnosis"
+
+    def test_finds_entity_via_databricks_slash_ref(self):
+        prop = _assertion(
+            ref=REF_COL,
+            predicate=AssertionPredicate.HAS_PROPERTY_NAME.value,
+            value={"value": "Patient ID"},
+        )
+        entity = _assertion(
+            ref=REF_TABLE,
+            predicate=AssertionPredicate.HAS_ENTITY_NAME.value,
+            value={"value": "Patient"},
+        )
+        groups = {
+            (REF_COL, AssertionPredicate.HAS_PROPERTY_NAME.value): [prop],
+            (REF_TABLE, AssertionPredicate.HAS_ENTITY_NAME.value): [entity],
+        }
+        result = _resolve_property_details(REF_COL, [prop], groups)
+        assert result is not None
+        assert result["entity_name"] == "Patient"
 
 
 class TestUpsertPhysicalNodes:
@@ -363,6 +414,43 @@ class TestUpsertDecodedValues:
         upsert_decoded_values(loader, groups)
         vs_batch = mock_vs.call_args[0][1]
         assert len(vs_batch) == 0
+
+    def test_value_set_merge_runs_before_add_term_to_value_set(self):
+        """`add_term_to_value_set` MERGEs ValueSet by name only; if it
+        runs before `batch_upsert_value_sets` (which MERGEs by column_ref),
+        a duplicate ValueSet node is created with no column_ref.
+        """
+        loader = MagicMock()
+        call_order: list[str] = []
+        loader.add_term_to_value_set = MagicMock(
+            side_effect=lambda *a, **kw: call_order.append("add_term"),
+        )
+
+        def _record_vs(_loader, _batch, **_kw):
+            call_order.append("batch_vs")
+
+        def _record_terms(_loader, _batch, **_kw):
+            call_order.append("batch_terms")
+
+        groups = {
+            (REF_COL, AssertionPredicate.HAS_DECODED_VALUE.value): [
+                _assertion(
+                    ref=REF_COL,
+                    predicate=AssertionPredicate.HAS_DECODED_VALUE.value,
+                    value={"raw": "M", "label": "Male"},
+                ),
+            ],
+        }
+        with patch(
+            "sema.graph.materializer_utils.batch_upsert_value_sets",
+            side_effect=_record_vs,
+        ), patch(
+            "sema.graph.materializer_utils.batch_upsert_terms",
+            side_effect=_record_terms,
+        ):
+            upsert_decoded_values(loader, groups, source_schema="clinical")
+
+        assert call_order.index("batch_vs") < call_order.index("add_term")
 
 
 class TestCollectAliasBatch:
