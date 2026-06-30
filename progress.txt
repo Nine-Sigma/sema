@@ -174,6 +174,20 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   VocabStore(conn, schema=OMOP_VOCAB_SCHEMA, namespace="vocabulary_omop"). Live tests copy the
   source study into a temp work DuckDB (ATTACH poc READ_ONLY + CREATE TABLE AS) so poc.duckdb is
   never mutated.
+- Multi-warehouse staging (US-013): the §1.5(b) staging WRITE + QA reads go through a
+  `StagingBackend` strategy (src/sema/compile/staging_backend.py, R29-scanned generic) —
+  `DUCKDB_BACKEND` (default, temp-build + scoped swap) and `DATABRICKS_BACKEND` (atomic Delta
+  `INSERT INTO t REPLACE WHERE (source_schema=… AND source_table=…) <select databricks dialect>`,
+  `USING DELTA`, backtick quoting). compiler.execute / staging_qa.* / run_fit all take
+  `backend=`/`staging_backend=` defaulting to DuckDB so existing callers are byte-identical; pick
+  the backend, don't branch the chain. The value-mapping store stays DuckDB (US-005 canonical) on
+  EVERY backend. A Databricks SQL cursor (conn.cursor()) satisfies BOTH the VocabStore connection
+  Protocol and the StagingCursor Protocol, so the same VocabStore/QA serve both warehouses. CLI:
+  `sema fit --backend databricks --catalog workspace` (cli_fit_utils.open_databricks_cursor reuses
+  connectors.databricks.sql_connect; enumerate_source_databricks backticks the source). Databricks
+  scope predicates inline quoted literals (internal study ids) to avoid databricks-sql param-marker
+  version drift; DuckDB keeps `?`-binding. Live test skip-guards on DATABRICKS_* creds AND source
+  reachability (skip on TABLE_OR_VIEW_NOT_FOUND). Runbook: docs/runbooks/slice0_live_databricks.md.
 
 ---
 
@@ -826,4 +840,73 @@ Started: Tue Jun 30 14:37:57 EDT 2026
     (target.stage.<property>). Do NOT drop in make_slice0_staging_obligation here
     (3 required fields) — the single VOCAB_LOOKUP FieldMap wouldn't cover the
     resolver_policy_ref/vocab_release fields and the plan would FAIL.
+---
+
+## 2026-06-30 - US-013 (LIVE end-to-end Slice 0 on Databricks)
+- Made the Slice-0 chain multi-warehouse so the SAME `sema fit` CLI surface runs
+  on DuckDB (US-012A) OR live Databricks, with NO new chain logic — only an
+  injected staging-backend strategy + connections differ.
+- NEW src/sema/compile/staging_backend.py (R29-SCANNED, generic) +
+  staging_backend_utils.py: `StagingBackend` ABC with `DUCKDB_BACKEND`
+  (default) and `DATABRICKS_BACKEND`. DuckDB = the existing temp-build +
+  scoped-swap; Databricks = atomic Delta `INSERT INTO ... REPLACE WHERE
+  (source_schema=… AND source_table=…) <select rendered in databricks dialect>`
+  (idempotent, partition-scoped, `CREATE TABLE … USING DELTA`, backtick quoting,
+  no person_id/FK closure). Backend owns dialect/quote/qualified/scope_predicate
+  + a uniform execute/fetch over a `StagingCursor` Protocol (DuckDB connection OR
+  Databricks cursor).
+- compiler.execute now delegates to `backend.write_staging(...)`
+  (default DUCKDB_BACKEND ⇒ byte-identical to before); staging_qa
+  read/count/run gained `backend=` (DuckDB output unchanged); run_fit gained
+  `staging_backend=` (threads it to compile + QA). Value-mapping store stays
+  DuckDB (US-005 canonical) on every backend.
+- CLI: `sema fit --backend duckdb|databricks` (+ `--catalog`). Databricks branch
+  (cli_fit.py:_run_databricks) reads vocab from `workspace.vocabulary_omop` and
+  the source from `workspace.<study>.sample` via a Databricks cursor (VocabStore
+  with dialect="databricks"), keeps the value-mapping store on a local DuckDB,
+  and writes staging to Databricks. cli_fit_utils.py: open_databricks_cursor
+  (reuses connectors.databricks.sql_connect, mockable) + enumerate_source_databricks.
+- Files: NEW compile/staging_backend.py, compile/staging_backend_utils.py,
+  cli_fit_utils.py, tests/unit/test_staging_backend.py,
+  tests/unit/test_cli_fit_utils.py, tests/integration/test_fit_databricks_live.py,
+  docs/runbooks/slice0_live_databricks.md; EDIT compile/compiler.py,
+  eval/staging_qa.py, pipeline/fit_slice0.py, cli_fit.py, tests/unit/test_cli_fit.py.
+- TDD: wrote test_staging_backend.py first (failed ImportError), then implemented.
+  Hermetic coverage: fake cursor records SQL → asserts databricks REPLACE WHERE /
+  USING DELTA / backticks / parses in databricks dialect / no person_id; DuckDB
+  backend round-trips against real temp DuckDB. A faithful `_FakeDatabricksCursor`
+  drives the WHOLE databricks CLI chain (enumerate→resolve→stage→QA→eval) with no
+  warehouse. Live e2e (skip-guarded on DATABRICKS_* creds AND source reachability):
+  `sema fit --backend databricks` runs, rows_staged==source_row_count, Gate D-lite
+  PASS, idempotent re-run; DESCRIBE asserts no person_id.
+- Quality: uv run pytest 2107 passed / 1 skipped (pre-existing bug-347); mypy
+  clean (208 files); R29 guard clean; coverage 93% repo (staging_backend +
+  _utils + cli_fit_utils + fit_slice0 + staging_qa + compiler all 100%, cli_fit 91%).
+- HUMAN GATE (not Ralph-certifiable): the live run + acceptance need workspace
+  credentials AND human-labelled 100% gold coverage (US-002/US-012, currently
+  0/64 → eval verdict PROVISIONAL_NOT_ACCEPTED). Verified the connection works in
+  this environment (Databricks returned a real TABLE_OR_VIEW_NOT_FOUND for the
+  guessed study path); the live tests skip until a workspace is provisioned and
+  DATABRICKS_FIT_SCHEMA points at a real cBioPortal study. Runbook:
+  docs/runbooks/slice0_live_databricks.md.
+- **Learnings for future iterations:**
+  - The chain already split value_mapping_conn vs staging_conn, so going
+    multi-warehouse was an injected `StagingBackend` strategy, not a rewrite.
+    Keep the DuckDB backend as the default so every existing caller/test is
+    untouched and byte-identical; new dialect logic lives only in the Databricks
+    backend + its *_utils builders.
+  - Databricks atomic scoped replace = Delta `INSERT INTO t REPLACE WHERE
+    (predicate) <query>` — NOT temp-table+DELETE+INSERT+COMMIT (Databricks SQL
+    warehouses auto-commit per statement; there is no multi-statement txn). It is
+    atomic, idempotent and partition-scoped in one statement.
+  - A Databricks SQL *cursor* satisfies VocabStore's connection Protocol
+    (execute→None then cursor.fetchall) AND the StagingCursor Protocol, so the
+    same VocabStore/QA code serves both warehouses — pass `conn.cursor()`.
+  - For Databricks, inline the scope predicate values as quoted string literals
+    (they are internal study identifiers, not user input) to dodge the
+    databricks-sql param-marker version differences; keep `?`-binding on DuckDB.
+  - Live tests in THIS environment have real DATABRICKS_* creds but no provisioned
+    cBioPortal/OMOP data — guard live tests on BOTH creds AND source reachability
+    (skip on TABLE_OR_VIEW_NOT_FOUND) so `-m integration` stays green everywhere
+    except a fully-provisioned workspace.
 ---

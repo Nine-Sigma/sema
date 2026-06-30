@@ -13,7 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Sequence
 
-import duckdb
 import sqlglot.expressions as exp
 
 from sema.compile.compiler_utils import (
@@ -22,18 +21,17 @@ from sema.compile.compiler_utils import (
     StagingColumns,
     StagingDecision,
     build_staging_select,
-    count_scope_sql,
-    create_staging_table_sql,
-    delete_scope_sql,
-    insert_from_temp_sql,
+)
+from sema.compile.staging_backend import (
+    DUCKDB_BACKEND,
+    StagingBackend,
+    StagingCursor,
 )
 from sema.models.planner._enums import TargetArtifactKind
 from sema.models.planner.mapping_plan import MappingPlan
 from sema.models.planner.patterns import MappingPattern
 
 __all__ = ["CompiledTransform", "TransformCompiler", "UnsupportedTransformError"]
-
-_TEMP_TABLE = "_sema_staging_build"
 
 _Builder = Callable[
     [StagingColumns, SourceTableSpec, CompileContext, Sequence[StagingDecision]],
@@ -85,31 +83,23 @@ class TransformCompiler:
 
     def execute(
         self,
-        conn: duckdb.DuckDBPyConnection,
+        conn: StagingCursor,
         compiled: CompiledTransform,
         *,
         columns: StagingColumns,
         source: SourceTableSpec,
         staging_schema: str,
         staging_table: str,
+        backend: StagingBackend = DUCKDB_BACKEND,
     ) -> int:
-        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{staging_schema}"')
-        conn.execute(create_staging_table_sql(columns, staging_schema, staging_table))
-        conn.execute(
-            f"CREATE OR REPLACE TEMP TABLE {_TEMP_TABLE} AS {compiled.sql('duckdb')}"
+        return backend.write_staging(
+            conn,
+            compiled.select,
+            columns=columns,
+            source=source,
+            staging_schema=staging_schema,
+            staging_table=staging_table,
         )
-        scope = [source.schema, source.table]
-        conn.execute("BEGIN TRANSACTION")
-        conn.execute(delete_scope_sql(columns, staging_schema, staging_table), scope)
-        conn.execute(
-            insert_from_temp_sql(columns, staging_schema, staging_table, _TEMP_TABLE)
-        )
-        conn.execute("COMMIT")
-        conn.execute(f"DROP TABLE IF EXISTS {_TEMP_TABLE}")
-        row = conn.execute(
-            count_scope_sql(columns, staging_schema, staging_table), scope
-        ).fetchone()
-        return int(row[0]) if row else 0
 
 
 def _plan_pattern(plan: MappingPlan) -> MappingPattern:

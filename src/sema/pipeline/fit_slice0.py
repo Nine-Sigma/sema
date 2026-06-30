@@ -26,6 +26,11 @@ from sema.compile.compiler_utils import (
     SourceTableSpec,
     StagingColumns,
 )
+from sema.compile.staging_backend import (
+    DUCKDB_BACKEND,
+    StagingBackend,
+    StagingCursor,
+)
 from sema.eval.mapping_goldset import GoldSet
 from sema.eval.mapping_report import build_mapping_report, decisions_from_store
 from sema.eval.mapping_report_utils import MappingReport
@@ -102,9 +107,15 @@ def run_fit(
     request: FitRequest,
     *,
     value_mapping_conn: duckdb.DuckDBPyConnection,
-    staging_conn: duckdb.DuckDBPyConnection,
+    staging_conn: StagingCursor,
+    staging_backend: StagingBackend = DUCKDB_BACKEND,
 ) -> FitResult:
-    """Run resolve -> produce -> assemble -> compile -> QA -> eval on DuckDB."""
+    """Run resolve -> produce -> assemble -> compile -> QA -> eval.
+
+    ``staging_backend`` selects the warehouse the §1.5(b) staging table is
+    written to (DuckDB by default, Databricks for the live US-013 run). The
+    value-mapping store stays on DuckDB (its canonical home, US-005) regardless.
+    """
     ctx = request.resolve_context
     store = ValueMappingStore(value_mapping_conn)
     resolver.resolve_and_store(request.source_codes, store, ctx)
@@ -129,6 +140,7 @@ def run_fit(
         source=request.source,
         staging_schema=request.staging_schema,
         staging_table=request.staging_table,
+        backend=staging_backend,
     )
 
     qa = run_staging_qa(
@@ -140,6 +152,7 @@ def run_fit(
         source_table=request.source.table,
         expected_row_count=request.source_row_count,
         gold_set=request.gold,
+        backend=staging_backend,
     )
 
     report = build_mapping_report(

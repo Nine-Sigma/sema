@@ -9,9 +9,12 @@ structured reason before it is called "done".
 
 from __future__ import annotations
 
-from typing import Any, Protocol
-
 from sema.compile.compiler_utils import StagingColumns
+from sema.compile.staging_backend import (
+    DUCKDB_BACKEND,
+    StagingBackend,
+    StagingCursor,
+)
 from sema.eval.mapping_goldset import GoldSet
 from sema.eval.staging_qa_utils import (
     StagingQAReport,
@@ -28,30 +31,32 @@ __all__ = [
 ]
 
 
-class _Conn(Protocol):
-    def execute(self, sql: str, params: list[Any] = ...) -> Any: ...
-
-
-def _qualified(schema: str, table: str) -> str:
-    return f'"{schema}"."{table}"'
-
-
 def read_staging_rows(
-    conn: _Conn,
+    conn: StagingCursor,
     columns: StagingColumns,
     staging_schema: str,
     staging_table: str,
     source_schema: str,
     source_table: str,
+    *,
+    backend: StagingBackend = DUCKDB_BACKEND,
 ) -> list[StagingRow]:
     """Read the staged rows for one source scope into generic QA rows."""
-    sql = (
-        f'SELECT "{columns.source_value_column}", '
-        f'"{columns.target_concept_column}", "{columns.resolution_status}" '
-        f"FROM {_qualified(staging_schema, staging_table)} "
-        f'WHERE "{columns.source_schema}" = ? AND "{columns.source_table}" = ?'
+    predicate, params = backend.scope_predicate(columns, source_schema, source_table)
+    select_cols = ", ".join(
+        backend.quote(name)
+        for name in (
+            columns.source_value_column,
+            columns.target_concept_column,
+            columns.resolution_status,
+        )
     )
-    result = conn.execute(sql, [source_schema, source_table]).fetchall()
+    sql = (
+        f"SELECT {select_cols} "
+        f"FROM {backend.qualified(staging_schema, staging_table)} "
+        f"WHERE {predicate}"
+    )
+    result = backend.query(conn, sql, params)
     return [
         StagingRow(
             source_value=str(row[0]),
@@ -63,24 +68,27 @@ def read_staging_rows(
 
 
 def staging_scope_count(
-    conn: _Conn,
+    conn: StagingCursor,
     columns: StagingColumns,
     staging_schema: str,
     staging_table: str,
     source_schema: str,
     source_table: str,
+    *,
+    backend: StagingBackend = DUCKDB_BACKEND,
 ) -> int:
     """Count staged rows for one source scope."""
+    predicate, params = backend.scope_predicate(columns, source_schema, source_table)
     sql = (
-        f"SELECT COUNT(*) FROM {_qualified(staging_schema, staging_table)} "
-        f'WHERE "{columns.source_schema}" = ? AND "{columns.source_table}" = ?'
+        f"SELECT COUNT(*) FROM {backend.qualified(staging_schema, staging_table)} "
+        f"WHERE {predicate}"
     )
-    row = conn.execute(sql, [source_schema, source_table]).fetchone()
+    row = backend.fetch_one(conn, sql, params)
     return int(row[0]) if row else 0
 
 
 def run_staging_qa(
-    conn: _Conn,
+    conn: StagingCursor,
     *,
     columns: StagingColumns,
     staging_schema: str,
@@ -89,13 +97,16 @@ def run_staging_qa(
     source_table: str,
     expected_row_count: int,
     gold_set: GoldSet,
+    backend: StagingBackend = DUCKDB_BACKEND,
 ) -> StagingQAReport:
     """Run the three Gate D-lite checks over one staged source scope."""
     actual = staging_scope_count(
-        conn, columns, staging_schema, staging_table, source_schema, source_table
+        conn, columns, staging_schema, staging_table, source_schema, source_table,
+        backend=backend,
     )
     rows = read_staging_rows(
-        conn, columns, staging_schema, staging_table, source_schema, source_table
+        conn, columns, staging_schema, staging_table, source_schema, source_table,
+        backend=backend,
     )
     return StagingQAReport(
         checks=(

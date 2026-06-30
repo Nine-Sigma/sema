@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import duckdb
 import pytest
@@ -120,3 +121,98 @@ def test_fit_missing_duckdb_exits_2(runner: CliRunner, tmp_path) -> None:
     )
     assert result.exit_code == 2
     assert "not found" in result.output
+
+
+# --- US-013: Databricks backend (hermetic, fake cursor) --------------------
+
+
+class _FakeDatabricksCursor:
+    """A faithful stand-in for a Databricks SQL cursor.
+
+    Answers the handful of statement shapes the chain issues (source
+    enumeration, vocabulary lookups, staging write + QA read) so the whole
+    databricks path is exercised without a live warehouse.
+    """
+
+    def __init__(self) -> None:
+        self.statements: list[str] = []
+        self._rows: list[Any] = []
+        self._one: Any = None
+
+    def execute(self, sql: str, parameters: Any = None) -> "_FakeDatabricksCursor":
+        self.statements.append(sql)
+        params = list(parameters) if parameters else []
+        self._rows, self._one = [], None
+        if "SELECT DISTINCT" in sql:
+            self._rows = [("LUAD",), ("ZZZZ",)]
+        elif "COUNT(*)" in sql:
+            self._one = (3,)
+        elif len(params) == 3:  # maps_to_targets(concept_id, rel, standard_flag)
+            self._rows = [
+                ("45768916", "Adeno of lung", "Condition", "SNOMED", "S", "254", None)
+            ]
+        elif len(params) == 2:  # concept_by_code(vocabulary, code)
+            if params[1] == "LUAD":
+                self._rows = [
+                    ("777926", "Lung Adeno", "Condition", "OncoTree", None, "LUAD", None)
+                ]
+        elif "`sema_staging`.`condition_staging`" in sql:  # QA read-back
+            self._rows = [
+                ("LUAD", 45768916, "RESOLVED"),
+                ("LUAD", 45768916, "RESOLVED"),
+                ("ZZZZ", None, "NO_MAP"),
+            ]
+        return self
+
+    def fetchall(self) -> list[Any]:
+        return self._rows
+
+    def fetchone(self) -> Any:
+        return self._one
+
+
+def test_fit_databricks_backend_runs_chain(runner: CliRunner, tmp_path, monkeypatch) -> None:
+    cursor = _FakeDatabricksCursor()
+    monkeypatch.setattr(
+        "sema.cli_fit.open_databricks_cursor", lambda *a, **k: cursor
+    )
+    result = runner.invoke(
+        cli,
+        [
+            "fit",
+            "--manifest",
+            str(_MANIFEST),
+            "--backend",
+            "databricks",
+            "--study-schema",
+            "study",
+            "--duckdb",
+            str(tmp_path / "store.duckdb"),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    summary = json.loads(result.output)
+    assert summary["rows_staged"] == 3
+    assert summary["gate_d_lite"]["outcome"] == "PASS"
+    assert summary["staging"] == "sema_staging.condition_staging"
+    # the staging write went through the atomic Delta REPLACE WHERE path
+    joined = "\n".join(cursor.statements)
+    assert "REPLACE WHERE" in joined
+    assert "USING DELTA" in joined
+
+
+def test_fit_databricks_requires_study_schema(runner: CliRunner, tmp_path) -> None:
+    result = runner.invoke(
+        cli,
+        [
+            "fit",
+            "--manifest",
+            str(_MANIFEST),
+            "--backend",
+            "databricks",
+            "--duckdb",
+            str(tmp_path / "store.duckdb"),
+        ],
+    )
+    assert result.exit_code == 2
+    assert "study-schema" in result.output
