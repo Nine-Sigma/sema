@@ -237,8 +237,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "VocabLookupProducer (src/sema/resolve/producer.py, generic spine; NOT R29-scanned but names no domain literal) + producer_utils.py. VOCAB_LOOKUP is a COLUMN-level mapping: produce() emits ONE MappingAssertion(pattern=VOCAB_LOOKUP) carrying source_field_ref AND target_property_ref, projects it into ONE FieldMap (target_field_ref=condition_concept_id), and writes :FieldMap node + MAPS_TO->target :Property + DERIVED_FROM->source :Property (MAPS_TO always originates at the FieldMap). Per-code decisions are READ from the value-mapping store via a DecisionSource Protocol (read_all()); the producer NEVER writes the store (US-006 sole writer) — asserted by test_producer_never_writes... build_column_assertion folds decisions: status=review_pending if any review_pending else auto_accepted, confidence=min; reuses engine_utils.build_vocab_lookup_assertion with a synthetic column-level CodeResolution (DRY: VocabLookup payload built in one place). decisions_for_binding scopes by source_vocabulary/target_property_ref/resolver_policy_ref/vocab_release. Edge writes reuse planner_loader cypher builders (cypher_create_field_map_maps_to/derived_from return (stmt,params) -> session.run(stmt,**params); ModelRole.TARGET/SOURCE enforced). No MappingProposal; chain is MappingAssertion->FieldMap->MappingPlan only. 10 hermetic unit tests (fake DecisionSource + fake session, TDD-first) + skip-guarded Neo4j integration (AC bridge query -> ONCOTREE_CODE | VOCAB_LOOKUP | condition_concept_id). pytest 2041 passed/1 skipped; mypy clean (195 files); R29 guard clean; coverage 93% repo, producer.py + producer_utils.py both 100%."
     },
     {
       "id": "US-010",

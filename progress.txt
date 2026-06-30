@@ -99,6 +99,21 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   per-field properties). Edge name is HAS_VOCABULARY_BINDING (not HAS_VOCAB_BINDING).
   ManifestVocabularyBinding accepts resolver_policy_ref, which resolve_policy() (US-004)
   dispatches to a concrete ResolverPolicy.
+- US-009 graph producer (src/sema/resolve/producer.py + producer_utils.py): VOCAB_LOOKUP
+  is a COLUMN-level mapping — ONE MappingAssertion + ONE FieldMap for the whole source
+  column, NOT one per code. Per-code decisions stay in the value-mapping store (US-006
+  sole writer); the producer only READS via a DecisionSource Protocol (read_all()), never
+  writes. Reuse engine_utils.build_vocab_lookup_assertion with a synthetic column-level
+  CodeResolution (source_code=context.source_field_ref, concept_id=None, survivors=()) —
+  the assertion builder only consumes resolution_status/source_code/confidence/status.
+  Status aggregates: review_pending if any decision is review_pending else auto_accepted;
+  confidence=min. Edges reuse planner_loader cypher builders: cypher_create_field_map_
+  maps_to/derived_from return (stmt, params) tuples → session.run(stmt, **params). MAPS_TO
+  requires ModelRole.TARGET / DERIVED_FROM ModelRole.SOURCE (require_property_role_for_
+  relationship enforces it); MAPS_TO ALWAYS originates at the :FieldMap. Target :Property
+  carries n.id (=`{model_id}|{ver}|{hash}|{entity}.{name}`) + n.name + n.model_role; query
+  by name+model_role to fetch the id for MappingNodes. producer.py is NOT R29-scanned but
+  stays generic (refs/ids passed as data).
 
 ---
 
@@ -528,4 +543,42 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   - select_winner (mapping_plan.py:112) is status-tiered then confidence/recency/template;
     a human_pinned assertion beats a higher-confidence auto_accepted one — the assembler
     relies on this, NOT winner_selection.py:24.
+---
+
+## 2026-06-30 - US-009 (Deterministic VOCAB_LOOKUP assertion producer + graph edges)
+- Built the narrow producer that turns (target binding + source ValueSet + resolved
+  decisions) into a column-level MappingAssertion(pattern=VOCAB_LOOKUP) and materializes
+  the :FieldMap with MAPS_TO -> target :Property and DERIVED_FROM -> source :Property.
+- TDD: wrote tests/unit/test_vocab_lookup_producer.py first (10 hermetic tests, fake
+  DecisionSource + fake graph session) — failed on missing module — then implemented.
+- Files changed:
+  - NEW src/sema/resolve/producer.py — VocabLookupProducer.produce(decisions, policy,
+    context, nodes); MappingNodes dataclass; DecisionSource Protocol; reuses
+    planner_loader cypher builders for MAPS_TO/DERIVED_FROM + write_field_map.
+  - NEW src/sema/resolve/producer_utils.py — decisions_for_binding (scope filter),
+    build_column_assertion (fold per-code decisions -> one assertion, status/confidence
+    aggregation), field_map_from_assertion, NoResolvedDecisionError.
+  - NEW tests/unit/test_vocab_lookup_producer.py (10 tests).
+  - NEW tests/integration/test_vocab_lookup_producer_graph.py (skip-guarded Neo4j: AC
+    bridge query MATCH (src SOURCE)<-DERIVED_FROM-(fm)-MAPS_TO->(tgt TARGET) -> one row
+    ONCOTREE_CODE | VOCAB_LOOKUP | condition_concept_id).
+- No MappingProposal; chain is MappingAssertion -> FieldMap -> MappingPlan only. Producer
+  NEVER writes the value-mapping store (asserted by test_producer_never_writes...).
+- Quality: 2041 unit passed / 1 skipped; mypy clean (195 files); R29 guard clean;
+  coverage 93% repo, producer.py + producer_utils.py both 100%.
+- **Learnings for future iterations:**
+  - VOCAB_LOOKUP is a COLUMN-level mapping (one assertion/FieldMap), per-code decisions
+    live in the store and are inlined later by the US-010 compiler — do NOT emit one
+    assertion per code.
+  - build_vocab_lookup_assertion (engine_utils) only consumes resolution_status,
+    source_code, confidence, status from the CodeResolution — concept_id/survivors/chosen
+    are unused, so a synthetic column-level CodeResolution reuses it cleanly (DRY: the
+    VocabLookup payload is built in exactly one place).
+  - planner_loader.cypher_create_field_map_maps_to/derived_from RETURN (stmt, params)
+    tuples (they don't execute) — the caller runs session.run(stmt, **params). MAPS_TO
+    enforces ModelRole.TARGET, DERIVED_FROM ModelRole.SOURCE.
+  - For the Neo4j integration, fetch a target :Property id by querying name+model_role;
+    target Property ids are `{model_id}|{version}|{hash}|{entity}.{name}`.
+  - planner_loader.py is already 454 lines (>400) — do NOT grow it; reuse its existing
+    builders from the caller instead of adding write helpers.
 ---
