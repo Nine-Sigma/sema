@@ -87,8 +87,8 @@ class TestResumeGating:
         ), patch(
             "sema.graph.loader.GraphLoader", return_value=loader,
         ), patch(
-            "sema.connectors.databricks.DatabricksConnector",
-        ) as conn_cls, patch(
+            "sema.pipeline.build.DatabricksConnectorFactory",
+        ) as factory_cls, patch(
             "sema.pipeline.orchestrate._register_datasource",
         ), patch(
             "sema.pipeline.orchestrate._discover_tables",
@@ -112,7 +112,9 @@ class TestResumeGating:
             conn.get_datasource_ref.return_value = (
                 "unity://cat", "cat", "src",
             )
-            conn_cls.return_value = conn
+            factory = MagicMock()
+            factory.create.return_value = conn
+            factory_cls.return_value = factory
             profiler = MagicMock()
             profiler.profile.return_value = MagicMock()
             profiler_cls.return_value = profiler
@@ -141,8 +143,8 @@ class TestResumeGating:
         ), patch(
             "sema.graph.loader.GraphLoader", return_value=loader,
         ), patch(
-            "sema.connectors.databricks.DatabricksConnector",
-        ) as conn_cls, patch(
+            "sema.pipeline.build.DatabricksConnectorFactory",
+        ) as factory_cls, patch(
             "sema.pipeline.orchestrate._register_datasource",
         ), patch(
             "sema.pipeline.orchestrate._discover_tables",
@@ -166,7 +168,9 @@ class TestResumeGating:
             conn.get_datasource_ref.return_value = (
                 "unity://cat", "cat", "src",
             )
-            conn_cls.return_value = conn
+            factory = MagicMock()
+            factory.create.return_value = conn
+            factory_cls.return_value = factory
             profiler = MagicMock()
             profiler.profile.return_value = MagicMock()
             profiler_cls.return_value = profiler
@@ -200,8 +204,8 @@ class TestResumeGating:
         ), patch(
             "sema.graph.loader.GraphLoader", return_value=loader,
         ), patch(
-            "sema.connectors.databricks.DatabricksConnector",
-        ) as conn_cls, patch(
+            "sema.pipeline.build.DatabricksConnectorFactory",
+        ) as factory_cls, patch(
             "sema.pipeline.orchestrate._register_datasource",
         ), patch(
             "sema.pipeline.orchestrate._discover_tables",
@@ -225,7 +229,9 @@ class TestResumeGating:
             conn.get_datasource_ref.return_value = (
                 "unity://cat", "cat", "src",
             )
-            conn_cls.return_value = conn
+            factory = MagicMock()
+            factory.create.return_value = conn
+            factory_cls.return_value = factory
             profiler = MagicMock()
             profiler.profile.return_value = MagicMock()
             profiler_cls.return_value = profiler
