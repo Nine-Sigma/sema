@@ -26,9 +26,14 @@ class CypherQueries:
 
     @staticmethod
     def expand_value_set() -> str:
+        # Value-set names are not globally unique (same table.column name
+        # across studies), so callers that can should prefer
+        # find_value_set_members_by_column (column-scoped). vocabulary_name
+        # is returned here so same-code terms remain distinguishable.
         return (
             "MATCH (t:Term)-[:MEMBER_OF]->(vs:ValueSet {name: $value_set_name}) "
-            "RETURN t.code AS code, t.label AS label"
+            "RETURN t.code AS code, t.label AS label, "
+            "t.vocabulary_name AS vocabulary_name"
         )
 
     @staticmethod
@@ -211,12 +216,19 @@ class CypherQueries:
 
     @staticmethod
     def find_value_set_members_by_column() -> str:
+        # Scope the column by schema so same-named columns in different
+        # studies don't merge, and surface vocabulary_name so callers can
+        # disambiguate same-code terms across vocabularies. schema_name is
+        # optional (OR-null) to stay backward-compatible with callers that
+        # cannot resolve it.
         return (
             "MATCH (c:Column {name: $column_name, "
-            "table_name: $table_name})"
-            "-[:HAS_VALUE_SET]->(vs:ValueSet) "
+            "table_name: $table_name}) "
+            "WHERE (c.schema_name = $schema_name OR $schema_name IS NULL) "
+            "MATCH (c)-[:HAS_VALUE_SET]->(vs:ValueSet) "
             "MATCH (t:Term)-[:MEMBER_OF]->(vs) "
-            "RETURN t.code AS code, t.label AS label"
+            "RETURN t.code AS code, t.label AS label, "
+            "t.vocabulary_name AS vocabulary_name"
         )
 
     @staticmethod

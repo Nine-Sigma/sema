@@ -76,9 +76,10 @@ class TestEmbeddingEngine:
             ),
         )
 
-        mock_loader.set_embedding.assert_called_once()
-        call_args = mock_loader.set_embedding.call_args
-        assert call_args[1]["label"] == "Entity" or call_args[0][0] == "Entity"
+        mock_loader.set_node_embedding.assert_called_once()
+        kwargs = mock_loader.set_node_embedding.call_args.kwargs
+        assert kwargs["label"] == "Entity"
+        assert kwargs["match"] == {"name": "Cancer Diagnosis"}
 
     def test_create_vector_indexes(self):
         mock_loader = MagicMock()

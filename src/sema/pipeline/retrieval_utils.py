@@ -85,6 +85,7 @@ def _expand_values(
                     CypherQueries.find_value_set_members_by_column(),
                     column_name=col_name,
                     table_name=table_name,
+                    schema_name=r.get("schema_name"),
                 )
                 values.extend([
                     {**v, "property": col["property"],

@@ -79,8 +79,8 @@ class TestAssertionSourceSchemaStamp:
         loader.store_assertion(a, source_schema=SCHEMA_BRCA)
         cypher = session.run.call_args[0][0]
         params = session.run.call_args[1]
-        assert "source_schema" in cypher
-        assert params["source_schema"] == SCHEMA_BRCA
+        assert "n.source_schema = a.source_schema" in cypher
+        assert params["assertions"][0]["source_schema"] == SCHEMA_BRCA
 
     def test_commit_table_assertions_threads_source_schema(
         self, loader, mock_driver,
@@ -93,7 +93,7 @@ class TestAssertionSourceSchemaStamp:
         )
         cypher = tx.run.call_args[0][0]
         kwargs = tx.run.call_args[1]
-        assert "source_schema: a.source_schema" in cypher
+        assert "n.source_schema = a.source_schema" in cypher
         assert kwargs["assertions"][0]["source_schema"] == SCHEMA_MSK
 
 

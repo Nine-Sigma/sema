@@ -95,9 +95,9 @@ class TestEmbedLabelNodesChangeDetection:
         ]
         engine = MagicMock()
         loader = MagicMock()
-        _embed_label_nodes(engine, loader, "Entity", "name", nodes)
+        _embed_label_nodes(engine, loader, "Entity", ("name",), nodes)
         engine.embed_batch.assert_not_called()
-        loader.set_embedding.assert_not_called()
+        loader.set_node_embedding.assert_not_called()
 
     def test_changed_node_reembedded_and_writes_hash(self):
         nodes = [
@@ -111,10 +111,10 @@ class TestEmbedLabelNodesChangeDetection:
         engine = MagicMock()
         engine.embed_batch.return_value = [[0.9]]
         loader = MagicMock()
-        _embed_label_nodes(engine, loader, "Entity", "name", nodes)
+        _embed_label_nodes(engine, loader, "Entity", ("name",), nodes)
         engine.embed_batch.assert_called_once()
-        loader.set_embedding.assert_called_once()
-        kwargs = loader.set_embedding.call_args.kwargs
+        loader.set_node_embedding.assert_called_once()
+        kwargs = loader.set_node_embedding.call_args.kwargs
         new_text = build_embedding_text("entity", name="Order", description="new")
         assert kwargs["description_hash"] == description_hash(new_text)
 
@@ -123,8 +123,8 @@ class TestEmbedLabelNodesChangeDetection:
         engine = MagicMock()
         engine.embed_batch.return_value = [[0.9]]
         loader = MagicMock()
-        _embed_label_nodes(engine, loader, "Entity", "name", nodes)
-        loader.set_embedding.assert_called_once()
+        _embed_label_nodes(engine, loader, "Entity", ("name",), nodes)
+        loader.set_node_embedding.assert_called_once()
 
     def test_property_composite_key_writes_hash(self):
         nodes = [{"name": "status", "entity_name": "Order"}]
@@ -134,8 +134,33 @@ class TestEmbedLabelNodesChangeDetection:
         _embed_label_nodes(
             engine, loader, "Property", ("name", "entity_name"), nodes,
         )
-        loader.set_property_embedding.assert_called_once()
-        assert "description_hash" in loader.set_property_embedding.call_args.kwargs
+        loader.set_node_embedding.assert_called_once()
+        kwargs = loader.set_node_embedding.call_args.kwargs
+        assert kwargs["match"] == {"name": "status", "entity_name": "Order"}
+        assert "description_hash" in kwargs
+
+    def test_term_composite_key_matches_vocabulary_and_code(self):
+        nodes = [{"vocabulary_name": "Gender", "code": "M", "label": "Male"}]
+        engine = MagicMock()
+        engine.embed_batch.return_value = [[0.9]]
+        loader = MagicMock()
+        _embed_label_nodes(
+            engine, loader, "Term", ("vocabulary_name", "code"), nodes,
+        )
+        loader.set_node_embedding.assert_called_once()
+        assert loader.set_node_embedding.call_args.kwargs["match"] == {
+            "vocabulary_name": "Gender", "code": "M",
+        }
+
+    def test_term_missing_vocabulary_name_skipped(self):
+        nodes = [{"code": "M", "label": "Male"}]
+        engine = MagicMock()
+        engine.embed_batch.return_value = [[0.9]]
+        loader = MagicMock()
+        _embed_label_nodes(
+            engine, loader, "Term", ("vocabulary_name", "code"), nodes,
+        )
+        loader.set_node_embedding.assert_not_called()
 
     def test_mixed_only_stale_embedded(self):
         fresh_text = build_embedding_text("entity", name="A", description="d")
@@ -151,14 +176,16 @@ class TestEmbedLabelNodesChangeDetection:
         engine = MagicMock()
         engine.embed_batch.return_value = [[0.9]]
         loader = MagicMock()
-        _embed_label_nodes(engine, loader, "Entity", "name", nodes)
+        _embed_label_nodes(engine, loader, "Entity", ("name",), nodes)
         engine.embed_batch.assert_called_once()
         embedded_texts = engine.embed_batch.call_args[0][0]
         assert embedded_texts == [
             build_embedding_text("entity", name="B", description="d2")
         ]
-        loader.set_embedding.assert_called_once()
-        assert loader.set_embedding.call_args.kwargs["match_value"] == "B"
+        loader.set_node_embedding.assert_called_once()
+        assert loader.set_node_embedding.call_args.kwargs["match"] == {
+            "name": "B",
+        }
 
 
 class TestLoaderWritesDescriptionHash:

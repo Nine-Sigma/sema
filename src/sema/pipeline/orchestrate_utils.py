@@ -267,7 +267,7 @@ def _compute_embeddings(
             nodes = loader.query_nodes_by_label(label)
             if not nodes:
                 continue
-            key_spec = EMBEDDING_KEY_MAP.get(label, "name")
+            key_spec = EMBEDDING_KEY_MAP.get(label, ("name",))
             _embed_label_nodes(
                 emb_engine, loader, label, key_spec, nodes,
             )
@@ -284,14 +284,14 @@ def _embed_label_nodes(
     engine: Any,
     loader: Any,
     label: str,
-    key_spec: str | tuple[str, ...],
+    key_spec: tuple[str, ...],
     nodes: list[dict[str, Any]],
 ) -> None:
     from sema.engine.embedding_utils import (
         description_hash,
         select_stale_nodes,
     )
-    from sema.engine.embeddings import build_embedding_text
+    from sema.engine.embeddings import _build_match, build_embedding_text
 
     texts = [build_embedding_text(label.lower(), **node) for node in nodes]
     stale = select_stale_nodes(nodes, texts)
@@ -301,23 +301,15 @@ def _embed_label_nodes(
         batch = stale[start : start + max_batch]
         embeddings = engine.embed_batch([text for _, text in batch])
         for (node, text), embedding in zip(batch, embeddings):
-            emb_list = list(embedding)
-            d_hash = description_hash(text)
-            if isinstance(key_spec, tuple):
-                loader.set_property_embedding(
-                    name=node[key_spec[0]],
-                    entity_name=node[key_spec[1]],
-                    embedding=emb_list,
-                    description_hash=d_hash,
-                )
-            else:
-                loader.set_embedding(
-                    label=label,
-                    match_prop=key_spec,
-                    match_value=node[key_spec],
-                    embedding=emb_list,
-                    description_hash=d_hash,
-                )
+            match = _build_match(label, key_spec, node)
+            if match is None:
+                continue
+            loader.set_node_embedding(
+                label=label,
+                match=match,
+                embedding=list(embedding),
+                description_hash=description_hash(text),
+            )
 
 
 def run_fk_detection(

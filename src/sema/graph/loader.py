@@ -5,7 +5,7 @@ import logging
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Mapping
 
 from sema.graph.materializer_utils import (
     apply_resolution_edges as _apply_resolution_edges,
@@ -23,6 +23,29 @@ from sema.models.assertions import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Idempotent assertion write. MERGE on the immutable assertion id makes the
+# write a no-op on replay, so a retried commit (or a duplicate call) can never
+# create a second node. ON CREATE SET avoids overwriting any later edits to an
+# existing assertion. Shared by store_assertion and commit_table_assertions so
+# both production and single-write paths are idempotent.
+_ASSERTION_UPSERT_CYPHER = (
+    "UNWIND $assertions AS a "
+    "MERGE (n:Assertion {id: a.id}) "
+    "ON CREATE SET "
+    "  n.subject_ref = a.subject_ref, "
+    "  n.subject_id = a.subject_id, "
+    "  n.predicate = a.predicate, "
+    "  n.payload = a.payload, "
+    "  n.object_ref = a.object_ref, "
+    "  n.object_id = a.object_id, "
+    "  n.source = a.source, "
+    "  n.confidence = a.confidence, "
+    "  n.status = a.status, "
+    "  n.run_id = a.run_id, "
+    "  n.observed_at = a.observed_at, "
+    "  n.source_schema = a.source_schema"
+)
 
 
 class GraphLoader:
@@ -43,6 +66,29 @@ class GraphLoader:
                 return [dict(record) for record in result]
 
         return run_with_retry(op, statement_summary(cypher))
+
+    def ensure_core_constraints(self) -> None:
+        """Create core graph constraints, deduping any violations first.
+
+        Idempotent; run once per build before table workers commit. The
+        Assertion.id uniqueness constraint both prevents duplicate
+        assertions and backs the MERGE in _ASSERTION_UPSERT_CYPHER with an
+        index. Pre-existing duplicate-id assertions (e.g. from pre-MERGE
+        builds) are collapsed to one node first, because CREATE CONSTRAINT
+        fails on already-violating data.
+        """
+        self._run(
+            "MATCH (a:Assertion) "
+            "WHERE a.id IS NOT NULL "
+            "WITH a.id AS id, collect(a) AS nodes "
+            "WHERE size(nodes) > 1 "
+            "UNWIND nodes[1..] AS dup "
+            "DETACH DELETE dup"
+        )
+        self._run(
+            "CREATE CONSTRAINT assertion_id_unique IF NOT EXISTS "
+            "FOR (a:Assertion) REQUIRE a.id IS UNIQUE"
+        )
 
     def upsert_datasource(
         self, id: str, ref: str, platform: str, workspace: str,
@@ -283,14 +329,32 @@ class GraphLoader:
         self, term_code: str, value_set_name: str,
         source_schema: str | None = None,
         vocabulary_name: str | None = None,
+        value_set_ref: str | None = None,
     ) -> None:
+        """Link a Term to its ValueSet via MEMBER_OF.
+
+        When ``value_set_ref`` (a column_ref) is given, the ValueSet is
+        matched on ``column_ref`` — the canonical identity used by
+        ``upsert_value_set`` / ``batch_upsert_value_sets``. Matching on
+        ``name`` (the legacy fallback) would attach MEMBER_OF to a separate
+        name-keyed node distinct from the column_ref node that HAS_VALUE_SET
+        points at. Production always passes ``value_set_ref``.
+        """
+        if value_set_ref is not None:
+            vs_clause = (
+                "MERGE (vs:ValueSet {column_ref: $value_set_ref}) "
+                "ON CREATE SET vs.name = $value_set_name "
+            )
+        else:
+            vs_clause = "MERGE (vs:ValueSet {name: $value_set_name}) "
         self._run(
             "MERGE (t:Term {vocabulary_name: $vocabulary_name, "
             "code: $term_code}) "
-            "MERGE (vs:ValueSet {name: $value_set_name}) "
+            + vs_clause +
             "MERGE (t)-[m:MEMBER_OF "
             "{source_schema: $source_schema}]->(vs)",
             term_code=term_code, value_set_name=value_set_name,
+            value_set_ref=value_set_ref,
             source_schema=source_schema,
             vocabulary_name=term_namespace(vocabulary_name),
         )
@@ -440,33 +504,10 @@ class GraphLoader:
     def store_assertion(
         self, assertion: Assertion, source_schema: str | None = None,
     ) -> None:
-        schema = source_schema or assertion.source_schema
-        self._run(
-            "CREATE (a:Assertion {"
-            "  id: $id, subject_ref: $subject_ref,"
-            "  subject_id: $subject_id,"
-            "  predicate: $predicate,"
-            "  payload: $payload, object_ref: $object_ref,"
-            "  object_id: $object_id,"
-            "  source: $source, confidence: $confidence,"
-            "  status: $status, run_id: $run_id,"
-            "  observed_at: $observed_at,"
-            "  source_schema: $source_schema"
-            "})",
-            id=assertion.id,
-            subject_ref=assertion.subject_ref,
-            subject_id=assertion.subject_id,
-            predicate=assertion.predicate.value,
-            payload=json.dumps(assertion.payload),
-            object_ref=assertion.object_ref,
-            object_id=assertion.object_id,
-            source=assertion.source,
-            confidence=assertion.confidence,
-            status="auto",
-            run_id=assertion.run_id,
-            observed_at=assertion.observed_at.isoformat(),
-            source_schema=schema,
+        dicts = self._build_assertion_dicts(
+            [assertion], source_schema=source_schema,
         )
+        self._run(_ASSERTION_UPSERT_CYPHER, assertions=dicts)
 
     def batch_store_assertions(
         self, assertions: list[Assertion],
@@ -508,25 +549,7 @@ class GraphLoader:
                 assertion_dicts = self._build_assertion_dicts(
                     assertions, source_schema=source_schema,
                 )
-                tx.run(
-                    "UNWIND $assertions AS a "
-                    "CREATE (n:Assertion {"
-                    "  id: a.id,"
-                    "  subject_ref: a.subject_ref,"
-                    "  subject_id: a.subject_id,"
-                    "  predicate: a.predicate,"
-                    "  payload: a.payload,"
-                    "  object_ref: a.object_ref,"
-                    "  object_id: a.object_id,"
-                    "  source: a.source,"
-                    "  confidence: a.confidence,"
-                    "  status: a.status,"
-                    "  run_id: a.run_id,"
-                    "  observed_at: a.observed_at,"
-                    "  source_schema: a.source_schema"
-                    "})",
-                    assertions=assertion_dicts,
-                )
+                tx.run(_ASSERTION_UPSERT_CYPHER, assertions=assertion_dicts)
                 tx.commit()
             except Exception:
                 tx.rollback()
@@ -554,19 +577,54 @@ class GraphLoader:
             )
             return [record["props"] for record in result]
 
+    def set_node_embedding(
+        self, label: str, match: Mapping[str, str],
+        embedding: list[float], description_hash: str = "",
+    ) -> None:
+        """Set an embedding on a node matched by a composite key.
+
+        ``match`` maps node property -> value; ALL pairs must match, so a
+        composite-identity node (e.g. ``:Term {vocabulary_name, code}``)
+        is addressed unambiguously. Label and property names are validated
+        against the embedding allowlist before interpolation.
+        """
+        from sema.graph.embedding_match import (
+            EMBEDDING_MATCH_KEYS,
+            validate_match_props,
+        )
+
+        if not match:
+            raise ValueError(
+                "set_node_embedding requires at least one match property"
+            )
+        validate_match_props(label, match.keys())
+        expected = set(EMBEDDING_MATCH_KEYS[label])
+        if set(match) != expected:
+            raise ValueError(
+                f"{label} embedding must match on the full composite key "
+                f"{sorted(expected)}, got {sorted(match)}. A partial key "
+                "(e.g. Term code without vocabulary_name) would clobber "
+                "the embeddings of other nodes sharing that value."
+            )
+        pattern = ", ".join(f"{prop}: $m_{prop}" for prop in match)
+        params = {f"m_{prop}": value for prop, value in match.items()}
+        self._run(
+            f"MATCH (n:{label} {{{pattern}}}) "
+            "SET n.embedding = $embedding, "
+            "n.embedding_updated_at = $updated_at, "
+            "n.description_hash = $description_hash",
+            embedding=embedding, description_hash=description_hash,
+            updated_at=datetime.now(timezone.utc).isoformat(),
+            **params,
+        )
+
     def set_property_embedding(
         self, name: str, entity_name: str,
         embedding: list[float], description_hash: str = "",
     ) -> None:
-        self._run(
-            "MATCH (n:Property {name: $name, "
-            "entity_name: $entity_name}) "
-            "SET n.embedding = $embedding, "
-            "n.embedding_updated_at = $updated_at, "
-            "n.description_hash = $description_hash",
-            name=name, entity_name=entity_name,
-            embedding=embedding, description_hash=description_hash,
-            updated_at=datetime.now(timezone.utc).isoformat(),
+        self.set_node_embedding(
+            "Property", {"name": name, "entity_name": entity_name},
+            embedding, description_hash,
         )
 
     def set_embedding(
@@ -574,14 +632,8 @@ class GraphLoader:
         match_value: str, embedding: list[float],
         description_hash: str = "",
     ) -> None:
-        self._run(
-            f"MATCH (n:{label} {{{match_prop}: $match_value}}) "
-            f"SET n.embedding = $embedding, "
-            f"n.embedding_updated_at = $updated_at, "
-            f"n.description_hash = $description_hash",
-            match_value=match_value, embedding=embedding,
-            description_hash=description_hash,
-            updated_at=datetime.now(timezone.utc).isoformat(),
+        self.set_node_embedding(
+            label, {match_prop: match_value}, embedding, description_hash,
         )
 
     def delete_study_scoped(

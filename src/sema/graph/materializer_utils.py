@@ -247,6 +247,7 @@ def upsert_decoded_values(
 
     vs_batch: list[dict[str, Any]] = []
     term_batch: list[dict[str, Any]] = []
+    member_links: list[dict[str, str]] = []
 
     for col_ref, decoded in decoded_groups.items():
         try:
@@ -276,15 +277,23 @@ def upsert_decoded_values(
                 "vocabulary_name": term_vocab,
                 "source": a.source, "confidence": a.confidence,
             })
-            loader.add_term_to_value_set(
-                raw, vs_name, source_schema=source_schema,
-                vocabulary_name=term_vocab,
-            )
+            member_links.append({
+                "code": raw, "vs_name": vs_name,
+                "vocab": term_vocab, "ref": ref,
+            })
 
+    # Upsert canonical ValueSet/Term nodes (which own `id`/status via their
+    # ON CREATE SET) BEFORE creating MEMBER_OF edges. Otherwise the edge's
+    # MERGE would create those nodes first, leaving them without ids.
     batch_upsert_value_sets(
         loader, vs_batch, source_schema=source_schema,
     )
     batch_upsert_terms(loader, term_batch, source_schema=source_schema)
+    for link in member_links:
+        loader.add_term_to_value_set(
+            link["code"], link["vs_name"], source_schema=source_schema,
+            vocabulary_name=link["vocab"], value_set_ref=link["ref"],
+        )
 
 
 def _collect_alias_batch(

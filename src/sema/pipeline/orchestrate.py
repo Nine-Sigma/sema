@@ -62,6 +62,11 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         driver.close()
         return aggregate_report([])
 
+    # Create core constraints (incl. Assertion.id uniqueness) once, before
+    # any table worker commits — backs the idempotent assertion MERGE and
+    # blocks duplicate assertions even under transient-retry replays.
+    loader.ensure_core_constraints()
+
     # Clean each study's prior graph writes before re-materialization, for
     # both fresh and resume builds (finding L). Resume preserves :Assertion
     # nodes — they are the cache process_table reads to skip completed
