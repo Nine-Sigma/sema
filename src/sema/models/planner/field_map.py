@@ -9,7 +9,9 @@ from pydantic import BaseModel, Field, model_validator
 
 from sema.models.planner._enums import MaterializationMode
 from sema.models.planner._refs import RefStr
+from sema.models.planner.lifecycle import Status
 from sema.models.planner.patterns import (
+    ConstantValue,
     MappingPattern,
     PatternPayload,
     expected_payload_type,
@@ -31,6 +33,7 @@ class FieldMap(BaseModel):
     target_field_ref: RefStr
     pattern: MappingPattern
     payload: PatternPayload
+    status: Status = Status.candidate
 
     @model_validator(mode="before")
     @classmethod
@@ -45,6 +48,24 @@ class FieldMap(BaseModel):
                 f"pattern {self.pattern.value} requires payload of {expected.__name__}"
             )
         return self
+
+    def covers_required_field(self) -> bool:
+        """§1.5(e): only an accepted, value-producing FieldMap covers a field.
+
+        A rejected status, a ``NO_MAP`` pattern, or a ``CONSTANT`` with a NULL
+        literal never satisfies a required obligation field.
+        """
+        if self.status is Status.rejected:
+            return False
+        if self.pattern is MappingPattern.NO_MAP:
+            return False
+        if (
+            self.pattern is MappingPattern.CONSTANT
+            and isinstance(self.payload, ConstantValue)
+            and self.payload.literal_value is None
+        ):
+            return False
+        return True
 
 
 class RowIdentity(BaseModel):

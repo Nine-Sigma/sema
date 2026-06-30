@@ -214,8 +214,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "FieldMap gained status: Status (default candidate) + covers_required_field() (§1.5(e) gate: rejected/NO_MAP/CONSTANT-NULL never cover). MappingPlan.covered_required_fields() filters on it; derive_verdict() computes any_review_pending from field-map statuses (replaces hard-coded False at mapping_plan.py:76; review_pending -> awaiting_review, short-circuits ahead of obligation checks). planner_loader field_map_to_properties/properties_to_field_map round-trip status (read .get default candidate). NEW src/sema/resolve/assembler.py:Slice0PlanAssembler (R29-SCANNED, generic): groups assertions by target_property_ref, select_winner per group (planner mapping_plan.py:112, NOT winner_selection.py), projects winner->FieldMap carrying winner.status, emits RISK_ASSEMBLER_CONFLICT_RESOLVED (Severity.info, non-blocking) on >1 live assertion; raises on empty/all-rejected. Slice-0 staging obligation make_slice0_staging_obligation() in ALLOWLISTED policies/omop.py: required={condition_concept_id, resolver_policy_ref, vocab_release} as dotted RefStr under target.condition_occurrence_staging; NATURAL_KEY PK; distinct from production condition_occurrence (no person_id/dates); condition_concept_id REQUIRED not nullable. Coverage matching is EXACT string equality (target_field_ref needs >=1 dot). 16 hermetic TDD unit tests (tests/unit/test_plan_assembler.py). pytest 2031 passed/1 skipped; mypy clean (193 files); R29 guard clean; coverage 93% repo (planner_loader 100%, omop policy 100%, assembler 97%, field_map 98%, mapping_plan 99%). Pre-existing integration failure bug-347 (graph/loader test_different_sources_coexist) confirmed failing on HEAD too — NOT a US-008 regression."
     },
     {
       "id": "US-009",

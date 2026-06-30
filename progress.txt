@@ -73,6 +73,27 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   PropertyOp/TargetObligationOp, and HAS_PROPERTY/HAS_OBLIGATION relationships. Manifest FKs
   must reference an entity present in the same manifest (normalizer rejects dangling refs);
   unknown vocab refs are rejected too — declare every vocabulary in `vocabularies:`.
+- §1.5(d)/(e) plan assembly (US-008): FieldMap now carries `status: Status`
+  (default candidate). `FieldMap.covers_required_field()` is the §1.5(e) gate — a
+  rejected status, NO_MAP pattern, or CONSTANT(NULL) literal NEVER covers a required
+  field. `MappingPlan.covered_required_fields()` filters on it; `derive_verdict()`
+  computes `any_review_pending` from field-map statuses (any review_pending → verdict
+  awaiting_review, which short-circuits ahead of obligation/fk checks in
+  derive_plan_verdict). Coverage matching is EXACT string equality between
+  obligation.required_fields and FieldMap.target_field_ref, so both must use the SAME
+  dotted RefStr (target_field_ref needs ≥1 dot; bare names like "condition_concept_id"
+  are NOT valid RefStr). planner_loader field_map serialization now includes `status`
+  (read uses .get(default=candidate) for back-compat). The concrete assembler is
+  src/sema/resolve/assembler.py:Slice0PlanAssembler (R29-SCANNED → generic, names no
+  domain literal): groups assertions by target_property_ref, select_winner per group
+  (planner mapping_plan.py:112, NOT winner_selection.py), projects winner→FieldMap
+  carrying winner.status, emits RISK_ASSEMBLER_CONFLICT_RESOLVED (Severity.info, never
+  blocks) on >1 live assertion. The Slice-0 staging obligation
+  (make_slice0_staging_obligation) lives in the ALLOWLISTED policies/omop.py (it names
+  condition_concept_id); required={condition_concept_id, resolver_policy_ref,
+  vocab_release}, no person_id/dates. KNOWN pre-existing integration failure (bug-347):
+  test_graph_loader_integration::test_different_sources_coexist fails on HEAD too — NOT
+  a US-008 regression (graph/loader MERGE-key over-collapse).
 - Neo4j target-graph schema gotchas: :Entity has `qualified_name` (NO `name`);
   :TargetObligation stores the obligation as a single `payload_json` JSON string (no
   per-field properties). Edge name is HAS_VOCABULARY_BINDING (not HAS_VOCAB_BINDING).
@@ -451,4 +472,60 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   - Manifests ship under src/sema/targets/manifests/ (package data; hatchling includes
     non-.py files under the package). CLI takes any path:
     `uv run sema target load --manifest src/sema/targets/manifests/omop_condition_slice0.yaml`.
+---
+
+## 2026-06-30 - US-008 (Slice-0 staging obligation + real PlanAssembler)
+- Shipped the concrete PlanAssembler that composes MappingAssertions against the
+  Slice-0 staging obligation into a MappingPlan with a real verdict — closing the L4
+  CONSTANT(NULL) caveat (R19) and replacing the Protocol stub + the hard-coded
+  any_review_pending=False at mapping_plan.py:76.
+- §1.5(d) status flow: EDIT models/planner/field_map.py — added FieldMap.status: Status
+  (default candidate) + covers_required_field() (§1.5(e) gate). EDIT
+  models/planner/mapping_plan.py — covered_required_fields() now filters on
+  covers_required_field(); derive_verdict() computes any_review_pending from field-map
+  statuses; updated PlanAssembler Protocol docstring (points at the concrete impl).
+- §1.5(e) coverage rule: a required field is covered ONLY by an accepted, value-producing
+  FieldMap. NO_MAP pattern, CONSTANT(NULL) literal, and rejected status never cover.
+  condition_concept_id stays REQUIRED (not nullable): per-code NO_MAP is a per-row
+  outcome, not an un-covered field.
+- NEW src/sema/resolve/assembler.py (R29-SCANNED, generic — names no domain literal):
+  Slice0PlanAssembler.assemble groups by target_property_ref, select_winner per group
+  (planner mapping_plan.py:112), projects winner→FieldMap with winner.status, emits
+  RISK_ASSEMBLER_CONFLICT_RESOLVED (info, non-blocking) on >1 live assertion, derives
+  source_scope_ref + lineage from the assertions. Raises on empty/all-rejected input.
+- Slice-0 staging obligation in the ALLOWLISTED policies/omop.py
+  (make_slice0_staging_obligation): required={condition_concept_id, resolver_policy_ref,
+  vocab_release} as dotted RefStr under target.condition_occurrence_staging; NATURAL_KEY
+  PK; distinct from the production condition_occurrence obligation (US-007) — no
+  person_id, no dates. EDIT planner_loader.py: field_map_to_properties/
+  properties_to_field_map round-trip the new status (read .get default candidate).
+- TDD: tests/unit/test_plan_assembler.py (16 hermetic tests) written first, failed
+  ModuleNotFoundError + missing FieldMap.status/covers/derive behavior, then implemented.
+  Covers status default+round-trip, the three non-coverage cases (NO_MAP/CONSTANT-null/
+  rejected), awaiting_review on review_pending, the staging obligation shape, PASS/FAIL
+  verdicts, status-from-winner, select_winner status-tier, conflict-flag, empty-reject.
+- Quality: uv run pytest 2031 passed / 1 skipped; mypy clean (193 files); R29 guard
+  clean; coverage 93% repo (planner_loader 100%, omop policy 100%, assembler 97%,
+  field_map 98%, mapping_plan 99%). KNOWN pre-existing integration failure bug-347
+  (graph/loader test_different_sources_coexist) confirmed failing on HEAD without these
+  changes — NOT a US-008 regression; the hermetic unit suite is fully green.
+- **Learnings for future iterations:**
+  - FieldMap.target_field_ref is a RefStr (regex requires ≥1 dot). Obligation
+    required_fields are list[str] (bare allowed) but coverage matching is EXACT string
+    equality, so the assembler/producer MUST emit field maps whose target_field_ref is
+    byte-identical to the obligation required_fields entries. I used dotted refs for both
+    (target.condition_occurrence_staging.<field>); the conceptual field NAMES are the last
+    segments. Do NOT switch covered_required_fields to last-segment matching — it would
+    break the existing _compilable_plan_factory tests (required uses full dotted ref).
+  - derive_plan_verdict checks any_review_pending FIRST → a review_pending FieldMap yields
+    awaiting_review regardless of coverage. So coverage and review-state don't conflict.
+  - The R29 guard greps resolve/assembler.py and `concept_id` is denylisted. Keep the
+    assembler purely generic (it only sees target_property_ref/status as data); the
+    OMOP-named staging obligation lives in the allowlisted policies/omop.py.
+  - US-009 (next) is the VOCAB_LOOKUP assertion producer; it builds the MappingAssertions
+    this assembler consumes (target_property_ref must match the staging obligation's
+    required field refs) and writes the :FieldMap/MAPS_TO/DERIVED_FROM graph edges.
+  - select_winner (mapping_plan.py:112) is status-tiered then confidence/recency/template;
+    a human_pinned assertion beats a higher-confidence auto_accepted one — the assembler
+    relies on this, NOT winner_selection.py:24.
 ---

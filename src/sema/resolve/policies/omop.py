@@ -8,11 +8,21 @@ standard flag ("S") are confined here. The generic spine
 
 from __future__ import annotations
 
+from sema.models.planner._enums import PrimaryKeyStrategy
+from sema.models.planner.target_model import TargetObligation
 from sema.models.target.vocab_binding import VocabularyBindingDecl
 from sema.resolve.policy import ResolverPolicy
 from sema.resolve.vocab_store_utils import VocabStoreSchema
 
 OMOP_ONCOTREE_CONDITION_REF = "omop.oncotree_to_snomed_condition"
+
+# §1.5(b) staging target. Distinct from the production condition_occurrence
+# obligation (US-007): no person_id, no dates, no FK closure. The required
+# fields are the staging projection columns that must be value-producing per
+# source row (§1.5(e)). This OMOP-named obligation lives in the allowlisted
+# policy layer; the generic assembler (R29-scanned) never names these fields.
+SLICE0_STAGING_TARGET = "condition_occurrence_staging"
+_STAGING_PREFIX = "target.condition_occurrence_staging"
 
 # The OMOP physical schema for the concept-vocabulary tables. This is the only
 # place these OMOP column literals live (R29-allowlisted); the VocabStore reads
@@ -48,4 +58,21 @@ def make_omop_oncotree_condition_policy(
         maps_to_relationship="Maps to",
         standard_flag="S",
         binding=binding,
+    )
+
+
+def make_slice0_staging_obligation() -> TargetObligation:
+    """Build the Slice-0 staging obligation (§1.5(b)).
+
+    ``condition_concept_id`` stays REQUIRED, not nullable (§1.5(e)): a per-code
+    NO_MAP is a per-row store/staging outcome, not an un-covered field.
+    """
+    return TargetObligation(
+        target_entity=SLICE0_STAGING_TARGET,
+        required_fields=[
+            f"{_STAGING_PREFIX}.condition_concept_id",
+            f"{_STAGING_PREFIX}.resolver_policy_ref",
+            f"{_STAGING_PREFIX}.vocab_release",
+        ],
+        primary_key=PrimaryKeyStrategy.NATURAL_KEY,
     )

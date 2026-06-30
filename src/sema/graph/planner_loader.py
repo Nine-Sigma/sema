@@ -185,6 +185,7 @@ def field_map_to_properties(fm: FieldMap) -> dict[str, Any]:
         "target_field_ref": fm.target_field_ref,
         "pattern": fm.pattern.value,
         "payload_json": fm.payload.model_dump_json(),
+        "status": fm.status.value,
     }
 
 
@@ -194,6 +195,7 @@ def properties_to_field_map(props: dict[str, Any]) -> FieldMap:
             "target_field_ref": props["target_field_ref"],
             "pattern": props["pattern"],
             "payload": json.loads(props["payload_json"]),
+            "status": props.get("status", Status.candidate.value),
         }
     )
 
