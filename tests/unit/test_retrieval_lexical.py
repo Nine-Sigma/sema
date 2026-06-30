@@ -169,3 +169,48 @@ class TestArtifactDedup:
         ]
         result = _dedup_artifacts(artifacts)
         assert len(result) == 1
+
+    def test_term_artifacts_keyed_by_vocabulary_and_code(self) -> None:
+        """Multi-candidate terms: Gender M and State M are alternatives,
+        not duplicates — both must survive artifact dedup."""
+        artifacts = [
+            {"type": "term", "code": "M", "label": "Male",
+             "vocabulary": "Gender", "confidence": 0.8},
+            {"type": "term", "code": "M", "label": "Mississippi",
+             "vocabulary": "State", "confidence": 0.8},
+        ]
+        result = _dedup_artifacts(artifacts)
+        assert len(result) == 2
+
+    def test_same_term_from_two_paths_deduped(self) -> None:
+        artifacts = [
+            {"type": "term", "code": "M", "label": "Male",
+             "vocabulary": "Gender", "confidence": 0.5},
+            {"type": "term", "code": "M", "label": "Male",
+             "vocabulary": "Gender", "confidence": 0.9},
+        ]
+        result = _dedup_artifacts(artifacts)
+        assert len(result) == 1
+        assert result[0]["confidence"] == 0.9
+
+    def test_distinct_term_codes_not_collapsed(self) -> None:
+        """Regression: terms have no 'name'/'text' key, so the default
+        identity collapsed ALL term artifacts into one."""
+        artifacts = [
+            {"type": "term", "code": "M", "label": "Male",
+             "vocabulary": "Gender", "confidence": 0.8},
+            {"type": "term", "code": "F", "label": "Female",
+             "vocabulary": "Gender", "confidence": 0.7},
+        ]
+        result = _dedup_artifacts(artifacts)
+        assert len(result) == 2
+
+    def test_ancestry_keyed_by_vocabulary(self) -> None:
+        artifacts = [
+            {"type": "ancestry", "code": "M", "parent_code": "ALL",
+             "vocabulary": "Gender", "confidence": 0.8},
+            {"type": "ancestry", "code": "M", "parent_code": "ALL",
+             "vocabulary": "State", "confidence": 0.8},
+        ]
+        result = _dedup_artifacts(artifacts)
+        assert len(result) == 2

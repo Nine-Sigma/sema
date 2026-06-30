@@ -17,7 +17,6 @@ from sema.graph.materializer_utils import (
     apply_resolution_edges,
     parse_ref_any,
     pick_winner,
-    run_lifecycle_phase,
     upsert_column_nodes,
     upsert_decoded_values,
     upsert_entities,
@@ -530,7 +529,7 @@ class TestApplyResolutionEdges:
         apply_resolution_edges(loader, groups)
         loader.add_term_hierarchy.assert_called_once_with(
             parent_code="NEOPLASM", child_code="CARCINOMA",
-            source_schema=None,
+            source_schema=None, vocabulary_name="_unscoped",
         )
 
     def test_skips_rejected_hierarchy(self):
@@ -546,32 +545,3 @@ class TestApplyResolutionEdges:
         }
         apply_resolution_edges(loader, groups)
         loader.add_term_hierarchy.assert_not_called()
-
-
-class TestRunLifecyclePhase:
-    def test_deprecates_inactive_vocabularies(self):
-        loader = MagicMock()
-        assertions = [
-            _assertion(
-                predicate=AssertionPredicate.VOCABULARY_MATCH.value,
-                value="ICD-10",
-            ),
-        ]
-        run_lifecycle_phase(loader, assertions)
-        loader._run.assert_called_once()
-        call_kwargs = loader._run.call_args
-        assert "ICD-10" in call_kwargs.kwargs.get(
-            "active_names", call_kwargs[1].get("active_names", []),
-        )
-
-    def test_no_op_when_no_active_vocabs(self):
-        loader = MagicMock()
-        assertions = [
-            _assertion(
-                predicate=AssertionPredicate.VOCABULARY_MATCH.value,
-                value="stale",
-                status=AssertionStatus.REJECTED,
-            ),
-        ]
-        run_lifecycle_phase(loader, assertions)
-        loader._run.assert_not_called()

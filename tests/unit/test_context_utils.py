@@ -142,6 +142,32 @@ class TestBuildGovernedValues:
         assert result[0].property_name == "Status"
         assert len(result[0].values) == 2
 
+    def test_ambiguous_values_keep_vocabulary_and_flag(self) -> None:
+        """Ambiguity-group values stay separate per vocabulary and
+        carry the metadata the prompt needs to present alternatives."""
+        cs = SemanticCandidateSet(
+            query="test",
+            candidates=[
+                {"type": "value", "property_name": "gender",
+                 "column": "gender", "table": "patient",
+                 "code": "M", "label": "Male",
+                 "vocabulary": "Gender", "ambiguous": True},
+                {"type": "value", "property_name": "state",
+                 "column": "state", "table": "address",
+                 "code": "M", "label": "Mississippi",
+                 "vocabulary": "State", "ambiguous": True},
+                {"type": "value", "property_name": "Status",
+                 "column": "status_cd", "table": "patients",
+                 "code": "A", "label": "Active"},
+            ],
+        )
+        result = _build_governed_values(cs)
+        ambiguous = [g for g in result if g.ambiguous]
+        authoritative = [g for g in result if not g.ambiguous]
+        assert {g.vocabulary for g in ambiguous} == {"Gender", "State"}
+        assert len(authoritative) == 1
+        assert authoritative[0].vocabulary is None
+
 
 class TestBuildMetrics:
     def test_metric_candidate_survives_into_sco(self) -> None:

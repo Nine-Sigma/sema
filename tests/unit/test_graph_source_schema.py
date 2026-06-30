@@ -79,8 +79,8 @@ class TestAssertionSourceSchemaStamp:
         loader.store_assertion(a, source_schema=SCHEMA_BRCA)
         cypher = session.run.call_args[0][0]
         params = session.run.call_args[1]
-        assert "source_schema" in cypher
-        assert params["source_schema"] == SCHEMA_BRCA
+        assert "n.source_schema = a.source_schema" in cypher
+        assert params["assertions"][0]["source_schema"] == SCHEMA_BRCA
 
     def test_commit_table_assertions_threads_source_schema(
         self, loader, mock_driver,
@@ -93,7 +93,7 @@ class TestAssertionSourceSchemaStamp:
         )
         cypher = tx.run.call_args[0][0]
         kwargs = tx.run.call_args[1]
-        assert "source_schema: a.source_schema" in cypher
+        assert "n.source_schema = a.source_schema" in cypher
         assert kwargs["assertions"][0]["source_schema"] == SCHEMA_MSK
 
 
@@ -347,7 +347,8 @@ class TestScopedDelete:
             for c in calls
         )
         for c in session.run.call_args_list:
-            assert c[1]["schema"] == SCHEMA_BRCA
+            if "schema" in c[1]:
+                assert c[1]["schema"] == SCHEMA_BRCA
 
     def test_delete_does_not_touch_shared_concept_nodes(
         self, loader, mock_driver,
@@ -363,6 +364,30 @@ class TestScopedDelete:
         ):
             assert f"DELETE n.{shared}" not in joined
             assert f"DETACH DELETE {shared}" not in joined
+
+    def test_preserve_assertions_keeps_assertion_nodes(
+        self, loader, mock_driver,
+    ):
+        """Resume builds preserve :Assertion nodes — they are the resume
+        cache process_table reads to skip completed tables."""
+        _, session = mock_driver
+        loader.delete_study_scoped(
+            SCHEMA_BRCA, preserve_assertions=True,
+        )
+        calls = [c[0][0] for c in session.run.call_args_list]
+        assert not any(
+            "MATCH (a:Assertion {source_schema: $schema})" in c
+            for c in calls
+        )
+        assert any(
+            "MATCH ()-[r {source_schema: $schema}]-() DELETE r" in c
+            for c in calls
+        )
+        assert any(
+            "MATCH (jp:JoinPath {source_schema: $schema})" in c
+            and "DETACH DELETE jp" in c
+            for c in calls
+        )
 
 
 class TestSourceSchemaFailFast:

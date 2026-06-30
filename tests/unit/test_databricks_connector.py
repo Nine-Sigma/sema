@@ -39,6 +39,13 @@ def connector(mock_connection):
         yield conn
 
 
+class TestExecuteQuery:
+    def test_execute_query_delegates_to_execute(self, connector, mock_cursor):
+        mock_cursor.fetchall.return_value = [("row",)]
+        result = connector.execute_query("SELECT 1")
+        assert result == [("row",)]
+
+
 class TestCatalogDiscovery:
     def test_list_catalogs(self, connector, mock_cursor):
         mock_cursor.fetchall.return_value = [("catalog_a",), ("catalog_b",)]

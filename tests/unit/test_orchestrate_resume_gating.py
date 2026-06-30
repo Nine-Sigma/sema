@@ -1,4 +1,8 @@
-"""Resume gating: schema-wipe loop must NOT run when --resume is set."""
+"""Resume cleanup (US-009): the schema-wipe loop runs for BOTH a fresh
+build and a --resume build, so a resumed study's prior graph writes are
+cleared before re-materialization (finding L). A resume build preserves
+:Assertion nodes — they are the resume cache process_table reads, so
+deleting them would silently turn every resume into a full rebuild."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -61,10 +65,20 @@ def _common_patches(work_items, results=None):
 
 
 class TestResumeGating:
-    def test_resume_true_does_not_wipe_assertions(self, loader_and_driver):
+    def test_resume_true_wipes_each_schema_before_workers(
+        self, loader_and_driver,
+    ):
         driver, loader = loader_and_driver
-        work_items = _patch_run_build(["sch1", "sch2"])
+        work_items = _patch_run_build(["sch1", "sch2", "sch1"])
         results = _common_patches(work_items)
+
+        observed = {"deleted_before_workers": None}
+
+        def _spawn_side_effect(*args, **kwargs):
+            observed["deleted_before_workers"] = (
+                loader.delete_study_scoped.called
+            )
+            return results
 
         cfg = _build_config(resume=True, schemas=["sch1", "sch2"])
         with patch(
@@ -73,15 +87,15 @@ class TestResumeGating:
         ), patch(
             "sema.graph.loader.GraphLoader", return_value=loader,
         ), patch(
-            "sema.connectors.databricks.DatabricksConnector",
-        ) as conn_cls, patch(
+            "sema.pipeline.build.DatabricksConnectorFactory",
+        ) as factory_cls, patch(
             "sema.pipeline.orchestrate._register_datasource",
         ), patch(
             "sema.pipeline.orchestrate._discover_tables",
             return_value=work_items,
         ), patch(
             "sema.pipeline.orchestrate._spawn_workers",
-            return_value=results,
+            side_effect=_spawn_side_effect,
         ), patch(
             "sema.pipeline.orchestrate.run_fk_detection",
         ), patch(
@@ -98,7 +112,9 @@ class TestResumeGating:
             conn.get_datasource_ref.return_value = (
                 "unity://cat", "cat", "src",
             )
-            conn_cls.return_value = conn
+            factory = MagicMock()
+            factory.create.return_value = conn
+            factory_cls.return_value = factory
             profiler = MagicMock()
             profiler.profile.return_value = MagicMock()
             profiler_cls.return_value = profiler
@@ -106,7 +122,14 @@ class TestResumeGating:
             from sema.pipeline.orchestrate import run_build
             run_build(cfg)
 
-        loader.delete_study_scoped.assert_not_called()
+        called_schemas = sorted(
+            c.args[0] for c in loader.delete_study_scoped.call_args_list
+        )
+        assert called_schemas == ["sch1", "sch2"]
+        assert observed["deleted_before_workers"] is True
+        # Resume cleanup must NOT delete the :Assertion resume cache.
+        for c in loader.delete_study_scoped.call_args_list:
+            assert c.kwargs.get("preserve_assertions") is True
 
     def test_resume_false_wipes_each_schema_once(self, loader_and_driver):
         driver, loader = loader_and_driver
@@ -120,8 +143,8 @@ class TestResumeGating:
         ), patch(
             "sema.graph.loader.GraphLoader", return_value=loader,
         ), patch(
-            "sema.connectors.databricks.DatabricksConnector",
-        ) as conn_cls, patch(
+            "sema.pipeline.build.DatabricksConnectorFactory",
+        ) as factory_cls, patch(
             "sema.pipeline.orchestrate._register_datasource",
         ), patch(
             "sema.pipeline.orchestrate._discover_tables",
@@ -145,7 +168,9 @@ class TestResumeGating:
             conn.get_datasource_ref.return_value = (
                 "unity://cat", "cat", "src",
             )
-            conn_cls.return_value = conn
+            factory = MagicMock()
+            factory.create.return_value = conn
+            factory_cls.return_value = factory
             profiler = MagicMock()
             profiler.profile.return_value = MagicMock()
             profiler_cls.return_value = profiler
@@ -157,10 +182,18 @@ class TestResumeGating:
             c.args[0] for c in loader.delete_study_scoped.call_args_list
         )
         assert called_schemas == ["sch1", "sch2"]
+        # Fresh builds delete :Assertion nodes too (full wipe).
+        for c in loader.delete_study_scoped.call_args_list:
+            assert c.kwargs.get("preserve_assertions") is False
 
-    def test_resume_true_no_prior_data_skips_wipe(self, loader_and_driver):
+    def test_resume_true_absent_study_cleanup_is_no_op(
+        self, loader_and_driver,
+    ):
+        """Fresh resume: an absent study still gets a cleanup call, which
+        is a harmless no-op (delete matches nothing) — run completes."""
         driver, loader = loader_and_driver
         loader.has_assertions.return_value = False
+        loader.delete_study_scoped.return_value = None
         work_items = _patch_run_build(["sch1"])
         results = _common_patches(work_items)
 
@@ -171,8 +204,8 @@ class TestResumeGating:
         ), patch(
             "sema.graph.loader.GraphLoader", return_value=loader,
         ), patch(
-            "sema.connectors.databricks.DatabricksConnector",
-        ) as conn_cls, patch(
+            "sema.pipeline.build.DatabricksConnectorFactory",
+        ) as factory_cls, patch(
             "sema.pipeline.orchestrate._register_datasource",
         ), patch(
             "sema.pipeline.orchestrate._discover_tables",
@@ -196,7 +229,9 @@ class TestResumeGating:
             conn.get_datasource_ref.return_value = (
                 "unity://cat", "cat", "src",
             )
-            conn_cls.return_value = conn
+            factory = MagicMock()
+            factory.create.return_value = conn
+            factory_cls.return_value = factory
             profiler = MagicMock()
             profiler.profile.return_value = MagicMock()
             profiler_cls.return_value = profiler
@@ -204,7 +239,9 @@ class TestResumeGating:
             from sema.pipeline.orchestrate import run_build
             run_build(cfg)
 
-        loader.delete_study_scoped.assert_not_called()
+        loader.delete_study_scoped.assert_called_once_with(
+            "sch1", preserve_assertions=True,
+        )
 
 
 class TestProcessTableResumeWithAssertions:

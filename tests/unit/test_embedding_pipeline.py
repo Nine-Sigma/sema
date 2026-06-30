@@ -29,7 +29,9 @@ class TestEmbeddingComputation:
         fake_nodes = {
             "Entity": [{"name": "Order", "description": "A purchase order"}],
             "Property": [{"name": "order_id", "entity_name": "Order"}],
-            "Term": [{"code": "ACTIVE", "label": "Active"}],
+            "Term": [
+                {"vocabulary_name": "Status", "code": "ACTIVE", "label": "Active"}
+            ],
             "Alias": [{"text": "purchase"}],
             "Metric": [{"name": "total_revenue", "description": "Sum of sales"}],
         }
@@ -51,9 +53,9 @@ class TestEmbeddingComputation:
                 text_fn=lambda item, lbl=label: build_embedding_text(lbl.lower(), **item),
             )
 
-        # One set_embedding call per node with data in fake_nodes
+        # One set_node_embedding call per node with data in fake_nodes
         expected = sum(len(v) for v in fake_nodes.values())
-        assert mock_loader.set_embedding.call_count == expected
+        assert mock_loader.set_node_embedding.call_count == expected
 
     def test_property_embedding_uses_composite_key(self):
         mock_loader = MagicMock()
@@ -73,16 +75,12 @@ class TestEmbeddingComputation:
             text_fn=lambda item: build_embedding_text("property", **item),
         )
 
-        set_calls = mock_loader.set_embedding.call_args_list
+        set_calls = mock_loader.set_node_embedding.call_args_list
         assert len(set_calls) == 2
 
-        match_values = [c.kwargs.get("match_value", c[1].get("match_value", None))
-                        if c.kwargs else c[1]["match_value"]
-                        for c in set_calls]
-        assert match_values[0] == "status"
-        assert match_values[1] == "status"
-
-        mock_loader.set_property_embedding.assert_not_called()
+        matches = [c.kwargs["match"] for c in set_calls]
+        assert matches[0] == {"name": "status", "entity_name": "Order"}
+        assert matches[1] == {"name": "status", "entity_name": "Shipment"}
 
     def test_per_label_match_property(self):
         mock_loader = MagicMock()
@@ -93,11 +91,14 @@ class TestEmbeddingComputation:
 
         engine.embed_and_store(
             label="Term", match_prop="code",
-            items=[{"code": "T001", "label": "Active"}],
+            items=[{"vocabulary_name": "Status", "code": "T001",
+                    "label": "Active"}],
             text_fn=lambda item: build_embedding_text("term", **item),
         )
-        term_call = mock_loader.set_embedding.call_args
-        assert term_call.kwargs["match_prop"] == "code"
+        term_call = mock_loader.set_node_embedding.call_args
+        assert term_call.kwargs["match"] == {
+            "vocabulary_name": "Status", "code": "T001",
+        }
 
         mock_loader.reset_mock()
         mock_model.encode.return_value = [[0.5]]
@@ -106,8 +107,8 @@ class TestEmbeddingComputation:
             items=[{"text": "order"}],
             text_fn=lambda item: build_embedding_text("alias", **item),
         )
-        alias_call = mock_loader.set_embedding.call_args
-        assert alias_call.kwargs["match_prop"] == "text"
+        alias_call = mock_loader.set_node_embedding.call_args
+        assert alias_call.kwargs["match"] == {"text": "order"}
 
         mock_loader.reset_mock()
         mock_model.encode.return_value = [[0.5]]
@@ -116,8 +117,35 @@ class TestEmbeddingComputation:
             items=[{"name": "Customer"}],
             text_fn=lambda item: build_embedding_text("entity", **item),
         )
-        entity_call = mock_loader.set_embedding.call_args
-        assert entity_call.kwargs["match_prop"] == "name"
+        entity_call = mock_loader.set_node_embedding.call_args
+        assert entity_call.kwargs["match"] == {"name": "Customer"}
+
+    def test_same_code_terms_get_distinct_match_keys(self):
+        """Two terms sharing a code in different vocabularies must each be
+        matched on their full {vocabulary_name, code} key, so their
+        embeddings cannot overwrite one another."""
+        mock_loader = MagicMock()
+        mock_model = MagicMock(spec=["encode"])
+        mock_model.encode.return_value = [[0.1], [0.2]]
+
+        engine = EmbeddingEngine(model=mock_model, loader=mock_loader)
+        engine.embed_and_store(
+            label="Term", match_prop="code",
+            items=[
+                {"vocabulary_name": "Gender", "code": "M", "label": "Male"},
+                {"vocabulary_name": "State", "code": "M",
+                 "label": "Mississippi"},
+            ],
+            text_fn=lambda item: build_embedding_text("term", **item),
+        )
+        matches = [
+            c.kwargs["match"]
+            for c in mock_loader.set_node_embedding.call_args_list
+        ]
+        assert matches == [
+            {"vocabulary_name": "Gender", "code": "M"},
+            {"vocabulary_name": "State", "code": "M"},
+        ]
 
     def test_embedding_batch_size_64(self):
         mock_loader = MagicMock()
@@ -178,7 +206,7 @@ class TestSkipEmbeddings:
 
         mock_get_embedder.assert_not_called()
         mock_loader.create_vector_index.assert_not_called()
-        mock_loader.set_embedding.assert_not_called()
+        mock_loader.set_node_embedding.assert_not_called()
 
     @patch("sema.pipeline.orchestrate_utils._get_embedder")
     def test_no_skip_invokes_embedder(self, mock_get_embedder):

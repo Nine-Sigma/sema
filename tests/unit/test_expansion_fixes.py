@@ -54,6 +54,190 @@ class TestTermGovernedValues:
         values = [r for r in results if r["type"] == "value"]
         assert len(values) == 0
 
+    def test_ambiguous_code_emits_one_candidate_per_vocabulary(
+        self, mock_engine,
+    ) -> None:
+        """A hit with no vocabulary whose code exists in several
+        vocabularies must surface ALL of them as distinct candidates —
+        retrieval never silently picks; downstream ranking selects."""
+        governed_calls: list = []
+
+        def run_query(query, **params):
+            if "IN_VOCABULARY" in query and "$code" in query:
+                return [
+                    {"vocabulary_name": "Gender"},
+                    {"vocabulary_name": "State"},
+                ]
+            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+                governed_calls.append(params.get("vocabulary_name"))
+            return []
+
+        mock_engine._run_query.side_effect = run_query
+        hit = {"code": "M", "label": "M", "final_score": 0.9}
+        results = _expand_term_hit(mock_engine, hit)
+        terms = [r for r in results if r["type"] == "term"]
+        assert {t.get("vocabulary") for t in terms} == {
+            "Gender", "State",
+        }
+        # Each alternative's expansion is scoped to its own vocabulary.
+        assert sorted(governed_calls) == ["Gender", "State"]
+
+    def test_unknown_vocabulary_keeps_single_unscoped_candidate(
+        self, mock_engine,
+    ) -> None:
+        mock_engine._run_query.return_value = []
+        hit = {"code": "M", "label": "M", "final_score": 0.9}
+        results = _expand_term_hit(mock_engine, hit)
+        terms = [r for r in results if r["type"] == "term"]
+        assert len(terms) == 1
+        assert "vocabulary" not in terms[0]
+
+    def test_unresolved_vocabulary_scopes_to_unscoped_namespace(
+        self, mock_engine,
+    ) -> None:
+        """No IN_VOCABULARY rows must NOT disable filtering: terms
+        without a vocabulary live in the _unscoped namespace, so the
+        expansion scopes there instead of matching every vocabulary."""
+        from sema.graph.term_identity_utils import UNSCOPED_VOCAB
+
+        captured: dict = {}
+
+        def run_query(query, **params):
+            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+                captured["vocab"] = params.get("vocabulary_name")
+            return []
+
+        mock_engine._run_query.side_effect = run_query
+        hit = {"code": "M", "label": "M", "final_score": 0.9}
+        _expand_term_hit(mock_engine, hit)
+        assert captured["vocab"] == UNSCOPED_VOCAB
+
+    def test_resolver_failure_emits_bare_term_only(
+        self, mock_engine,
+    ) -> None:
+        """A transient lookup failure must degrade to a bare term,
+        never to unscoped cross-vocabulary expansion."""
+        seen_queries: list = []
+
+        def run_query(query, **params):
+            seen_queries.append(query)
+            if "IN_VOCABULARY" in query:
+                raise RuntimeError("neo4j unavailable")
+            return []
+
+        mock_engine._run_query.side_effect = run_query
+        hit = {"code": "M", "label": "M", "final_score": 0.9}
+        results = _expand_term_hit(mock_engine, hit)
+        assert len(results) == 1
+        assert results[0]["type"] == "term"
+        assert "vocabulary" not in results[0]
+        assert not any("MEMBER_OF" in q for q in seen_queries)
+
+    def test_governed_value_artifacts_carry_vocabulary(
+        self, mock_engine,
+    ) -> None:
+        def run_query(query, **params):
+            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+                return [
+                    {"column_name": "gender", "table_name": "patient",
+                     "value_set_name": "gender_values"},
+                ]
+            return []
+
+        mock_engine._run_query.side_effect = run_query
+        hit = {
+            "code": "M", "label": "Male",
+            "vocabulary_name": "Gender", "final_score": 0.9,
+        }
+        results = _expand_term_hit(mock_engine, hit)
+        values = [r for r in results if r["type"] == "value"]
+        assert values
+        assert all(v["vocabulary"] == "Gender" for v in values)
+
+    def test_ambiguous_alternatives_are_marked(
+        self, mock_engine,
+    ) -> None:
+        """Every artifact of a multi-vocabulary fan-out carries
+        ambiguity metadata so context assembly can present the
+        alternatives instead of treating them as facts."""
+        def run_query(query, **params):
+            if "IN_VOCABULARY" in query:
+                return [
+                    {"vocabulary_name": "Gender"},
+                    {"vocabulary_name": "State"},
+                ]
+            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+                col = (
+                    "gender" if params.get("vocabulary_name") == "Gender"
+                    else "state"
+                )
+                return [
+                    {"column_name": col, "table_name": "t",
+                     "value_set_name": f"{col}_values"},
+                ]
+            return []
+
+        mock_engine._run_query.side_effect = run_query
+        hit = {"code": "M", "label": "M", "final_score": 0.9}
+        results = _expand_term_hit(mock_engine, hit)
+        assert all(r.get("ambiguous") is True for r in results)
+        assert all(r.get("ambiguity_group") == "M" for r in results)
+        values = [r for r in results if r["type"] == "value"]
+        assert {v["vocabulary"] for v in values} == {"Gender", "State"}
+
+    def test_single_vocabulary_results_not_marked_ambiguous(
+        self, mock_engine,
+    ) -> None:
+        mock_engine._run_query.return_value = []
+        hit = {
+            "code": "M", "label": "Male",
+            "vocabulary_name": "Gender", "final_score": 0.9,
+        }
+        results = _expand_term_hit(mock_engine, hit)
+        assert not any(r.get("ambiguous") for r in results)
+
+    def test_vocabulary_fanout_is_capped(self, mock_engine) -> None:
+        def run_query(query, **params):
+            if "IN_VOCABULARY" in query:
+                return [
+                    {"vocabulary_name": f"V{i}"} for i in range(5)
+                ]
+            return []
+
+        mock_engine._run_query.side_effect = run_query
+        hit = {"code": "M", "label": "M", "final_score": 0.9}
+        results = _expand_term_hit(mock_engine, hit)
+        terms = [r for r in results if r["type"] == "term"]
+        assert len(terms) == 3
+        assert {t["vocabulary"] for t in terms} == {"V0", "V1", "V2"}
+
+    def test_governed_values_scoped_to_hit_vocabulary(
+        self, mock_engine,
+    ) -> None:
+        """Term identity is {vocabulary_name, code}: a Gender 'M' hit
+        must not pull value sets from a State vocabulary's 'M'."""
+        captured: dict = {}
+
+        def run_query(query, **params):
+            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+                captured["query"] = query
+                captured["params"] = params
+                return [
+                    {"column_name": "gender",
+                     "table_name": "patient",
+                     "value_set_name": "gender_values"},
+                ]
+            return []
+
+        mock_engine._run_query.side_effect = run_query
+        hit = {
+            "code": "M", "label": "Male",
+            "vocabulary_name": "Gender", "final_score": 0.9,
+        }
+        _expand_term_hit(mock_engine, hit)
+        assert captured["params"].get("vocabulary_name") == "Gender"
+        assert "$vocabulary_name" in captured["query"]
+
 
 class TestAliasDispatch:
     def test_alias_to_property_dispatches(

@@ -16,6 +16,9 @@ class FakeConnector(Connector):
     def get_datasource_ref(self) -> tuple[str, str, str]:
         return "fake://workspace", "fake", "workspace"
 
+    def execute_query(self, query: str) -> list[tuple]:
+        return []
+
 
 class TestConnectorProtocol:
     def test_extract_returns_assertions(self):

@@ -39,7 +39,6 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     table_workers controls parallelism (default 1 = sequential).
     """
     from sema.circuit_breaker import CircuitBreaker
-    from sema.connectors.databricks import DatabricksConnector
     from sema.graph.loader import GraphLoader
     from sema.pipeline.build import (
         DatabricksConnectorFactory,
@@ -52,9 +51,10 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     driver = _get_neo4j_driver(config.neo4j)
     loader = GraphLoader(driver)
 
-    discovery_connector = DatabricksConnector(
+    connector_factory = DatabricksConnectorFactory(
         config=config.databricks, profiling=config.profiling,
     )
+    discovery_connector = connector_factory.create()
     _register_datasource(discovery_connector, loader)
     work_items = _discover_tables(discovery_connector, config)
 
@@ -62,9 +62,21 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         driver.close()
         return aggregate_report([])
 
-    if not config.resume:
-        for schema in sorted({wi.schema for wi in work_items}):
-            loader.delete_study_scoped(schema)
+    # Create core constraints (incl. Assertion.id uniqueness) once, before
+    # any table worker commits — backs the idempotent assertion MERGE and
+    # blocks duplicate assertions even under transient-retry replays.
+    loader.ensure_core_constraints()
+
+    # Clean each study's prior graph writes before re-materialization, for
+    # both fresh and resume builds (finding L). Resume preserves :Assertion
+    # nodes — they are the cache process_table reads to skip completed
+    # tables, and per-table re-materialization runs AFTER this cleanup, so
+    # deleting them here would silently turn every resume into a full
+    # rebuild. Cleanup of an absent study is a no-op.
+    for schema in sorted({wi.schema for wi in work_items}):
+        loader.delete_study_scoped(
+            schema, preserve_assertions=config.resume,
+        )
 
     circuit_breaker = CircuitBreaker(
         failure_threshold=config.circuit_breaker_threshold,
@@ -72,9 +84,6 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         success_threshold=config.circuit_breaker_success_threshold,
     )
 
-    connector_factory = DatabricksConnectorFactory(
-        config=config.databricks, profiling=config.profiling,
-    )
     llm_factory = LLMClientFactory(
         llm_factory=lambda: _get_llm(config.llm),
         retry_max_attempts=config.retry_max_attempts,
@@ -119,6 +128,12 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         raise
 
     report = _collect_results(results)
+
+    from sema.graph.lifecycle_utils import deprecate_stale_from_results
+    deprecate_stale_from_results(
+        loader, results, work_items,
+        full_coverage=not (config.slice_tables or config.table_pattern),
+    )
 
     schemas = sorted({wi.schema for wi in work_items})
     run_fk_detection(

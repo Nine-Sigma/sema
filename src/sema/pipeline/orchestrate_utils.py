@@ -15,6 +15,7 @@ from sema.cli_factories import (
     _get_embedder,
     _get_neo4j_driver,
 )
+from sema.connectors.base import Connector
 from sema.engine.join_detector import JoinDetector, to_fk_assertion
 from sema.engine.join_detector_utils import (
     enumerate_candidates_from_metadata,
@@ -34,7 +35,7 @@ from sema.pipeline.context import prune_to_sco
 from sema.pipeline.retrieval import RetrievalEngine
 
 
-def _register_datasource(connector: Any, loader: Any) -> None:
+def _register_datasource(connector: Connector, loader: Any) -> None:
     """Create or update the DataSource node for the given connector."""
     import uuid
     ref, platform, workspace = connector.get_datasource_ref()
@@ -47,7 +48,7 @@ def _register_datasource(connector: Any, loader: Any) -> None:
 
 
 def _discover_tables(
-    connector: Any,
+    connector: Connector,
     config: BuildConfig,
 ) -> list[Any]:
     if config.verbose:
@@ -63,7 +64,7 @@ def _discover_tables(
         )
     if config.verbose:
         click.echo(f"  Found {len(work_items)} tables")
-    return work_items  # type: ignore[no-any-return]
+    return work_items
 
 
 def _filter_work_items_to_slice(
@@ -266,7 +267,7 @@ def _compute_embeddings(
             nodes = loader.query_nodes_by_label(label)
             if not nodes:
                 continue
-            key_spec = EMBEDDING_KEY_MAP.get(label, "name")
+            key_spec = EMBEDDING_KEY_MAP.get(label, ("name",))
             _embed_label_nodes(
                 emb_engine, loader, label, key_spec, nodes,
             )
@@ -283,41 +284,37 @@ def _embed_label_nodes(
     engine: Any,
     loader: Any,
     label: str,
-    key_spec: str | tuple[str, ...],
+    key_spec: tuple[str, ...],
     nodes: list[dict[str, Any]],
 ) -> None:
-    from sema.engine.embeddings import build_embedding_text
+    from sema.engine.embedding_utils import (
+        description_hash,
+        select_stale_nodes,
+    )
+    from sema.engine.embeddings import _build_match, build_embedding_text
+
+    texts = [build_embedding_text(label.lower(), **node) for node in nodes]
+    stale = select_stale_nodes(nodes, texts)
 
     max_batch = 64
-    texts = [
-        build_embedding_text(label.lower(), **node) for node in nodes
-    ]
-
-    for start in range(0, len(nodes), max_batch):
-        batch_texts = texts[start : start + max_batch]
-        batch_nodes = nodes[start : start + max_batch]
-        embeddings = engine.embed_batch(batch_texts)
-
-        for node, embedding in zip(batch_nodes, embeddings):
-            emb_list = list(embedding)
-            if isinstance(key_spec, tuple):
-                loader.set_property_embedding(
-                    name=node[key_spec[0]],
-                    entity_name=node[key_spec[1]],
-                    embedding=emb_list,
-                )
-            else:
-                loader.set_embedding(
-                    label=label,
-                    match_prop=key_spec,
-                    match_value=node[key_spec],
-                    embedding=emb_list,
-                )
+    for start in range(0, len(stale), max_batch):
+        batch = stale[start : start + max_batch]
+        embeddings = engine.embed_batch([text for _, text in batch])
+        for (node, text), embedding in zip(batch, embeddings):
+            match = _build_match(label, key_spec, node)
+            if match is None:
+                continue
+            loader.set_node_embedding(
+                label=label,
+                match=match,
+                embedding=list(embedding),
+                description_hash=description_hash(text),
+            )
 
 
 def run_fk_detection(
     loader: Any,
-    connector: Any,
+    connector: Connector,
     config: BuildConfig,
     schemas: list[str],
     run_id: str,
@@ -337,10 +334,10 @@ def run_fk_detection(
         materialization_threshold=config.fk_materialization_threshold,
     )
     sampler = WarehouseSampler(
-        query_fn=connector._execute, catalog=config.catalog,
+        query_fn=connector.execute_query, catalog=config.catalog,
     )
     profile_lookup = WarehouseProfileLookup(
-        query_fn=connector._execute, catalog=config.catalog,
+        query_fn=connector.execute_query, catalog=config.catalog,
     )
     for schema in schemas:
         columns = fetch_columns_by_schema(loader, schema)

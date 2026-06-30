@@ -45,6 +45,10 @@ class DatabricksConnector(Connector):
         except Exception as e:
             raise ConnectionError(f"Failed to connect to Databricks: {e}") from e
 
+    def execute_query(self, query: str) -> list[tuple[Any, ...]]:
+        """Public read-query entry point (Connector contract)."""
+        return self._execute(query)
+
     def _execute(self, query: str) -> list[tuple[Any, ...]]:
         with self._connection.cursor() as cursor:
             cursor.execute(query)

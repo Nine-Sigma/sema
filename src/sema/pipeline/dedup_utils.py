@@ -181,9 +181,18 @@ def _artifact_identity_key(
         )
     if art_type == "metric":
         return (art_type, art.get("name", ""))
+    if art_type == "term":
+        # Term identity is {vocabulary, code}: a Gender "M" and a
+        # State "M" are alternatives, not duplicates.
+        return (
+            art_type,
+            art.get("vocabulary", ""),
+            art.get("code") or art.get("label", ""),
+        )
     if art_type == "ancestry":
         return (
             art_type,
+            art.get("vocabulary", ""),
             art.get("code", ""),
             art.get("parent_code", ""),
         )

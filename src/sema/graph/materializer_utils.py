@@ -22,6 +22,10 @@ from sema.graph.loader_utils import (
     batch_upsert_terms,
     batch_upsert_value_sets,
 )
+from sema.graph.term_vocab_utils import (
+    resolve_term_vocab,
+    term_vocab_for_subject,
+)
 from sema.models.constants import source_precedence
 from sema.models.physical_key import CanonicalRef
 
@@ -259,7 +263,7 @@ def upsert_decoded_values(
 
     vs_batch: list[dict[str, Any]] = []
     term_batch: list[dict[str, Any]] = []
-    member_writes: list[tuple[str, str]] = []
+    member_links: list[dict[str, str]] = []
 
     for col_ref, decoded in decoded_groups.items():
         try:
@@ -269,6 +273,7 @@ def upsert_decoded_values(
         if not pk.column:
             continue
         vs_name = f"{pk.table}_{pk.column}_values"
+        term_vocab = resolve_term_vocab(col_ref, groups, vs_name)
         ref = _column_ref(pk)
         vs_batch.append({
             "name": vs_name,
@@ -285,21 +290,27 @@ def upsert_decoded_values(
             label = a.payload.get("label", raw)
             term_batch.append({
                 "code": raw, "label": label,
-                "vocabulary_name": vs_name,
+                "vocabulary_name": term_vocab,
                 "source": a.source, "confidence": a.confidence,
             })
-            member_writes.append((raw, vs_name))
+            member_links.append({
+                "code": raw, "vs_name": vs_name,
+                "vocab": term_vocab, "ref": ref,
+            })
 
-    # ValueSet must MERGE on column_ref BEFORE add_term_to_value_set MERGEs
-    # by name; otherwise the by-name MERGE creates a duplicate node with
-    # no column_ref, then the by-column_ref MERGE creates a second.
+    # Upsert canonical ValueSet/Term nodes (which own `id`/status via their
+    # ON CREATE SET) BEFORE creating MEMBER_OF edges. The edges match the
+    # ValueSet on column_ref (via value_set_ref), so the canonical
+    # column_ref node must exist first — otherwise the edge MERGE would
+    # create nodes without ids.
     batch_upsert_value_sets(
         loader, vs_batch, source_schema=source_schema,
     )
     batch_upsert_terms(loader, term_batch, source_schema=source_schema)
-    for raw, vs_name in member_writes:
+    for link in member_links:
         loader.add_term_to_value_set(
-            raw, vs_name, source_schema=source_schema,
+            link["code"], link["vs_name"], source_schema=source_schema,
+            vocabulary_name=link["vocab"], value_set_ref=link["ref"],
         )
 
 
@@ -422,6 +433,7 @@ def apply_resolution_edges(
 ) -> None:
     for (subj, pred), group in groups.items():
         if pred == AssertionPredicate.PARENT_OF.value:
+            vocab = term_vocab_for_subject(subj, groups)
             for a in group:
                 if a.status in (
                     AssertionStatus.REJECTED, AssertionStatus.SUPERSEDED,
@@ -431,32 +443,5 @@ def apply_resolution_edges(
                     parent_code=a.payload.get("parent", ""),
                     child_code=a.payload.get("child", ""),
                     source_schema=source_schema,
+                    vocabulary_name=vocab,
                 )
-
-
-
-def run_lifecycle_phase(
-    loader: GraphLoader,
-    assertions: list[Assertion],
-) -> None:
-    """Deprecate non-anchored nodes that lost all supporting assertions."""
-    active_vocabs: set[str] = set()
-    for a in assertions:
-        if (
-            a.predicate == AssertionPredicate.VOCABULARY_MATCH
-            and a.status not in (
-                AssertionStatus.REJECTED, AssertionStatus.SUPERSEDED,
-            )
-        ):
-            vocab_name = a.payload.get("value")
-            if vocab_name:
-                active_vocabs.add(vocab_name)
-
-    if active_vocabs:
-        loader._run(
-            "MATCH (v:Vocabulary) "
-            "WHERE v.status = 'ACTIVE' "
-            "AND NOT v.name IN $active_names "
-            "SET v.status = 'DEPRECATED'",
-            active_names=list(active_vocabs),
-        )

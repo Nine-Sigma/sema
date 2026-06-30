@@ -4,7 +4,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from sema.engine.normalize_utils import normalize_name
 
 
 class AssertionPredicate(str, Enum):
@@ -40,6 +42,18 @@ class AssertionPredicate(str, Enum):
     FK_TO = "fk_to"
 
 
+# Predicates whose payload "value" is a name/alias that becomes a graph MERGE
+# key; normalized at construction so cosmetic variants cannot fragment nodes.
+_NAME_PREDICATES = frozenset(
+    {
+        "has_entity_name",
+        "has_property_name",
+        "has_alias",
+        "has_synonym",
+    }
+)
+
+
 class AssertionStatus(str, Enum):
     AUTO = "auto"
     ACCEPTED = "accepted"
@@ -66,3 +80,11 @@ class Assertion(BaseModel):
     run_id: str
     observed_at: datetime
     source_schema: str | None = None
+
+    @model_validator(mode="after")
+    def _normalize_name_payload(self) -> Assertion:
+        if self.predicate.value in _NAME_PREDICATES:
+            value = self.payload.get("value")
+            if isinstance(value, str):
+                self.payload["value"] = normalize_name(value)
+        return self
