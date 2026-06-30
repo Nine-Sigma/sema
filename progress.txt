@@ -156,3 +156,47 @@ Started: Tue Jun 30 14:37:57 EDT 2026
     and lists them in GoldSetReport.unscored_unlabelled so they can never be
     silently scored as labelled.
 ---
+
+## 2026-06-30 - US-004 (Per-vocabulary resolver policy object)
+- Shipped the vocabulary-agnostic ResolverPolicy so OMOP specifics sit behind a
+  boundary and source-vs-target conflation (R9) is structurally impossible.
+- NEW src/sema/resolve/policy.py: ResolverPolicy frozen dataclass exposing
+  SOURCE-side data (source_vocabulary, maps_to_relationship, standard_flag) and
+  reading the TARGET obligation (target_domain, require_standard,
+  allow_zero_default) FROM the bound VocabularyBindingDecl via @property — the
+  fields are NOT duplicated. Candidate dataclass (standard_value/is_invalid/
+  domain) + the validity predicate accepts() = valid AND (standard if required)
+  AND in target domain; plus is_standard/is_valid/in_target_domain and
+  candidate_lookup(code) -> (source_vocabulary, code) for R9.
+- NEW src/sema/resolve/policies/omop.py: the ONLY module naming OncoTree /
+  "Maps to" / "S"; make_omop_oncotree_condition_policy(binding) factory +
+  OMOP_ONCOTREE_CONDITION_REF constant.
+- NEW src/sema/resolve/policies/__init__.py: resolve_policy(binding) dispatches
+  binding.resolver_policy_ref through a module-level _FACTORIES constant;
+  UnknownResolverPolicyError on missing/unknown ref.
+- Consumed the MERGED binding model src/sema/models/target/vocab_binding.py
+  (VocabularyBindingDecl: domain/require_standard/allow_zero_default/
+  resolver_policy_ref/vocabulary) — fields read, never re-declared.
+- TDD: tests/unit/test_resolver_policy.py (13 tests) written first, failed with
+  ModuleNotFoundError: No module named 'sema.resolve', then implemented.
+- Quality: uv run pytest 1957 passed / 1 skipped; mypy clean (182 files); R29
+  guard clean; coverage 93% repo, 100% on all four new resolve modules.
+- **Learnings for future iterations:**
+  - R9 boundary made concrete: ResolverPolicy.source_vocabulary is the SOURCE
+    (OncoTree); binding.vocabulary.name is the TARGET (SNOMED). US-006's
+    candidates.py must match the source code in policy.candidate_lookup()'s
+    SOURCE vocab, NOT the binding's target vocab.
+  - "Read, don't duplicate" pattern: target_domain/require_standard/
+    allow_zero_default are @property reads off self.binding, so changing the
+    obligation needs no policy change. US-007's manifest sets these on the
+    VocabularyBindingDecl; the policy picks them up for free.
+  - resolve/policy.py and resolve/policies/ are BOTH allowlisted by the R29
+    guard, but only policies/omop.py actually names OMOP literals — policy.py and
+    policies/__init__.py are kept generic by design (defense in depth).
+  - VocabularyBindingDecl is frozen + extra='forbid'; build test bindings with
+    all fields. TargetEntityRef.qualified_name needs >=1 dot (regex), e.g.
+    "omop.condition_occurrence".
+  - resolve_policy expects a registered ref; US-007's manifest must set
+    resolver_policy_ref="omop.oncotree_to_snomed_condition" (OMOP_ONCOTREE_
+    CONDITION_REF) for the binding to resolve.
+---

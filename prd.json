@@ -92,8 +92,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "ResolverPolicy (src/sema/resolve/policy.py) is vocabulary-agnostic: SOURCE-side literals (source_vocabulary/maps_to_relationship/standard_flag) are data; target obligation (target_domain/require_standard/allow_zero_default) is read via @property from the bound VocabularyBindingDecl (models/target/vocab_binding.py) — never duplicated. Validity predicate accepts()=valid AND (standard if required) AND in-target-domain; candidate_lookup() matches the SOURCE vocab (R9). OMOP/OncoTree instance + 'Maps to'/'S' literals confined to allowlisted resolve/policies/omop.py; resolve/policies/__init__.py resolve_policy(binding) dispatches on resolver_policy_ref (UnknownResolverPolicyError otherwise). 13 hermetic unit tests (TDD). R29 guard clean, mypy clean, coverage 93% repo / 100% new modules."
     },
     {
       "id": "US-003",
