@@ -139,6 +139,22 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   NOTE: sqlglot `exp.alias_` returns the `exp.Expr` union (not `exp.Expression`) — type
   projection lists as `list[exp.Expr]` or mypy strict fails. Databricks renders VALUES
   without wrapping parens but still parses (US-013 owns live execution).
+- US-012 mapping eval report (src/sema/eval/mapping_report.py + mapping_report_utils.py,
+  eval/ R29-allowlisted so it may read the store's `concept_id` + reconcile gold): does
+  NOT re-derive metric math — build_mapping_report() calls eval.mapping_goldset.score()
+  (the frozen §1.5(f) ConfusionMatrix). decision_from_value_mapping() bridges the TWO
+  ResolutionStatus enums (resolve's + eval's, identical values) by `.value`. Acceptance
+  is GATED, never self-certified: AcceptanceVerdict {ACCEPTED, PROVISIONAL_NOT_ACCEPTED,
+  RUNNING_NOT_ACCEPTED}. evaluate_acceptance(matrix, coverage): coverage<1.0 →
+  PROVISIONAL (US-002 human-label gate open, surfaces unlabelled_codes); full coverage +
+  precision>=0.95 + auto_resolution>=0.70 → ACCEPTED; else RUNNING. Thresholds
+  MIN_MAPPED_PRECISION=0.95 / MIN_AUTO_RESOLUTION_RATE=0.70. GOTCHA: auto_resolution_rate
+  = zone1/scored and `scored` INCLUDES correctly-predicted NO_MAP gold (tn) — so a gold
+  set with many NO_MAP codes drags auto_resolution down even at perfect precision (it is
+  NOT tp/RESOLVED-only). no_map_accuracy is reported but is NOT a gating threshold.
+  STRUCTURAL_PRECISION_CAVEAT is always emitted (Slice-0 ~100% precision is a property of
+  the deterministic exact-code walk, not the product). report.as_dict() = JSON (verdict +
+  coverage + thresholds + 3-granularity metrics + caveat); human_summary() = text.
 
 ---
 
@@ -694,4 +710,50 @@ Started: Tue Jun 30 14:37:57 EDT 2026
     reads the compiled staging table.
   - DuckDB UPDATE supports `rowid`; used `MIN(rowid)` to corrupt exactly one RESOLVED
     row in the live test without depending on a specific code.
+---
+
+## 2026-06-30 - US-012 (Mapping eval report — confusion matrix vs gold set, thresholds)
+- Shipped the end-to-end §1.5(f) report that runs the FROZEN US-002 metric module
+  over the resolved value-mapping store (US-005) against the gold set and applies the
+  acceptance gate. Re-derives NO math.
+- NEW src/sema/eval/mapping_report_utils.py (100% cov): AcceptanceVerdict enum
+  (ACCEPTED / PROVISIONAL_NOT_ACCEPTED / RUNNING_NOT_ACCEPTED), thresholds
+  MIN_MAPPED_PRECISION=0.95 + MIN_AUTO_RESOLUTION_RATE=0.70, STRUCTURAL_PRECISION_CAVEAT,
+  decision_from_value_mapping (bridges resolve→eval ResolutionStatus by value),
+  evaluate_acceptance (coverage gate first, then precision+auto thresholds; no_map_accuracy
+  reported but NOT gated), and the frozen MappingReport dataclass (as_dict JSON +
+  human_summary text; carries score/coverage/verdict/unlabelled_codes).
+- NEW src/sema/eval/mapping_report.py (100% cov): decisions_from_store (optional scope
+  filters source_vocabulary/target_property_ref/resolver_policy_ref/vocab_release),
+  build_mapping_report (score() → evaluate_acceptance), report_from_store convenience.
+- TDD: tests/unit/test_mapping_report.py (19 hermetic tests) written first, failed
+  ModuleNotFoundError, then implemented. Covers 3-granularity metrics, no_map_accuracy
+  reported-separately-not-gated, ACCEPTED at full coverage + thresholds (incl. exact 0.95
+  boundary), PROVISIONAL on subset coverage (surfaces unlabelled gap), RUNNING below
+  precision / below auto-resolution / undefined-precision, JSON+caveat serialization,
+  human_summary None-metric handling, store reads + all scope filters, frozen-ness.
+- NEW tests/integration/test_mapping_report_live.py (skip-guarded ~/.sema/poc.duckdb):
+  resolves every gold ONCOTREE_CODE via the real §4 resolver into a temp value-mapping
+  store, builds the report, prints human_summary; asserts thresholds ONLY at 100%
+  human-labelled coverage, else asserts PROVISIONAL + surfaced gap (gold ships UNLABELLED,
+  so Ralph never self-certifies — honours the US-002 human gate / US-012 dependency).
+- DEPENDENCY: US-012 acceptance CANNOT be self-certified. The gold set is 0/64 labelled
+  (UNLABELLED), so coverage=0.0 → PROVISIONAL — not accepted. Full ACCEPTED requires the
+  human-label gate (US-002) complete; US-013 acceptance then reads this verdict.
+- Quality: uv run pytest 2083 passed / 1 skipped; mypy clean (202 files); R29 guard
+  clean; coverage 93% repo, mapping_report.py + mapping_report_utils.py both 100%.
+- **Learnings for future iterations:**
+  - auto_resolution_rate = zone1/scored and `scored` INCLUDES correctly-predicted NO_MAP
+    gold (tn). A gold set heavy with NO_MAP codes lowers auto_resolution even at 100%
+    precision — it is NOT tp/RESOLVED-only. Do not "fix" this; it is the frozen US-002
+    definition (bug-353). When writing acceptance fixtures, use all-RESOLVED gold to hit
+    the ACCEPTED path, or compute zone1/scored by hand.
+  - The two ResolutionStatus enums (resolve.value_mapping_store_utils + eval.mapping_
+    goldset_utils) are deliberately separate with identical values; bridge via
+    `EvalResolutionStatus(store_status.value)`, never import one into the other.
+  - eval/ is R29-allowlisted, so reading ValueMapping.concept_id and gold.oncotree_code
+    here does NOT trip the guard. Keeping the report in eval/ (not resolve/ or compile/)
+    is the same reasoning as US-011's staging QA.
+  - US-013 reuses this report at full Databricks coverage; it asserts the thresholds only
+    when coverage==1.0 (the live test branches on report.coverage_fraction).
 ---
