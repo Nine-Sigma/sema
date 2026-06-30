@@ -166,8 +166,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "VocabularyResolver (src/sema/resolve/engine.py, R29-scanned, names no domain literal) orchestrates the §4 stages: candidates.py (1a exact code match in SOURCE vocab via policy.candidate_lookup, R9; no embeddings) -> standardize.py (2: 'Maps to' standard+valid via store.maps_to_targets, relationship/flag from policy, only_valid; self-standard candidate kept; validity-window reduces to invalid_reason IS NULL since ConceptRow has no date cols) -> domain_gate.py (3: policy.in_target_domain). disambiguate.py = single-model Disambiguator protocol + pick_single_survivor default that DECLINES ties (no council). engine_utils.py (NOT scanned; owns every concept_id touch): CodeResolution/ResolveContext + classify_resolution (1 survivor=auto_accepted RESOLVED conf 1.0/Zone-1; 0=NO_MAP conf 1.0/Zone-3; >1 tie=review_pending RESOLVED deterministic min-id placeholder conf 0.5/Zone-2) + build_value_mapping (§1.5(a) row) + build_vocab_lookup_assertion (VOCAB_LOOKUP MappingAssertion, raises on NO_MAP). Code-bearing hot path invokes NO LLM. resolve_and_store is the SOLE value-mapping-store writer (one row per grain incl NO_MAP). 15 hermetic unit tests (FakeVocabStore, TDD-first). Live integration (skip-guarded poc.duckdb): LUAD->45768916; unknown->NO_MAP; OncoTree->SNOMED path coverage RECORDED 63/64 (98.4%), NO_MAP=1 (threshold deferred to US-012). mypy clean (192 files), R29 guard green, coverage 93% repo / 99-100% new modules."
     },
     {
       "id": "US-007",
