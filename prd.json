@@ -142,8 +142,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "ValueMappingStore (src/sema/resolve/value_mapping_store.py) is a DuckDB-backed §1.5(a) decision cache; value_mapping_store_utils.py owns the FROZEN_COLUMNS (15) + GRAIN_KEY (5) constants, the ValueMapping frozen dataclass (concept_id NULL iff NO_MAP; no_map_reason non-null iff NO_MAP; confidence in [0,1]), and the SQL builders (create/upsert/select). Table PRIMARY KEY = the §1.5(a) grain (source_vocabulary, normalized_source_value, target_property_ref, resolver_policy_ref, vocab_release); upsert uses DuckDB ON CONFLICT DO UPDATE so a re-write of the same grain updates, never duplicates; vocab_release is part of the grain (different release => distinct row); run_id is provenance-only. Location-independent (NO source_schema/source_table). ResolutionStatus enum defined locally in resolve (mirrors eval's; identical values, no eval edit). DuckDB is the canonical home, no Databricks seed sync (compiler inlines, US-010) — documented in the module docstring. No SSSOM dep. 20 hermetic unit tests (temp DuckDB) + integration drift/round-trip test (tests/integration/test_value_mapping_store_schema.py, temp DuckDB so always runnable under -m integration). mypy clean (186 files); R29 guard green; coverage 93% repo / 94% store / 98% utils. US-006 will be the sole writer."
     },
     {
       "id": "US-006",

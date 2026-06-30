@@ -37,6 +37,17 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   (resolve/policies/omop.py:OMOP_VOCAB_SCHEMA), not hardcoded in the query module.
   VocabStore._fetch handles both DuckDB (execute->result.fetchall) and DBAPI cursors
   (execute->None, conn.fetchall). poc.duckdb concept tables are ALL-VARCHAR.
+- §1.5(a) value-mapping store schema is FROZEN in
+  src/sema/resolve/value_mapping_store_utils.py (FROZEN_COLUMNS + GRAIN_KEY constants);
+  the ValueMapping dataclass + SQL builders live there too. Downstream stories
+  (US-006 writes; US-010/US-012 read) MUST import these, never re-list columns. The
+  drift test (tests/integration/test_value_mapping_store_schema.py) freezes the contract.
+- DuckDB upsert pattern: declare PRIMARY KEY on the grain columns, then
+  `INSERT ... ON CONFLICT (grain) DO UPDATE SET col = excluded.col` (one row per
+  execute() call — a single statement can't update the same conflict row twice).
+- Hermetic DuckDB unit tests use a real temp file (tmp_path / "x.duckdb"), not a fake
+  conn — established by tests/unit/test_duckdb_staging.py. In-process DuckDB is local
+  (no network), so it stays within the hermetic-unit-suite rule.
 
 ---
 
@@ -264,4 +275,48 @@ Started: Tue Jun 30 14:37:57 EDT 2026
     store.maps_to_targets(cid, relationship_id=policy.maps_to_relationship,
     standard_flag=policy.standard_flag if policy.require_standard else None,
     only_valid=True); domain_gate.py uses ConceptRow.domain vs policy.target_domain.
+---
+
+## 2026-06-30 - US-005 (Resolved value-mapping store)
+- Shipped the §1.5(a) DuckDB-backed value-mapping store: the location-independent
+  decision cache (source_code -> concept_id | NO_MAP) the compiler reads from.
+  NO resolver (US-006 writes it); this story is the store + frozen schema only.
+- NEW src/sema/resolve/value_mapping_store_utils.py: FROZEN_COLUMNS (15, in table
+  order) + GRAIN_KEY (5) module constants; ResolutionStatus enum (RESOLVED|NO_MAP,
+  mirrors eval's — kept local to avoid editing the frozen US-002 module); ValueMapping
+  frozen dataclass with __post_init__ invariants (concept_id NULL iff NO_MAP;
+  no_map_reason non-null iff NO_MAP; RESOLVED forbids reason; confidence in [0,1]);
+  to_params/from_row and SQL builders (create_table/upsert/select_all/select_by_grain).
+- NEW src/sema/resolve/value_mapping_store.py: ValueMappingStore(conn, schema, table)
+  + open_duckdb_value_mapping_store(db_path) factory. PRIMARY KEY = the §1.5(a) grain;
+  upsert() uses ON CONFLICT DO UPDATE (re-write of same grain updates, never dups).
+  read_all/get(by grain)/column_names/count; context manager. Module docstring records:
+  DuckDB is the canonical home, NO Databricks seed sync (compiler inlines, US-010),
+  US-006 is the SOLE writer.
+- NEW tests/unit/test_value_mapping_store.py (20 hermetic tests, temp DuckDB):
+  frozen-columns-match-spec, grain-key-match-spec, created-table-cols==FROZEN_COLUMNS,
+  location-independent (no source_schema/table), write+read-back, get-by-grain,
+  upsert-same-grain (count stays 1, value updated), different-vocab_release => 2 rows,
+  NO_MAP persists NULL concept + reason, all 5 Status values round-trip, and the four
+  ValueMapping validation guards.
+- NEW tests/integration/test_value_mapping_store_schema.py (drift guard + real-code
+  round-trip): live table cols == FROZEN_COLUMNS exactly; uses a temp DuckDB so it
+  always runs under -m integration (not gated on a warehouse).
+- Quality: uv run pytest 1993 passed / 1 skipped (+2 integration passed); mypy clean
+  (186 files); R29 guard green; coverage 93% repo, 94% store / 98% utils.
+- **Learnings for future iterations:**
+  - concept_id is BIGINT / int|None in the store (aligns with the gold set's int and
+    eval's Decision), DESPITE poc.duckdb's all-VARCHAR concept tables (US-003). US-006
+    must CAST the VocabStore's str concept_id to int before writing a ValueMapping.
+  - DuckDB ON CONFLICT needs a PRIMARY KEY/UNIQUE on the conflict columns; the grain is
+    the PK. Upsert one ValueMapping per execute() — a single INSERT...VALUES with the
+    same grain twice raises "can not update the same row twice".
+  - ResolutionStatus now exists in TWO places (resolve + eval) with identical values.
+    Kept separate to avoid touching the frozen US-002 eval module. If a future story
+    wants one source of truth, make resolve canonical and have eval re-export (no cycle:
+    eval->resolve->models is clean).
+  - value_mapping_store*.py are NOT in the R29 guard core_paths and carry no OMOP
+    literals anyway (a row's source_vocabulary/target_field are data the resolver writes).
+  - The store is DuckDB-only by design — do NOT add a Databricks mirror; US-010's
+    compiler inlines decisions into the staging write instead.
 ---
