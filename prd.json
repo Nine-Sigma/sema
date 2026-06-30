@@ -310,8 +310,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "src/sema/eval/mapping_report.py + mapping_report_utils.py (eval/ R29-allowlisted, both 100% cov) run the FROZEN US-002 §1.5(f) metric module (eval.mapping_goldset.score) over the US-005 value-mapping store against the gold set — NO re-derived math. decision_from_value_mapping bridges the two (separate, identical-valued) ResolutionStatus enums by .value. evaluate_acceptance is GATED never self-certified: AcceptanceVerdict {ACCEPTED, PROVISIONAL_NOT_ACCEPTED, RUNNING_NOT_ACCEPTED}; coverage<1.0 -> PROVISIONAL (US-002 human-label gate open, surfaces unlabelled_codes); full coverage + mapped_precision>=0.95 + auto_resolution_rate>=0.70 -> ACCEPTED; else RUNNING. no_map_accuracy reported SEPARATELY, NOT a gating threshold. Three granularities (distinct-code/row-weighted/per-bucket) from score(). STRUCTURAL_PRECISION_CAVEAT always emitted (Slice-0 ~100% precision is the deterministic exact-code walk, not the product approach on the ambiguous tail). as_dict()=JSON, human_summary()=text. GOTCHA (bug-353): auto_resolution_rate=zone1/scored and scored INCLUDES correctly-predicted NO_MAP gold (tn), so NO_MAP-heavy gold lowers it even at 100% precision (frozen US-002 semantics, not a bug). 19 hermetic unit tests (TDD-first) + skip-guarded live integration (resolves every gold code via real §4 resolver into a temp store, asserts thresholds ONLY at 100% human coverage else PROVISIONAL+surfaced gap). HUMAN GATE: gold is 0/64 labelled so live verdict=PROVISIONAL — Ralph does NOT self-certify; US-013 reads this verdict at full Databricks coverage. pytest 2083 passed/1 skipped; mypy clean (202 files); R29 guard clean; coverage 93% repo."
     },
     {
       "id": "US-012A",
