@@ -1,0 +1,206 @@
+{
+  "project": "sema",
+  "branchName": "ralph/fix/data-unification",
+  "description": "Data Unification Correctness & Wiring Fixes — fix the Neo4j semantic layer bugs from docs/architecture/data-unification-analysis.md: lifecycle deprecation bug, last-writer-wins shared nodes, never-created provenance edges, incomplete study deletion, Term identity collisions, deadlock handling, stale embeddings, connector coupling. Standards for EVERY story: strict TDD (failing test first), no globals, functions <=60 lines, files <=400 lines, helpers in *_utils.py modules, self-documenting code with no excessive comments, type hints (mypy strict), logging via sema.log logger, all commands via uv run, coverage >= 85% (uv run pytest --cov=sema --cov-report=term-missing) verified BEFORE every commit/push, conventional commits (fix:/feat:/test:/refactor:) with simple subject lines and NO Co-Authored-By lines.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Normalize names and alias text at assertion creation",
+      "description": "As a build pipeline, I want entity/property/alias strings normalized once at the assertion boundary so whitespace and unicode variants of the same name cannot fragment into separate graph nodes (finding N).",
+      "acceptanceCriteria": [
+        "Failing tests written first: leading/trailing whitespace, internal double spaces, NFC vs NFD unicode, idempotency, empty string",
+        "normalize_name(text: str) -> str helper in a *_utils.py module (e.g. src/sema/engine/normalize_utils.py): strip, collapse internal whitespace runs to single spaces, unicode NFC; case preserved",
+        "Normalization applied at assertion-creation time (L2/L3 payload -> Assertion) for entity names, property names, and alias/synonym text — Assertion() is constructed at ~9 sites across 6 engine files (semantic.py, vocabulary.py, joins.py, join_detector.py, stage_utils.py, corrections.py), so use ONE choke point (e.g. a Pydantic validator on Assertion or a single shared builder), NOT edits at every call site or MERGE site",
+        "Unit test: two assertions differing only by whitespace/unicode produce one :Entity upsert row (loader mocked, no Neo4j)",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "normalize_name in src/sema/engine/normalize_utils.py (pure stdlib NFC + whitespace collapse + strip). Single choke point: @model_validator(mode='after') on Assertion normalizes payload['value'] for HAS_ENTITY_NAME/HAS_PROPERTY_NAME/HAS_ALIAS/HAS_SYNONYM. Tests in tests/unit/test_normalize_utils.py incl. loader-mocked collapse-to-one-MERGE-key test. 1527 passed, mypy clean, coverage 90%."
+    },
+    {
+      "id": "US-002",
+      "title": "Key :Term on {vocabulary_name, code}",
+      "description": "As a multi-domain platform, I want term identity namespaced by vocabulary so unrelated codes (M=Male vs M=Mississippi) never collapse into one node (finding B). Existing graphs are rebuilt; no migration script.",
+      "acceptanceCriteria": [
+        "Failing test first: same code in two different vocabularies produces two distinct :Term MERGE rows; same code + same vocabulary still produces one",
+        "batch_upsert_terms (src/sema/graph/loader_utils.py:142) MERGEs on {vocabulary_name, code}; vocabulary-less terms use sentinel namespace '_unscoped' so the key is never null",
+        "Every Cypher site that MATCHes :Term by code updated to the composite key — grep ':Term' across src/sema to enumerate (MEMBER_OF/IN_VOCABULARY edge creation, graph/queries.py retrieval, deletion paths); list each updated site in notes",
+        "Any Neo4j uniqueness constraint/index on :Term(code) updated to the composite key — note: as of writing, no such constraint exists (planner_migrations.py creates only *_id_unique constraints); verify with grep and skip if still absent",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "NEW src/sema/graph/term_identity_utils.py (pure stdlib: UNSCOPED_VOCAB='_unscoped' sentinel + term_namespace()). NEW src/sema/graph/term_vocab_utils.py (resolve_term_vocab / term_vocab_for_subject: namespace a column's terms by matched vocabulary, else value-set name; lazy pick_winner import avoids cycle). Composite key {vocabulary_name, code} applied at every :Term MERGE/MATCH-by-code site: loader_utils.batch_upsert_terms (MERGE), loader_utils.batch_create_in_vocabulary (MATCH), loader.upsert_term/add_term_to_value_set/add_term_hierarchy (each gained optional vocabulary_name param, sentinel default). materializer_utils.upsert_decoded_values + apply_resolution_edges thread the resolved namespace so value-set membership, IN_VOCABULARY edges, and hierarchy all MATCH the same Term node. queries.py find_vocabulary_for_term left MATCH-by-code by design (read path answering 'which vocab holds this code'; cannot pre-filter by vocab). queries.py lines 18/30/127/177/212 match :Term without code key — unaffected. delete_study_scoped deletes by source_schema, not by Term code — unaffected. No :Term(code) uniqueness constraint exists (planner_migrations.py only has term_model_role_exists existence constraint) — verified, skipped per AC. Tests: NEW tests/unit/test_term_identity.py (18). 1545 passed, mypy clean, coverage 90%."
+    },
+    {
+      "id": "US-003",
+      "title": "Order-independent shared-node writes (confidence-guarded SET)",
+      "description": "As a graph with nodes shared across studies, I want description/source/confidence on :Entity/:Property/:Term updated only when incoming confidence is strictly greater than stored, so build order can never decide what a shared node says (finding C).",
+      "acceptanceCriteria": [
+        "Failing tests first: low-confidence after high does NOT overwrite; high after low DOES; equal confidence keeps existing value; final state identical regardless of write order",
+        "batch_upsert_entities, batch_upsert_properties, batch_upsert_terms (src/sema/graph/loader_utils.py:78-171) replace unconditional SET with confidence-guarded update; source_id coalesce behavior preserved",
+        "ON CREATE still sets all fields for new nodes",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "NEW helpers in src/sema/graph/loader_utils.py: UNSET_CONFIDENCE=-1.0 sentinel, confidence_wins(incoming, stored) (strictly-greater wins; equal keeps existing; None stored treated as sentinel), _confidence_guard(alias) -> Cypher 'r.confidence > coalesce(<alias>.confidence, -1.0)', _guarded_set(alias, fields) -> comma-joined 'CASE WHEN win THEN r.<f> ELSE <alias>.<f> END'. batch_upsert_entities/properties/terms now insert 'WITH <alias>, r, <guard> AS win' after ON CREATE SET, then guard description/source/confidence/resolved_at (label for Term, semantic_type for Property). On a freshly created node <alias>.confidence is null -> coalesce->-1.0 -> win true, so ON CREATE still sets all fields. status stays unconditional 'ACTIVE'; model_role and source_id keep their coalesce behavior. Final node state is now order-independent. Tests: NEW tests/unit/test_confidence_guard.py (11): confidence_wins semantics, order-independence simulation (forward==backward==max), structural guard presence per function, source_id coalesce preserved. 1556 passed, mypy clean, coverage 90%, loader_utils.py 338 lines."
+    },
+    {
+      "id": "US-004",
+      "title": "Run vocabulary lifecycle phase once per build, not per table",
+      "description": "As a multi-table build, I want vocabulary deprecation computed over the union of all tables' active vocabularies after materialization completes, so table 2 can never deprecate vocabularies table 1 introduced (finding D).",
+      "acceptanceCriteria": [
+        "Failing test first reproducing the bug: materialize table A (vocab X) then table B (vocab Y) -> X must remain ACTIVE",
+        "run_lifecycle_phase removed from materialize_unified per-table steps (src/sema/graph/materializer.py:66); orchestrator invokes it once after all work items finish with the union of active vocabulary names",
+        "Union accumulated via worker return values — workers return TableResult from _spawn_workers (src/sema/pipeline/orchestrate_utils.py:138-160); carry each table's active vocabulary names on/alongside that return value; no module-level mutable global",
+        "Test covers behavior under config.resume",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "NEW src/sema/graph/lifecycle_utils.py: active_vocab_names(assertions) (active VOCABULARY_MATCH values), deprecate_stale_vocabularies(loader, active_names) (no-op on empty set so a zero-vocab build never deprecates everything; sorted active_names), deprecate_stale_from_results(loader, results) (unions each result's active_vocabularies and deprecates once). run_lifecycle_phase REMOVED from materializer_utils.py (shrank 449->420) and its call removed from materializer.py materialize_unified (now 4 phases; docstring notes lifecycle moved to orchestrator). TableResult gained active_vocabularies: list[str] = field(default_factory=list); success()/skipped() accept it. process_table sets it from active_vocab_names(all_assertions); _try_resume sets it from stored assertions so resumed tables still contribute to the union (resume case covered). orchestrate.run_build calls deprecate_stale_from_results(loader, results) once after _collect_results. Helper put in lifecycle_utils (71 lines) not orchestrate_utils to avoid growing that already-407-line file. Tests: NEW tests/unit/test_vocab_lifecycle.py (8): active_vocab_names filtering, deprecate no-op/runs, materialize_unified issues no DEPRECATED query, union keeps every table's vocab, no-op union, resume result carries vocab. Old TestRunLifecyclePhase removed from test_materializer_utils.py. 1562 passed, mypy clean, coverage 90% (lifecycle_utils 100%)."
+    },
+    {
+      "id": "US-005",
+      "title": "Retry transient Neo4j errors during materialization",
+      "description": "As a build running the default table_workers=4, I want MERGE deadlocks on shared nodes retried with backoff instead of failing the table (finding E).",
+      "acceptanceCriteria": [
+        "Failing tests first with mocked driver: TransientError twice then success -> succeeds in 3 attempts; persistent TransientError -> raises after max attempts; ClientError NOT retried, propagates immediately",
+        "Retry helper in graph *_utils.py wraps GraphLoader._run / batch execution: retries neo4j.exceptions.TransientError with exponential backoff; max attempts and base delay as module-level constants",
+        "Each retry logged via sema.log logger with statement summary and attempt number",
+        "No real sleeps in unit tests (sleep function injected/patched)",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "NEW src/sema/graph/retry_utils.py: run_with_retry(operation, summary, sleep=None) retries neo4j.exceptions.TransientError with exponential backoff (BASE_RETRY_DELAY_SECONDS=0.2 * 2**(attempt-1)); module-level MAX_RETRY_ATTEMPTS=3. ClientError is NOT caught so it propagates immediately. Each retry + final exhaustion logged via sema.log (loguru) logger with statement summary and attempt number. statement_summary(cypher) truncates to first line/80 chars. Sleep injectable via sleep param; loader path uses module-level _sleep() patchable in tests (monkeypatch sema.graph.retry_utils._sleep). Wired into GraphLoader._run AND _run_read (loader.py) — both wrap their session work in a local op() closure passed to run_with_retry, so all batch UNWIND helpers (loader_utils routes through loader._run/_run_read) inherit retry. Tests: NEW tests/unit/test_retry_utils.py (9): helper-level (2 transient then success in 3 attempts, persistent raises after MAX, ClientError 1 call no retry, exponential delays, summary truncation) and loader-level with mocked driver (_run + _run_read retry, persistent raise, ClientError immediate). No real sleeps (injected/patched). 1571 passed, mypy clean, coverage 90% (retry_utils 96%)."
+    },
+    {
+      "id": "US-006",
+      "title": "Actually create provenance SUBJECT/OBJECT edges (bug-239)",
+      "description": "As a curator, I want every provenance assertion linked to the node it describes. Today materialize_provenance_edges matches on subject_id which is always None, so zero SUBJECT/OBJECT edges have ever been written (finding I).",
+      "acceptanceCriteria": [
+        "Failing test first proving the current no-op: materializing a has_entity_name assertion must issue a SUBJECT edge statement that can match the subject node",
+        "One mechanism chosen and documented in module docstring: resolve subject from assertion.subject_ref to the physical :Table/:Column key, OR populate subject_id/object_id at assertion creation — dead alternative deleted",
+        "Guard clauses skip unresolvable subjects with a debug log; no unguarded null-MATCH round-trips remain (src/sema/graph/loader.py:478-501)",
+        "Edges created in batch via UNWIND, not one Cypher round-trip per assertion",
+        "Test asserts OBJECT edges for predicates that carry an object",
+        "Update .wolf/buglog.json bug-239 with the actual fix",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "NEW src/sema/graph/provenance_utils.py. Mechanism (documented in module docstring): resolve subject_ref/object_ref to the physical :Table/:Column MERGE key via CanonicalRef.parse (the SAME key physical nodes are upserted on), then MERGE SUBJECT/OBJECT edges. Chose subject_ref resolution over populating subject_id/object_id because node ids are random UUIDs assigned at materialization time — unknowable when the assertion is created; subject_ref is the stable identity. Critical gotcha: connector emits column refs as {fqn}/{column} (slash) but L2/stage_utils emits {table_ref}.{column} (dot) — CanonicalRef.parse normalizes both, so raw-string ref equality would have silently missed every column. Edges batched via UNWIND, one statement per role(SUBJECT/OBJECT)+label(Table/Column), never per-assertion. Guard: provenance-predicate filter + skip unparseable refs with debug log (no unguarded null-MATCH round-trips). loader.materialize_provenance_edges now delegates (loader.py shrank); dead subject_id null-MATCH path deleted. subject_id/object_id Assertion fields left as stored vestigial schema (always None) — out of scope to remove. bug-239 updated to FIXED. Tests: NEW tests/unit/test_provenance_edges.py (10) + updated TestProvenanceEdges in test_graph_loader.py to the new mechanism (added join-evidence OBJECT-edge test). 1581 passed, 1 skipped; mypy clean; coverage 90% (provenance_utils 100%)."
+    },
+    {
+      "id": "US-007",
+      "title": "Add source_schema to IN_VOCABULARY and CLASSIFIED_AS edges",
+      "description": "As a study owner, I want my vocabulary-association edges deleted when my study is deleted; today these two edge types carry no source_schema and survive delete_study_scoped (finding K).",
+      "acceptanceCriteria": [
+        "Failing tests first: relationship MERGE keys for batch_create_in_vocabulary (src/sema/graph/loader_utils.py:307) and batch_create_classified_as (loader_utils.py:291) include source_schema, matching the HAS_VALUE_SET/MEMBER_OF pattern",
+        "Two studies asserting the same Term->Vocabulary association produce two edges, one per study, each independently deletable",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "batch_create_classified_as and batch_create_in_vocabulary (src/sema/graph/loader_utils.py) now MERGE their CLASSIFIED_AS / IN_VOCABULARY edge with {source_schema: r.source_schema} in the relationship key, mirroring HAS_VALUE_SET/MEMBER_OF, so two studies asserting the same Property->Vocabulary or Term->Vocabulary association produce two distinct edges each deletable by delete_study_scoped (which sweeps `MATCH ()-[r {source_schema:$schema}]-() DELETE r`). source_schema is threaded from materialize_unified -> materialize_vocabulary_edges(loader, groups, source_schema=) -> classified_edges dicts + _collect_in_vocabulary_edges(groups, source_schema) -> in_vocab_edges dicts. Tests: NEW tests/unit/test_vocab_edge_scoping.py (5): MERGE-key presence for both edge types, two-study two-row batches, and materialize_vocabulary_edges threading source_schema into both edge collections. 1586 passed, 1 skipped; mypy clean; coverage 90% (loader_utils 97%, vocabulary_materializer 95%). loader_utils.py 350 lines, vocabulary_materializer.py 134 lines (both <400)."
+    },
+    {
+      "id": "US-008",
+      "title": "Complete study deletion: orphaned aliases and concept nodes",
+      "description": "As an operator deleting a study, I want no stranded :Alias nodes and no edge-less concept nodes left behind (findings J and H).",
+      "acceptanceCriteria": [
+        "Failing tests first (mocked loader, assert issued Cypher): after edge deletion, delete :Alias nodes with no remaining REFERS_TO edges; delete :Entity/:Property/:Term/:Vocabulary/:ValueSet nodes with no remaining relationships",
+        "Cleanup lives in delete_study_scoped (src/sema/graph/loader.py:538) or a loader_utils helper it calls — one entry point",
+        "Two-study test: shared nodes still referenced by the surviving study are untouched",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "NEW helper delete_orphaned_nodes(loader) in src/sema/graph/loader_utils.py (the single entry point, called by loader.delete_study_scoped after its three scoped-delete _run calls; loader.py stays ~660 lines, helper logic extracted not inlined). Sweeps in two ordered passes: (1) `MATCH (a:Alias) WHERE NOT (a)-[:REFERS_TO]->() DELETE a` removes aliases whose only REFERS_TO edge was just deleted (finding J); (2) for each of _ORPHAN_CONCEPT_LABELS = Entity/Property/Term/Vocabulary/ValueSet, `MATCH (n:Label) WHERE NOT (n)--() DELETE n` removes edge-less concept nodes (finding H). Aliases dropped FIRST so a freed target concept node becomes orphan-eligible in the concept sweep. The `NOT (n)--()` guard is the two-study safety: a shared node still referenced by a surviving study has edges, so it is untouched. delete_study_scoped docstring updated. Tests: NEW tests/unit/test_orphan_cleanup.py (8: alias guard present + never-unconditional, each concept label swept, concept deletion always guarded, ordering edge-sweep<alias<concept, helper entry-point) + NEW TestOrphanCleanupOnDelete integration class in tests/integration/test_multi_study_lifecycle.py (sole-study delete strands nothing incl. an :Alias; two-study delete keeps shared Entity/Term). Updated TestScopedDelete.test_delete_runs_three_queries to only assert the schema kwarg on schema-bearing queries (orphan GC queries are global, no schema param). 1592 passed, 1 skipped; mypy clean; coverage 90% (loader_utils 97%). loader_utils.py 373 lines (<400)."
+    },
+    {
+      "id": "US-009",
+      "title": "Resume runs study-scoped cleanup before re-materializing",
+      "description": "As a resumed build, I want the study's prior graph writes cleaned up before re-materialization, so edges from tables removed since the failed run cannot persist (finding L). Resume reloads the full assertion set, so delete-then-rewrite is safe.",
+      "acceptanceCriteria": [
+        "Failing test first: with config.resume=True, delete_study_scoped is invoked for the study schema before any materialize_unified call (today skipped at src/sema/pipeline/orchestrate.py:64)",
+        "Resume still skips re-extraction and LLM work; only graph cleanup behavior changes",
+        "Test covers fresh-resume case: cleanup of an absent study is a no-op, not an error",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "Removed the `if not config.resume:` guard around the schema-wipe loop in src/sema/pipeline/orchestrate.py run_build, so loader.delete_study_scoped(schema) now runs for EVERY distinct work-item schema before _spawn_workers (which invokes materialize_unified via process_table/_try_resume) for both fresh and resume builds. Resume reloads the full assertion set (build._try_resume -> load_assertions -> materialize_unified), so delete-then-rewrite is safe and clears edges from tables removed since a failed run (finding L). Cleanup of an absent study is a harmless no-op (delete MATCHes nothing). Resume still skips re-extraction/LLM (gating lives in process_table, unchanged). Tests: rewrote TestResumeGating in tests/unit/test_orchestrate_resume_gating.py — test_resume_true_wipes_each_schema_before_workers (delete called once per distinct schema AND before workers spawn, via _spawn_workers side_effect observing loader.delete_study_scoped.called), test_resume_false_wipes_each_schema_once (unchanged), test_resume_true_absent_study_cleanup_is_no_op (has_assertions=False fresh-resume still gets one cleanup call, run completes without error). 1592 passed, 1 skipped; mypy clean; coverage 90%."
+    },
+    {
+      "id": "US-010",
+      "title": "Re-embed nodes whose description changed",
+      "description": "As the retrieval engine, I want embeddings matching current node descriptions; today embeddings are computed once post-build with no change detection, so a later study's overwrite leaves a stale vector (finding M). The embedding phase is _compute_embeddings (src/sema/pipeline/orchestrate_utils.py:224) + src/sema/engine/embeddings.py; the write path is GraphLoader.set_embedding / set_property_embedding (src/sema/graph/loader.py).",
+      "acceptanceCriteria": [
+        "Failing tests first: embedding phase selects nodes where embedding is missing OR stored description_hash differs from hash of current description; unchanged nodes NOT re-embedded (assert call counts on mocked embedder)",
+        "description_hash (sha256 of embedded text) written alongside the embedding in the same statement",
+        "Hashing/selection helpers in the relevant *_utils.py",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "NEW src/sema/engine/embedding_utils.py (pure stdlib, no sema imports): description_hash(text)=sha256 hex of embedded text; needs_reembedding(node, text) True when node has no/empty embedding OR stored description_hash != hash(current text); select_stale_nodes(nodes, texts) pairs only stale (node, text). _embed_label_nodes (orchestrate_utils.py) now builds texts via build_embedding_text, filters to select_stale_nodes, batches+embeds ONLY stale nodes, and passes description_hash(text) to the writer — unchanged nodes are never re-embedded (embed_batch not called). Write path: GraphLoader.set_embedding and set_property_embedding (loader.py) gained description_hash: str = '' param and SET n.description_hash = $description_hash in the SAME statement as n.embedding, so hash+vector are written atomically. Hashing/selection helpers live in embedding_utils.py (the relevant *_utils.py). Tests: NEW tests/unit/test_embedding_change_detection.py (17): hash semantics, needs_reembedding cases (missing/empty embedding, changed hash, present-embedding-missing-hash, unchanged skip), select_stale_nodes filtering, _embed_label_nodes change-detection (unchanged not re-embedded, changed re-embedded+writes new hash, missing-embedding re-embedded, Property composite-key writes hash, mixed only-stale embedded), and loader write-path asserting description_hash in same statement for both set_embedding/set_property_embedding. 1609 passed, 1 skipped; mypy clean; coverage 90% (embedding_utils 100%). loader.py 664, orchestrate_utils.py 411 (pre-existing >400, grew +4)."
+    },
+    {
+      "id": "US-011",
+      "title": "Pipeline programs against the Connector ABC",
+      "description": "As a future non-Databricks source, I want orchestration typed against the existing Connector interface (src/sema/connectors/base.py) instead of the concrete DatabricksConnector, with no pipeline code reaching into private connector internals (finding G).",
+      "acceptanceCriteria": [
+        "Failing tests first: orchestration accepts any Connector implementation (stub subclass in test, no Databricks imports)",
+        "orchestrate.py / build.py type hints and factories use Connector; DatabricksConnector constructed in exactly one composition-root/factory location",
+        "FK sampler's connector._execute access (src/sema/pipeline/orchestrate_utils.py:340-343) replaced with a public abstract method on Connector, implemented in DatabricksConnector by delegating to existing logic",
+        "No new connector implementations — the test stub is sufficient proof",
+        "Functions <=60 lines; NEW files <=400 lines; loader.py (614 lines) and materializer_utils.py (464) already exceed 400 — do NOT grow them and do NOT refactor them wholesale (out of scope), extract new logic into *_utils.py modules; no globals",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": "Added abstract execute_query(query) -> list[tuple] to the Connector ABC (src/sema/connectors/base.py); DatabricksConnector.execute_query delegates to existing _execute. FK sampler/profile lookup in orchestrate_utils.run_fk_detection now wire query_fn=connector.execute_query (was connector._execute, private). discover_tables/extract_table lifted onto the ABC as default methods raising NotImplementedError (TYPE_CHECKING import of TableWorkItem from databricks to avoid runtime cycle; base uses `from __future__ import annotations`) so orchestration type hints can be Connector and mypy strict passes. Type hints switched DatabricksConnector/Any -> Connector at: orchestrate_utils._register_datasource/_discover_tables/run_fk_detection; build.process_table; build_utils._run_extraction/_run_pipeline_stages. DatabricksConnector is now constructed in EXACTLY ONE place: DatabricksConnectorFactory.create() (build.py:130) — orchestrate.run_build's discovery_connector now comes from connector_factory.create() (the duplicate later factory construction removed). Removed a now-unused `# type: ignore[no-any-return]` in _discover_tables (return type became concrete). No new connector implementations: StubConnector test stub (no Databricks imports) proves orchestration accepts any Connector. Tests: NEW tests/unit/test_connector_abstraction.py (3: abstract-instantiation guard, stub execute_query, run_fk_detection wires public execute_query into both WarehouseSampler+WarehouseProfileLookup); updated test_connector_base.FakeConnector (+execute_query) and added TestExecuteQuery delegation test in test_databricks_connector.py. 1613 passed, 1 skipped; mypy clean; coverage 90%. base.py 123 lines; orchestrate_utils.py 412 / build_utils.py 540 (pre-existing >400, type-hint-only edits, not grown)."
+    },
+    {
+      "id": "US-012",
+      "title": "Mark fixed findings in the analysis doc",
+      "description": "As the next reader of docs/architecture/data-unification-analysis.md, I want findings B, C, D, E, G, I, J, K, L, M, N marked fixed with the implementing mechanism, so the doc stays a trustworthy map of remaining gaps (A and F stay open).",
+      "acceptanceCriteria": [
+        "Each fixed finding in section 5 gets a one-line '**Fixed:**' note naming the mechanism; original analysis text untouched",
+        "Section 6 recommendations 2-5 and 8-13 marked done; 1 and 6 remain open",
+        "Section 7 verdict paragraph updated to the post-fix state",
+        "Coverage >= 85% confirmed via uv run pytest --cov=sema --cov-report=term-missing",
+        "uv run pytest passes",
+        "uv run mypy src/sema/ passes (typecheck)"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": "Documentation-only (docs/architecture/data-unification-analysis.md is gitignored — edits live on disk, not in git; prior docs stories committed only prd.json+progress.txt). Section 5: added a one-line '**Fixed:**' note to findings B, C, D, E, G, I, J, K, L, M, N (and H, whose two parts map to US-003+US-008) naming the implementing mechanism/story; original analysis text untouched. A and F left open (no Fixed note). Section 6: recommendations 2,3,4,5,8,9,10,11,12,13 marked '— Done' with the story; rec 7 marked '— Partially done' (ABC wired US-011, second connector still open); rec 1 (entity resolution) and rec 6 (cross-study join inference #31) left open. Section 7 verdict rewritten to the post-fix state: wiring gaps I–N closed + order-dependence bugs (B/C/D/E/G) closed, leaving A (entity resolution) and F (cross-study joins) as the two remaining high-impact gaps. Checks: 1613 passed, 1 skipped; mypy clean; coverage 90%."
+    }
+  ]
+}
