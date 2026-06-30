@@ -559,6 +559,18 @@ Acceptance criteria (+ all Global Standards):
   omop_condition_slice0.yaml --writer neo4j` against Neo4j **(skip-guarded)** asserts the
   `condition_concept_id` binding exists with `domain='Condition'`; the **hermetic**
   `--writer in-memory` assertion above is the always-on gate.
+- **Neo4j visibility assertion (what you'll see in the graph).** The live test runs this
+  Cypher and asserts exactly one row (`condition_occurrence | condition_concept_id |
+  Condition | true`), proving the TARGET schema is materialized and traversable:
+  ```cypher
+  MATCH (e:Entity {model_role:'TARGET'})-[:HAS_PROPERTY]->(p:Property)
+        -[:HAS_VOCABULARY_BINDING]->(vb:VocabularyBinding)
+  WHERE vb.property_name = 'condition_concept_id'
+  RETURN e.name, vb.property_name, vb.domain, vb.require_standard
+  ```
+  It also asserts the obligation is present:
+  `MATCH (e:Entity {model_role:'TARGET'})-[:HAS_OBLIGATION]->(o:TargetObligation)
+  RETURN o` returns the `condition_occurrence` obligation.
 
 ---
 
@@ -620,6 +632,20 @@ Acceptance criteria (+ all Global Standards):
 - `integration` live test: run the producer over a real study's `ONCOTREE_CODE`
   `:ValueSet` (built source graph) + the US-007 target binding; assert the `:FieldMap`
   edges exist with the correct direction.
+- **Neo4j visibility assertion (the source→target bridge).** The live test runs this
+  Cypher and asserts exactly one row (`ONCOTREE_CODE | VOCAB_LOOKUP | condition_concept_id`),
+  proving the SOURCE and TARGET halves are stitched together and the mapping is traversable
+  in the graph:
+  ```cypher
+  MATCH (src:Property {model_role:'SOURCE'})<-[:DERIVED_FROM]-(fm:FieldMap)
+        -[:MAPS_TO]->(tgt:Property {model_role:'TARGET'})
+  RETURN src.name, fm.pattern, tgt.name
+  ```
+  The test also asserts **direction** explicitly: `MAPS_TO` originates at the `:FieldMap`
+  (never at a source `:Property`), and `DERIVED_FROM` points from the `:FieldMap` to the
+  SOURCE `:Property` (per `planner_loader.py:101/112`). The per-value crosswalk
+  (`LUAD→concept_id`) is **not** asserted here — it lives in the value-mapping store
+  (US-005), not as graph edges.
 
 ---
 
