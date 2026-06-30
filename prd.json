@@ -116,8 +116,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "VocabStore (src/sema/resolve/vocab_store.py) + vocab_store_utils.py: SQLGlot ASTs (concept_by_code_query/maps_to_targets_query/concept_domain_query) rendered per dialect (.sql(dialect=duckdb|databricks)); values bound as exp.Placeholder() so 'Maps to'/'S' come from the US-004 policy at call time, never embedded. Generic VocabStoreSchema (role-based field names) + ConceptRow (id/name/domain/vocabulary/standard/code/invalid_reason); OMOP column literals confined to policies/omop.py:OMOP_VOCAB_SCHEMA (R29-allowlisted). _fetch handles DuckDB (result.fetchall) and DBAPI cursors (conn.fetchall) so the same class serves Databricks in US-013. 16 hermetic unit tests (fake conn records SQL+params) TDD-first. Live integration (skip-guarded poc.duckdb): LUAD->777926 domain Condition; maps_to standard SNOMED Condition 45768916; latency ~0.5s (<30s bound) on 54.9M concept_relationship. R29 clean, mypy clean, coverage 93% repo / 96% vocab_store / 100% utils."
     },
     {
       "id": "US-005",

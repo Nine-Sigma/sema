@@ -31,6 +31,12 @@ Started: Tue Jun 30 14:37:57 EDT 2026
 - Gold-set artifact tests/data/gold/oncotree_condition_slice0.jsonl: gold_concept_id
   is an EXTERNAL ORACLE (human/crosswalk), never Sema's resolver. Codes awaiting the
   human gate use gold_label=UNLABELLED (excluded from scoring, surfaced separately).
+- SQL query layers use SQLGlot ASTs (exp.select/.from_/.where/.join), rendered per
+  dialect via .sql(dialect="duckdb"|"databricks"); bind values as exp.Placeholder()
+  (`?`), never embed them. OMOP physical table/column names are config
+  (resolve/policies/omop.py:OMOP_VOCAB_SCHEMA), not hardcoded in the query module.
+  VocabStore._fetch handles both DuckDB (execute->result.fetchall) and DBAPI cursors
+  (execute->None, conn.fetchall). poc.duckdb concept tables are ALL-VARCHAR.
 
 ---
 
@@ -199,4 +205,63 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   - resolve_policy expects a registered ref; US-007's manifest must set
     resolver_policy_ref="omop.oncotree_to_snomed_condition" (OMOP_ONCOTREE_
     CONDITION_REF) for the binding to resolve.
+---
+
+## 2026-06-30 - US-003 (Vocabulary store query layer over vocabulary_omop)
+- Shipped the thin SQLGlot-based query layer over the OMOP concept tables. One
+  query authored once, rendered per dialect (DuckDB dev / Databricks prod), so
+  the 10M-concept vocabulary stays in the warehouse, never Neo4j.
+- NEW src/sema/resolve/vocab_store_utils.py: generic VocabStoreSchema (role-based
+  field names — id_col/code_col/standard_col/...), ConceptRow (generic shape:
+  id/name/domain/vocabulary/standard/code/invalid_reason), and SQLGlot AST
+  builders concept_by_code_query / maps_to_targets_query (JOIN, optional
+  standard+validity filters) / concept_domain_query. All return exp.Select — no
+  hand-concatenated SQL. Placeholders render as `?` (bind params), so the
+  relationship name ('Maps to') and standard flag ('S') are NEVER embedded in SQL.
+- NEW src/sema/resolve/vocab_store.py: VocabStore(connection, schema, namespace,
+  dialect) with concept_by_code / maps_to_targets / concept_domain. _fetch()
+  handles BOTH DuckDB (execute returns a result with fetchall) and DBAPI cursors
+  (execute returns None -> conn.fetchall()), so the same class serves DuckDB now
+  and Databricks in US-013. open_duckdb_vocab_store() factory (read-only, FileNotFound
+  guard); VocabStoreBackend enum + namespace_for_backend() (duckdb=vocabulary_omop,
+  databricks=workspace.vocabulary_omop).
+- EDIT src/sema/resolve/policies/omop.py (R29-allowlisted): added OMOP_VOCAB_SCHEMA
+  — the ONLY place the OMOP column literals (concept_id, standard_concept, domain_id,
+  concept_relationship, ...) live. VocabStore reads them as config so the query
+  layer stays vocabulary-agnostic.
+- TDD: tests/unit/test_vocab_store.py (16 hermetic tests, fake conn records SQL+params)
+  written first, failed ModuleNotFoundError, then implemented. Asserts: namespaced
+  SELECTs, 2-placeholder code lookup, JOIN with relationship bound (NOT literal),
+  standard+validity filter pushed to SQL, both-dialect rendering, DBAPI-cursor path,
+  builders return exp.Select. NEW tests/integration/test_vocab_store_live.py +
+  tests/integration/_omop_binding.py (skip-guarded on ~/.sema/poc.duckdb): LUAD
+  (OncoTree) -> concept_id 777926 domain Condition; maps_to_targets w/ policy's
+  'Maps to'/'S'/only_valid -> standard SNOMED Condition concept 45768916; latency
+  RECORDED at ~0.5s (bound asserted <30s) on the 54.9M concept_relationship table.
+- Quality: uv run pytest 1976 passed / 1 skipped (+ 2 live integration passed);
+  mypy clean (184 files); R29 guard clean; coverage 93% repo, 96% vocab_store.py /
+  100% vocab_store_utils.py.
+- **Learnings for future iterations:**
+  - resolve/vocab_store.py and vocab_store_utils.py are NOT in the R29 guard's
+    core_paths (only resolve/engine.py + resolve/assembler.py are), so they aren't
+    scanned. But the US-003 AC still forbids hardcoding 'Maps to'/'S' — those are
+    bound as `?` params from the policy. The OMOP COLUMN names live in
+    policies/omop.py:OMOP_VOCAB_SCHEMA (allowlisted), passed in as config.
+  - OMOP concept tables in poc.duckdb are ALL-VARCHAR (concept_id is a string
+    '777926', not int). ConceptRow.id is str. US-005/US-006 must treat concept_id
+    as a string from this store (cast at the store/compile boundary if an int is
+    needed for the §1.5(a) store column).
+  - OncoTree vocabulary_id is exactly 'OncoTree' (also 'OncoKB' present). 'Maps to'
+    relationship_id + standard_concept='S' + invalid_reason IS NULL is the standard
+    walk; LUAD->45768916 (SNOMED, Condition) verified live.
+  - SQLGlot: exp.select(...).from_(...).where(a).where(b) ANDs the wheres;
+    exp.Placeholder() renders as `?`; exp.to_table("a.b.c") parses dotted
+    catalog.db.table so one namespace string works for both DuckDB (vocabulary_omop)
+    and Databricks (workspace.vocabulary_omop). exp.column(name, table="alias")
+    qualifies; .is_(exp.null()) -> `IS NULL`.
+  - US-006 (resolver) wires policy -> store: candidates.py calls
+    store.concept_by_code(policy.source_vocabulary, code); standardize.py calls
+    store.maps_to_targets(cid, relationship_id=policy.maps_to_relationship,
+    standard_flag=policy.standard_flag if policy.require_standard else None,
+    only_valid=True); domain_gate.py uses ConceptRow.domain vs policy.target_domain.
 ---
