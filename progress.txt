@@ -188,6 +188,18 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   scope predicates inline quoted literals (internal study ids) to avoid databricks-sql param-marker
   version drift; DuckDB keeps `?`-binding. Live test skip-guards on DATABRICKS_* creds AND source
   reachability (skip on TABLE_OR_VIEW_NOT_FOUND). Runbook: docs/runbooks/slice0_live_databricks.md.
+- No-vocab projection compile (US-014): a curated target with NO vocabulary_binding flows
+  source -> assembler -> compiler -> staging-write with zero concept resolution via
+  `TransformCompiler.compile_projection(plan, source_schema=, source_table=)` +
+  `execute_projection(conn, compiled, staging_schema=, staging_table=)` (idempotent
+  CREATE OR REPLACE TABLE AS). The projection AST lives in
+  `src/sema/compile/projection_utils.py:build_projection_select` (R29-scanned generic):
+  DIRECT_COPY -> src column, DERIVED -> `exp.cast` from `expression_ast={'cast':{'to_type':..}}`,
+  CONSTANT -> `exp.convert` (NULL literal -> `exp.null`); target column = last dotted segment
+  of target_field_ref. This path shares NO vocab structure (no StagingColumns/StagingDecision/
+  StagingBackend) with the vocab compile() — keep them separate; that separation is the R29
+  boundary proof. The assembler is already pattern-agnostic, so non-vocab targets need no
+  assembler change. mypy: `exp.cast/convert/alias_` return `exp.Expr` (NOT `exp.Expression`).
 
 ---
 
@@ -909,4 +921,58 @@ Started: Tue Jun 30 14:37:57 EDT 2026
     cBioPortal/OMOP data — guard live tests on BOTH creds AND source reachability
     (skip on TABLE_OR_VIEW_NOT_FOUND) so `-m integration` stays green everywhere
     except a fully-provisioned workspace.
+---
+
+## 2026-06-30 - US-014 (no-vocab manifest target: R29 boundary proof)
+- Generality counter-example: a curated `dim_customer` target with NO vocabulary
+  at all flows through the SAME target loader (US-007), assembler (US-008), and
+  compiler (US-010) as the OMOP vocab path, with ZERO concept resolution — proving
+  the engine/policy boundary is real, not asserted.
+- NEW src/sema/targets/manifests/dim_customer.yaml: model_role=TARGET
+  analytics.dim_customer, 4 properties (customer_key/customer_name/signup_year/
+  source_system), obligation (required columns + NATURAL_KEY PK), NO `vocabularies:`
+  section and NO `vocabulary_binding` on any property. Loaded via the unchanged
+  load_target/ManifestTargetAdapter — emits EntityOp/PropertyOp/TargetObligationOp
+  but NO VocabularyBindingOp and NO HAS_VOCABULARY_BINDING edge (the positive
+  complement of US-007's test).
+- NEW src/sema/compile/projection_utils.py (R29-scanned, generic, 100% cov):
+  build_projection_select(source_schema, source_table, field_maps) builds ONE
+  SQLGlot AST projecting each FieldMap per pattern — DIRECT_COPY (copy/rename → a
+  src column), DERIVED (a cast via expression_ast={'cast':{'to_type':...}} → exp.cast),
+  CONSTANT (a literal → exp.convert; NULL literal → exp.null). target_column_name =
+  last dotted segment of target_field_ref; no StagingColumns/StagingDecision, no
+  domain gate, no vocabulary columns. UnsupportedProjectionError for any other pattern.
+- TransformCompiler gained compile_projection(plan, *, source_schema, source_table)
+  -> CompiledProjection and execute_projection(conn, compiled, *, staging_schema,
+  staging_table) (idempotent CREATE OR REPLACE TABLE AS <select duckdb>, returns row
+  count). The vocab compile()/execute() path is untouched — the projection path is a
+  separate method sharing the same class, with NO OMOP-shaped branch.
+- The assembler (Slice0PlanAssembler) was already pattern-agnostic: it projects
+  winner assertions → FieldMaps regardless of pattern, so no change was needed. The
+  test builds DIRECT_COPY/DERIVED/CONSTANT MappingAssertions (the resolver step is
+  SKIPPED) and asserts the plan verdict is `compilable` and covers every required field.
+- Files: NEW dim_customer.yaml, projection_utils.py, tests/unit/test_projection_compiler.py
+  (12 hermetic unit tests, TDD-first), tests/integration/test_projection_compiler_live.py
+  (CSV fixture → temp DuckDB, always-runnable under -m integration), tests/data/
+  fixtures/customers.csv; EDIT src/sema/compile/compiler.py.
+- Quality: pytest 2115 passed/1 skipped (+3 integration); mypy clean (209 files);
+  R29 guard clean; coverage 93% repo / projection_utils.py + compiler.py 100%.
+- **Learnings for future iterations:**
+  - The §1.5(b) vocab staging path (StagingColumns/StagingDecision/StagingBackend) is
+    ENTIRELY separate from a plain projection. For a non-vocab target do NOT thread the
+    vocab structures through with empty/placeholder fields — add a parallel generic method
+    (compile_projection/execute_projection) that names no vocab structure. That separation
+    IS the boundary proof; reusing the vocab shape would defeat the story.
+  - mypy + sqlglot: `exp.cast(...)`, `exp.convert(...)`, and `exp.alias_(...)` all return
+    the `exp.Expr` union (NOT `exp.Expression`). Annotate projection helpers as `-> exp.Expr`
+    (and projection lists as `list[exp.Expr]`), matching compiler_utils._projections. Using
+    `exp.Expression` trips strict mode at the return.
+  - SourceTableSpec requires a `value_column` (vocab-path artefact). For a plain projection
+    pass source_schema/source_table as plain strings instead of forcing a SourceTableSpec —
+    keeps the projection decoupled from the vocab compile signature.
+  - obligation.required_fields must EXACTLY equal the FieldMap.target_field_ref (dotted
+    RefStr, ≥1 dot) for coverage to PASS — same rule as US-008. Use
+    "target.<entity>.<col>" on both sides.
+  - The R29 guard scans *.py only, so OMOP-free YAML manifests under targets/manifests/
+    are exempt; dim_customer.yaml carries no denylist literal anyway.
 ---

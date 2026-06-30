@@ -1,0 +1,47 @@
+# US-014 generality counter-example: a curated analytics target with NO
+# vocabulary at all. Loaded via the SAME load_target / ManifestTargetAdapter as
+# the OMOP target (US-007), it flows source -> assembler -> compiler ->
+# staging-write with ZERO concept resolution. No `vocabularies:` section and no
+# `vocabulary_binding` on any property, so loading writes no :VocabularyBinding
+# node and no HAS_VOCABULARY_BINDING edge — the positive complement of US-007.
+# This proves the engine/policy boundary is real: the spine handles a plain
+# dimension without any OMOP-shaped code path.
+manifest_version: 1
+descriptor:
+  target_model_id: dim-customer-slice0
+  target_model_version: "0.1.0"
+  display_name: Curated Customer Dimension (no-vocab R29 boundary proof)
+  owner: sema-mapping-team@datadepo.us
+entities:
+  - qualified_name: analytics.dim_customer
+    kind: TABLE_ROW
+    properties:
+      - name: customer_key
+        type: integer
+        nullable: false
+      - name: customer_name
+        type: string
+        nullable: false
+        synonyms: [full_name]
+      - name: signup_year
+        type: integer
+        nullable: false
+      - name: source_system
+        type: string
+        nullable: false
+    obligation:
+      required_fields:
+        - customer_key
+        - customer_name
+        - signup_year
+        - source_system
+      primary_key: NATURAL_KEY
+    context_card:
+      card_version: "1.0.0"
+      description: >
+        Curated analytics customer dimension with NO vocabulary binding — the
+        R29 generality counter-example. Source columns flow copy/rename
+        (DIRECT_COPY), a cast (DERIVED), and a literal (CONSTANT) into the
+        staging table with no concept resolution, no domain gate, and no
+        vocabulary columns.
+      obligation_summary: Required natural-key dimension columns, no vocabulary.

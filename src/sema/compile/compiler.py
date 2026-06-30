@@ -22,6 +22,10 @@ from sema.compile.compiler_utils import (
     StagingDecision,
     build_staging_select,
 )
+from sema.compile.projection_utils import (
+    build_projection_select,
+    target_columns,
+)
 from sema.compile.staging_backend import (
     DUCKDB_BACKEND,
     StagingBackend,
@@ -31,7 +35,12 @@ from sema.models.planner._enums import TargetArtifactKind
 from sema.models.planner.mapping_plan import MappingPlan
 from sema.models.planner.patterns import MappingPattern
 
-__all__ = ["CompiledTransform", "TransformCompiler", "UnsupportedTransformError"]
+__all__ = [
+    "CompiledProjection",
+    "CompiledTransform",
+    "TransformCompiler",
+    "UnsupportedTransformError",
+]
 
 _Builder = Callable[
     [StagingColumns, SourceTableSpec, CompileContext, Sequence[StagingDecision]],
@@ -48,6 +57,17 @@ class CompiledTransform:
     """A dialect-agnostic compiled staging SELECT."""
 
     select: exp.Select
+
+    def sql(self, dialect: str) -> str:
+        return self.select.sql(dialect=dialect)
+
+
+@dataclass(frozen=True)
+class CompiledProjection:
+    """A plain (non-vocabulary) compiled projection SELECT (US-014)."""
+
+    select: exp.Select
+    target_columns: tuple[str, ...]
 
     def sql(self, dialect: str) -> str:
         return self.select.sql(dialect=dialect)
@@ -100,6 +120,42 @@ class TransformCompiler:
             staging_schema=staging_schema,
             staging_table=staging_table,
         )
+
+    def compile_projection(
+        self,
+        plan: MappingPlan,
+        *,
+        source_schema: str,
+        source_table: str,
+    ) -> CompiledProjection:
+        """Compile a no-vocabulary plan into a plain projection SELECT (US-014).
+
+        The resolver is never invoked: every field map is a DIRECT_COPY,
+        DERIVED, or CONSTANT projection of the source, with no vocabulary
+        columns and no domain gate.
+        """
+        select = build_projection_select(source_schema, source_table, plan.field_maps)
+        return CompiledProjection(
+            select=select, target_columns=target_columns(plan.field_maps)
+        )
+
+    def execute_projection(
+        self,
+        conn: StagingCursor,
+        compiled: CompiledProjection,
+        *,
+        staging_schema: str,
+        staging_table: str,
+    ) -> int:
+        """Write the projection to DuckDB via an idempotent CREATE OR REPLACE."""
+        table = f'"{staging_schema}"."{staging_table}"'
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{staging_schema}"')
+        conn.execute(
+            f"CREATE OR REPLACE TABLE {table} AS {compiled.sql('duckdb')}"
+        )
+        conn.execute(f"SELECT COUNT(*) FROM {table}")
+        row = conn.fetchone()
+        return int(row[0]) if row else 0
 
 
 def _plan_pattern(plan: MappingPlan) -> MappingPattern:
