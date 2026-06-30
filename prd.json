@@ -44,8 +44,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "scripts/check_engine_coupling.py owns ONE frozen policy constant (R29_POLICY: denylist + core_paths + allowlist) and a scan(root, policy) fn; importable by tests + runnable as CLI. tests/unit/test_engine_coupling.py: fixture-positive (leaky core file -> non-empty), clean-passes, allowlisted-file-exempt, missing-core-path-skipped, case-explicit denylist, and live-tree green. Missing core paths (resolve/engine.py, compile/, resolve/assembler.py) are skipped so the guard tightens automatically as later stories create them. mypy clean, coverage 93%."
     },
     {
       "id": "US-002",
