@@ -190,8 +190,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Authored src/sema/targets/manifests/omop_condition_slice0.yaml (model_role=TARGET omop.condition_occurrence: condition_concept_id property -> vocabulary_binding {vocabulary: SNOMED target (R9), domain: Condition, require_standard: true, resolver_policy_ref: omop.oncotree_to_snomed_condition (US-004 policy)}; obligation required_fields incl condition_concept_id, NATURAL_KEY PK, FK -> minimal omop.person, domain_constraint -> Condition). NO new loader/materializer code — reused load_target/ManifestTargetAdapter/materializer/`sema target load`; the merged framework already emits VocabularyBindingOp + HAS_VOCABULARY_BINDING, so no targets/ fix needed. TDD: 7 hermetic unit tests (InMemoryGraphWriter; entity/property/obligation/binding ops, HAS_VOCABULARY_BINDING present + NOT HAS_VOCAB_BINDING, normalized binding resolves via resolve_policy() to ResolverPolicy source_vocabulary=OncoTree/target_domain=Condition) written first, failed on missing manifest. Skip-guarded Neo4j integration test runs the AC bridge query (-> condition_occurrence | Condition | true) + HAS_OBLIGATION present. R29 guard scans *.py only so OMOP literals confined to YAML+tests stay clean. pytest 2015 passed/1 skipped; mypy clean (192 files); coverage 93%. NOTE: :Entity has qualified_name not name; :TargetObligation stores payload_json (bug-342)."
     },
     {
       "id": "US-008",

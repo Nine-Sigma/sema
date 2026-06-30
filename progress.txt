@@ -65,6 +65,19 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   code-bearing hot path (disambiguate default declines ties -> None). resolve_and_store(codes,
   ValueMappingStore, ResolveContext) is the SOLE store writer. ConceptRow.id is str -> cast
   int() at the value-mapping boundary (poc.duckdb concept tables are all-VARCHAR).
+- Authored targets live as YAML manifests under src/sema/targets/manifests/ (R29-allowlisted
+  by extension — the guard scans *.py only). Load via the MERGED framework: load_target(
+  ManifestTargetAdapter(path), writer=InMemoryGraphWriter()|Neo4jGraphWriter(driver)); never
+  reimplement loaders/materializers. The framework ALREADY emits VocabularyBindingOp (with
+  resolver_policy_ref/domain/require_standard) + HAS_VOCABULARY_BINDING edges, EntityOp/
+  PropertyOp/TargetObligationOp, and HAS_PROPERTY/HAS_OBLIGATION relationships. Manifest FKs
+  must reference an entity present in the same manifest (normalizer rejects dangling refs);
+  unknown vocab refs are rejected too — declare every vocabulary in `vocabularies:`.
+- Neo4j target-graph schema gotchas: :Entity has `qualified_name` (NO `name`);
+  :TargetObligation stores the obligation as a single `payload_json` JSON string (no
+  per-field properties). Edge name is HAS_VOCABULARY_BINDING (not HAS_VOCAB_BINDING).
+  ManifestVocabularyBinding accepts resolver_policy_ref, which resolve_policy() (US-004)
+  dispatches to a concrete ResolverPolicy.
 
 ---
 
@@ -389,4 +402,53 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   - US-009 (next) READS resolve_and_store's rows and writes the graph edges; it must NOT
     write the value-mapping store (US-006 is sole writer). to_assertion() gives it the
     VOCAB_LOOKUP MappingAssertion to materialize :FieldMap/MAPS_TO/DERIVED_FROM from.
+---
+
+## 2026-06-30 - US-007 (OMOP target via authored manifest + merged loader)
+- Authored src/sema/targets/manifests/omop_condition_slice0.yaml: a model_role=TARGET
+  OMOP condition_occurrence entity whose condition_concept_id property carries a
+  vocabulary_binding {vocabulary: SNOMED (target, R9), domain: Condition,
+  require_standard: true, resolver_policy_ref: omop.oncotree_to_snomed_condition (the
+  US-004 OMOP/OncoTree policy)}. Plus a minimal omop.person entity as the person_id FK
+  target (condition_occurrence required_fields = condition_occurrence_id, person_id,
+  condition_concept_id, condition_start_date; NATURAL_KEY PK; FK -> omop.person;
+  domain_constraint condition_concept_id -> Condition).
+- NO new loader/materializer code: reused load_target (loader.py:36), ManifestTargetAdapter
+  (adapters/manifest.py), the materializer -> InMemory/Neo4j writer path, and the existing
+  `sema target load --manifest` CLI (cli_target.py:33). The merged framework already emits
+  VocabularyBindingOp (with resolver_policy_ref/domain/require_standard) + the
+  HAS_VOCABULARY_BINDING RelationshipOp — no framework gap, so no targets/ fix was needed.
+- TDD: tests/unit/targets/test_omop_condition_slice0_manifest.py (7 hermetic tests via
+  InMemoryGraphWriter: entity/property/obligation/binding ops, HAS_VOCABULARY_BINDING edge
+  present + NOT misspelled HAS_VOCAB_BINDING, and normalized binding resolves through
+  resolve_policy() to the US-004 ResolverPolicy with source_vocabulary=OncoTree,
+  target_domain=Condition). Wrote them first; confirmed FileNotFoundError (manifest absent)
+  before authoring the YAML.
+- Integration (skip-guarded Neo4j) tests/integration/targets/test_omop_condition_slice0_round_trip.py:
+  the AC bridge query (Entity{model_role:TARGET}-[:HAS_PROPERTY]->Property-[:HAS_VOCABULARY_BINDING]->
+  VocabularyBinding WHERE property_name='condition_concept_id') returns one row
+  (condition_occurrence | Condition | true); HAS_OBLIGATION -> :TargetObligation present.
+- Files changed: NEW src/sema/targets/manifests/omop_condition_slice0.yaml, NEW
+  tests/unit/targets/test_omop_condition_slice0_manifest.py, NEW
+  tests/integration/targets/test_omop_condition_slice0_round_trip.py.
+- Quality: pytest 2015 passed / 1 skipped; mypy clean (192 files); R29 guard clean;
+  coverage 93%. R29 stays green because the guard only scans *.py — the OMOP literals
+  live entirely in the YAML and tests/ (allowlisted).
+- **Learnings for future iterations:**
+  - :Entity nodes carry `qualified_name`, NOT `name`. The AC's `RETURN e.name` is read in
+    the integration test as `e.qualified_name AS name` (and asserted endswith
+    'condition_occurrence'). EntityOp has no `name` field at all.
+  - :TargetObligation nodes store the whole obligation as a single `payload_json` JSON
+    string in Neo4j (target_obligation_merge), NOT as list/scalar properties. Query
+    `o.payload_json` and parse/substring-check; `o.required_fields` returns null. (bug-342)
+  - The merged targets/ framework ALREADY materializes VocabularyBinding nodes +
+    HAS_VOCABULARY_BINDING edges with resolver_policy_ref/domain/require_standard/
+    allow_zero_default. US-009 reads this binding (property_name=condition_concept_id) to
+    drive the VOCAB_LOOKUP producer — no need to re-emit it.
+  - ManifestVocabularyBinding (manifest_models.py:33) already accepts resolver_policy_ref;
+    the normalizer rejects unknown vocab refs and dangling FK refs, so a FK requires its
+    referenced entity to exist in the manifest (added minimal omop.person).
+  - Manifests ship under src/sema/targets/manifests/ (package data; hatchling includes
+    non-.py files under the package). CLI takes any path:
+    `uv run sema target load --manifest src/sema/targets/manifests/omop_condition_slice0.yaml`.
 ---

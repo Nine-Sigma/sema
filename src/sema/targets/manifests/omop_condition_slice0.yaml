@@ -1,0 +1,71 @@
+# Slice-0 OMOP target: condition_occurrence with a SNOMED-bound
+# condition_concept_id resolved from OncoTree via the US-004 policy.
+#
+# This is the ONLY place these OMOP/OncoTree specifics live for US-007:
+# authored manifests are an R29-allowlisted location (the engine core and
+# generic spine stay free of these literals). The target vocabulary is
+# SNOMED (R9: the binding's `vocabulary`); the SOURCE vocabulary
+# (OncoTree) is named only by the resolver policy referenced here.
+manifest_version: 1
+descriptor:
+  target_model_id: omop-condition-slice0
+  target_model_version: "0.1.0"
+  display_name: OMOP Condition Occurrence (Slice 0)
+  owner: sema-mapping-team@datadepo.us
+  vocabulary_release: omop-vocab-2024
+vocabularies:
+  - name: SNOMED
+    source: EXTERNAL
+entities:
+  - qualified_name: omop.person
+    kind: TABLE_ROW
+    properties:
+      - name: person_id
+        type: integer
+        nullable: false
+    obligation:
+      required_fields: [person_id]
+      primary_key: NATURAL_KEY
+    context_card:
+      card_version: "1.0.0"
+      description: OMOP person table; FK target for condition_occurrence.
+  - qualified_name: omop.condition_occurrence
+    kind: TABLE_ROW
+    properties:
+      - name: condition_occurrence_id
+        type: integer
+        nullable: false
+      - name: person_id
+        type: integer
+        nullable: false
+      - name: condition_concept_id
+        type: integer
+        nullable: false
+        synonyms: [cancer_type_code, diagnosis_concept]
+        vocabulary_binding:
+          vocabulary: SNOMED
+          domain: Condition
+          require_standard: true
+          resolver_policy_ref: omop.oncotree_to_snomed_condition
+      - name: condition_start_date
+        type: date
+        nullable: false
+    obligation:
+      required_fields:
+        - condition_occurrence_id
+        - person_id
+        - condition_concept_id
+        - condition_start_date
+      primary_key: NATURAL_KEY
+      foreign_keys:
+        - referenced_entity: omop.person
+          join_keys: [["person_id", "person_id"]]
+      domain_constraints:
+        - property_name: condition_concept_id
+          domain_id: Condition
+    context_card:
+      card_version: "1.0.0"
+      description: >
+        OMOP condition_occurrence; one row per recorded condition. Slice-0
+        target for OncoTree->SNOMED condition_concept_id resolution.
+      obligation_summary: Required PK, person FK, start date, and SNOMED concept.
