@@ -285,8 +285,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Gate D-lite staging QA lives in eval/ (R29-allowlisted) so it can reconcile against the US-002 gold set without tripping the coupling guard on gold.oncotree_code attribute access. src/sema/eval/staging_qa_utils.py owns the pure checks: check_row_count (staged scope count == source row count), check_null_rate (reconciled against resolution_status: a NULL <target_concept_column> is legit ONLY for NO_MAP; RESOLVED-but-NULL and NO_MAP-but-populated are defects), check_no_map_accounting (a code the gold set labels RESOLVED but staged NO_MAP is reported, never dropped; UNLABELLED gold codes skipped/surfaced). QACheck/StagingQAReport carry structured reason+details; report.passed only when all three pass; as_dict() for JSON. src/sema/eval/staging_qa.py reads the §1.5(b) staging table via StagingColumns physical names (policy-owned, so it names no showcase literal) scoped on (source_schema, source_table). 11 hermetic unit tests (pure checks + temp-DuckDB reader/orchestration). Skip-guarded live integration (tests/integration/test_staging_qa_live.py): compile+execute a real study's staging write, QA PASSES; NULL out one RESOLVED row's target -> null_rate check FAILS. pytest 2064 passed/1 skipped; mypy clean (200 files); R29 guard clean; coverage 93% repo / 100% both new modules."
     },
     {
       "id": "US-012",

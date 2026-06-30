@@ -24,6 +24,11 @@ Started: Tue Jun 30 14:37:57 EDT 2026
 - ONCOTREE_CODE source-of-truth: `cbioportal_<study>.sample.ONCOTREE_CODE` only (2
   studies in ~/.sema/poc.duckdb). Discover studies via information_schema.columns
   (column_name='ONCOTREE_CODE' AND table_name='sample'); 64 distinct codes.
+- GOLD-SET-CONSUMING code must NOT live under an R29 core path (compile/,
+  resolve/engine.py, resolve/assembler.py): GoldRow.oncotree_code attribute access
+  contains the "oncotree" denylist substring and trips the guard. Put it in eval/
+  (allowlisted) or a non-scanned *_utils.py. Staging QA (US-011) lives in
+  src/sema/eval/staging_qa.py(+_utils) for exactly this reason.
 - §1.5(f) metric math is FROZEN in src/sema/eval/mapping_goldset_utils.py (US-002):
   derive_zone/classify_cell/ConfusionMatrix. US-012 MUST reuse it (no re-derived
   math). Recall denominator includes Zone-2 recall_miss (reduces to the doc's
@@ -641,4 +646,52 @@ Started: Tue Jun 30 14:37:57 EDT 2026
     `DROP TABLE IF EXISTS t`. Scope on (source_schema, source_table), not bare schema.
   - Live tests must NOT assert a study contains a NO_MAP code — some studies resolve 100%.
     Assert projection invariants (NULL targets subset of NO_MAP codes) instead.
+---
+
+## 2026-06-30 - US-011 (Gate D-lite staging QA)
+- Built the staging QA gate (row count, null-rate, NO_MAP accounting vs the gold
+  set) so a bad §1.5(b) staging table is caught before it is called "done".
+- LOCATION CHOICE: put it in eval/ (not compile/). compile/ is R29-SCANNED and the
+  gold-set reconciliation accesses gold.oncotree_code — "oncotree" is a denylist
+  substring, so a scanned file would trip the guard. eval/ is allowlisted; the AC
+  explicitly permits "compile/staging_qa.py (or eval/)".
+- NEW src/sema/eval/staging_qa_utils.py (pure, 100% cov): QAOutcome enum, StagingRow
+  (source_value/target_value/resolution_status), QACheck (name/outcome/reason/details
+  + passed), StagingQAReport (passed only when ALL checks pass; failures(); as_dict()).
+  Three pure checks:
+  - check_row_count(actual, expected): staged scope count == source row count.
+  - check_null_rate(rows): reconcile NULL <target_concept_column> against
+    resolution_status. NO_MAP rows are EXPECTED nulls (not defects); defects are
+    resolved_but_null (RESOLVED yet NULL target) and no_map_but_populated.
+  - check_no_map_accounting(rows, gold_set): a code the gold set labels RESOLVED but
+    staged NO_MAP -> gold_resolved_but_no_map (FAIL, reported not dropped). UNLABELLED
+    gold codes are skipped and surfaced in details (no_map_unlabelled_gold).
+- NEW src/sema/eval/staging_qa.py (100% cov): read_staging_rows / staging_scope_count /
+  run_staging_qa read the staging table via StagingColumns physical names (policy-owned,
+  so the module names NO showcase literal) scoped on (source_schema, source_table).
+- TDD: tests/unit/test_staging_qa.py (11 hermetic tests) written first, failed
+  ModuleNotFoundError, then implemented. Pure-check cases + a temp-DuckDB reader/
+  orchestration path (real temp file, in-process = hermetic).
+- NEW tests/integration/test_staging_qa_live.py (skip-guarded poc.duckdb): compile +
+  execute a real study's US-010 staging write, assert QA PASSES; then NULL out one
+  RESOLVED row's target and assert the null_rate check FAILS. Ran live: 1 passed.
+- Quality: uv run pytest 2064 passed / 1 skipped; mypy clean (200 files); R29 guard
+  clean; coverage 93% repo, staging_qa.py + staging_qa_utils.py both 100%.
+- **Learnings for future iterations:**
+  - Gold-set reconciliation must live OUTSIDE the R29 core paths (compile/, resolve/
+    engine.py, resolve/assembler.py) because GoldRow.oncotree_code attribute access
+    contains the "oncotree" denylist substring. Put gold-consuming code in eval/
+    (allowlisted) or a non-scanned utils.
+  - The §1.5(b) projection invariant (target NULL IFF NO_MAP) is what the null_rate
+    check enforces both directions — it is NOT a fixed null-rate threshold; it is
+    reconciled per-row against resolution_status. NO_MAP nulls are legitimate.
+  - GoldSet.by_code() keys are the raw ONCOTREE_CODE strings, which equal the staging
+    source_value_column values — so QA matches staging rows to gold by source value
+    directly (no normalization needed for Slice-0 codes).
+  - US-012 (next) reuses the SAME gold set + the §1.5(f) metric module
+    (eval/mapping_goldset.py) for the confusion-matrix report; it READS the
+    value-mapping store, not the staging table. Distinct from this story's QA, which
+    reads the compiled staging table.
+  - DuckDB UPDATE supports `rowid`; used `MIN(rowid)` to corrupt exactly one RESOLVED
+    row in the live test without depending on a specific code.
 ---
