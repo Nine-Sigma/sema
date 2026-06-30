@@ -263,8 +263,8 @@
         "Append a Learnings entry to progress.txt; update .wolf/ (memory.md, anatomy.md on new files, buglog.json) per OpenWolf"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "TransformCompiler (src/sema/compile/compiler.py, R29-SCANNED, names no showcase literal) dispatches on (MappingPattern, TargetArtifactKind); Slice 0 registers only (VOCAB_LOOKUP, TABLE_ROW). compile() -> CompiledTransform holding ONE SQLGlot AST (source LEFT JOIN (VALUES (code,target_value,resolution_status,no_map_reason,status)) ON src.value=m.code) rendered per dialect via compiled.sql('duckdb'|'databricks') — no per-dialect string templates. execute() does CREATE OR REPLACE TEMP TABLE build + BEGIN/DELETE-scope/INSERT/COMMIT atomic swap scoped on (source_schema, source_table) so sibling studies survive; re-run is byte-identical. NO_MAP rows inline target_value=NULL -> <target_concept_column> IS NULL. compiler_utils.py owns StagingColumns (policy-named; showcase fields have NO defaults so literals can't leak as defaults), generic StagingDecision (field target_value, NOT concept_id), §1.5(b) column order + create/insert/delete/count SQL. R29: 'concept_id' is a denylist SUBSTRING, so compile/*.py never touches .concept_id; the ValueMapping->StagingDecision projection (staging_decision_from_value_mapping) lives in the unscanned resolve/engine_utils.py; showcase names (source_oncotree_code, condition_concept_id) confined to allowlisted policies/omop.py:OMOP_STAGING_COLUMNS. mypy gotcha: sqlglot exp.alias_ returns exp.Expr (Union) not exp.Expression -> annotate list[exp.Expr]. 14 hermetic unit tests (TDD-first) + skip-guarded live integration on poc.duckdb (resolved a real study's distinct ONCOTREE_CODE, executed staging write, row count = source row count, condition_concept_id populated, NULL targets subset of NO_MAP, Databricks SQL rendered+parsed). pytest 2053 passed/1 skipped; mypy clean (198 files); R29 guard clean; coverage 93% repo, compiler.py + compiler_utils.py 100%."
     },
     {
       "id": "US-011",

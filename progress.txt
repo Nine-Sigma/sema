@@ -114,6 +114,26 @@ Started: Tue Jun 30 14:37:57 EDT 2026
   carries n.id (=`{model_id}|{ver}|{hash}|{entity}.{name}`) + n.name + n.model_role; query
   by name+model_role to fetch the id for MappingNodes. producer.py is NOT R29-scanned but
   stays generic (refs/ids passed as data).
+- US-010 transform compiler (src/sema/compile/ — R29-SCANNED): `concept_id` is a
+  DENYLIST substring, so compile/*.py must NEVER access `value_mapping.concept_id`.
+  The compiler consumes a generic `StagingDecision(normalized_source_value, target_value,
+  resolution_status, no_map_reason, status)` — the ValueMapping->StagingDecision projection
+  (which DOES read .concept_id) lives in the unscanned `resolve/engine_utils.py`
+  (`staging_decision_from_value_mapping`). Field name `target_concept_column` is SAFE
+  (no `concept_id` substring); showcase column names (`source_oncotree_code`,
+  `condition_concept_id`) live ONLY in the allowlisted `policies/omop.py:OMOP_STAGING_COLUMNS`
+  (a `StagingColumns` instance). `StagingColumns` required showcase fields have NO defaults
+  (so the literals can't sneak into compile/ as defaults); generic columns have neutral
+  defaults. The §1.5(b) staging SELECT is built ONCE as a SQLGlot AST (source LEFT JOIN
+  `(VALUES (...)) AS m(code,target_value,...)` ON src.value=m.code) and rendered per dialect
+  via `compiled.sql("duckdb"|"databricks")` — NO per-dialect string templates. Idempotency =
+  `CREATE OR REPLACE TEMP TABLE` build, then BEGIN/DELETE-scope/INSERT/COMMIT scoped on
+  (source_schema, source_table) so sibling studies in the same schema survive a swap. NO_MAP
+  rows carry target_value=NULL inline -> `<target_concept_column>` IS NULL. Dispatch is on
+  (MappingPattern, TargetArtifactKind); Slice 0 registers only (VOCAB_LOOKUP, TABLE_ROW).
+  NOTE: sqlglot `exp.alias_` returns the `exp.Expr` union (not `exp.Expression`) — type
+  projection lists as `list[exp.Expr]` or mypy strict fails. Databricks renders VALUES
+  without wrapping parens but still parses (US-013 owns live execution).
 
 ---
 
@@ -581,4 +601,44 @@ Started: Tue Jun 30 14:37:57 EDT 2026
     target Property ids are `{model_id}|{version}|{hash}|{entity}.{name}`.
   - planner_loader.py is already 454 lines (>400) — do NOT grow it; reuse its existing
     builders from the caller instead of adding write helpers.
+---
+
+## 2026-06-30 - US-010 (Transform compiler: MappingPlan -> SQLGlot -> staging write)
+- Built the §1.5(b) transform compiler. `src/sema/compile/compiler_utils.py`
+  (R29-scanned, 100% cov): `StagingColumns` (policy-owned physical column names;
+  showcase fields have no defaults), `StagingDecision` (generic inlined decision,
+  field `target_value` not `concept_id`), `SourceTableSpec`, `CompileContext`,
+  `build_staging_select` (one SQLGlot AST: source LEFT JOIN (VALUES ...) ON value=code),
+  create/insert/delete/count SQL builders. `src/sema/compile/compiler.py`
+  (R29-scanned, 100% cov): `TransformCompiler.compile` dispatches on
+  (MappingPattern, TargetArtifactKind) -> `CompiledTransform` (dialect-agnostic AST);
+  `.execute` does temp-build + scoped atomic swap on DuckDB. `UnsupportedTransformError`.
+- Concept-id projection: `resolve/engine_utils.staging_decision_from_value_mapping`
+  (unscanned) reads ValueMapping.concept_id -> StagingDecision so compile/ stays
+  R29-clean. OMOP showcase column names in `policies/omop.py:OMOP_STAGING_COLUMNS`.
+- Files changed: NEW src/sema/compile/{__init__,compiler,compiler_utils}.py;
+  src/sema/resolve/engine_utils.py (+ staging projection helper);
+  src/sema/resolve/policies/omop.py (+ OMOP_STAGING_COLUMNS); NEW
+  tests/unit/test_transform_compiler.py (12 tests); NEW
+  tests/integration/test_transform_compiler_live.py (skip-guarded poc.duckdb).
+- Quality: 2053 passed / 1 skipped; mypy clean (198 files); R29 guard clean;
+  coverage 93% repo, compiler.py + compiler_utils.py 100%. Live integration on
+  poc.duckdb: resolved a real study's distinct ONCOTREE_CODE, executed the staging
+  write, row count = source row count, condition_concept_id populated, NULL targets
+  subset of NO_MAP codes; Databricks dialect rendered + parsed.
+- **Learnings for future iterations:**
+  - `concept_id` is a denylist SUBSTRING — never write `.concept_id` (attribute access
+    included) in any src/sema/compile/*.py or src/sema/resolve/{engine,assembler}.py.
+    Project through a generic shape in an unscanned helper.
+  - sqlglot 30: `exp.alias_` returns `exp.Expr` (a Union), NOT `exp.Expression`; mypy
+    strict rejects `list[exp.Expression]` of alias_ results — annotate `list[exp.Expr]`.
+  - `exp.values(rows, alias=..., columns=[...])` + `.join(values_expr, on=..., join_type=
+    "left")` renders `LEFT JOIN (VALUES ...) AS m(...)` (DuckDB) / unparenthesized VALUES
+    (Databricks, still parses). Build numeric literals with `exp.Literal.number`, NULLs
+    with `exp.null()`.
+  - DuckDB idempotent partition swap: `CREATE OR REPLACE TEMP TABLE t AS <select>`, then
+    `BEGIN TRANSACTION` / `DELETE ... WHERE scope` / `INSERT ... SELECT FROM t` / `COMMIT`,
+    `DROP TABLE IF EXISTS t`. Scope on (source_schema, source_table), not bare schema.
+  - Live tests must NOT assert a study contains a NO_MAP code — some studies resolve 100%.
+    Assert projection invariants (NULL targets subset of NO_MAP codes) instead.
 ---

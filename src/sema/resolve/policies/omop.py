@@ -8,6 +8,7 @@ standard flag ("S") are confined here. The generic spine
 
 from __future__ import annotations
 
+from sema.compile.compiler_utils import StagingColumns
 from sema.models.planner._enums import PrimaryKeyStrategy
 from sema.models.planner.target_model import TargetObligation
 from sema.models.target.vocab_binding import VocabularyBindingDecl
@@ -15,6 +16,13 @@ from sema.resolve.policy import ResolverPolicy
 from sema.resolve.vocab_store_utils import VocabStoreSchema
 
 OMOP_ONCOTREE_CONDITION_REF = "omop.oncotree_to_snomed_condition"
+
+# §1.5(b) staging column names for the OncoTree->SNOMED showcase. The compiler
+# (R29-scanned) never names these literals; it reads them from here.
+OMOP_STAGING_COLUMNS = StagingColumns(
+    source_value_column="source_oncotree_code",
+    target_concept_column="condition_concept_id",
+)
 
 # §1.5(b) staging target. Distinct from the production condition_occurrence
 # obligation (US-007): no person_id, no dates, no FK closure. The required

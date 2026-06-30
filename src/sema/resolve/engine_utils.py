@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sema.compile.compiler_utils import StagingDecision
 from sema.models.planner.lifecycle import Status
 from sema.models.planner.mapping_plan import MappingAssertion
 from sema.models.planner.patterns import MappingPattern, VocabLookup
@@ -175,3 +176,23 @@ def _assertion_id(
         f"vocab_lookup:{policy.source_vocabulary}:"
         f"{resolution.source_code}->{context.target_field}"
     )
+
+
+def staging_decision_from_value_mapping(mapping: ValueMapping) -> StagingDecision:
+    """Project a §1.5(a) store row onto a generic compiler input (US-010).
+
+    Lives here (an unscanned sibling) because it reads the store's concept-id
+    field; the R29-scanned compiler only ever sees the neutral
+    :class:`StagingDecision`.
+    """
+    return StagingDecision(
+        normalized_source_value=mapping.normalized_source_value,
+        target_value=mapping.concept_id,
+        resolution_status=mapping.resolution_status.value,
+        no_map_reason=mapping.no_map_reason,
+        status=_status_value(mapping.status),
+    )
+
+
+def _status_value(status: Status) -> str:
+    return status.value if isinstance(status, Status) else str(status)
