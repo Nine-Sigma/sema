@@ -22,17 +22,24 @@ from sema.compile.compiler_utils import CompileContext, SourceTableSpec
 from sema.eval.mapping_goldset import GoldSet
 from sema.models.planner._enums import (
     MaterializationMode,
-    PrimaryKeyStrategy,
     TargetArtifactKind,
 )
 from sema.models.planner.field_map import RowIdentity
+from sema.models.planner.mapping_plan import MappingAssertion
+from sema.models.planner.patterns import ConstantValue, MappingPattern
+from sema.models.planner.lifecycle import Status
 from sema.models.planner.provenance import Provenance, RunProvenance, SourceScope
-from sema.models.planner.target_model import TargetObligation
 from sema.models.target.refs import TargetEntityRef, TargetPropertyRef
 from sema.models.target.vocab_binding import VocabularyBindingDecl
 from sema.pipeline.fit_slice0 import FitRequest
 from sema.resolve.engine_utils import ResolveContext
-from sema.resolve.policies.omop import OMOP_STAGING_COLUMNS
+from sema.resolve.policies.omop import (
+    OMOP_STAGING_COLUMNS,
+    SLICE0_CONDITION_CONCEPT_FIELD,
+    SLICE0_RESOLVER_POLICY_FIELD,
+    SLICE0_VOCAB_RELEASE_FIELD,
+    make_slice0_staging_obligation,
+)
 from sema.resolve.policy import ResolverPolicy
 from sema.resolve.policies import resolve_policy
 from sema.resolve.producer import MappingNodes
@@ -150,11 +157,8 @@ def build_slice0_fit_request(
             run_id=run_id,
         ),
         staging_columns=OMOP_STAGING_COLUMNS,
-        obligation=TargetObligation(
-            target_entity="target.stage",
-            required_fields=[context.target_property_ref],
-            primary_key=PrimaryKeyStrategy.NATURAL_KEY,
-        ),
+        obligation=make_slice0_staging_obligation(),
+        constant_assertions=_constant_assertions(context),
         row_identity=RowIdentity(
             target_row_key_rule=context.source_value_ref,
             source_lineage=[context.source_value_ref],
@@ -171,6 +175,33 @@ def build_slice0_fit_request(
     return policy, request
 
 
+def _constant_assertions(context: ResolveContext) -> list[MappingAssertion]:
+    """Build the two run-constant staging field maps (§1.5(e) coverage).
+
+    ``resolver_policy_ref`` and ``vocab_release`` are stamped onto every staging
+    row as compile-time constants; representing them as CONSTANT assertions makes
+    the ``MappingPlan`` a faithful description of the staging output and lets the
+    assembler's coverage gate check all three required fields end-to-end.
+    """
+    specs = (
+        (SLICE0_RESOLVER_POLICY_FIELD, context.resolver_policy_ref, "resolver-policy"),
+        (SLICE0_VOCAB_RELEASE_FIELD, context.vocab_release, "vocab-release"),
+    )
+    return [
+        MappingAssertion(
+            id=f"const::{slug}::{context.run_id}",
+            source_field_ref=context.source_value_ref,
+            target_property_ref=target_ref,
+            pattern=MappingPattern.CONSTANT,
+            payload=ConstantValue(literal_value=value, target_type="VARCHAR"),
+            confidence=1.0,
+            provenance=context.provenance,
+            status=Status.auto_accepted,
+        )
+        for target_ref, value, slug in specs
+    ]
+
+
 def _resolve_context(
     binding: VocabularyBindingDecl,
     source_schema: str,
@@ -180,7 +211,7 @@ def _resolve_context(
     run_id: str,
 ) -> ResolveContext:
     source_ref = f"source.{source_table}.{value_column}"
-    target_ref = f"target.stage.{binding.property_name}"
+    target_ref = SLICE0_CONDITION_CONCEPT_FIELD
     policy_ref = binding.resolver_policy_ref or ""
     return ResolveContext(
         source_field_ref=source_ref,

@@ -29,6 +29,7 @@ from sema.compile.staging_backend import (
     StagingBackend,
 )
 from sema.eval.mapping_goldset import GoldSet, load_gold_set
+from sema.eval.mapping_report_utils import AcceptanceVerdict
 from sema.models.config import DatabricksConfig
 from sema.pipeline.fit_slice0 import FitResult, run_fit
 from sema.pipeline.fit_slice0_utils import (
@@ -83,6 +84,12 @@ _DEFAULT_DUCKDB = Path.home() / ".sema" / "poc.duckdb"
 )
 @click.option("--staging-schema", default="sema_staging", show_default=True)
 @click.option("--staging-table", default="condition_staging", show_default=True)
+@click.option(
+    "--strict/--no-strict",
+    default=False,
+    show_default=True,
+    help="Exit non-zero (3) if Gate D-lite fails or the eval verdict is not ACCEPTED.",
+)
 def fit_cmd(
     manifest_path: Path,
     backend: str,
@@ -94,6 +101,7 @@ def fit_cmd(
     gold_path: Path | None,
     staging_schema: str,
     staging_table: str,
+    strict: bool,
 ) -> None:
     """Run the full resolve->...->eval chain for one study."""
     gold = GoldSet(rows=load_gold_set(gold_path)) if gold_path else GoldSet(rows=[])
@@ -117,6 +125,21 @@ def fit_cmd(
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
     click.echo(json.dumps(_summary(result), indent=2, default=str))
+    if strict:
+        _enforce_strict(result)
+
+
+def _enforce_strict(result: FitResult) -> None:
+    """Exit 3 when the run is not clean (Gate D-lite fail or verdict != ACCEPTED)."""
+    reasons = []
+    if not result.qa.passed:
+        reasons.append(f"Gate D-lite: {result.qa.outcome.value}")
+    verdict = result.report.verdict
+    if verdict is not AcceptanceVerdict.ACCEPTED:
+        reasons.append(f"eval verdict: {verdict.value}")
+    if reasons:
+        click.echo("STRICT FAIL — " + "; ".join(reasons), err=True)
+        sys.exit(3)
 
 
 def _run_duckdb(duckdb_path: Path, *, manifest_path: Path, study_schema: str | None,

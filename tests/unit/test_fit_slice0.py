@@ -125,11 +125,25 @@ class TestRunFit:
         assert isinstance(result.assertion, MappingAssertion)
         assert result.assertion.pattern is MappingPattern.VOCAB_LOOKUP
         assert isinstance(result.plan, MappingPlan)
-        # the plan is built from FieldMaps projected off the assertion
-        assert result.plan.field_maps
-        assert all(
-            fm.pattern is MappingPattern.VOCAB_LOOKUP for fm in result.plan.field_maps
+        # the plan is built from FieldMaps projected off the assertions: the
+        # VOCAB_LOOKUP target plus the two run-constant staging columns (§1.5(e)).
+        patterns = {fm.pattern for fm in result.plan.field_maps}
+        assert patterns == {MappingPattern.VOCAB_LOOKUP, MappingPattern.CONSTANT}
+
+    def test_plan_covers_the_three_field_staging_obligation(
+        self, tmp_path: Path
+    ) -> None:
+        from sema.models.planner.lifecycle import PlanVerdict
+
+        conn = duckdb.connect(str(tmp_path / "fit.duckdb"))
+        _seed_source(conn)
+        result = _run(conn)
+        # the live path now enforces the real §1.5(e) 3-field staging obligation
+        assert len(result.plan.obligation.required_fields) == 3
+        assert set(result.plan.obligation.required_fields).issubset(
+            result.plan.covered_required_fields()
         )
+        assert result.plan.derive_verdict() is PlanVerdict.compilable
 
     def test_writes_staging_table_with_row_count(self, tmp_path: Path) -> None:
         conn = duckdb.connect(str(tmp_path / "fit.duckdb"))

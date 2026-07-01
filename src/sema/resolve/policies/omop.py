@@ -32,6 +32,15 @@ OMOP_STAGING_COLUMNS = StagingColumns(
 SLICE0_STAGING_TARGET = "condition_occurrence_staging"
 _STAGING_PREFIX = "target.condition_occurrence_staging"
 
+# The three §1.5(e) staging required-field refs. Exposed so the live fit chain
+# (pipeline layer) references the SAME refs the assembler's coverage gate checks
+# — the target property (a VOCAB_LOOKUP) plus the two run-constant provenance
+# columns (CONSTANT field maps). Keeping them here confines the OMOP literals to
+# the allowlisted policy layer.
+SLICE0_CONDITION_CONCEPT_FIELD = f"{_STAGING_PREFIX}.condition_concept_id"
+SLICE0_RESOLVER_POLICY_FIELD = f"{_STAGING_PREFIX}.resolver_policy_ref"
+SLICE0_VOCAB_RELEASE_FIELD = f"{_STAGING_PREFIX}.vocab_release"
+
 # The OMOP physical schema for the concept-vocabulary tables. This is the only
 # place these OMOP column literals live (R29-allowlisted); the VocabStore reads
 # them as config so the query layer itself stays vocabulary-agnostic.
@@ -78,9 +87,9 @@ def make_slice0_staging_obligation() -> TargetObligation:
     return TargetObligation(
         target_entity=SLICE0_STAGING_TARGET,
         required_fields=[
-            f"{_STAGING_PREFIX}.condition_concept_id",
-            f"{_STAGING_PREFIX}.resolver_policy_ref",
-            f"{_STAGING_PREFIX}.vocab_release",
+            SLICE0_CONDITION_CONCEPT_FIELD,
+            SLICE0_RESOLVER_POLICY_FIELD,
+            SLICE0_VOCAB_RELEASE_FIELD,
         ],
         primary_key=PrimaryKeyStrategy.NATURAL_KEY,
     )

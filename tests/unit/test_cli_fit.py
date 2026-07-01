@@ -98,6 +98,29 @@ def test_fit_runs_full_chain_on_duckdb(runner: CliRunner, tmp_path) -> None:
     assert total == 3
 
 
+def test_fit_strict_exits_3_when_not_accepted(runner: CliRunner, tmp_path) -> None:
+    db = tmp_path / "fixture.duckdb"
+    _seed_fixture_db(db)
+    result = runner.invoke(
+        cli,
+        [
+            "fit",
+            "--manifest",
+            str(_MANIFEST),
+            "--duckdb",
+            str(db),
+            "--study-schema",
+            "study",
+            "--strict",
+        ],
+    )
+    # no gold labels -> verdict is not ACCEPTED -> strict fails with exit 3
+    assert result.exit_code == 3, result.output
+    assert "STRICT FAIL" in result.output
+    # the summary is still printed before the strict gate fires
+    assert '"rows_staged": 3' in result.output
+
+
 def test_fit_is_registered(runner: CliRunner) -> None:
     result = runner.invoke(cli, ["fit", "--help"])
     assert result.exit_code == 0

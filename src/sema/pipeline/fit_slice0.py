@@ -15,7 +15,7 @@ manifest) — this module re-loads nothing and names no domain literal.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import duckdb
@@ -69,6 +69,7 @@ class FitRequest:
     staging_table: str
     gold: GoldSet
     nodes: MappingNodes
+    constant_assertions: list[MappingAssertion] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -123,7 +124,9 @@ def run_fit(
     producer = VocabLookupProducer(_RecordingSession())
     assertion = producer.produce(store, request.policy, ctx, request.nodes)
     plan = Slice0PlanAssembler().assemble(
-        [assertion], request.obligation, request.row_identity
+        [assertion, *request.constant_assertions],
+        request.obligation,
+        request.row_identity,
     )
 
     decisions = [
