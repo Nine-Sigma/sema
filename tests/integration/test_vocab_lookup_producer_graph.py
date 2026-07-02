@@ -140,7 +140,7 @@ def test_producer_writes_field_map_bridge(migrated_neo4j) -> None:
     store = _seed_store(policy)
     with migrated_neo4j.session() as s:
         VocabLookupProducer(s).produce(
-            store,
+            store.read_all(),
             policy,
             _context(policy),
             MappingNodes(source_property_id="src-onco", target_property_id=target_id),

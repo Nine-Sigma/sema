@@ -119,6 +119,21 @@ class TestFrozenSchema:
     ) -> None:
         assert tuple(store.column_names()) == FROZEN_COLUMNS
 
+    def test_column_names_scoped_to_current_catalog(self, tmp_path: Path) -> None:
+        # A second attached catalog that ALSO has sema_resolve.value_mapping must
+        # not double the column list: column_names() reflects the store's own
+        # (current) catalog, matching its unqualified read/write SQL.
+        import duckdb
+
+        other = tmp_path / "other.duckdb"
+        oc = duckdb.connect(str(other))
+        ValueMappingStore(oc)
+        oc.close()
+        conn = duckdb.connect(str(tmp_path / "work.duckdb"))
+        store = ValueMappingStore(conn)
+        conn.execute(f"ATTACH '{other}' AS poc")
+        assert tuple(store.column_names()) == FROZEN_COLUMNS
+
     def test_store_is_location_independent(self) -> None:
         assert "source_schema" not in FROZEN_COLUMNS
         assert "source_table" not in FROZEN_COLUMNS

@@ -13,7 +13,7 @@ in as data. The graph writes reuse :mod:`sema.graph.planner_loader`.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Sequence
 
 from sema.graph.planner_loader import (
     cypher_create_field_map_derived_from,
@@ -44,26 +44,23 @@ class MappingNodes:
     target_property_id: str
 
 
-class DecisionSource(Protocol):
-    """Read-only surface over the value-mapping store (US-005)."""
-
-    def read_all(self) -> list[ValueMapping]: ...
-
-
 class VocabLookupProducer:
-    """Turns stored value-mapping decisions into one graph mapping (US-009)."""
+    """Turns this run's value-mapping decisions into one graph mapping (US-009)."""
 
     def __init__(self, session: Any) -> None:
         self._session = session
 
     def produce(
         self,
-        decisions: DecisionSource,
+        decisions: Sequence[ValueMapping],
         policy: ResolverPolicy,
         context: ResolveContext,
         nodes: MappingNodes,
     ) -> MappingAssertion:
-        scoped = decisions_for_binding(decisions.read_all(), policy, context)
+        # ``decisions`` are THIS run's mappings (the caller's scope), never the
+        # whole store: folding store.read_all() would let a stale same-policy row
+        # leak its status/confidence into the assertion — or mask an empty run.
+        scoped = decisions_for_binding(list(decisions), policy, context)
         assertion = build_column_assertion(scoped, policy, context)
         field_map = field_map_from_assertion(assertion)
         self._write_graph(field_map, _field_map_id(assertion), nodes)

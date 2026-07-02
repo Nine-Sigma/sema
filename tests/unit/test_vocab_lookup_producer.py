@@ -39,21 +39,6 @@ _TARGET_FIELD = "condition_concept_id"
 _VOCAB_RELEASE = "OMOP_2024"
 
 
-class FakeDecisionSource:
-    """Read-only view over configured decisions (no writes)."""
-
-    def __init__(self, decisions: list[ValueMapping]) -> None:
-        self._decisions = decisions
-        self.writes = 0
-
-    def read_all(self) -> list[ValueMapping]:
-        return list(self._decisions)
-
-    def upsert(self, _: object) -> int:  # pragma: no cover - guards against writes
-        self.writes += 1
-        return 0
-
-
 class FakeSession:
     """Records every ``run`` call (query + named parameters)."""
 
@@ -184,12 +169,11 @@ def _no_map(code: str = "DEAD") -> ValueMapping:
 
 def _produce(
     decisions: list[ValueMapping], policy: ResolverPolicy
-) -> tuple[MappingAssertion, FakeSession, FakeDecisionSource]:
-    source = FakeDecisionSource(decisions)
+) -> tuple[MappingAssertion, FakeSession, list[ValueMapping]]:
     session = FakeSession()
     producer = VocabLookupProducer(session)
-    assertion = producer.produce(source, policy, _context(), _nodes())
-    return assertion, session, source
+    assertion = producer.produce(decisions, policy, _context(), _nodes())
+    return assertion, session, decisions
 
 
 def test_produce_emits_single_vocab_lookup_assertion(policy: ResolverPolicy) -> None:
@@ -256,17 +240,20 @@ def test_review_pending_decision_escalates_assertion(policy: ResolverPolicy) -> 
 
 
 def test_no_resolved_decisions_raises(policy: ResolverPolicy) -> None:
-    source = FakeDecisionSource([_no_map("DEAD"), _no_map("GONE")])
     producer = VocabLookupProducer(FakeSession())
     with pytest.raises(NoResolvedDecisionError):
-        producer.produce(source, policy, _context(), _nodes())
+        producer.produce([_no_map("DEAD"), _no_map("GONE")], policy, _context(), _nodes())
 
 
-def test_producer_never_writes_the_value_mapping_store(
+def test_producer_does_not_mutate_input_decisions(
     policy: ResolverPolicy,
 ) -> None:
-    _, _, source = _produce([_resolved()], policy)
-    assert source.writes == 0
+    decisions = [_resolved(), _no_map()]
+    _produce(decisions, policy)
+    # The producer folds a provided decision list; it owns no store handle and
+    # cannot write US-005 (structural since the store read was removed).
+    assert decisions == [decisions[0], decisions[1]]
+    assert len(decisions) == 2
 
 
 def test_decisions_for_other_bindings_are_ignored(policy: ResolverPolicy) -> None:

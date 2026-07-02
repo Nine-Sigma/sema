@@ -60,10 +60,11 @@ valid. (The slice-0 manifest's own snapshot hash is computed, not pinned to that
 Policy ref value `omop.oncotree_to_snomed_condition` → `omop.oncotree_condition`:
 - `src/sema/resolve/policies/omop.py:18` — `OMOP_ONCOTREE_CONDITION_REF` (single source of truth).
 - `src/sema/targets/manifests/omop_condition_slice0.yaml:71` + legacy-anchor comments (14-15, 62-67).
-- ~15 test files hardcode the literal (unit: test_value_mapping_store, test_mapping_report,
+- 8 test files hardcode the literal (unit: test_value_mapping_store, test_mapping_report,
   test_transform_compiler, test_plan_assembler; integration: test_value_mapping_store_schema,
   test_staging_qa_live, test_mapping_report_live, test_transform_compiler_live). Prefer importing
-  `OMOP_ONCOTREE_CONDITION_REF` over re-hardcoding, so a future rename is one-line.
+  `OMOP_ONCOTREE_CONDITION_REF` over re-hardcoding, so a future rename is one-line. (Note:
+  test_vocab_lookup_producer already imports the constant — the model to follow.)
 
 Binding vocabulary value `SNOMED` → sentinel (D1-A):
 - `src/sema/targets/manifests/omop_condition_slice0.yaml:67` (`vocabulary: SNOMED`) + comments.

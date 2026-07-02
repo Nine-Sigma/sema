@@ -129,7 +129,7 @@ def run_fit(
     run_mappings = resolver.resolve_and_store(request.source_codes, store, ctx)
 
     producer = VocabLookupProducer(_RecordingSession())
-    assertion = producer.produce(store, request.policy, ctx, request.nodes)
+    assertion = producer.produce(run_mappings, request.policy, ctx, request.nodes)
     plan = Slice0PlanAssembler().assemble(
         [assertion, *request.constant_assertions],
         request.obligation,

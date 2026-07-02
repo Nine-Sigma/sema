@@ -319,6 +319,42 @@ def test_staging_compile_is_scoped_to_this_run_not_whole_store(
     assert total == 3
 
 
+def test_assertion_production_is_scoped_to_this_run_not_whole_store(
+    tmp_path: Path,
+) -> None:
+    # Stale-cache finding: the produced assertion must fold THIS run's decisions,
+    # not store.read_all(). A prior run left a same-policy RESOLVED LUAD row; the
+    # current run resolves only ZZZZ (all NO_MAP). The assertion must NOT inherit
+    # the stale row's status/confidence — with no resolved decision this run, the
+    # producer must raise (exactly as it would against a clean store).
+    from sema.resolve.producer import NoResolvedDecisionError
+
+    conn = duckdb.connect(str(tmp_path / "fit.duckdb"))
+    conn.execute('CREATE SCHEMA IF NOT EXISTS "study"')
+    conn.execute('CREATE TABLE "study"."sample" (ONCOTREE_CODE VARCHAR)')
+    conn.executemany(
+        'INSERT INTO "study"."sample" VALUES (?)', [("ZZZZ",)]
+    )
+    # Seed a stale, same-policy LUAD row via a prior full run sharing the store.
+    _run_codes(conn, ["LUAD", "ZZZZ"], _gold())
+    with pytest.raises(NoResolvedDecisionError):
+        _run_codes_only(conn, ["ZZZZ"])
+
+
+def _run_codes_only(conn: duckdb.DuckDBPyConnection, codes: list[str]) -> FitResult:
+    policy, request = build_slice0_fit_request(
+        manifest_path=_MANIFEST,
+        source_schema="study",
+        source_table="sample",
+        value_column="ONCOTREE_CODE",
+        source_codes=codes,
+        source_row_count=1,
+        gold=_gold(),
+    )
+    resolver = VocabularyResolver(_FakeVocabStore(), policy)
+    return run_fit(resolver, request, value_mapping_conn=conn, staging_conn=conn)
+
+
 def test_build_request_reads_binding_from_manifest() -> None:
     policy, request = build_slice0_fit_request(
         manifest_path=_MANIFEST,

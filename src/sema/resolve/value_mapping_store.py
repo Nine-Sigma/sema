@@ -88,9 +88,14 @@ class ValueMappingStore:
         return from_row(tuple(row), Status) if row is not None else None
 
     def column_names(self) -> list[str]:
+        # Scope to the store's own catalog: an attached second DuckDB database
+        # (e.g. ~/.sema/poc.duckdb) may expose the same schema.table, which would
+        # otherwise interleave a duplicate column list. The store's read/write
+        # SQL is unqualified, so current_database() is the catalog it targets.
         rows = self._conn.execute(
             "SELECT column_name FROM information_schema.columns "
-            "WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position",
+            "WHERE table_catalog = current_database() "
+            "AND table_schema = ? AND table_name = ? ORDER BY ordinal_position",
             [self._schema, self._table],
         ).fetchall()
         return [r[0] for r in rows]
