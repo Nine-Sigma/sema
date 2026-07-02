@@ -32,9 +32,12 @@ from sema.compile.staging_backend import (
     StagingCursor,
 )
 from sema.eval.mapping_goldset import GoldSet
-from sema.eval.mapping_report import build_mapping_report, decisions_from_store
+from sema.eval.mapping_report import build_mapping_report
 from sema.eval.conformance import ConformanceReport, assert_contract_conformance
-from sema.eval.mapping_report_utils import MappingReport
+from sema.eval.mapping_report_utils import (
+    MappingReport,
+    decision_from_value_mapping,
+)
 from sema.eval.staging_qa import run_staging_qa
 from sema.eval.staging_qa_utils import StagingQAReport
 from sema.models.planner.field_map import RowIdentity
@@ -162,14 +165,13 @@ def run_fit(
         backend=staging_backend,
     )
 
+    # Score against THIS run's decisions only (like the F1 conformance gate).
+    # Reading the whole store would let a stale row for a code absent from the
+    # current source contradict a gold label and fail --strict (bug-369 F1
+    # follow-up); run_mappings is exactly the current run/property/policy grain.
     report = build_mapping_report(
         request.gold,
-        decisions_from_store(
-            store,
-            target_property_ref=ctx.target_property_ref,
-            resolver_policy_ref=ctx.resolver_policy_ref,
-            vocab_release=ctx.vocab_release,
-        ),
+        [decision_from_value_mapping(mapping) for mapping in run_mappings],
     )
     conformance = assert_contract_conformance(
         run_mappings, resolver.vocab_store, request.policy

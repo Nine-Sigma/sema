@@ -229,6 +229,46 @@ class TestRunFit:
             assert "Proposal" not in type(fm).__name__
 
 
+def _run_codes(
+    conn: duckdb.DuckDBPyConnection, codes: list[str], gold: GoldSet
+) -> FitResult:
+    policy, request = build_slice0_fit_request(
+        manifest_path=_MANIFEST,
+        source_schema="study",
+        source_table="sample",
+        value_column="ONCOTREE_CODE",
+        source_codes=codes,
+        source_row_count=3,
+        gold=gold,
+    )
+    resolver = VocabularyResolver(_FakeVocabStore(), policy)
+    return run_fit(resolver, request, value_mapping_conn=conn, staging_conn=conn)
+
+
+def test_strict_report_ignores_stale_store_rows_absent_from_this_run(
+    tmp_path: Path,
+) -> None:
+    # bug-369 F1 follow-up: the strict contradiction check must be scoped to
+    # THIS run's mappings, not the whole historical store. A prior run left a
+    # stale NO_MAP row for OTHER; OTHER is no longer in the source table, yet a
+    # human labelled it RESOLVED. The current run (LUAD, ZZZZ) never touches
+    # OTHER, so it must not fail on that stale disagreement.
+    conn = duckdb.connect(str(tmp_path / "fit.duckdb"))
+    _seed_source(conn)
+    gold = GoldSet(
+        rows=[
+            GoldRow("LUAD", int(_STANDARD_ID), GoldLabel.RESOLVED, 2),
+            GoldRow("ZZZZ", None, GoldLabel.NO_MAP, 1),
+            GoldRow("OTHER", 999999, GoldLabel.RESOLVED, 1),
+        ]
+    )
+    # Run 1 leaves a stale OTHER -> NO_MAP row in the shared store.
+    _run_codes(conn, ["LUAD", "ZZZZ", "OTHER"], gold)
+    # Run 2: OTHER has dropped out of the source; only LUAD, ZZZZ resolve now.
+    result = _run_codes(conn, ["LUAD", "ZZZZ"], gold)
+    assert result.report.has_labelled_contradiction() is False
+
+
 def test_build_request_reads_binding_from_manifest() -> None:
     policy, request = build_slice0_fit_request(
         manifest_path=_MANIFEST,
