@@ -67,16 +67,30 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     # blocks duplicate assertions even under transient-retry replays.
     loader.ensure_core_constraints()
 
-    # Clean each study's prior graph writes before re-materialization, for
-    # both fresh and resume builds (finding L). Resume preserves :Assertion
-    # nodes — they are the cache process_table reads to skip completed
-    # tables, and per-table re-materialization runs AFTER this cleanup, so
-    # deleting them here would silently turn every resume into a full
-    # rebuild. Cleanup of an absent study is a no-op.
-    for schema in sorted({wi.schema for wi in work_items}):
-        loader.delete_study_scoped(
-            schema, preserve_assertions=config.resume,
-        )
+    # Clean prior graph writes before re-materialization (finding L), but
+    # scope the cleanup to what is actually being rebuilt (bug-368):
+    #   - Fresh build: full per-schema wipe — also drops tables removed from
+    #     the source since the last build.
+    #   - Resume: clear ONLY tables with no cached assertions (the ones this
+    #     run re-extracts). Tables that have assertions are left intact and
+    #     re-materialized from the cache by process_table. The old code ran
+    #     the schema-wide wipe on resume too, orphan-deleting every structural
+    #     node; because resume then skips cached tables, those nodes were
+    #     never rebuilt (or lost outright if the run was interrupted).
+    if config.resume:
+        for work_item in work_items:
+            if not loader.has_assertions(work_item.fqn):
+                loader.delete_table_scoped(
+                    work_item.catalog,
+                    work_item.schema,
+                    work_item.table_name,
+                    work_item.fqn,
+                )
+    else:
+        for schema in sorted({wi.schema for wi in work_items}):
+            loader.delete_study_scoped(
+                schema, preserve_assertions=False,
+            )
 
     circuit_breaker = CircuitBreaker(
         failure_threshold=config.circuit_breaker_threshold,
