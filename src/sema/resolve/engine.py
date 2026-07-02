@@ -26,6 +26,7 @@ from sema.resolve.engine_utils import (
     build_vocab_lookup_assertion,
     classify_resolution,
     dedupe_concepts,
+    ResolveTrace,
 )
 from sema.resolve.policy import ResolverPolicy
 from sema.resolve.standardize import standardize
@@ -52,14 +53,21 @@ class VocabularyResolver:
     def resolve(self, source_code: str) -> CodeResolution:
         """Resolve one distinct source code to a Zone-classified decision."""
         candidates = generate_candidates(self._store, self._policy, source_code)
-        survivors = self._survivors(candidates)
-        return classify_resolution(source_code, survivors, self._disambiguate)
+        standardized = self._standardized(candidates)
+        survivors = apply_domain_gate(self._policy, standardized)
+        trace = ResolveTrace(
+            n_candidates=len(candidates), n_standardized=len(standardized)
+        )
+        return classify_resolution(
+            source_code, survivors, self._disambiguate, trace, self._policy
+        )
 
-    def _survivors(self, candidates: list[ConceptRow]) -> list[ConceptRow]:
+    def _standardized(self, candidates: list[ConceptRow]) -> list[ConceptRow]:
+        """Standard/valid targets (step 2), deduped, BEFORE the domain gate."""
         standardized: list[ConceptRow] = []
         for candidate in candidates:
             standardized.extend(standardize(self._store, self._policy, candidate))
-        return apply_domain_gate(self._policy, dedupe_concepts(standardized))
+        return dedupe_concepts(standardized)
 
     def to_value_mapping(
         self, resolution: CodeResolution, context: ResolveContext

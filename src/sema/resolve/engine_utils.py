@@ -26,7 +26,18 @@ AUTO_CONFIDENCE = 1.0
 NO_MAP_CONFIDENCE = 1.0
 AMBIGUOUS_CONFIDENCE = 0.5
 
-_NO_MAP_REASON = "no standard target concept survived the domain gate"
+@dataclass(frozen=True)
+class ResolveTrace:
+    """Stage counts from one resolve pass, used to explain a NO_MAP outcome.
+
+    ``n_candidates`` is the source-vocabulary match count (step 1a);
+    ``n_standardized`` is the deduped standard/valid target count before the
+    domain gate (step 2). Zero survivors + these two counts pinpoint WHERE the
+    walk ended without hardcoding any domain literal here.
+    """
+
+    n_candidates: int
+    n_standardized: int
 
 
 @dataclass(frozen=True)
@@ -81,10 +92,12 @@ def classify_resolution(
     source_code: str,
     survivors: list[ConceptRow],
     disambiguate: Disambiguator,
+    trace: ResolveTrace,
+    policy: ResolverPolicy,
 ) -> CodeResolution:
     """Map surviving standard candidates to a §1.5(c) Zone decision."""
     if not survivors:
-        return _no_map(source_code)
+        return _no_map(source_code, trace, policy)
     if len(survivors) == 1:
         return _resolved(source_code, survivors[0], Status.auto_accepted, AUTO_CONFIDENCE)
     chosen = disambiguate(survivors) or min(survivors, key=lambda c: int(c.id))
@@ -106,16 +119,38 @@ def _resolved(
     )
 
 
-def _no_map(source_code: str) -> CodeResolution:
+def _no_map(
+    source_code: str, trace: ResolveTrace, policy: ResolverPolicy
+) -> CodeResolution:
     return CodeResolution(
         source_code=source_code,
         resolution_status=ResolutionStatus.NO_MAP,
         concept_id=None,
         status=Status.auto_accepted,
         confidence=NO_MAP_CONFIDENCE,
-        no_map_reason=_NO_MAP_REASON,
+        no_map_reason=_no_map_reason(trace, policy),
         survivors=(),
         chosen=None,
+    )
+
+
+def _no_map_reason(trace: ResolveTrace, policy: ResolverPolicy) -> str:
+    """Explain WHERE the deterministic walk ended, using policy data only.
+
+    Reason strings interpolate the policy's source vocabulary, standardizing
+    relationship, and target domain — never a hardcoded domain literal — so this
+    stays vocabulary-agnostic (and R29-clean).
+    """
+    if trace.n_candidates == 0:
+        return f"source code not found in vocabulary '{policy.source_vocabulary}'"
+    if trace.n_standardized == 0:
+        return (
+            f"no standard, valid '{policy.maps_to_relationship}' target "
+            "(no curated crosswalk)"
+        )
+    return (
+        "standardized target(s) fell outside target domain "
+        f"'{policy.target_domain}'"
     )
 
 

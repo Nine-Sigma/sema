@@ -252,6 +252,40 @@ def test_resolve_tie_escalates_to_zone2_review(policy: ResolverPolicy):
     assert resolution.confidence < 1.0
 
 
+def test_no_map_reason_source_code_absent(policy: ResolverPolicy):
+    resolution = VocabularyResolver(FakeVocabStore(), policy).resolve("ZZZZ")
+    assert resolution.resolution_status is ResolutionStatus.NO_MAP
+    assert resolution.no_map_reason is not None
+    assert "not found" in resolution.no_map_reason
+    assert "OncoTree" in resolution.no_map_reason  # policy.source_vocabulary, not a literal
+
+
+def test_no_map_reason_no_curated_crosswalk(policy: ResolverPolicy):
+    # Source concept exists but has zero 'Maps to' targets (the PANEC case).
+    store = FakeVocabStore(
+        by_code={("OncoTree", "PANEC"): _source(code="PANEC")},
+        maps_to={"777926": []},
+    )
+    resolution = VocabularyResolver(store, policy).resolve("PANEC")
+    assert resolution.resolution_status is ResolutionStatus.NO_MAP
+    assert resolution.no_map_reason is not None
+    assert "crosswalk" in resolution.no_map_reason
+    assert "Maps to" in resolution.no_map_reason  # policy.maps_to_relationship
+
+
+def test_no_map_reason_domain_gated(policy: ResolverPolicy):
+    # A standard target exists but is in the wrong OMOP domain -> gated out.
+    store = FakeVocabStore(
+        by_code={("OncoTree", "MEAS"): _source(code="MEAS")},
+        maps_to={"777926": [_standard(domain="Measurement")]},
+    )
+    resolution = VocabularyResolver(store, policy).resolve("MEAS")
+    assert resolution.resolution_status is ResolutionStatus.NO_MAP
+    assert resolution.no_map_reason is not None
+    assert "domain" in resolution.no_map_reason
+    assert "Condition" in resolution.no_map_reason  # policy.target_domain
+
+
 def test_code_bearing_hot_path_invokes_no_llm(policy: ResolverPolicy):
     def explode(_: Sequence[ConceptRow]) -> ConceptRow | None:
         raise AssertionError("disambiguator must not fire on the single-survivor path")
