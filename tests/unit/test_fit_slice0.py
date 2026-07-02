@@ -269,6 +269,56 @@ def test_strict_report_ignores_stale_store_rows_absent_from_this_run(
     assert result.report.has_labelled_contradiction() is False
 
 
+def _stale_luad_row() -> Any:
+    from sema.models.planner.lifecycle import Status
+    from sema.resolve.value_mapping_store_utils import (
+        ResolutionStatus,
+        ValueMapping,
+    )
+
+    # A grain row for LUAD left by a PRIOR resolver policy (grain key includes
+    # resolver_policy_ref, so it coexists with this run's LUAD row).
+    return ValueMapping(
+        source_vocabulary="OncoTree",
+        normalized_source_value="LUAD",
+        target_property_ref="stale.prop",
+        target_field="condition_concept_id",
+        vocab_binding="stale.binding",
+        concept_id=99999999,
+        vocab_release="stale-release",
+        valid_start=None,
+        valid_end=None,
+        resolution_status=ResolutionStatus.RESOLVED,
+        no_map_reason=None,
+        confidence=1.0,
+        status=Status.auto_accepted,
+        resolver_policy_ref="stale.policy",
+        run_id="stale-run",
+    )
+
+
+def test_staging_compile_is_scoped_to_this_run_not_whole_store(
+    tmp_path: Path,
+) -> None:
+    # bug-374: the staging compile must inline THIS run's decisions, not
+    # store.read_all(). A stale grain row for LUAD under a renamed policy would
+    # otherwise match the same source rows in the VALUES LEFT JOIN and duplicate
+    # every LUAD staging row.
+    from sema.resolve.value_mapping_store import ValueMappingStore
+
+    conn = duckdb.connect(str(tmp_path / "fit.duckdb"))
+    _seed_source(conn)
+    ValueMappingStore(conn).upsert([_stale_luad_row()])
+    result = _run(conn)
+    # 3 source rows (LUAD, LUAD, ZZZZ) -> exactly 3 staging rows, no duplication.
+    assert result.rows_staged == 3
+    total = conn.execute(
+        f'SELECT COUNT(*) FROM "{result.staging_schema}".'
+        f'"{result.staging_table}"'
+    ).fetchone()[0]
+    assert total == 3
+
+
 def test_build_request_reads_binding_from_manifest() -> None:
     policy, request = build_slice0_fit_request(
         manifest_path=_MANIFEST,

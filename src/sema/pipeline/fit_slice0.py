@@ -136,8 +136,12 @@ def run_fit(
         request.row_identity,
     )
 
+    # Inline THIS run's decisions only (bug-374). store.read_all() is unscoped:
+    # a stale grain row for a code under a renamed/second resolver_policy_ref
+    # would match the same source rows in the VALUES LEFT JOIN and duplicate
+    # every staging row for that code. run_mappings is the current-run grain.
     decisions = [
-        staging_decision_from_value_mapping(mapping) for mapping in store.read_all()
+        staging_decision_from_value_mapping(mapping) for mapping in run_mappings
     ]
     compiler = TransformCompiler()
     compiled = compiler.compile(
