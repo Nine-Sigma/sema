@@ -52,6 +52,7 @@ from sema.resolve.engine_utils import (
 from sema.resolve.policy import ResolverPolicy
 from sema.resolve.producer import MappingNodes, VocabLookupProducer
 from sema.resolve.value_mapping_store import ValueMappingStore
+from sema.resolve.value_mapping_store_utils import GRAIN_KEY, ValueMapping
 
 __all__ = ["FitRequest", "FitResult", "run_fit"]
 
@@ -108,6 +109,20 @@ class _RecordingSession:
         self.writes.append((statement, params))
 
 
+def _dedupe_to_grain(mappings: list[ValueMapping]) -> list[ValueMapping]:
+    """Collapse to one row per store grain (last-wins), matching the store PK.
+
+    The value-mapping store's ``ON CONFLICT (GRAIN_KEY) DO UPDATE`` keeps the last
+    write per grain; ``resolve_and_store`` returns one row per INPUT code, so this
+    mirrors what the store actually holds when input codes are non-distinct (or
+    alias to the same normalized grain).
+    """
+    by_grain: dict[tuple[Any, ...], ValueMapping] = {}
+    for mapping in mappings:
+        by_grain[tuple(getattr(mapping, col) for col in GRAIN_KEY)] = mapping
+    return list(by_grain.values())
+
+
 def run_fit(
     resolver: VocabularyResolver,
     request: FitRequest,
@@ -125,8 +140,13 @@ def run_fit(
     ctx = request.resolve_context
     store = ValueMappingStore(value_mapping_conn)
     # Capture THIS run's decisions (scoped to run/property/policy/vocab release)
-    # for the F1 conformance gate — never the whole historical store.
-    run_mappings = resolver.resolve_and_store(request.source_codes, store, ctx)
+    # for the F1 conformance gate — never the whole historical store. Collapse to
+    # the store's grain (last-wins, as its ON CONFLICT PK does): resolve_and_store
+    # returns one row per INPUT code, so non-distinct source codes would otherwise
+    # inline duplicate VALUES rows and inflate the staging join.
+    run_mappings = _dedupe_to_grain(
+        resolver.resolve_and_store(request.source_codes, store, ctx)
+    )
 
     producer = VocabLookupProducer(_RecordingSession())
     assertion = producer.produce(run_mappings, request.policy, ctx, request.nodes)

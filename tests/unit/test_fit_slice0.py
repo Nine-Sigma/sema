@@ -341,6 +341,31 @@ def test_assertion_production_is_scoped_to_this_run_not_whole_store(
         _run_codes_only(conn, ["ZZZZ"])
 
 
+def test_duplicate_source_codes_stage_exactly_source_rows(tmp_path: Path) -> None:
+    # run_mappings is normalized to the store grain: even if the caller passes
+    # duplicate source codes, each source row must join exactly one VALUES row
+    # (the store PK would collapse them; the inlined decisions must match).
+    conn = duckdb.connect(str(tmp_path / "fit.duckdb"))
+    _seed_source(conn)  # LUAD, LUAD, ZZZZ -> 3 source rows
+    policy, request = build_slice0_fit_request(
+        manifest_path=_MANIFEST,
+        source_schema="study",
+        source_table="sample",
+        value_column="ONCOTREE_CODE",
+        source_codes=["LUAD", "LUAD", "ZZZZ"],  # NON-distinct input
+        source_row_count=3,
+        gold=_gold(),
+    )
+    resolver = VocabularyResolver(_FakeVocabStore(), policy)
+    result = run_fit(resolver, request, value_mapping_conn=conn, staging_conn=conn)
+    assert result.rows_staged == 3
+    total = conn.execute(
+        f'SELECT COUNT(*) FROM "{result.staging_schema}".'
+        f'"{result.staging_table}"'
+    ).fetchone()[0]
+    assert total == 3
+
+
 def _run_codes_only(conn: duckdb.DuckDBPyConnection, codes: list[str]) -> FitResult:
     policy, request = build_slice0_fit_request(
         manifest_path=_MANIFEST,
