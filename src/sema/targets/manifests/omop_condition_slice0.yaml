@@ -1,11 +1,27 @@
-# Slice-0 OMOP target: condition_occurrence with a SNOMED-bound
-# condition_concept_id resolved from OncoTree via the US-004 policy.
+# Slice-0 OMOP target: condition_occurrence with a condition_concept_id
+# resolved from OncoTree via the US-004 policy.
+#
+# TARGET CONTRACT (the user-provided semantics for Slice-0 are OMOP, not a
+# single vocabulary): condition_concept_id must be an OMOP concept that is
+# VALID + STANDARD (standard_concept='S') + domain_id='Condition'. That is
+# governed by the CDM's Condition domain, whose standard concepts span SNOMED
+# AND — via the OMOP oncology extension — ICDO3 histology. The resolver is
+# vocabulary-agnostic by design: it gates on valid+standard+domain (see
+# resolve/policy.py::ResolverPolicy.accepts) and does NOT filter on a single
+# target vocabulary_id. So an OncoTree code resolving to a standard ICDO3
+# Condition concept is a CORRECT OMOP mapping, not a miss.
+#
+# NOTE: the `vocabulary: SNOMED` binding field below and the
+# `oncotree_to_snomed_condition` policy ref are a STRUCTURAL/LEGACY anchor
+# (they MERGE a :Vocabulary node + name a persisted policy id); they are NOT a
+# resolution filter and must not be read as "output is SNOMED-only". Flipping
+# them to reflect the vocabulary-agnostic contract is tracked as an open
+# decision (bug-369) because it touches graph shape + persisted provenance ids.
 #
 # This is the ONLY place these OMOP/OncoTree specifics live for US-007:
 # authored manifests are an R29-allowlisted location (the engine core and
-# generic spine stay free of these literals). The target vocabulary is
-# SNOMED (R9: the binding's `vocabulary`); the SOURCE vocabulary
-# (OncoTree) is named only by the resolver policy referenced here.
+# generic spine stay free of these literals). The SOURCE vocabulary (OncoTree)
+# is named only by the resolver policy referenced here.
 manifest_version: 1
 descriptor:
   target_model_id: omop-condition-slice0
@@ -43,9 +59,15 @@ entities:
         nullable: false
         synonyms: [cancer_type_code, diagnosis_concept]
         vocabulary_binding:
+          # `vocabulary: SNOMED` is a legacy/governance ANCHOR, NOT a resolution
+          # filter: `standard_domain_governed: true` declares (machine-readably)
+          # that acceptance is governed by standardness + domain, so a code may
+          # resolve to a standard Condition concept in SNOMED OR ICDO3 and both
+          # are correct. See bug-369.
           vocabulary: SNOMED
           domain: Condition
           require_standard: true
+          standard_domain_governed: true
           resolver_policy_ref: omop.oncotree_to_snomed_condition
       - name: condition_start_date
         type: date
@@ -67,5 +89,8 @@ entities:
       card_version: "1.0.0"
       description: >
         OMOP condition_occurrence; one row per recorded condition. Slice-0
-        target for OncoTree->SNOMED condition_concept_id resolution.
-      obligation_summary: Required PK, person FK, start date, and SNOMED concept.
+        target for OncoTree -> OMOP standard Condition concept_id resolution
+        (valid + standard + domain=Condition; SNOMED or ICDO3 both acceptable).
+      obligation_summary: >
+        Required PK, person FK, start date, and a valid+standard OMOP Condition
+        concept (vocabulary-agnostic; SNOMED or ICDO3 via the oncology extension).

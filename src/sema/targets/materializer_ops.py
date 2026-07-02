@@ -110,6 +110,7 @@ class VocabularyBindingOp(_Op):
     domain: str | None = None
     require_standard: bool = False
     allow_zero_default: bool = False
+    standard_domain_governed: bool = False
     effective_date_ref: str | None = None
     resolver_policy_ref: str | None = None
     is_current: bool = True

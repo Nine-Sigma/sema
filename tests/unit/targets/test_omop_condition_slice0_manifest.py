@@ -96,6 +96,9 @@ def test_vocabulary_binding_op_carries_condition_binding() -> None:
     )
     assert binding.domain == _CONDITION_DOMAIN
     assert binding.require_standard is True
+    # bug-369 F2: the target is OMOP-standard-Condition (vocabulary-agnostic),
+    # declared machine-readably so `vocabulary: SNOMED` reads as a legacy anchor.
+    assert binding.standard_domain_governed is True
     assert binding.resolver_policy_ref == OMOP_ONCOTREE_CONDITION_REF
 
 

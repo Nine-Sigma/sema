@@ -279,6 +279,7 @@ def to_vocabulary_bindings(
             domain=binding.domain,
             require_standard=binding.require_standard,
             allow_zero_default=binding.allow_zero_default,
+            standard_domain_governed=binding.standard_domain_governed,
             effective_date_ref=binding.effective_date_ref,
             resolver_policy_ref=binding.resolver_policy_ref,
         )

@@ -87,6 +87,27 @@ def test_write_property_emits_full_hash_versioned_merge_keys() -> None:
     assert params["materialized_as_edge_property"] is True
 
 
+def test_write_vocabulary_binding_carries_standard_domain_governed() -> None:
+    calls: list[tuple[str, dict]] = []
+    writer = Neo4jGraphWriter(_mock_driver_capturing(calls))
+    op = VocabularyBindingOp(
+        target_model_id="t",
+        target_model_version="1",
+        target_schema_snapshot_hash="h",
+        parent_entity_qualified_name="omop.condition_occurrence",
+        property_name="condition_concept_id",
+        vocabulary_name="SNOMED",
+        vocabulary_source="EXTERNAL",
+        domain="Condition",
+        require_standard=True,
+        standard_domain_governed=True,
+    )
+    writer.write_vocabulary_binding(op)
+    cypher, params = calls[0]
+    assert "n.standard_domain_governed = $standard_domain_governed" in cypher
+    assert params["standard_domain_governed"] is True
+
+
 def test_write_endpoint_property_carries_endpoint_typing() -> None:
     calls: list[tuple[str, dict]] = []
     writer = Neo4jGraphWriter(_mock_driver_capturing(calls))
