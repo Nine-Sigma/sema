@@ -29,7 +29,6 @@ from sema.compile.staging_backend import (
     StagingBackend,
 )
 from sema.eval.mapping_goldset import GoldSet, load_gold_set
-from sema.eval.mapping_report_utils import AcceptanceVerdict
 from sema.models.config import DatabricksConfig
 from sema.pipeline.fit_slice0 import FitResult, run_fit
 from sema.pipeline.fit_slice0_utils import (
@@ -88,7 +87,11 @@ _DEFAULT_DUCKDB = Path.home() / ".sema" / "poc.duckdb"
     "--strict/--no-strict",
     default=False,
     show_default=True,
-    help="Exit non-zero (3) if Gate D-lite fails or the eval verdict is not ACCEPTED.",
+    help=(
+        "Exit non-zero (3) if Gate D-lite fails, contract conformance fails, "
+        "or provided gold labels contradict the resolver. Does NOT require the "
+        "gold ACCEPTED verdict."
+    ),
 )
 def fit_cmd(
     manifest_path: Path,
@@ -130,13 +133,24 @@ def fit_cmd(
 
 
 def _enforce_strict(result: FitResult) -> None:
-    """Exit 3 when the run is not clean (Gate D-lite fail or verdict != ACCEPTED)."""
+    """Exit 3 unless the deterministic run is clean.
+
+    ``--strict`` = Gate D-lite passes AND contract conformance passes AND any
+    provided gold labels do not contradict. It does NOT require the gold-based
+    ACCEPTED verdict: the deterministic path is validated by contract
+    conformance (every resolved concept is valid + standard + in target domain),
+    not by gold coverage. Gold, when provided, only fails strict on an ACTUAL
+    contradiction (a labelled code the resolver disagrees with).
+    """
     reasons = []
     if not result.qa.passed:
         reasons.append(f"Gate D-lite: {result.qa.outcome.value}")
-    verdict = result.report.verdict
-    if verdict is not AcceptanceVerdict.ACCEPTED:
-        reasons.append(f"eval verdict: {verdict.value}")
+    if not result.conformance.passed:
+        reasons.append(
+            f"contract conformance: {len(result.conformance.violations)} violation(s)"
+        )
+    if result.report.has_labelled_contradiction():
+        reasons.append("labelled gold contradiction")
     if reasons:
         click.echo("STRICT FAIL — " + "; ".join(reasons), err=True)
         sys.exit(3)
@@ -236,7 +250,14 @@ def _summary(result: FitResult) -> dict[str, object]:
         "source_row_count": result.source_row_count,
         "staging": f"{result.staging_schema}.{result.staging_table}",
         "gate_d_lite": result.qa.as_dict(),
-        "eval": result.report.as_dict(),
+        "conformance": result.conformance.as_dict(),
+        "eval": {
+            **result.report.as_dict(),
+            "note": (
+                "informational / benchmark-only for the deterministic path; the "
+                "ACCEPTED verdict does NOT gate --strict (contract conformance does)"
+            ),
+        },
     }
 
 

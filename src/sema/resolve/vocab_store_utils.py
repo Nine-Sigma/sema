@@ -141,3 +141,15 @@ def concept_domain_query(schema: VocabStoreSchema, namespace: str) -> exp.Select
         .from_(_table(namespace, schema.concept_table))
         .where(exp.column(schema.id_col).eq(exp.Placeholder()))
     )
+
+
+def concepts_by_ids_query(
+    schema: VocabStoreSchema, namespace: str, count: int
+) -> exp.Select:
+    """``SELECT <concept cols> WHERE id IN (?, ?, ...)`` — ``count`` placeholders."""
+    placeholders = [exp.Placeholder() for _ in range(count)]
+    return (
+        _concept_select(schema, namespace, None)
+        .from_(_table(namespace, schema.concept_table))
+        .where(exp.column(schema.id_col).isin(*placeholders))
+    )

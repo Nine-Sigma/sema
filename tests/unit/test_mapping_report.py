@@ -154,6 +154,42 @@ def test_no_map_accuracy_reported_separately_not_in_verdict() -> None:
     assert report.as_dict()["metrics"]["distinct_code"]["no_map_accuracy"] == 0.0
 
 
+# --- F1: labelled-gold contradiction predicate (gates --strict) --------------
+
+
+def test_partial_labelled_gold_that_agrees_has_no_contradiction() -> None:
+    # A is labelled and agrees; B is unlabelled -> coverage < 1 but NO contradiction.
+    gold = [_gold("A", 10, GoldLabel.RESOLVED)]
+    decisions = [
+        _decision("A", 10, Status.auto_accepted, ResolutionStatus.RESOLVED),
+        _decision("B", 20, Status.auto_accepted, ResolutionStatus.RESOLVED),
+    ]
+    report = build_mapping_report(GoldSet(gold), decisions)
+    # B has no gold label; only A is scored, and it agrees -> no contradiction.
+    assert report.has_labelled_contradiction() is False
+
+
+def test_wrong_concept_is_a_contradiction() -> None:
+    gold = [_gold("A", 10, GoldLabel.RESOLVED)]
+    decisions = [_decision("A", 99, Status.auto_accepted, ResolutionStatus.RESOLVED)]
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.has_labelled_contradiction() is True
+
+
+def test_gold_resolved_predicted_no_map_is_a_contradiction() -> None:
+    gold = [_gold("A", 10, GoldLabel.RESOLVED)]
+    decisions = [_decision("A", None, Status.auto_accepted, ResolutionStatus.NO_MAP)]
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.has_labelled_contradiction() is True
+
+
+def test_gold_no_map_predicted_resolved_is_a_contradiction() -> None:
+    gold = [_gold("X", None, GoldLabel.NO_MAP)]
+    decisions = [_decision("X", 99, Status.auto_accepted, ResolutionStatus.RESOLVED)]
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.has_labelled_contradiction() is True
+
+
 # --- acceptance thresholds + coverage gate ----------------------------------
 
 

@@ -133,6 +133,20 @@ class MappingReport:
             "structural_precision_caveat": STRUCTURAL_PRECISION_CAVEAT,
         }
 
+    def has_labelled_contradiction(self) -> bool:
+        """True if any LABELLED gold code contradicts the resolver output.
+
+        Contradiction = scored cells where a human label disagrees with the
+        prediction: ``wrong`` (mapped to the wrong concept), ``fn`` (gold
+        RESOLVED but we said NO_MAP), ``fp_map`` (gold NO_MAP but we mapped).
+        ``recall_miss`` (Zone-2 review-pending) is EXCLUDED by design. Fires at
+        any ``labelled_count > 0``; full coverage is required only to GRANT the
+        ACCEPTED verdict, never to start honoring labels. This — not the
+        ACCEPTED verdict — is what gates ``sema fit --strict`` on gold.
+        """
+        m = self.score.distinct_code
+        return (m.wrong + m.fn + m.fp_map) > 0
+
     def human_summary(self) -> str:
         m = self.score.distinct_code
         lines = [

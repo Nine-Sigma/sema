@@ -50,6 +50,11 @@ class VocabularyResolver:
         self._policy = policy
         self._disambiguate = disambiguator or pick_single_survivor
 
+    @property
+    def vocab_store(self) -> VocabStore:
+        """The target-vocabulary store (read by the F1 conformance gate)."""
+        return self._store
+
     def resolve(self, source_code: str) -> CodeResolution:
         """Resolve one distinct source code to a Zone-classified decision."""
         candidates = generate_candidates(self._store, self._policy, source_code)

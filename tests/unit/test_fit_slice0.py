@@ -69,6 +69,10 @@ class _FakeVocabStore:
             ]
         }
 
+        self._by_id = {
+            row.id: row for rows in self._maps_to.values() for row in rows
+        }
+
     def concept_by_code(self, vocabulary: str, code: str) -> ConceptRow | None:
         return self._by_code.get((vocabulary, code))
 
@@ -81,6 +85,9 @@ class _FakeVocabStore:
         only_valid: bool = False,
     ) -> list[ConceptRow]:
         return list(self._maps_to.get(concept_id, []))
+
+    def concepts_by_ids(self, ids: list[str]) -> dict[str, ConceptRow | None]:
+        return {i: self._by_id.get(i) for i in ids}
 
 
 def _seed_source(conn: duckdb.DuckDBPyConnection) -> None:

@@ -218,3 +218,20 @@ def test_namespace_for_backend() -> None:
         namespace_for_backend(VocabStoreBackend.DATABRICKS)
         == "workspace.vocabulary_omop"
     )
+
+
+def test_concepts_by_ids_preserves_missing_ids() -> None:
+    conn = _FakeConn([_CONCEPT_TUPLE])  # only "777926" comes back
+    store = VocabStore(conn, schema=_SCHEMA, namespace="ns")
+    out = store.concepts_by_ids(["777926", "999"])
+    assert set(out) == {"777926", "999"}
+    assert out["777926"] is not None and out["777926"].id == "777926"
+    assert out["999"] is None  # missing id preserved, not dropped
+    assert conn.last_params == ["777926", "999"]
+
+
+def test_concepts_by_ids_empty_runs_no_query() -> None:
+    conn = _FakeConn()
+    store = VocabStore(conn, schema=_SCHEMA, namespace="ns")
+    assert store.concepts_by_ids([]) == {}
+    assert conn.last_sql is None

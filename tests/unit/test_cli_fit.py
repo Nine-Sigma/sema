@@ -98,7 +98,9 @@ def test_fit_runs_full_chain_on_duckdb(runner: CliRunner, tmp_path) -> None:
     assert total == 3
 
 
-def test_fit_strict_exits_3_when_not_accepted(runner: CliRunner, tmp_path) -> None:
+def test_fit_strict_passes_on_conformance_without_gold(
+    runner: CliRunner, tmp_path
+) -> None:
     db = tmp_path / "fixture.duckdb"
     _seed_fixture_db(db)
     result = runner.invoke(
@@ -114,11 +116,50 @@ def test_fit_strict_exits_3_when_not_accepted(runner: CliRunner, tmp_path) -> No
             "--strict",
         ],
     )
-    # no gold labels -> verdict is not ACCEPTED -> strict fails with exit 3
+    # No gold labels, but every resolved concept is valid + standard + Condition,
+    # so contract conformance passes -> strict passes. Gold no longer gates.
+    assert result.exit_code == 0, result.output
+    summary = json.loads(result.output)
+    assert summary["conformance"]["passed"] is True
+    assert summary["conformance"]["violations"] == []
+
+
+def test_fit_strict_fails_on_labelled_gold_contradiction(
+    runner: CliRunner, tmp_path
+) -> None:
+    db = tmp_path / "fixture.duckdb"
+    _seed_fixture_db(db)
+    gold = tmp_path / "gold.jsonl"
+    # LUAD resolves to 45768916, but the human label says 999 -> `wrong` cell.
+    gold.write_text(
+        json.dumps(
+            {
+                "oncotree_code": "LUAD",
+                "gold_concept_id": 999,
+                "gold_label": "RESOLVED",
+                "row_count": 1,
+                "notes": "deliberately wrong",
+            }
+        )
+        + "\n"
+    )
+    result = runner.invoke(
+        cli,
+        [
+            "fit",
+            "--manifest",
+            str(_MANIFEST),
+            "--duckdb",
+            str(db),
+            "--study-schema",
+            "study",
+            "--gold",
+            str(gold),
+            "--strict",
+        ],
+    )
     assert result.exit_code == 3, result.output
-    assert "STRICT FAIL" in result.output
-    # the summary is still printed before the strict gate fires
-    assert '"rows_staged": 3' in result.output
+    assert "labelled gold contradiction" in result.output
 
 
 def test_fit_is_registered(runner: CliRunner) -> None:

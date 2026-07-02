@@ -22,6 +22,7 @@ from sema.resolve.vocab_store_utils import (
     VocabStoreSchema,
     concept_by_code_query,
     concept_domain_query,
+    concepts_by_ids_query,
     maps_to_targets_query,
     row_to_concept,
 )
@@ -88,6 +89,25 @@ class VocabStore:
             params.append(standard_flag)
         rows = self._fetch(ast.sql(dialect=self._dialect), params)
         return [row_to_concept(r) for r in rows]
+
+    def concepts_by_ids(self, ids: list[str]) -> dict[str, ConceptRow | None]:
+        """Look up many concepts by id in ONE query; missing ids map to None.
+
+        Missing ids are preserved as explicit ``None`` values (never silently
+        dropped) so callers can distinguish "not in the vocabulary" from "not
+        requested". Used by the F1 contract-conformance gate.
+        """
+        result: dict[str, ConceptRow | None] = {i: None for i in ids}
+        unique = list(dict.fromkeys(i for i in ids if i is not None))
+        if not unique:
+            return result
+        sql = concepts_by_ids_query(self._schema, self._namespace, len(unique)).sql(
+            dialect=self._dialect
+        )
+        for raw in self._fetch(sql, unique):
+            row = row_to_concept(raw)
+            result[row.id] = row
+        return result
 
     def concept_domain(self, concept_id: str) -> str | None:
         sql = concept_domain_query(self._schema, self._namespace).sql(

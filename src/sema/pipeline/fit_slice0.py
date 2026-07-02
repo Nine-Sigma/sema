@@ -33,6 +33,7 @@ from sema.compile.staging_backend import (
 )
 from sema.eval.mapping_goldset import GoldSet
 from sema.eval.mapping_report import build_mapping_report, decisions_from_store
+from sema.eval.conformance import ConformanceReport, assert_contract_conformance
 from sema.eval.mapping_report_utils import MappingReport
 from sema.eval.staging_qa import run_staging_qa
 from sema.eval.staging_qa_utils import StagingQAReport
@@ -82,6 +83,7 @@ class FitResult:
     source_row_count: int
     qa: StagingQAReport
     report: MappingReport
+    conformance: ConformanceReport
     staging_schema: str
     staging_table: str
     store_columns: list[str]
@@ -119,7 +121,9 @@ def run_fit(
     """
     ctx = request.resolve_context
     store = ValueMappingStore(value_mapping_conn)
-    resolver.resolve_and_store(request.source_codes, store, ctx)
+    # Capture THIS run's decisions (scoped to run/property/policy/vocab release)
+    # for the F1 conformance gate — never the whole historical store.
+    run_mappings = resolver.resolve_and_store(request.source_codes, store, ctx)
 
     producer = VocabLookupProducer(_RecordingSession())
     assertion = producer.produce(store, request.policy, ctx, request.nodes)
@@ -167,6 +171,9 @@ def run_fit(
             vocab_release=ctx.vocab_release,
         ),
     )
+    conformance = assert_contract_conformance(
+        run_mappings, resolver.vocab_store, request.policy
+    )
     return FitResult(
         assertion=assertion,
         plan=plan,
@@ -174,6 +181,7 @@ def run_fit(
         source_row_count=request.source_row_count,
         qa=qa,
         report=report,
+        conformance=conformance,
         staging_schema=request.staging_schema,
         staging_table=request.staging_table,
         store_columns=store.column_names(),
