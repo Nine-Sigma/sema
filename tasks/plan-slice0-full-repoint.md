@@ -1,6 +1,11 @@
 # Plan — Full Slice-0 repoint (retire the SNOMED legacy anchors)
 
-> Date: 2026-07-02 · Status: planned (not executed) · codex-adversarial-reviewed · Branch: `ralph/feat/mapping-slice0`
+> Date: 2026-07-02 · Status: **EXECUTED 2026-07-02** · codex-adversarial-reviewed · Branch: `ralph/feat/mapping-slice0`
+> Executed in two commits: policy-ref rename (`omop.oncotree_condition`) + manifest
+> vocabulary repoint (`OMOP-Condition`, D1-A). D2 cache wipe done (backup at
+> `~/.sema/value_mapping_oldref_backup.csv`). Live Databricks fit verified: rows_staged
+> 25040 == source count, Gate D-lite PASS, conformance 0 violations, store repopulated
+> under the new ref (single grain, no fork).
 > Follows: `tasks/decision-slice0-omop-target.md` (the OMOP-not-SNOMED decision).
 > Unblocked by: **bug-383** (report scoped to run) + **bug-374** (staging scoped to run)
 > + **bug-384** (producer scoped) + **bug-386** (run_mappings grain dedup), all fixed on this

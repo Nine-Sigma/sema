@@ -41,16 +41,26 @@ therefore **contract conformance**, not an LLM eval. Gold / adjudication is for
   `cli_fit._enforce_strict`.
 - **F2** — a machine-readable `standard_domain_governed: true` binding flag declares that
   acceptance is governed by standardness + domain, not by the target vocabulary id. The
-  manifest's `vocabulary: SNOMED` and the `oncotree_to_snomed_condition` policy id are
-  **legacy/governance anchors**, not resolution filters.
+  manifest binding vocabulary and the policy ref are domain-governed identity/provenance
+  strings, not resolution filters. (The SNOMED-named anchors were retired by the full
+  repoint, 2026-07-02 — see below.)
 - **F4** — NO_MAP reasons are bucketed: source-code absent · no curated crosswalk
   (PANEC) · domain-gated. PANEC (OncoTree 905261, zero `Maps to`) surfaces as NO_MAP and
   routes to producer #2 / future user-review UI — an OMOP crosswalk gap, not a sema bug.
 
-## Deferred (tracked follow-ups)
+## Done (was deferred)
 
-- **bug-374** — staging compiles from an unscoped `store.read_all()` over a persistent
-  DuckDB cache; benign today, but a prerequisite before renaming any `resolver_policy_ref`.
-- **Full repoint** — making `VocabularyBindingDecl.vocabulary` optional/domain-governed and
-  renaming `oncotree_to_snomed_condition` → `oncotree_condition` (touches the graph
-  `:VocabularyBinding` keys + provenance ids) is gated on bug-374.
+- **bug-374/383/384/386** — the unscoped `store.read_all()` reads over the persistent
+  DuckDB cache (staging compile, strict report, VOCAB_LOOKUP producer) are all scoped to
+  the current run, with run-grain dedup. These were the prerequisite for renaming any
+  `resolver_policy_ref`.
+- **Full repoint** — DONE 2026-07-02 (`tasks/plan-slice0-full-repoint.md`). Renamed the
+  policy ref `omop.oncotree_to_snomed_condition` → `omop.oncotree_condition` and the
+  manifest binding vocabulary `SNOMED` → `OMOP-Condition` (D1-A: kept the field required,
+  renamed both the top-level `vocabularies:` declaration and the binding slot together to
+  avoid `DanglingRefError`). Chose D1-A over making `VocabularyBindingDecl.vocabulary`
+  optional (D1-B) to avoid re-keying the `:VocabularyBinding`/`:Term` graph identity.
+  The `poc.duckdb` value-mapping cache was wiped of old-ref rows (D2, backed up to
+  `~/.sema/value_mapping_oldref_backup.csv`) and repopulated under the new ref by a live
+  Databricks `sema fit` (rows_staged 25040 == source count, Gate D-lite PASS, conformance
+  0 violations — the store-key change did not fork staging).
