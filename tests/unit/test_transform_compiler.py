@@ -16,6 +16,8 @@ import duckdb
 import pytest
 import sqlglot
 
+from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
+
 pytestmark = pytest.mark.unit
 
 
@@ -73,7 +75,7 @@ def _vocab_lookup_plan() -> object:
             domain_constraint_ref="target.stage.domain=Condition",
             require_standard=True,
             allow_zero_default=False,
-            resolver_policy_ref="omop.oncotree_to_snomed_condition",
+            resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
         ),
         confidence=1.0,
         provenance=_provenance(),
@@ -116,7 +118,7 @@ def _context() -> object:
     from sema.compile.compiler_utils import CompileContext
 
     return CompileContext(
-        resolver_policy_ref="omop.oncotree_to_snomed_condition",
+        resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
         vocab_release="omop-2026-q1",
         run_id="run-1",
     )
@@ -255,7 +257,7 @@ class TestStagingDecisionProjection:
             no_map_reason="dead end" if no_map else None,
             confidence=1.0,
             status=Status.auto_accepted,
-            resolver_policy_ref="omop.oncotree_to_snomed_condition",
+            resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
             run_id="run-1",
         )
 

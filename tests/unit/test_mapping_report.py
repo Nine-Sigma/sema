@@ -35,6 +35,7 @@ from sema.eval.mapping_report_utils import (
     evaluate_acceptance,
 )
 from sema.models.planner.lifecycle import Status
+from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
 from sema.resolve.value_mapping_store import ValueMappingStore
 from sema.resolve.value_mapping_store_utils import (
     ResolutionStatus as StoreResolutionStatus,
@@ -107,7 +108,7 @@ def _value_mapping(
         no_map_reason="dead end" if res is StoreResolutionStatus.NO_MAP else None,
         confidence=1.0,
         status=Status.auto_accepted,
-        resolver_policy_ref="omop.oncotree_to_snomed_condition",
+        resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
         run_id="r1",
     )
 
@@ -382,7 +383,7 @@ def test_decisions_from_store_all_scope_filters(tmp_path: Path) -> None:
     kept = decisions_from_store(
         store,
         source_vocabulary="OncoTree",
-        resolver_policy_ref="omop.oncotree_to_snomed_condition",
+        resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
         vocab_release="vocab-2024",
     )
     assert [d.concept_id for d in kept] == [1]

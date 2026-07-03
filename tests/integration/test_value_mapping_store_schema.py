@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from sema.models.planner.lifecycle import Status
+from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
 from sema.resolve.value_mapping_store import open_duckdb_value_mapping_store
 from sema.resolve.value_mapping_store_utils import (
     FROZEN_COLUMNS,
@@ -39,7 +40,7 @@ def _row(code: str, concept_id: int) -> ValueMapping:
         no_map_reason=None,
         confidence=0.99,
         status=Status.auto_accepted,
-        resolver_policy_ref="omop.oncotree_to_snomed_condition",
+        resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
         run_id="run-int",
     )
 

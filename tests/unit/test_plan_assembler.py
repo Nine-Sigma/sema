@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 
 import pytest
 
+from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
+
 pytestmark = pytest.mark.unit
 
 
@@ -61,7 +63,7 @@ def _vocab_lookup_assertion(target_ref: str, *, status: object, aid: str = "a-cc
             domain_constraint_ref="target.x.domain=Condition",
             require_standard=True,
             allow_zero_default=False,
-            resolver_policy_ref="omop.oncotree_to_snomed_condition",
+            resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
         ),
         confidence=1.0,
         provenance=_provenance(),
@@ -106,7 +108,7 @@ def _full_assertions(status_for_cc: object):
     return obligation, [
         _vocab_lookup_assertion(cc_ref, status=status_for_cc, aid="a-cc"),
         _constant_assertion(
-            policy_ref, "omop.oncotree_to_snomed_condition", status=status_for_cc, aid="a-pol"
+            policy_ref, OMOP_ONCOTREE_CONDITION_REF, status=status_for_cc, aid="a-pol"
         ),
         _constant_assertion(release_ref, "omop-2026-q1", status=status_for_cc, aid="a-rel"),
     ]

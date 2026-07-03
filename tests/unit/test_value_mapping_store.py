@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from sema.models.planner.lifecycle import Status
+from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
 from sema.resolve.value_mapping_store import (
     ValueMappingStore,
     open_duckdb_value_mapping_store,
@@ -77,7 +78,7 @@ def _resolved(
         no_map_reason=None,
         confidence=confidence,
         status=status,
-        resolver_policy_ref="omop.oncotree_to_snomed_condition",
+        resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
         run_id="run-1",
     )
 
@@ -97,7 +98,7 @@ def _no_map(code: str = "ZZZ", *, reason: str = "no standard candidate") -> Valu
         no_map_reason=reason,
         confidence=0.0,
         status=Status.auto_accepted,
-        resolver_policy_ref="omop.oncotree_to_snomed_condition",
+        resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
         run_id="run-1",
     )
 
@@ -153,7 +154,7 @@ class TestRoundTrip:
             source_vocabulary="OncoTree",
             normalized_source_value="LUAD",
             target_property_ref="omop.condition_occurrence.condition_concept_id",
-            resolver_policy_ref="omop.oncotree_to_snomed_condition",
+            resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
             vocab_release="2024-Q1",
         )
         assert got is not None

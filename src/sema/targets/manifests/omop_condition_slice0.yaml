@@ -68,7 +68,7 @@ entities:
           domain: Condition
           require_standard: true
           standard_domain_governed: true
-          resolver_policy_ref: omop.oncotree_to_snomed_condition
+          resolver_policy_ref: omop.oncotree_condition
       - name: condition_start_date
         type: date
         nullable: false

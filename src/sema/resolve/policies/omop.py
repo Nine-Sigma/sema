@@ -15,10 +15,10 @@ from sema.models.target.vocab_binding import VocabularyBindingDecl
 from sema.resolve.policy import ResolverPolicy
 from sema.resolve.vocab_store_utils import VocabStoreSchema
 
-OMOP_ONCOTREE_CONDITION_REF = "omop.oncotree_to_snomed_condition"
+OMOP_ONCOTREE_CONDITION_REF = "omop.oncotree_condition"
 
-# §1.5(b) staging column names for the OncoTree->SNOMED showcase. The compiler
-# (R29-scanned) never names these literals; it reads them from here.
+# §1.5(b) staging column names for the OncoTree->OMOP Condition showcase. The
+# compiler (R29-scanned) never names these literals; it reads them from here.
 OMOP_STAGING_COLUMNS = StagingColumns(
     source_value_column="source_oncotree_code",
     target_concept_column="condition_concept_id",
@@ -65,7 +65,11 @@ OMOP_VOCAB_SCHEMA = VocabStoreSchema(
 def make_omop_oncotree_condition_policy(
     binding: VocabularyBindingDecl,
 ) -> ResolverPolicy:
-    """Build the OncoTree→SNOMED Condition policy bound to ``binding``.
+    """Build the OncoTree→OMOP standard-Condition policy bound to ``binding``.
+
+    The target is a valid + standard (``standard_concept='S'``) OMOP concept in
+    ``domain_id='Condition'`` — vocabulary-agnostic (SNOMED or ICDO3 both
+    acceptable), not SNOMED-specific.
 
     The target obligation (domain, ``require_standard``, ``allow_zero_default``)
     is carried by ``binding``; only the source-side literals are supplied here.

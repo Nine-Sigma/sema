@@ -32,6 +32,7 @@ from sema.resolve.engine_utils import (
     staging_decision_from_value_mapping,
 )
 from sema.resolve.policies.omop import (
+    OMOP_ONCOTREE_CONDITION_REF,
     OMOP_STAGING_COLUMNS,
     OMOP_VOCAB_SCHEMA,
     make_omop_oncotree_condition_policy,
@@ -82,7 +83,7 @@ def _context() -> ResolveContext:
         vocabulary_ref="vocab.snomed",
         vocab_binding="binding.condition",
         vocab_release="omop-vocab-2024",
-        resolver_policy_ref="omop.oncotree_to_snomed_condition",
+        resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
         run_id="us011-live",
         provenance=prov,
     )
@@ -153,7 +154,7 @@ def test_staging_qa_passes_then_fails_on_corruption(tmp_path: Path) -> None:
         schema=src_schema, table=src_table, value_column="ONCOTREE_CODE"
     )
     cctx = CompileContext(
-        resolver_policy_ref="omop.oncotree_to_snomed_condition",
+        resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
         vocab_release="omop-vocab-2024",
         run_id="us011-live",
     )

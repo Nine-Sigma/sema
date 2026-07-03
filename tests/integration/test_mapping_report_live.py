@@ -27,6 +27,7 @@ from sema.models.planner.provenance import Provenance, RunProvenance, SourceScop
 from sema.resolve.engine import VocabularyResolver
 from sema.resolve.engine_utils import ResolveContext
 from sema.resolve.policies.omop import (
+    OMOP_ONCOTREE_CONDITION_REF,
     OMOP_VOCAB_SCHEMA,
     make_omop_oncotree_condition_policy,
 )
@@ -39,7 +40,7 @@ pytestmark = pytest.mark.integration
 _DB = Path.home() / ".sema" / "poc.duckdb"
 _GOLD = Path(__file__).resolve().parents[1] / "data" / "gold" / "oncotree_condition_slice0.jsonl"
 _VOCAB_RELEASE = "omop-vocab-2024"
-_POLICY_REF = "omop.oncotree_to_snomed_condition"
+_POLICY_REF = OMOP_ONCOTREE_CONDITION_REF
 _TARGET_PROPERTY_REF = "target.stage.condition_concept_id"
 
 
