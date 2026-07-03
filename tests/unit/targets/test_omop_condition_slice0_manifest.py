@@ -43,6 +43,7 @@ MANIFEST = (
 
 _CONDITION_PROPERTY = "condition_concept_id"
 _CONDITION_DOMAIN = "Condition"
+_CONDITION_VOCABULARY = "OMOP-Condition"
 
 
 def _load() -> InMemoryGraphWriter:
@@ -59,6 +60,21 @@ def _entity_qname() -> str:
 
 def test_manifest_file_exists() -> None:
     assert MANIFEST.is_file()
+
+
+def test_manifest_loads_without_dangling_ref() -> None:
+    # Repoint regression: the binding `vocabulary` slot is resolved against the
+    # top-level `vocabularies:` declaration. Renaming the binding to the
+    # domain-governed sentinel WITHOUT renaming the declaration would fall back
+    # to INLINE and raise DanglingRefError in the normalizer. A clean load
+    # proves both were renamed together.
+    normalized = TargetModelNormalizer.normalize(ManifestTargetAdapter(MANIFEST))
+    decl = next(
+        b
+        for b in normalized.vocabulary_bindings
+        if b.property_name == _CONDITION_PROPERTY
+    )
+    assert decl.vocabulary.name == _CONDITION_VOCABULARY
 
 
 def test_condition_occurrence_entity_materialized() -> None:
@@ -97,8 +113,9 @@ def test_vocabulary_binding_op_carries_condition_binding() -> None:
     assert binding.domain == _CONDITION_DOMAIN
     assert binding.require_standard is True
     # bug-369 F2: the target is OMOP-standard-Condition (vocabulary-agnostic),
-    # declared machine-readably so `vocabulary: SNOMED` reads as a legacy anchor.
+    # declared machine-readably; the vocabulary slot names the governance scope.
     assert binding.standard_domain_governed is True
+    assert binding.vocabulary_name == _CONDITION_VOCABULARY
     assert binding.resolver_policy_ref == OMOP_ONCOTREE_CONDITION_REF
 
 

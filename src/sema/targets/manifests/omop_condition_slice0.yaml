@@ -11,12 +11,12 @@
 # target vocabulary_id. So an OncoTree code resolving to a standard ICDO3
 # Condition concept is a CORRECT OMOP mapping, not a miss.
 #
-# NOTE: the `vocabulary: SNOMED` binding field below and the
-# `oncotree_to_snomed_condition` policy ref are a STRUCTURAL/LEGACY anchor
-# (they MERGE a :Vocabulary node + name a persisted policy id); they are NOT a
-# resolution filter and must not be read as "output is SNOMED-only". Flipping
-# them to reflect the vocabulary-agnostic contract is tracked as an open
-# decision (bug-369) because it touches graph shape + persisted provenance ids.
+# The binding's `vocabulary: OMOP-Condition` slot and the `omop.oncotree_condition`
+# policy ref are domain-governed IDENTITY/provenance strings (they MERGE a
+# :Vocabulary node + name a persisted policy id); they are NOT a resolution
+# filter. The value names the governance SCOPE (OMOP standard Condition), not a
+# source vocabulary — a code may resolve to a standard Condition concept in
+# SNOMED OR ICDO3 and both are correct.
 #
 # This is the ONLY place these OMOP/OncoTree specifics live for US-007:
 # authored manifests are an R29-allowlisted location (the engine core and
@@ -30,7 +30,7 @@ descriptor:
   owner: sema-mapping-team@datadepo.us
   vocabulary_release: omop-vocab-2024
 vocabularies:
-  - name: SNOMED
+  - name: OMOP-Condition
     source: EXTERNAL
 entities:
   - qualified_name: omop.person
@@ -59,12 +59,12 @@ entities:
         nullable: false
         synonyms: [cancer_type_code, diagnosis_concept]
         vocabulary_binding:
-          # `vocabulary: SNOMED` is a legacy/governance ANCHOR, NOT a resolution
+          # `vocabulary` is a domain-governed identity label, NOT a resolution
           # filter: `standard_domain_governed: true` declares (machine-readably)
           # that acceptance is governed by standardness + domain, so a code may
           # resolve to a standard Condition concept in SNOMED OR ICDO3 and both
-          # are correct. See bug-369.
-          vocabulary: SNOMED
+          # are correct.
+          vocabulary: OMOP-Condition
           domain: Condition
           require_standard: true
           standard_domain_governed: true

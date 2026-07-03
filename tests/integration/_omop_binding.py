@@ -20,7 +20,9 @@ def build_condition_binding() -> VocabularyBindingDecl:
             kind=TargetArtifactKind.TABLE_ROW,
         ),
         property_name="condition_concept_id",
-        vocabulary=VocabularyRef(name="SNOMED", source=VocabularySource.EXTERNAL),
+        vocabulary=VocabularyRef(
+            name="OMOP-Condition", source=VocabularySource.EXTERNAL
+        ),
         domain="Condition",
         require_standard=True,
         allow_zero_default=False,
