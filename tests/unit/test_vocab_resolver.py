@@ -23,7 +23,7 @@ from sema.models.target.vocab_binding import VocabularyBindingDecl
 from sema.resolve.candidates import generate_candidates
 from sema.resolve.domain_gate import apply_domain_gate
 from sema.resolve.engine import VocabularyResolver
-from sema.resolve.engine_utils import CodeResolution, ResolveContext
+from sema.resolve.engine_utils import ResolveContext
 from sema.resolve.policies.omop import (
     OMOP_ONCOTREE_CONDITION_REF,
     make_omop_oncotree_condition_policy,
@@ -35,6 +35,8 @@ from sema.resolve.value_mapping_store_utils import ResolutionStatus
 from sema.resolve.vocab_store_utils import ConceptRow
 
 pytestmark = pytest.mark.unit
+
+_TARGET_VOCABULARY = "OMOP-Condition"
 
 
 class FakeVocabStore:
@@ -82,10 +84,13 @@ def _binding() -> VocabularyBindingDecl:
             kind=TargetArtifactKind.TABLE_ROW,
         ),
         property_name="condition_concept_id",
-        vocabulary=VocabularyRef(name="SNOMED", source=VocabularySource.EXTERNAL),
+        vocabulary=VocabularyRef(
+            name=_TARGET_VOCABULARY, source=VocabularySource.EXTERNAL
+        ),
         domain="Condition",
         require_standard=True,
         allow_zero_default=False,
+        standard_domain_governed=True,
         resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
     )
 
@@ -150,7 +155,7 @@ def _context() -> ResolveContext:
         target_property_ref="target.condition_occurrence.condition_concept_id",
         target_field="condition_concept_id",
         domain_constraint_ref="target.condition_occurrence.domain=Condition",
-        vocabulary_ref="target.vocabulary.SNOMED",
+        vocabulary_ref="target.vocabulary.OMOP-Condition",
         vocab_binding="omop.condition_occurrence.condition_concept_id",
         vocab_release="OMOP_2024",
         resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
@@ -164,7 +169,7 @@ def test_candidates_exact_code_match_in_source_vocabulary(policy: ResolverPolicy
     store = FakeVocabStore(by_code={("OncoTree", "LUAD"): _source()})
     rows = generate_candidates(store, policy, "LUAD")
     assert [r.id for r in rows] == ["777926"]
-    # R9: matched in the SOURCE vocabulary, never the target (SNOMED).
+    # R9: matched in the SOURCE vocabulary, never the target governance scope.
     assert store.code_calls == [("OncoTree", "LUAD")]
 
 

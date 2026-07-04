@@ -7,7 +7,8 @@ obligation (domain, require_standard, allow_zero_default) from the loaded
 :class:`VocabularyBindingDecl` — never duplicating those fields.
 
 R9: ``resolver_policy_ref`` names the SOURCE vocabulary (OncoTree); the
-binding's singular ``vocabulary`` is the TARGET (SNOMED).
+binding's singular ``vocabulary`` is the TARGET governance scope
+(OMOP-Condition).
 """
 
 from __future__ import annotations
@@ -30,6 +31,8 @@ from sema.resolve.policy import Candidate, ResolverPolicy
 
 pytestmark = pytest.mark.unit
 
+_TARGET_VOCABULARY = "OMOP-Condition"
+
 
 def _binding(
     *,
@@ -46,10 +49,13 @@ def _binding(
     return VocabularyBindingDecl(
         entity_ref=entity_ref,
         property_name="condition_concept_id",
-        vocabulary=VocabularyRef(name="SNOMED", source=VocabularySource.EXTERNAL),
+        vocabulary=VocabularyRef(
+            name=_TARGET_VOCABULARY, source=VocabularySource.EXTERNAL
+        ),
         domain=domain,
         require_standard=require_standard,
         allow_zero_default=allow_zero_default,
+        standard_domain_governed=True,
         resolver_policy_ref=resolver_policy_ref,
     )
 
@@ -129,8 +135,8 @@ def test_r9_source_vocabulary_distinct_from_target() -> None:
     vocab, code = policy.candidate_lookup("LUAD")
     assert vocab == "OncoTree"
     assert code == "LUAD"
-    # ...which is distinct from the binding's TARGET vocabulary (SNOMED).
-    assert binding.vocabulary.name == "SNOMED"
+    # ...which is distinct from the binding's TARGET governance scope.
+    assert binding.vocabulary.name == _TARGET_VOCABULARY
     assert policy.source_vocabulary != binding.vocabulary.name
 
 

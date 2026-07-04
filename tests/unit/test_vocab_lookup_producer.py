@@ -36,6 +36,7 @@ pytestmark = pytest.mark.unit
 _SOURCE_FIELD = "source.sample.cancer_type_code"
 _TARGET_PROPERTY = "target.condition_occurrence.condition_concept_id"
 _TARGET_FIELD = "condition_concept_id"
+_TARGET_VOCABULARY = "OMOP-Condition"
 _VOCAB_RELEASE = "OMOP_2024"
 
 
@@ -65,10 +66,13 @@ def _binding() -> object:
             kind=TargetArtifactKind.TABLE_ROW,
         ),
         property_name=_TARGET_FIELD,
-        vocabulary=VocabularyRef(name="SNOMED", source=VocabularySource.EXTERNAL),
+        vocabulary=VocabularyRef(
+            name=_TARGET_VOCABULARY, source=VocabularySource.EXTERNAL
+        ),
         domain="Condition",
         require_standard=True,
         allow_zero_default=False,
+        standard_domain_governed=True,
         resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
     )
 
@@ -107,7 +111,7 @@ def _context() -> ResolveContext:
         target_property_ref=_TARGET_PROPERTY,
         target_field=_TARGET_FIELD,
         domain_constraint_ref="target.condition_occurrence.domain=Condition",
-        vocabulary_ref="target.vocabulary.SNOMED",
+        vocabulary_ref="target.vocabulary.OMOP-Condition",
         vocab_binding="omop.condition_occurrence.condition_concept_id",
         vocab_release=_VOCAB_RELEASE,
         resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,

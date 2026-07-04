@@ -390,10 +390,12 @@ def test_build_request_reads_binding_from_manifest() -> None:
         source_row_count=1,
         gold=_gold(),
     )
-    # SOURCE vocabulary comes from the resolver policy (R9); the binding's
-    # TARGET vocabulary is SNOMED.
+    # SOURCE vocabulary comes from the resolver policy (R9); the manifest
+    # binding names the OMOP-Condition governance scope.
     assert policy.source_vocabulary == "OncoTree"
+    assert policy.binding.vocabulary.name == "OMOP-Condition"
     assert policy.target_domain == "Condition"
+    assert request.resolve_context.vocabulary_ref == "vocab.omop-condition"
     assert request.resolve_context.target_field == "condition_concept_id"
 
 

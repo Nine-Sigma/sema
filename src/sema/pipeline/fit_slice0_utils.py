@@ -137,7 +137,7 @@ def build_slice0_fit_request(
     staging_schema: str = DEFAULT_STAGING_SCHEMA,
     staging_table: str = DEFAULT_STAGING_TABLE,
 ) -> tuple[ResolverPolicy, FitRequest]:
-    """Assemble the policy + FitRequest for the OncoTree->SNOMED showcase."""
+    """Assemble the policy + FitRequest for the OncoTree->OMOP Condition showcase."""
     binding = load_binding(manifest_path)
     policy = resolve_policy(binding)
     context = _resolve_context(
