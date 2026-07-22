@@ -17,6 +17,14 @@ from sema.resolve.vocab_store_utils import VocabStoreSchema
 
 OMOP_ONCOTREE_CONDITION_REF = "omop.oncotree_condition"
 
+# Slice-1 identity binding. The generic identity registry/resolver (R29-scanned)
+# assign a canonical ``entity_id``; these OMOP literals name what that entity is
+# (the ``person`` table / its PK) and the typed review reason for a condition row
+# whose patient key is missing (D5) — so the identity spine names no OMOP literal.
+OMOP_PERSON_ENTITY = "omop.person"
+OMOP_PERSON_ID_FIELD = "person_id"
+MISSING_PERSON_KEY_REASON = "MISSING_PERSON_KEY"
+
 # §1.5(b) staging column names for the OncoTree->OMOP Condition showcase. The
 # compiler (R29-scanned) never names these literals; it reads them from here.
 OMOP_STAGING_COLUMNS = StagingColumns(
