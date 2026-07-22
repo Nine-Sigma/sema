@@ -9,7 +9,12 @@ standard flag ("S") are confined here. The generic spine
 from __future__ import annotations
 
 from sema.compile.compiler_utils import StagingColumns
-from sema.models.planner._enums import PrimaryKeyStrategy
+from sema.models.planner._enums import MaterializationMode, PrimaryKeyStrategy
+from sema.models.planner.field_map import RowIdentity
+from sema.models.planner.lifecycle import Status
+from sema.models.planner.mapping_plan import MappingAssertion
+from sema.models.planner.patterns import DirectCopyPayload, MappingPattern
+from sema.models.planner.provenance import Provenance
 from sema.models.planner.target_model import TargetObligation
 from sema.models.target.vocab_binding import VocabularyBindingDecl
 from sema.resolve.policy import ResolverPolicy
@@ -23,6 +28,7 @@ OMOP_ONCOTREE_CONDITION_REF = "omop.oncotree_condition"
 # whose patient key is missing (D5) — so the identity spine names no OMOP literal.
 OMOP_PERSON_ENTITY = "omop.person"
 OMOP_PERSON_ID_FIELD = "person_id"
+OMOP_PERSON_ID_REF = f"{OMOP_PERSON_ENTITY}.{OMOP_PERSON_ID_FIELD}"
 MISSING_PERSON_KEY_REASON = "MISSING_PERSON_KEY"
 
 # §1.5(b) staging column names for the OncoTree->OMOP Condition showcase. The
@@ -87,6 +93,49 @@ def make_omop_oncotree_condition_policy(
         maps_to_relationship="Maps to",
         standard_flag="S",
         binding=binding,
+    )
+
+
+def make_person_obligation() -> TargetObligation:
+    """The manifest ``omop.person`` obligation (S1-03): a single required PK.
+
+    The generic assembler folds this like any other ``TargetObligation``; the
+    OMOP-named ``person_id`` ref is confined here in the allowlisted policy layer.
+    """
+    return TargetObligation(
+        target_entity=OMOP_PERSON_ENTITY,
+        required_fields=[OMOP_PERSON_ID_REF],
+        primary_key=PrimaryKeyStrategy.NATURAL_KEY,
+    )
+
+
+def make_person_id_assertion(
+    *, source_entity_id_ref: str, provenance: Provenance
+) -> MappingAssertion:
+    """A DIRECT_COPY of the registry's canonical ``entity_id`` into ``person_id``.
+
+    Person rows carry no vocabulary and no resolver: the canonical id assigned by
+    the identity registry (S1-01) IS the OMOP ``person_id``. Fed to the existing
+    assembler + ``compile_projection`` path (US-014), no new machinery.
+    """
+    return MappingAssertion(
+        id=f"person::{OMOP_PERSON_ID_FIELD}",
+        source_field_ref=source_entity_id_ref,
+        target_property_ref=OMOP_PERSON_ID_REF,
+        pattern=MappingPattern.DIRECT_COPY,
+        payload=DirectCopyPayload(source_field_ref=source_entity_id_ref),
+        confidence=1.0,
+        provenance=provenance,
+        status=Status.auto_accepted,
+    )
+
+
+def make_person_row_identity(source_entity_id_ref: str) -> RowIdentity:
+    """Row identity for the person projection: one row per canonical entity_id."""
+    return RowIdentity(
+        target_row_key_rule=source_entity_id_ref,
+        source_lineage=[source_entity_id_ref],
+        materialization_mode=MaterializationMode.REPLACE_PARTITION,
     )
 
 
