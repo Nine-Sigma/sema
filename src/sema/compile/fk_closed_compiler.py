@@ -31,6 +31,8 @@ from sema.compile.fk_closed_compiler_utils import (
     build_child_select,
 )
 
+__all__ = ["FkClosedCompiler", "FkClosedResult", "FkClosureViolation"]
+
 
 class FkClosureViolation(RuntimeError):
     """Raised when a child FK references no parent row (should be impossible)."""
@@ -81,6 +83,46 @@ class FkClosedCompiler:
             parent_rows=self._backend.count_all(conn, parent),
             child_rows=child_rows,
             missing_key_rows=self._backend.missing_key_count(conn, source),
+        )
+
+    def rebuild_after_collapse(
+        self,
+        conn: FkCursor,
+        *,
+        parent: ParentTableSpec,
+        child: ChildTableSpec,
+        sources: Sequence[ChildSourceSpec],
+        registry: RegistryJoinSpec,
+        decisions: Sequence[StagingDecision],
+    ) -> FkClosedResult:
+        """Rematerialize every child scope through a collapsed registry (Stage B).
+
+        A Stage B collapse RETIRES canonical ids, so the parent SHRINKS — the
+        inverse of Stage A. The order flips accordingly: rebuild every child
+        scope first (each FK now points at a surviving id) and shrink the parent
+        LAST, so no not-yet-rebuilt sibling scope is left referencing a retired
+        parent. The child's surrogate PK is preserved (source-derived, S1-05);
+        each row's FK is recomputed from the current registry.
+        """
+        child_rows = 0
+        missing = 0
+        for source in sources:
+            select = build_child_select(
+                child,
+                source,
+                registry,
+                decisions,
+                no_map_default=self._no_map_default,
+                dialect=self._backend.dialect,
+            )
+            child_rows += self._backend.write_child(conn, child, source, select)
+            missing += self._backend.missing_key_count(conn, source)
+        self._backend.replace_parent(conn, parent, registry)
+        self._assert_fk_closed(conn, parent, child)
+        return FkClosedResult(
+            parent_rows=self._backend.count_all(conn, parent),
+            child_rows=child_rows,
+            missing_key_rows=missing,
         )
 
     def _assert_fk_closed(

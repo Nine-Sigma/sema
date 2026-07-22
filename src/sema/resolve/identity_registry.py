@@ -19,7 +19,7 @@ OMOP ``person`` binding is applied by the policy/compile layer that reads
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import duckdb
@@ -33,6 +33,7 @@ from sema.resolve.identity_registry_utils import (
     select_all_sql,
     select_by_grain_sql,
     source_entity_uid,
+    update_entity_id_sql,
 )
 
 DEFAULT_SCHEMA = "sema_identity"
@@ -98,6 +99,21 @@ class IdentityRegistry:
                     row.run_id,
                 ],
             )
+
+    def remap_entity_ids(self, remaps: Mapping[SourceKey, int]) -> int:
+        """Reassign the canonical ``entity_id`` of the given grain keys (Stage B).
+
+        Generic collapse mechanism (D1/H1): a source entity's identity is revised
+        by pointing its row at a surviving canonical id, an UPDATE outside the
+        grain — never a PK change. Returns the number of rows actually changed
+        (a remap already at its target is a no-op), so replay is idempotent.
+        """
+        sql = update_entity_id_sql(self._schema, self._table)
+        changed = 0
+        for (namespace, key), entity_id in remaps.items():
+            row = self._conn.execute(sql, [entity_id, namespace, key, entity_id]).fetchone()
+            changed += int(row[0]) if row else 0
+        return changed
 
     def get(
         self, source_namespace: str, source_entity_key: str

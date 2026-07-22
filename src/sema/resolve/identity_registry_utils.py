@@ -127,3 +127,16 @@ def select_by_grain_sql(schema: str, table: str) -> str:
 
 def max_entity_id_sql(schema: str, table: str) -> str:
     return f'SELECT COALESCE(MAX("entity_id"), 0) FROM {_qualified(schema, table)}'
+
+
+def update_entity_id_sql(schema: str, table: str) -> str:
+    """Remap one grain key's canonical ``entity_id`` (Stage B collapse, D1/H1).
+
+    ``entity_id`` is outside the grain by design, so this UPDATE revises identity
+    without touching the transactional unique key or the per-entity ``uid``.
+    """
+    where = " AND ".join(f'"{c}" = ?' for c in GRAIN_KEY)
+    return (
+        f'UPDATE {_qualified(schema, table)} SET "entity_id" = ? '
+        f'WHERE {where} AND "entity_id" <> ?'
+    )
