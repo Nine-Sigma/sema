@@ -13,6 +13,7 @@ staging checks are pure functions over generic :class:`StagingRow` rows:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Sequence
@@ -122,6 +123,70 @@ def check_null_rate(rows: Sequence[StagingRow]) -> QACheck:
         reason=(
             f"{len(resolved_but_null)} RESOLVED rows have a NULL target and "
             f"{len(no_map_but_populated)} NO_MAP rows are populated"
+        ),
+        details=details,
+    )
+
+
+def check_fk_closure(orphan_count: int, *, fk_label: str = "the parent") -> QACheck:
+    """Gate-D-lite (S1-07): no child FK may reference a missing parent row."""
+    details = {"orphan_rows": orphan_count}
+    if orphan_count == 0:
+        return QACheck("fk_closure", QAOutcome.PASS, details=details)
+    return QACheck(
+        "fk_closure",
+        QAOutcome.FAIL,
+        reason=f"{orphan_count} child rows reference a missing {fk_label} row",
+        details=details,
+    )
+
+
+def check_required_not_null(null_counts: Mapping[str, int]) -> QACheck:
+    """Gate-D-lite (S1-07): each required (non-nullable) field must have 0 NULLs.
+
+    ``null_counts`` maps each REQUIRED field to its staged NULL count. A field the
+    contract marks nullable (D4's ``condition_start_date``) is simply absent from
+    this map — its null rate is reported separately, never gated.
+    """
+    offenders = {field_name: n for field_name, n in null_counts.items() if n > 0}
+    details = {"null_counts": dict(null_counts), "offenders": offenders}
+    if not offenders:
+        return QACheck("required_not_null", QAOutcome.PASS, details=details)
+    return QACheck(
+        "required_not_null",
+        QAOutcome.FAIL,
+        reason=(
+            f"{len(offenders)} required fields carry NULLs: "
+            f"{sorted(offenders)}"
+        ),
+        details=details,
+    )
+
+
+def check_missing_key_disposition(
+    *, written_rows: int, missing_key_rows: int, source_rows: int
+) -> QACheck:
+    """Gate-D-lite (S1-07/D5): every source row is written OR routed to review.
+
+    The row-count identity is ``written + missing_key == source`` — plain
+    equality with source only holds when no key is missing, so the disposition
+    count is accounted for explicitly, never dropped.
+    """
+    accounted = written_rows + missing_key_rows
+    details = {
+        "written": written_rows,
+        "missing_key": missing_key_rows,
+        "source": source_rows,
+        "accounted": accounted,
+    }
+    if accounted == source_rows:
+        return QACheck("missing_key_disposition", QAOutcome.PASS, details=details)
+    return QACheck(
+        "missing_key_disposition",
+        QAOutcome.FAIL,
+        reason=(
+            f"written {written_rows} + missing-key {missing_key_rows} = "
+            f"{accounted} != source {source_rows}"
         ),
         details=details,
     )

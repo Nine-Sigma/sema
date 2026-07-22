@@ -9,7 +9,17 @@ structured reason before it is called "done".
 
 from __future__ import annotations
 
+from typing import Any, Sequence
+
 from sema.compile.compiler_utils import StagingColumns
+from sema.compile.fk_closed_compiler_utils import (
+    ChildSourceSpec,
+    ChildTableSpec,
+    ParentTableSpec,
+    count_child_scope_sql,
+    missing_key_count_sql,
+    orphan_fk_count_sql,
+)
 from sema.compile.staging_backend import (
     DUCKDB_BACKEND,
     StagingBackend,
@@ -19,16 +29,85 @@ from sema.eval.mapping_goldset import GoldSet
 from sema.eval.staging_qa_utils import (
     StagingQAReport,
     StagingRow,
+    check_fk_closure,
+    check_missing_key_disposition,
     check_no_map_accounting,
     check_null_rate,
+    check_required_not_null,
     check_row_count,
 )
 
 __all__ = [
+    "count_column_nulls",
     "read_staging_rows",
+    "run_fk_closed_qa",
     "run_staging_qa",
     "staging_scope_count",
 ]
+
+
+def _scalar(conn: Any, sql: str, params: Sequence[Any] | None = None) -> int:
+    row = conn.execute(sql, params).fetchone() if params else conn.execute(sql).fetchone()
+    return int(row[0]) if row else 0
+
+
+def count_column_nulls(
+    conn: Any,
+    schema: str,
+    table: str,
+    columns: Sequence[str],
+    *,
+    scope_column: str | None = None,
+    scope_value: str | None = None,
+) -> dict[str, int]:
+    """Per-column NULL counts (optionally scoped to one partition)."""
+    if not columns:
+        return {}
+    sums = ", ".join(
+        f'SUM(CASE WHEN "{c}" IS NULL THEN 1 ELSE 0 END)' for c in columns
+    )
+    sql = f'SELECT {sums} FROM "{schema}"."{table}"'
+    params: list[Any] | None = None
+    if scope_column is not None:
+        sql += f' WHERE "{scope_column}" = ?'
+        params = [scope_value]
+    row = conn.execute(sql, params).fetchone() if params else conn.execute(sql).fetchone()
+    return {c: int(row[i] or 0) for i, c in enumerate(columns)}
+
+
+def run_fk_closed_qa(
+    conn: Any,
+    *,
+    parent: ParentTableSpec,
+    child: ChildTableSpec,
+    source: ChildSourceSpec,
+    required_fields: Sequence[str],
+    source_row_count: int,
+) -> StagingQAReport:
+    """Gate-D-lite over the FK-closed shape (S1-07): closure + required-null +
+    missing-key accounting, scoped to one study."""
+    orphans = _scalar(conn, orphan_fk_count_sql(parent, child))
+    missing = _scalar(conn, missing_key_count_sql(source))
+    written = _scalar(conn, count_child_scope_sql(child), [source.schema])
+    null_counts = count_column_nulls(
+        conn,
+        child.schema,
+        child.table,
+        required_fields,
+        scope_column=child.scope_schema_column,
+        scope_value=source.schema,
+    )
+    return StagingQAReport(
+        checks=(
+            check_fk_closure(orphans),
+            check_required_not_null(null_counts),
+            check_missing_key_disposition(
+                written_rows=written,
+                missing_key_rows=missing,
+                source_rows=source_row_count,
+            ),
+        )
+    )
 
 
 def read_staging_rows(
