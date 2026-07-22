@@ -9,6 +9,10 @@ standard flag ("S") are confined here. The generic spine
 from __future__ import annotations
 
 from sema.compile.compiler_utils import StagingColumns
+from sema.compile.fk_closed_compiler_utils import (
+    ChildTableSpec,
+    ParentTableSpec,
+)
 from sema.models.planner._enums import MaterializationMode, PrimaryKeyStrategy
 from sema.models.planner.field_map import RowIdentity
 from sema.models.planner.lifecycle import Status
@@ -30,6 +34,21 @@ OMOP_PERSON_ENTITY = "omop.person"
 OMOP_PERSON_ID_FIELD = "person_id"
 OMOP_PERSON_ID_REF = f"{OMOP_PERSON_ENTITY}.{OMOP_PERSON_ID_FIELD}"
 MISSING_PERSON_KEY_REASON = "MISSING_PERSON_KEY"
+
+# S1-08 physical FK-closed OMOP shape (person + condition_occurrence). These OMOP
+# physical names live ONLY here (R29-allowlisted); the generic compiler/backend
+# read them as specs. The four ``source_*`` columns are the FK-closed child's
+# provenance/scope columns (stable-row-ref, patient-key trace, per-study scope) —
+# fixed staging-provenance names, not source columns (those arrive via CLI args).
+OMOP_PERSON_TABLE = "person"
+OMOP_CONDITION_TABLE = "condition_occurrence"
+OMOP_CONDITION_PK = "condition_occurrence_id"
+OMOP_CONDITION_CONCEPT = "condition_concept_id"
+OMOP_CONDITION_START_DATE = "condition_start_date"
+_CHILD_ROW_REF_COL = "source_row_ref"
+_CHILD_PATIENT_KEY_COL = "source_patient_key"
+_CHILD_SCOPE_SCHEMA_COL = "source_schema"
+_CHILD_SCOPE_TABLE_COL = "source_table"
 
 # §1.5(b) staging column names for the OncoTree->OMOP Condition showcase. The
 # compiler (R29-scanned) never names these literals; it reads them from here.
@@ -137,6 +156,37 @@ def make_person_row_identity(source_entity_id_ref: str) -> RowIdentity:
         source_lineage=[source_entity_id_ref],
         materialization_mode=MaterializationMode.REPLACE_PARTITION,
     )
+
+
+def make_omop_fk_specs(
+    omop_schema: str,
+) -> tuple[ParentTableSpec, ChildTableSpec, tuple[str, ...]]:
+    """Build the S1-08 FK-closed ``person`` + ``condition_occurrence`` specs.
+
+    Returns ``(parent, child, required_fields)`` where ``required_fields`` is the
+    manifest's non-null obligation for ``condition_occurrence`` (the nullable D4
+    ``condition_start_date`` is deliberately excluded). ``omop_schema`` is the
+    physical target schema both tables land in.
+    """
+    parent = ParentTableSpec(
+        schema=omop_schema,
+        table=OMOP_PERSON_TABLE,
+        id_column=OMOP_PERSON_ID_FIELD,
+    )
+    child = ChildTableSpec(
+        schema=omop_schema,
+        table=OMOP_CONDITION_TABLE,
+        pk_column=OMOP_CONDITION_PK,
+        fk_column=OMOP_PERSON_ID_FIELD,
+        value_column=OMOP_CONDITION_CONCEPT,
+        null_columns=(OMOP_CONDITION_START_DATE,),
+        row_ref_column=_CHILD_ROW_REF_COL,
+        patient_key_column=_CHILD_PATIENT_KEY_COL,
+        scope_schema_column=_CHILD_SCOPE_SCHEMA_COL,
+        scope_table_column=_CHILD_SCOPE_TABLE_COL,
+    )
+    required_fields = (OMOP_CONDITION_PK, OMOP_PERSON_ID_FIELD, OMOP_CONDITION_CONCEPT)
+    return parent, child, required_fields
 
 
 def make_slice0_staging_obligation() -> TargetObligation:

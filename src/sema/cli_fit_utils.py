@@ -59,4 +59,28 @@ def enumerate_source_databricks(
     return codes, int(row[0]) if row else 0
 
 
-__all__ = ["enumerate_source_databricks", "open_databricks_cursor"]
+def enumerate_identity_source_databricks(
+    cursor: _Cursor, *, schema: str, table: str, patient_key_column: str
+) -> tuple[list[str], int]:
+    """S1-08: distinct non-blank patient keys + TOTAL source row count on Databricks.
+
+    The row count is ALL source rows (the row-count identity is
+    ``written + missing_key == source``); the distinct keys populate the registry.
+    """
+    col = f"`{patient_key_column}`"
+    tbl = f"`{schema}`.`{table}`"
+    cursor.execute(
+        f"SELECT DISTINCT {col} FROM {tbl} "
+        f"WHERE TRIM(COALESCE({col}, '')) <> '' ORDER BY {col}"
+    )
+    keys = [str(row[0]) for row in cursor.fetchall()]
+    cursor.execute(f"SELECT COUNT(*) FROM {tbl}")
+    row = cursor.fetchone()
+    return keys, int(row[0]) if row else 0
+
+
+__all__ = [
+    "enumerate_identity_source_databricks",
+    "enumerate_source_databricks",
+    "open_databricks_cursor",
+]

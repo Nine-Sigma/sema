@@ -342,9 +342,11 @@ def query(
 
 from sema.cli_target import target_group as _target_group
 from sema.cli_fit import fit_cmd as _fit_cmd
+from sema.cli_fit_omop import fit_omop_shape_cmd as _fit_omop_shape_cmd
 
 cli.add_command(_ingest_group, name="ingest")
 cli.add_command(_push_cmd, name="push")
 cli.add_command(_eval_group, name="eval")
 cli.add_command(_target_group, name="target")
 cli.add_command(_fit_cmd, name="fit")
+cli.add_command(_fit_omop_shape_cmd, name="fit-omop-shape")
