@@ -20,11 +20,8 @@ from sema.cli import cli
 pytestmark = pytest.mark.unit
 
 _MANIFEST = (
-    Path(__file__).resolve().parents[2]
-    / "src"
-    / "sema"
-    / "targets"
-    / "manifests"
+    Path(__file__).resolve().parents[3]
+    / "showcase" / "cbioportal_to_omop" / "manifests"
     / "omop_condition_slice0.yaml"
 )
 
@@ -238,7 +235,7 @@ class _FakeDatabricksCursor:
 def test_fit_databricks_backend_runs_chain(runner: CliRunner, tmp_path, monkeypatch) -> None:
     cursor = _FakeDatabricksCursor()
     monkeypatch.setattr(
-        "sema.cli_fit.open_databricks_cursor", lambda *a, **k: cursor
+        "showcase.cbioportal_to_omop.cli_slice0.open_databricks_cursor", lambda *a, **k: cursor
     )
     result = runner.invoke(
         cli,

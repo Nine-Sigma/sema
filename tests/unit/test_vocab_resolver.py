@@ -24,7 +24,7 @@ from sema.resolve.candidates import generate_candidates
 from sema.resolve.domain_gate import apply_domain_gate
 from sema.resolve.engine import VocabularyResolver
 from sema.resolve.engine_utils import ResolveContext
-from sema.resolve.policies.omop import (
+from showcase.cbioportal_to_omop.omop_policy import (
     OMOP_ONCOTREE_CONDITION_REF,
     make_omop_oncotree_condition_policy,
 )

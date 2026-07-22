@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
+from showcase.cbioportal_to_omop.omop_policy import OMOP_ONCOTREE_CONDITION_REF
 
 pytestmark = pytest.mark.unit
 
@@ -101,7 +101,7 @@ def _row_identity():
 
 def _full_assertions(status_for_cc: object):
     """All three staging required fields covered (condition_concept_id resolved)."""
-    from sema.resolve.policies.omop import make_slice0_staging_obligation
+    from showcase.cbioportal_to_omop.omop_policy import make_slice0_staging_obligation
 
     obligation = make_slice0_staging_obligation()
     cc_ref, policy_ref, release_ref = obligation.required_fields
@@ -252,7 +252,7 @@ def test_derive_verdict_awaiting_review_when_field_map_review_pending() -> None:
 
 
 def test_staging_obligation_three_required_fields_not_nullable() -> None:
-    from sema.resolve.policies.omop import make_slice0_staging_obligation
+    from showcase.cbioportal_to_omop.omop_policy import make_slice0_staging_obligation
 
     obligation = make_slice0_staging_obligation()
     fields = obligation.required_fields
@@ -291,7 +291,7 @@ def test_assemble_missing_required_field_yields_fail() -> None:
 def test_assemble_constant_null_required_field_yields_fail() -> None:
     from sema.models.planner.lifecycle import PlanVerdict, Status
     from sema.resolve.assembler import Slice0PlanAssembler
-    from sema.resolve.policies.omop import make_slice0_staging_obligation
+    from showcase.cbioportal_to_omop.omop_policy import make_slice0_staging_obligation
 
     obligation = make_slice0_staging_obligation()
     cc_ref, policy_ref, release_ref = obligation.required_fields
@@ -309,7 +309,7 @@ def test_assemble_no_map_field_does_not_cover() -> None:
     from sema.models.planner.mapping_plan import MappingAssertion
     from sema.models.planner.patterns import MappingPattern, NoMapPayload, NoMapScope
     from sema.resolve.assembler import Slice0PlanAssembler
-    from sema.resolve.policies.omop import make_slice0_staging_obligation
+    from showcase.cbioportal_to_omop.omop_policy import make_slice0_staging_obligation
 
     obligation = make_slice0_staging_obligation()
     cc_ref, policy_ref, release_ref = obligation.required_fields
@@ -347,7 +347,7 @@ def test_assemble_sets_field_map_status_from_winning_assertion() -> None:
 def test_assemble_uses_planner_select_winner_status_tier() -> None:
     from sema.models.planner.lifecycle import Status
     from sema.resolve.assembler import Slice0PlanAssembler
-    from sema.resolve.policies.omop import make_slice0_staging_obligation
+    from showcase.cbioportal_to_omop.omop_policy import make_slice0_staging_obligation
 
     obligation = make_slice0_staging_obligation()
     cc_ref, policy_ref, release_ref = obligation.required_fields
@@ -370,7 +370,7 @@ def test_assemble_emits_conflict_resolved_flag_without_blocking() -> None:
     from sema.models.planner.lifecycle import PlanVerdict, Status
     from sema.models.planner.risk import RiskCode
     from sema.resolve.assembler import Slice0PlanAssembler
-    from sema.resolve.policies.omop import make_slice0_staging_obligation
+    from showcase.cbioportal_to_omop.omop_policy import make_slice0_staging_obligation
 
     obligation = make_slice0_staging_obligation()
     cc_ref, policy_ref, release_ref = obligation.required_fields
@@ -388,7 +388,7 @@ def test_assemble_emits_conflict_resolved_flag_without_blocking() -> None:
 
 def test_assemble_rejects_empty_assertions() -> None:
     from sema.resolve.assembler import Slice0PlanAssembler
-    from sema.resolve.policies.omop import make_slice0_staging_obligation
+    from showcase.cbioportal_to_omop.omop_policy import make_slice0_staging_obligation
 
     with pytest.raises(ValueError):
         Slice0PlanAssembler().assemble(

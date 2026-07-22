@@ -4,7 +4,7 @@ Every query is authored once as a SQLGlot expression and rendered per dialect
 (DuckDB for dev, Databricks for prod) — no hand-concatenated SQL. The store is
 vocabulary-agnostic: the physical table and column names arrive as a
 :class:`VocabStoreSchema` (the OMOP instance lives behind the policy boundary in
-:mod:`sema.resolve.policies.omop`), and the standardizing relationship name and
+:mod:`showcase.cbioportal_to_omop.omop_policy`), and the standardizing relationship name and
 standard flag are bound as parameters by the caller (the US-004 policy), never
 embedded here.
 """

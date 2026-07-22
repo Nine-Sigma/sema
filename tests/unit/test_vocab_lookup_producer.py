@@ -19,7 +19,7 @@ from sema.models.planner.mapping_plan import MappingAssertion
 from sema.models.planner.patterns import MappingPattern, VocabLookup
 from sema.models.planner.provenance import Provenance, RunProvenance, SourceScope
 from sema.resolve.engine_utils import ResolveContext
-from sema.resolve.policies.omop import (
+from showcase.cbioportal_to_omop.omop_policy import (
     OMOP_ONCOTREE_CONDITION_REF,
     make_omop_oncotree_condition_policy,
 )

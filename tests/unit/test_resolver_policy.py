@@ -23,7 +23,7 @@ from sema.models.target.refs import (
 )
 from sema.models.target.vocab_binding import VocabularyBindingDecl
 from sema.resolve.policies import UnknownResolverPolicyError, resolve_policy
-from sema.resolve.policies.omop import (
+from showcase.cbioportal_to_omop.omop_policy import (
     OMOP_ONCOTREE_CONDITION_REF,
     make_omop_oncotree_condition_policy,
 )

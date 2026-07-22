@@ -25,7 +25,7 @@ from sema.resolve.identity_registry import (
     DEFAULT_TABLE,
     IdentityRegistry,
 )
-from sema.resolve.policies.omop import (
+from showcase.cbioportal_to_omop.omop_policy import (
     OMOP_PERSON_ID_REF,
     make_person_id_assertion,
     make_person_obligation,

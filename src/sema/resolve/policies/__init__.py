@@ -11,17 +11,28 @@ from __future__ import annotations
 from typing import Callable
 
 from sema.models.target.vocab_binding import VocabularyBindingDecl
-from sema.resolve.policies.omop import (
-    OMOP_ONCOTREE_CONDITION_REF,
-    make_omop_oncotree_condition_policy,
-)
 from sema.resolve.policy import ResolverPolicy
 
 PolicyFactory = Callable[[VocabularyBindingDecl], ResolverPolicy]
 
-_FACTORIES: dict[str, PolicyFactory] = {
-    OMOP_ONCOTREE_CONDITION_REF: make_omop_oncotree_condition_policy,
-}
+# Concrete per-vocabulary factories are supplied by showcase packages, not by
+# core: the OMOP/OncoTree binding lives in the cBioPortal→OMOP showcase. They are
+# registered lazily so core never hard-depends on a showcase and a wheel install
+# without one still loads (the registry is simply empty).
+_FACTORIES: dict[str, PolicyFactory] = {}
+
+
+def _load_showcase_factories() -> None:
+    if _FACTORIES:
+        return
+    try:
+        from showcase.cbioportal_to_omop.omop_policy import (
+            OMOP_ONCOTREE_CONDITION_REF,
+            make_omop_oncotree_condition_policy,
+        )
+    except ImportError:
+        return
+    _FACTORIES[OMOP_ONCOTREE_CONDITION_REF] = make_omop_oncotree_condition_policy
 
 
 class UnknownResolverPolicyError(KeyError):
@@ -30,6 +41,7 @@ class UnknownResolverPolicyError(KeyError):
 
 def resolve_policy(binding: VocabularyBindingDecl) -> ResolverPolicy:
     """Resolve ``binding.resolver_policy_ref`` to its concrete policy."""
+    _load_showcase_factories()
     ref = binding.resolver_policy_ref
     factory = _FACTORIES.get(ref) if ref is not None else None
     if factory is None:

@@ -29,7 +29,7 @@ from sema.resolve.engine_utils import (
     ResolveContext,
     staging_decision_from_value_mapping,
 )
-from sema.resolve.policies.omop import (
+from showcase.cbioportal_to_omop.omop_policy import (
     OMOP_ONCOTREE_CONDITION_REF,
     OMOP_STAGING_COLUMNS,
     OMOP_VOCAB_SCHEMA,

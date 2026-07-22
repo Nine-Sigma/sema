@@ -7,7 +7,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from sema.cli_fit_omop_utils import (
+from showcase.cbioportal_to_omop.cli_omop_shape_utils import (
     enumerate_identity_source_duckdb,
     load_staging_decisions,
 )

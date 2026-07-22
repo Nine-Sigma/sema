@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from sema.models.planner.lifecycle import Status
-from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
+from showcase.cbioportal_to_omop.omop_policy import OMOP_ONCOTREE_CONDITION_REF
 from sema.resolve.value_mapping_store import open_duckdb_value_mapping_store
 from sema.resolve.value_mapping_store_utils import (
     FROZEN_COLUMNS,

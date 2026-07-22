@@ -30,14 +30,14 @@ from sema.compile.staging_backend import (
 )
 from sema.eval.mapping_goldset import GoldSet, load_gold_set
 from sema.models.config import DatabricksConfig
-from sema.pipeline.fit_slice0 import FitResult, run_fit
-from sema.pipeline.fit_slice0_utils import (
+from showcase.cbioportal_to_omop.slice0_fit import FitResult, run_fit
+from showcase.cbioportal_to_omop.slice0_fit_utils import (
     build_slice0_fit_request,
     discover_study,
     enumerate_source,
 )
 from sema.resolve.engine import VocabularyResolver
-from sema.resolve.policies.omop import OMOP_VOCAB_SCHEMA
+from showcase.cbioportal_to_omop.omop_policy import OMOP_VOCAB_SCHEMA
 from sema.resolve.vocab_store import (
     VocabStore,
     VocabStoreBackend,

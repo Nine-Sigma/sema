@@ -37,8 +37,8 @@ class TestIngestCbioportalCommand:
 class TestIngestOmopCommand:
     def test_runs_cdm_only_when_vocab_path_not_provided(self, tmp_path: Path) -> None:
         runner = CliRunner()
-        with patch("sema.cli_ingest.ingest_cdm_schema") as mock_cdm, patch(
-            "sema.cli_ingest.ingest_vocabulary"
+        with patch("showcase.cbioportal_to_omop.omop_ingest.ingest_cdm_schema") as mock_cdm, patch(
+            "showcase.cbioportal_to_omop.omop_ingest.ingest_vocabulary"
         ) as mock_vocab, patch("sema.cli_ingest.Staging") as mock_staging:
             mock_staging.return_value = MagicMock()
             result = runner.invoke(
@@ -55,8 +55,8 @@ class TestIngestOmopCommand:
         runner = CliRunner()
         vocab_dir = tmp_path / "athena"
         vocab_dir.mkdir()
-        with patch("sema.cli_ingest.ingest_cdm_schema") as mock_cdm, patch(
-            "sema.cli_ingest.ingest_vocabulary"
+        with patch("showcase.cbioportal_to_omop.omop_ingest.ingest_cdm_schema") as mock_cdm, patch(
+            "showcase.cbioportal_to_omop.omop_ingest.ingest_vocabulary"
         ) as mock_vocab, patch("sema.cli_ingest.Staging") as mock_staging:
             mock_staging.return_value = MagicMock()
             result = runner.invoke(

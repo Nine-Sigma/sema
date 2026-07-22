@@ -35,7 +35,7 @@ from sema.eval.mapping_report_utils import (
     evaluate_acceptance,
 )
 from sema.models.planner.lifecycle import Status
-from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
+from showcase.cbioportal_to_omop.omop_policy import OMOP_ONCOTREE_CONDITION_REF
 from sema.resolve.value_mapping_store import ValueMappingStore
 from sema.resolve.value_mapping_store_utils import (
     ResolutionStatus as StoreResolutionStatus,

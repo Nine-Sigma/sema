@@ -25,28 +25,16 @@ from sema.cli_fit_utils import (
     enumerate_identity_source_databricks,
     open_databricks_cursor,
 )
-from sema.cli_fit_omop_utils import (
+from showcase.cbioportal_to_omop.cli_omop_shape_utils import (
+    build_omop_shape_request,
     enumerate_identity_source_duckdb,
     load_staging_decisions,
 )
-from sema.compile.fk_backend import DATABRICKS_FK_BACKEND, DUCKDB_FK_BACKEND, FkBackend
-from sema.compile.fk_closed_compiler_utils import ChildSourceSpec, RegistryJoinSpec
+from sema.compile.fk_backend import DATABRICKS_FK_BACKEND, DUCKDB_FK_BACKEND
 from sema.models.config import DatabricksConfig
-from sema.pipeline.fit_omop_shape import (
-    OmopShapeRequest,
-    OmopShapeResult,
-    run_omop_shape_fit,
-)
-from sema.resolve.identity_registry import (
-    DEFAULT_SCHEMA,
-    DEFAULT_TABLE,
-    IdentityRegistry,
-)
-from sema.resolve.policies.omop import (
-    MISSING_PERSON_KEY_REASON,
-    OMOP_ONCOTREE_CONDITION_REF,
-    make_omop_fk_specs,
-)
+from sema.pipeline.fk_closed_fit import FkClosedFitResult, run_fk_closed_fit
+from sema.resolve.identity_registry import IdentityRegistry
+from showcase.cbioportal_to_omop.omop_policy import OMOP_ONCOTREE_CONDITION_REF
 
 _DEFAULT_DUCKDB = Path.home() / ".sema" / "poc.duckdb"
 
@@ -98,34 +86,11 @@ def fit_omop_shape_cmd(
         sys.exit(3)
 
 
-def _build_request(
-    *, study_schema: str, source_table: str, value_column: str,
-    patient_key_column: str, row_ref_column: str, omop_schema: str,
-    keys: list[str], row_count: int, decisions: list[Any], run_id: str,
-) -> OmopShapeRequest:
-    parent, child, required = make_omop_fk_specs(omop_schema)
-    source = ChildSourceSpec(
-        schema=study_schema, table=source_table, value_column=value_column,
-        row_ref_column=row_ref_column, patient_key_column=patient_key_column,
-    )
-    registry_spec = RegistryJoinSpec(
-        schema=DEFAULT_SCHEMA, table=DEFAULT_TABLE,
-        namespace_column="source_namespace", key_column="source_entity_key",
-        id_column="entity_id",
-    )
-    return OmopShapeRequest(
-        source=source, source_row_count=row_count, distinct_patient_keys=keys,
-        parent=parent, child=child, registry_spec=registry_spec,
-        decisions=decisions, required_fields=required, no_map_default=0,
-        missing_key_reason=MISSING_PERSON_KEY_REASON, run_id=run_id,
-    )
-
-
 def _run(
     *, backend: str, duckdb_path: Path, catalog: str, study_schema: str,
     source_table: str, value_column: str, patient_key_column: str,
     row_ref_column: str, omop_schema: str, policy_ref: str, run_id: str,
-) -> OmopShapeResult:
+) -> FkClosedFitResult:
     store_path = Path(duckdb_path).expanduser()
     if not store_path.exists():
         click.echo(f"Error: DuckDB file not found: {store_path}", err=True)
@@ -156,19 +121,19 @@ def _run_duckdb(
     conn: duckdb.DuckDBPyConnection, *, study_schema: str, source_table: str,
     value_column: str, patient_key_column: str, row_ref_column: str,
     omop_schema: str, decisions: list[Any], run_id: str,
-) -> OmopShapeResult:
+) -> FkClosedFitResult:
     keys, row_count = enumerate_identity_source_duckdb(
         conn, schema=study_schema, table=source_table,
         patient_key_column=patient_key_column,
     )
-    request = _build_request(
+    request = build_omop_shape_request(
         study_schema=study_schema, source_table=source_table,
         value_column=value_column, patient_key_column=patient_key_column,
         row_ref_column=row_ref_column, omop_schema=omop_schema, keys=keys,
         row_count=row_count, decisions=decisions, run_id=run_id,
     )
     try:
-        return run_omop_shape_fit(
+        return run_fk_closed_fit(
             request, registry=IdentityRegistry(conn), target_cursor=conn,
             backend=DUCKDB_FK_BACKEND, bridge=False,
         )
@@ -180,7 +145,7 @@ def _run_databricks(
     store_conn: duckdb.DuckDBPyConnection, *, catalog: str, study_schema: str,
     source_table: str, value_column: str, patient_key_column: str,
     row_ref_column: str, omop_schema: str, decisions: list[Any], run_id: str,
-) -> OmopShapeResult:
+) -> FkClosedFitResult:
     cursor = open_databricks_cursor(
         DatabricksConfig(), catalog=catalog, schema=study_schema
     )
@@ -188,7 +153,7 @@ def _run_databricks(
         cursor, schema=study_schema, table=source_table,
         patient_key_column=patient_key_column,
     )
-    request = _build_request(
+    request = build_omop_shape_request(
         study_schema=study_schema, source_table=source_table,
         value_column=value_column, patient_key_column=patient_key_column,
         row_ref_column=row_ref_column, omop_schema=omop_schema, keys=keys,
@@ -196,7 +161,7 @@ def _run_databricks(
     )
     registry = IdentityRegistry(store_conn)  # DuckDB-canonical
     try:
-        return run_omop_shape_fit(
+        return run_fk_closed_fit(
             request, registry=registry, target_cursor=cursor,
             backend=DATABRICKS_FK_BACKEND, bridge=True,
         )
@@ -204,7 +169,7 @@ def _run_databricks(
         store_conn.close()
 
 
-def _summary(result: OmopShapeResult, omop_schema: str) -> dict[str, object]:
+def _summary(result: FkClosedFitResult, omop_schema: str) -> dict[str, object]:
     return {
         "omop_schema": omop_schema,
         "parent_rows": result.fk.parent_rows,

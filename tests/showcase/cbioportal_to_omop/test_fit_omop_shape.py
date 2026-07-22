@@ -17,13 +17,13 @@ import pytest
 from sema.compile.compiler_utils import StagingDecision
 from sema.compile.fk_backend import DATABRICKS_FK_BACKEND, DUCKDB_FK_BACKEND
 from sema.compile.fk_closed_compiler_utils import ChildSourceSpec, RegistryJoinSpec
-from sema.pipeline.fit_omop_shape import OmopShapeRequest, run_omop_shape_fit
+from sema.pipeline.fk_closed_fit import FkClosedFitRequest, run_fk_closed_fit
 from sema.resolve.identity_registry import (
     DEFAULT_SCHEMA,
     DEFAULT_TABLE,
     IdentityRegistry,
 )
-from sema.resolve.policies.omop import MISSING_PERSON_KEY_REASON, make_omop_fk_specs
+from showcase.cbioportal_to_omop.omop_policy import MISSING_PERSON_KEY_REASON, make_omop_fk_specs
 
 pytestmark = pytest.mark.unit
 
@@ -53,8 +53,8 @@ def _source() -> ChildSourceSpec:
     )
 
 
-def _request(keys: list[str], row_count: int) -> OmopShapeRequest:
-    return OmopShapeRequest(
+def _request(keys: list[str], row_count: int) -> FkClosedFitRequest:
+    return FkClosedFitRequest(
         source=_source(),
         source_row_count=row_count,
         distinct_patient_keys=keys,
@@ -99,7 +99,7 @@ def test_duckdb_end_to_end_row_count_identity_and_fk_closure(tmp_path: Path) -> 
         [("S-1", "P-1", "LUAD"), ("S-2", "P-2", "GBM"), ("S-3", "P-1", "ZZZ")],
     )
     registry = IdentityRegistry(conn)
-    result = run_omop_shape_fit(
+    result = run_fk_closed_fit(
         _request(["P-1", "P-2"], row_count=3),
         registry=registry,
         target_cursor=conn,
@@ -132,7 +132,7 @@ def test_duckdb_missing_key_accounts_in_row_count_identity(tmp_path: Path) -> No
     _seed_source(
         conn, [("S-1", "P-1", "LUAD"), ("S-2", "  ", "GBM"), ("S-3", None, "GBM")]
     )
-    result = run_omop_shape_fit(
+    result = run_fk_closed_fit(
         _request(["P-1"], row_count=3),
         registry=IdentityRegistry(conn),
         target_cursor=conn,
@@ -148,8 +148,8 @@ def test_duckdb_rerun_is_idempotent(tmp_path: Path) -> None:
     conn = duckdb.connect(str(tmp_path / "poc.duckdb"))
     _seed_source(conn, [("S-1", "P-1", "LUAD"), ("S-2", "P-2", "GBM")])
     req = _request(["P-1", "P-2"], row_count=2)
-    first = run_omop_shape_fit(req, registry=IdentityRegistry(conn), target_cursor=conn)
-    second = run_omop_shape_fit(req, registry=IdentityRegistry(conn), target_cursor=conn)
+    first = run_fk_closed_fit(req, registry=IdentityRegistry(conn), target_cursor=conn)
+    second = run_fk_closed_fit(req, registry=IdentityRegistry(conn), target_cursor=conn)
     assert first.fk.child_rows == second.fk.child_rows == 2
     total = conn.execute(
         "SELECT COUNT(*) FROM omop_stage_a.condition_occurrence"
@@ -161,7 +161,7 @@ def test_databricks_bridges_registry_before_write(tmp_path: Path) -> None:
     registry = IdentityRegistry(duckdb.connect(str(tmp_path / "poc.duckdb")))
     registry.get_or_create([(_SCHEMA, "P-1"), (_SCHEMA, "P-2")], run_id="seed")
     cur = _FakeCursor()
-    result = run_omop_shape_fit(
+    result = run_fk_closed_fit(
         _request(["P-1", "P-2"], row_count=5),
         registry=registry,
         target_cursor=cur,

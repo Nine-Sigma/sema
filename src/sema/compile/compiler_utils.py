@@ -3,8 +3,8 @@
 This module is R29-scanned (``src/sema/compile`` is a guard core path): it names
 no showcase literal. The physical staging column names arrive as a
 :class:`StagingColumns` instance whose showcase values (the source value column,
-the target concept column) live behind the policy boundary
-(:mod:`sema.resolve.policies.omop`). Resolved decisions arrive as generic
+the target concept column) live behind the policy boundary (an allowlisted
+showcase policy module). Resolved decisions arrive as generic
 :class:`StagingDecision` rows so this module never touches the store's
 concept-id field.
 

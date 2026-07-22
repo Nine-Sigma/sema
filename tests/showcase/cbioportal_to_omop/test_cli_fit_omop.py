@@ -163,7 +163,7 @@ def test_databricks_backend_bridges_and_writes(
     _seed_store(db)
     cursor = _FakeDatabricksCursor()
     monkeypatch.setattr(
-        "sema.cli_fit_omop.open_databricks_cursor", lambda *a, **k: cursor
+        "showcase.cbioportal_to_omop.cli_omop_shape.open_databricks_cursor", lambda *a, **k: cursor
     )
     result = runner.invoke(
         cli,

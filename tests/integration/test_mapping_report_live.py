@@ -26,7 +26,7 @@ from sema.eval.mapping_goldset import GoldSet, load_gold_set
 from sema.models.planner.provenance import Provenance, RunProvenance, SourceScope
 from sema.resolve.engine import VocabularyResolver
 from sema.resolve.engine_utils import ResolveContext
-from sema.resolve.policies.omop import (
+from showcase.cbioportal_to_omop.omop_policy import (
     OMOP_ONCOTREE_CONDITION_REF,
     OMOP_VOCAB_SCHEMA,
     make_omop_oncotree_condition_policy,

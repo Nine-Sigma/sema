@@ -25,7 +25,7 @@ from sema.eval.staging_qa_utils import (
     check_null_rate,
     check_row_count,
 )
-from sema.resolve.policies.omop import OMOP_STAGING_COLUMNS
+from showcase.cbioportal_to_omop.omop_policy import OMOP_STAGING_COLUMNS
 
 pytestmark = pytest.mark.unit
 

@@ -17,7 +17,7 @@ import pytest
 
 from sema.models.target.vocab_binding import VocabularyBindingDecl
 from sema.resolve.policies import resolve_policy
-from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
+from showcase.cbioportal_to_omop.omop_policy import OMOP_ONCOTREE_CONDITION_REF
 from sema.targets.adapters.manifest import ManifestTargetAdapter
 from sema.targets.loader import load_target
 from sema.targets.materializer import InMemoryGraphWriter
@@ -34,10 +34,7 @@ pytestmark = pytest.mark.unit
 
 MANIFEST = (
     Path(__file__).resolve().parents[3]
-    / "src"
-    / "sema"
-    / "targets"
-    / "manifests"
+    / "showcase" / "cbioportal_to_omop" / "manifests"
     / "omop_condition_slice0.yaml"
 )
 

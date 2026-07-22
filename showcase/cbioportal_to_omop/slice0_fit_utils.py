@@ -1,6 +1,6 @@
 """US-012A: showcase wiring for the local fit chain.
 
-Builds a :class:`~sema.pipeline.fit_slice0.FitRequest` from the already-authored
+Builds a :class:`~showcase.cbioportal_to_omop.slice0_fit.FitRequest` from the already-authored
 OMOP target manifest (US-007) plus a source study. The TARGET binding is read
 from the manifest as data (via :class:`ManifestTargetAdapter`) — the fit chain
 re-materialises nothing. The OMOP showcase column names live in the allowlisted
@@ -31,9 +31,9 @@ from sema.models.planner.lifecycle import Status
 from sema.models.planner.provenance import Provenance, RunProvenance, SourceScope
 from sema.models.target.refs import TargetEntityRef, TargetPropertyRef
 from sema.models.target.vocab_binding import VocabularyBindingDecl
-from sema.pipeline.fit_slice0 import FitRequest
+from showcase.cbioportal_to_omop.slice0_fit import FitRequest
 from sema.resolve.engine_utils import ResolveContext
-from sema.resolve.policies.omop import (
+from showcase.cbioportal_to_omop.omop_policy import (
     OMOP_STAGING_COLUMNS,
     SLICE0_CONDITION_CONCEPT_FIELD,
     SLICE0_RESOLVER_POLICY_FIELD,

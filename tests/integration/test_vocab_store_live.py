@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from sema.resolve.policies.omop import (
+from showcase.cbioportal_to_omop.omop_policy import (
     OMOP_VOCAB_SCHEMA,
     make_omop_oncotree_condition_policy,
 )

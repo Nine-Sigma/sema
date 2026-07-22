@@ -18,7 +18,7 @@ import pytest
 
 from sema.eval.mapping_goldset import load_gold_set
 from sema.resolve.engine import VocabularyResolver
-from sema.resolve.policies.omop import (
+from showcase.cbioportal_to_omop.omop_policy import (
     OMOP_VOCAB_SCHEMA,
     make_omop_oncotree_condition_policy,
 )

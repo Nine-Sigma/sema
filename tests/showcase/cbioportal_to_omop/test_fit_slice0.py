@@ -22,19 +22,16 @@ from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow
 from sema.eval.staging_qa_utils import QAOutcome
 from sema.models.planner.mapping_plan import MappingAssertion, MappingPlan
 from sema.models.planner.patterns import MappingPattern
-from sema.pipeline.fit_slice0 import FitResult, run_fit
-from sema.pipeline.fit_slice0_utils import build_slice0_fit_request
+from showcase.cbioportal_to_omop.slice0_fit import FitResult, run_fit
+from showcase.cbioportal_to_omop.slice0_fit_utils import build_slice0_fit_request
 from sema.resolve.engine import VocabularyResolver
 from sema.resolve.vocab_store_utils import ConceptRow
 
 pytestmark = pytest.mark.unit
 
 _MANIFEST = (
-    Path(__file__).resolve().parents[2]
-    / "src"
-    / "sema"
-    / "targets"
-    / "manifests"
+    Path(__file__).resolve().parents[3]
+    / "showcase" / "cbioportal_to_omop" / "manifests"
     / "omop_condition_slice0.yaml"
 )
 _STANDARD_ID = "45768916"

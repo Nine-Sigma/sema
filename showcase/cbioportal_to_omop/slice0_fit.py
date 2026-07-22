@@ -9,7 +9,7 @@ interface drift between them is caught before the live Databricks gate (US-013):
 
 It writes NO Databricks objects: the value-mapping store and the §1.5(b)
 staging table both live in DuckDB. The TARGET binding is consumed as data
-(built by :mod:`sema.pipeline.fit_slice0_utils` from the already-authored
+(built by :mod:`showcase.cbioportal_to_omop.slice0_fit_utils` from the already-authored
 manifest) — this module re-loads nothing and names no domain literal.
 """
 

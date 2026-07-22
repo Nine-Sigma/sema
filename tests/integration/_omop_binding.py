@@ -9,7 +9,7 @@ from __future__ import annotations
 from sema.models.planner._enums import TargetArtifactKind
 from sema.models.target.refs import TargetEntityRef, VocabularyRef, VocabularySource
 from sema.models.target.vocab_binding import VocabularyBindingDecl
-from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
+from showcase.cbioportal_to_omop.omop_policy import OMOP_ONCOTREE_CONDITION_REF
 
 
 def build_condition_binding() -> VocabularyBindingDecl:

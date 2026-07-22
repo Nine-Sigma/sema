@@ -12,7 +12,7 @@ from typing import Any, Sequence
 
 import pytest
 
-from sema.resolve.policies.omop import OMOP_VOCAB_SCHEMA
+from showcase.cbioportal_to_omop.omop_policy import OMOP_VOCAB_SCHEMA
 from sema.resolve.vocab_store import (
     VocabStore,
     VocabStoreBackend,

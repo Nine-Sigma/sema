@@ -10,7 +10,7 @@ binding's fields are read, never duplicated, so source-vs-target conflation
 the binding's singular ``vocabulary`` is the TARGET.
 
 This module is generic: no OMOP/OncoTree literal appears here. The concrete
-instance lives in :mod:`sema.resolve.policies.omop`, the only place those
+instance lives in :mod:`showcase.cbioportal_to_omop.omop_policy`, the only place those
 literals may appear.
 """
 

@@ -6,16 +6,68 @@ pure readers are unit-testable without the Click layer.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Sequence
 
 import duckdb
 
 from sema.compile.compiler_utils import StagingDecision
+from sema.compile.fk_closed_compiler_utils import ChildSourceSpec, RegistryJoinSpec
+from sema.pipeline.fk_closed_fit import FkClosedFitRequest
 from sema.resolve.engine_utils import staging_decision_from_value_mapping
+from sema.resolve.identity_registry import DEFAULT_SCHEMA, DEFAULT_TABLE
+from showcase.cbioportal_to_omop.omop_policy import MISSING_PERSON_KEY_REASON, make_omop_fk_specs
 from sema.resolve.value_mapping_store import ValueMappingStore
 from sema.resolve.value_mapping_store_utils import GRAIN_KEY, ValueMapping
 
-__all__ = ["enumerate_identity_source_duckdb", "load_staging_decisions"]
+__all__ = [
+    "build_omop_shape_request",
+    "enumerate_identity_source_duckdb",
+    "load_staging_decisions",
+]
+
+
+def build_omop_shape_request(
+    *,
+    study_schema: str,
+    source_table: str,
+    value_column: str,
+    patient_key_column: str,
+    row_ref_column: str,
+    omop_schema: str,
+    keys: Sequence[str],
+    row_count: int,
+    decisions: Sequence[StagingDecision],
+    run_id: str,
+) -> FkClosedFitRequest:
+    """Assemble one study's OMOP-shape request from CLI-supplied physical names."""
+    parent, child, required = make_omop_fk_specs(omop_schema)
+    source = ChildSourceSpec(
+        schema=study_schema,
+        table=source_table,
+        value_column=value_column,
+        row_ref_column=row_ref_column,
+        patient_key_column=patient_key_column,
+    )
+    registry_spec = RegistryJoinSpec(
+        schema=DEFAULT_SCHEMA,
+        table=DEFAULT_TABLE,
+        namespace_column="source_namespace",
+        key_column="source_entity_key",
+        id_column="entity_id",
+    )
+    return FkClosedFitRequest(
+        source=source,
+        source_row_count=row_count,
+        distinct_patient_keys=list(keys),
+        parent=parent,
+        child=child,
+        registry_spec=registry_spec,
+        decisions=list(decisions),
+        required_fields=required,
+        no_map_default=0,
+        missing_key_reason=MISSING_PERSON_KEY_REASON,
+        run_id=run_id,
+    )
 
 
 def enumerate_identity_source_duckdb(

@@ -1,23 +1,26 @@
-"""S1-08 — the FK-closed OMOP-shape materialization chain (DuckDB or Databricks).
+"""FK-closed two-table fit + Stage B identity collapse (DuckDB or Databricks).
 
-Wires the independently-built S1-01…S1-07 units into one ordered pass that lands
-a production-shaped ``omop.person`` + ``omop.condition_occurrence`` for one study:
+Generic platform capability: wires the identity engine, FK-closed compiler, and
+Gate-D-lite into one ordered pass that lands an FK-target parent + an FK-closed
+child for one source, and a Stage B pass that collapses shared identities and
+rebuilds the affected sources:
 
-    resolve identity (S1-02) -> registry get-or-create (S1-01)
-        -> [bridge registry into Databricks (S1-08)]
-        -> FK-closed materialize (S1-06) -> Gate-D-lite (S1-07)
+    resolve identity -> registry get-or-create
+        -> [bridge registry into Databricks]
+        -> FK-closed materialize -> Gate-D-lite
 
 ``backend`` selects the warehouse. DuckDB (the fit engine) reads the registry
 in-place — the registry connection IS the target connection, and no bridge runs.
 Databricks (the live engine) can only join a co-located registry, so the
 DuckDB-canonical registry is bridged into a Delta table first (``bridge=True``).
 
-Generic spine (D6/R29): every OMOP physical name arrives via specs from the
-allowlisted policy layer; this module names no OMOP/showcase literal.
+Domain-generic (D6/R29): every physical name arrives via specs supplied by the
+caller (a showcase policy layer); this module names no target-model literal.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Sequence
 
@@ -33,17 +36,24 @@ from sema.compile.fk_closed_compiler_utils import (
 from sema.eval.staging_qa import run_fk_closed_qa
 from sema.eval.staging_qa_utils import StagingQAReport
 from sema.resolve.identity_bridge import bridge_identity_registry
+from sema.resolve.identity_collapse import CollapseResult, collapse_identities
 from sema.resolve.identity_registry import IdentityRegistry
 from sema.resolve.identity_resolver import (
     DeterministicIdentityResolver,
     IdentitySourceRow,
 )
 
-__all__ = ["OmopShapeRequest", "OmopShapeResult", "run_omop_shape_fit"]
+__all__ = [
+    "FkClosedFitRequest",
+    "FkClosedFitResult",
+    "StageBResult",
+    "run_fk_closed_fit",
+    "run_stage_b_collapse",
+]
 
 
 @dataclass(frozen=True)
-class OmopShapeRequest:
+class FkClosedFitRequest:
     """Everything the FK-closed OMOP-shape chain needs, all supplied as data."""
 
     source: ChildSourceSpec
@@ -60,7 +70,7 @@ class OmopShapeRequest:
 
 
 @dataclass(frozen=True)
-class OmopShapeResult:
+class FkClosedFitResult:
     """The artifacts and verdicts produced by one FK-closed materialization."""
 
     fk: FkClosedResult
@@ -69,14 +79,14 @@ class OmopShapeResult:
     registry_rows_bridged: int
 
 
-def run_omop_shape_fit(
-    request: OmopShapeRequest,
+def run_fk_closed_fit(
+    request: FkClosedFitRequest,
     *,
     registry: IdentityRegistry,
     target_cursor: FkCursor,
     backend: FkBackend = DUCKDB_FK_BACKEND,
     bridge: bool = False,
-) -> OmopShapeResult:
+) -> FkClosedFitResult:
     """Resolve identity, (bridge), materialize the FK-closed shape, run Gate-D-lite."""
     resolver = DeterministicIdentityResolver(
         registry, missing_key_reason=request.missing_key_reason
@@ -119,9 +129,78 @@ def run_omop_shape_fit(
         source_row_count=request.source_row_count,
         backend=backend,
     )
-    return OmopShapeResult(
+    return FkClosedFitResult(
         fk=fk,
         qa=qa,
         review_count=resolution.review_count,
         registry_rows_bridged=bridged,
+    )
+
+
+@dataclass(frozen=True)
+class StageBResult:
+    """The outcome of one Stage B collapse + rebuild over a multi-study corpus."""
+
+    collapse: CollapseResult
+    fk: FkClosedResult
+    qa: Sequence[StagingQAReport]
+    registry_rows_bridged: int
+
+
+def run_stage_b_collapse(
+    requests: Sequence[FkClosedFitRequest],
+    *,
+    namespace_grouping: Mapping[str, str],
+    registry: IdentityRegistry,
+    target_cursor: FkCursor,
+    backend: FkBackend = DUCKDB_FK_BACKEND,
+    bridge: bool = False,
+) -> StageBResult:
+    """Collapse shared-identity persons, then rebuild every study's child rows.
+
+    Deterministic same-namespace collapse (S1-10): remaps the registry's
+    uid→entity_id level, then rebuilds ``condition_occurrence`` for all studies
+    through the collapsed registry (PKs preserved, FKs recomputed) and shrinks
+    ``person`` to the survivors. Idempotent — a re-run collapses nothing and
+    rebuilds to identical counts. All studies must target the same shape, so the
+    parent/child/registry specs are taken from the first request.
+    """
+    if not requests:
+        raise ValueError("run_stage_b_collapse requires at least one study request")
+    collapse = collapse_identities(registry, namespace_grouping=namespace_grouping)
+    head = requests[0]
+
+    bridged = 0
+    if bridge:
+        bridged = bridge_identity_registry(
+            target_cursor,
+            registry.read_all(),
+            schema=head.registry_spec.schema,
+            table=head.registry_spec.table,
+        )
+
+    fk = FkClosedCompiler(
+        no_map_default=head.no_map_default, backend=backend
+    ).rebuild_after_collapse(
+        target_cursor,
+        parent=head.parent,
+        child=head.child,
+        sources=[r.source for r in requests],
+        registry=head.registry_spec,
+        decisions=head.decisions,
+    )
+    qa = [
+        run_fk_closed_qa(
+            target_cursor,
+            parent=r.parent,
+            child=r.child,
+            source=r.source,
+            required_fields=r.required_fields,
+            source_row_count=r.source_row_count,
+            backend=backend,
+        )
+        for r in requests
+    ]
+    return StageBResult(
+        collapse=collapse, fk=fk, qa=qa, registry_rows_bridged=bridged
     )

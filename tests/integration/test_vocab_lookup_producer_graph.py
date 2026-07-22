@@ -32,10 +32,7 @@ pytestmark = pytest.mark.integration
 
 _MANIFEST = (
     Path(__file__).resolve().parents[1]
-    / "src"
-    / "sema"
-    / "targets"
-    / "manifests"
+    / "showcase" / "cbioportal_to_omop" / "manifests"
     / "omop_condition_slice0.yaml"
 )
 _TARGET_PROPERTY = "target.condition_occurrence.condition_concept_id"

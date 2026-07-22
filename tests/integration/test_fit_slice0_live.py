@@ -20,10 +20,10 @@ from sema.eval.mapping_goldset import GoldSet, load_gold_set
 from sema.eval.staging_qa_utils import QAOutcome
 from sema.models.planner.mapping_plan import MappingAssertion, MappingPlan
 from sema.models.planner.patterns import MappingPattern
-from sema.pipeline.fit_slice0 import run_fit
-from sema.pipeline.fit_slice0_utils import build_slice0_fit_request, discover_study
+from showcase.cbioportal_to_omop.slice0_fit import run_fit
+from showcase.cbioportal_to_omop.slice0_fit_utils import build_slice0_fit_request, discover_study
 from sema.resolve.engine import VocabularyResolver
-from sema.resolve.policies.omop import OMOP_VOCAB_SCHEMA
+from showcase.cbioportal_to_omop.omop_policy import OMOP_VOCAB_SCHEMA
 from sema.resolve.value_mapping_store_utils import FROZEN_COLUMNS
 from sema.resolve.vocab_store import open_duckdb_vocab_store, VocabStore
 
@@ -38,10 +38,7 @@ _GOLD = (
 )
 _MANIFEST = (
     Path(__file__).resolve().parents[2]
-    / "src"
-    / "sema"
-    / "targets"
-    / "manifests"
+    / "showcase" / "cbioportal_to_omop" / "manifests"
     / "omop_condition_slice0.yaml"
 )
 _VALUE_COLUMN = "ONCOTREE_CODE"
@@ -71,7 +68,7 @@ def test_fit_chain_end_to_end_on_duckdb(tmp_path: Path) -> None:
     work = duckdb.connect(str(tmp_path / "fit.duckdb"))
     _copy_source(work, src_schema, src_table)
 
-    from sema.pipeline.fit_slice0_utils import enumerate_source
+    from showcase.cbioportal_to_omop.slice0_fit_utils import enumerate_source
 
     codes, row_count = enumerate_source(
         work, schema=src_schema, table=src_table, value_column=_VALUE_COLUMN

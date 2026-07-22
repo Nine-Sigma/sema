@@ -16,7 +16,7 @@ import duckdb
 import pytest
 import sqlglot
 
-from sema.resolve.policies.omop import OMOP_ONCOTREE_CONDITION_REF
+from showcase.cbioportal_to_omop.omop_policy import OMOP_ONCOTREE_CONDITION_REF
 
 pytestmark = pytest.mark.unit
 

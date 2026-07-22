@@ -7,8 +7,8 @@ routed to a typed review disposition (D5). The registry is the sole identity
 writer; this resolver is its only caller in the fit chain.
 
 The module is DOMAIN-GENERIC (D6/R29): the missing-key reason code is injected
-by the policy layer (the OMOP ``MISSING_PERSON_KEY`` binding lives in
-:mod:`sema.resolve.policies.omop`), so nothing here names ``person``/OMOP.
+by the policy layer (the concrete binding lives in an allowlisted showcase policy
+module), so nothing here names ``person`` or any target-model literal.
 """
 
 from __future__ import annotations

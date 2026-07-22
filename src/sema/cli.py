@@ -341,12 +341,31 @@ def query(
 
 
 from sema.cli_target import target_group as _target_group
-from sema.cli_fit import fit_cmd as _fit_cmd
-from sema.cli_fit_omop import fit_omop_shape_cmd as _fit_omop_shape_cmd
+
+
+def _register_showcase_commands(group: click.Group) -> None:
+    """Register the cBioPortal→OMOP showcase commands when the showcase is on
+    the path (a source checkout).
+
+    These are *example* commands demonstrating the platform, not core surface, so
+    they live in ``showcase/`` and are imported optionally: a wheel install
+    without the showcase simply omits them rather than failing to load the CLI.
+    """
+    try:
+        from showcase.cbioportal_to_omop.cli_slice0 import fit_cmd
+        from showcase.cbioportal_to_omop.cli_omop_shape import fit_omop_shape_cmd
+        from showcase.cbioportal_to_omop.cli_omop_collapse import (
+            collapse_omop_identities_cmd,
+        )
+    except ImportError:
+        return
+    group.add_command(fit_cmd, name="fit")
+    group.add_command(fit_omop_shape_cmd, name="fit-omop-shape")
+    group.add_command(collapse_omop_identities_cmd, name="collapse-omop-identities")
+
 
 cli.add_command(_ingest_group, name="ingest")
 cli.add_command(_push_cmd, name="push")
 cli.add_command(_eval_group, name="eval")
 cli.add_command(_target_group, name="target")
-cli.add_command(_fit_cmd, name="fit")
-cli.add_command(_fit_omop_shape_cmd, name="fit-omop-shape")
+_register_showcase_commands(cli)

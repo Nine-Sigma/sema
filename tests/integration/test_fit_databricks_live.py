@@ -34,10 +34,7 @@ pytestmark = pytest.mark.integration
 
 _MANIFEST = (
     Path(__file__).resolve().parents[2]
-    / "src"
-    / "sema"
-    / "targets"
-    / "manifests"
+    / "showcase" / "cbioportal_to_omop" / "manifests"
     / "omop_condition_slice0.yaml"
 )
 _STUDY = os.environ.get("DATABRICKS_FIT_SCHEMA", "msk_chord_2024")
