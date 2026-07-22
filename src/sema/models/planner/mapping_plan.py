@@ -57,7 +57,11 @@ class MappingPlan(BaseModel):
     lineage: list[RefStr] = Field(default_factory=list)
 
     def covered_required_fields(self) -> set[str]:
-        return {fm.target_field_ref for fm in self.field_maps}
+        return {
+            fm.target_field_ref
+            for fm in self.field_maps
+            if fm.covers_required_field()
+        }
 
     def derive_verdict(self) -> PlanVerdict:
         required = set(self.obligation.required_fields)
@@ -73,7 +77,9 @@ class MappingPlan(BaseModel):
             minimum_viable_row_violated=(
                 "RISK_OBLIGATION_MINIMUM_VIABLE_ROW_VIOLATED" in codes
             ),
-            any_review_pending=False,
+            any_review_pending=any(
+                fm.status is Status.review_pending for fm in self.field_maps
+            ),
             any_resolution_dependency_missing=(
                 "RISK_RESOLUTION_DEPENDENCY_MISSING" in codes
             ),
@@ -121,10 +127,16 @@ def select_winner(
 
 
 class PlanAssembler(Protocol):
-    """Plan-assembler signature stub.
+    """Plan-assembler contract surface.
 
-    Implementations live in the matching-engine change; this protocol fixes
-    the contract surface and the RISK_ASSEMBLER_CONFLICT_RESOLVED emission rule.
+    The concrete Slice-0 implementation is ``sema.resolve.assembler``
+    (``Slice0PlanAssembler``); the generic matching engine is Slice 1+. An
+    implementation groups assertions by target property, resolves each conflict
+    with ``select_winner`` (emitting ``RISK_ASSEMBLER_CONFLICT_RESOLVED`` when a
+    group had >1 live assertion), projects the winner into a ``FieldMap``
+    carrying the winning ``Status`` (§1.5(d)), and returns a ``MappingPlan``
+    whose ``derive_verdict`` folds obligation coverage (§1.5(e)) and review
+    state into one verdict.
     """
 
     conflict_policy: ConflictResolutionPolicy

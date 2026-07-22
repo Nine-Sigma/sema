@@ -275,6 +275,7 @@ def vocabulary_binding_merge(op: VocabularyBindingOp) -> tuple[str, dict[str, An
         "SET n.vocabulary_source = $vocabulary_source, n.domain = $domain, "
         "n.require_standard = $require_standard, "
         "n.allow_zero_default = $allow_zero_default, "
+        "n.standard_domain_governed = $standard_domain_governed, "
         "n.effective_date_ref = $effective_date_ref, "
         "n.resolver_policy_ref = $resolver_policy_ref, "
         "n.is_current = $is_current, n.model_role = $model_role, n.id = $id"
@@ -290,6 +291,7 @@ def vocabulary_binding_merge(op: VocabularyBindingOp) -> tuple[str, dict[str, An
         "domain": op.domain,
         "require_standard": op.require_standard,
         "allow_zero_default": op.allow_zero_default,
+        "standard_domain_governed": op.standard_domain_governed,
         "effective_date_ref": op.effective_date_ref,
         "resolver_policy_ref": op.resolver_policy_ref,
         "is_current": op.is_current,

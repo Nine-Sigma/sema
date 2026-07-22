@@ -9,6 +9,7 @@ from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
 )
+from sema.models.vocab_knowledge import HIERARCHICAL_VOCABULARIES
 
 if TYPE_CHECKING:
     from sema.engine.vocabulary import VocabColumnContext, VocabularyEngine
@@ -175,11 +176,6 @@ def apply_agreement_boost(
 
 NON_HIERARCHICAL_TYPES = frozenset({
     "numeric", "temporal", "identifier", "free_text",
-})
-
-HIERARCHICAL_VOCABULARIES = frozenset({
-    "icd-10", "atc", "cpt", "snomed", "ajcc",
-    "tnm", "oncotree", "loinc", "meddra",
 })
 
 

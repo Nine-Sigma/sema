@@ -1,0 +1,102 @@
+# Slice-0 OMOP target: condition_occurrence with a condition_concept_id
+# resolved from OncoTree via the US-004 policy.
+#
+# TARGET CONTRACT (the user-provided semantics for Slice-0 are OMOP, not a
+# single vocabulary): condition_concept_id must be an OMOP concept that is
+# VALID + STANDARD (standard_concept='S') + domain_id='Condition'. That is
+# governed by the CDM's Condition domain, whose standard concepts span SNOMED
+# AND — via the OMOP oncology extension — ICDO3 histology. The resolver is
+# vocabulary-agnostic by design: it gates on valid+standard+domain (see
+# resolve/policy.py::ResolverPolicy.accepts) and does NOT filter on a single
+# target vocabulary_id. So an OncoTree code resolving to a standard ICDO3
+# Condition concept is a CORRECT OMOP mapping, not a miss.
+#
+# The binding's `vocabulary: OMOP-Condition` slot and the `omop.oncotree_condition`
+# policy ref are domain-governed IDENTITY/provenance strings (they MERGE a
+# :Vocabulary node + name a persisted policy id); they are NOT a resolution
+# filter. The value names the governance SCOPE (OMOP standard Condition), not a
+# source vocabulary — a code may resolve to a standard Condition concept in
+# SNOMED OR ICDO3 and both are correct.
+#
+# This is the ONLY place these OMOP/OncoTree specifics live for US-007:
+# authored manifests are an R29-allowlisted location (the engine core and
+# generic spine stay free of these literals). The SOURCE vocabulary (OncoTree)
+# is named only by the resolver policy referenced here.
+manifest_version: 1
+descriptor:
+  target_model_id: omop-condition-slice0
+  # 0.2.0 (Slice-1, D4): condition_start_date relaxed to nullable — S1-00 proved
+  # the cBio source carries no absolute date and no anchor to derive one from, so
+  # the contract is versioned rather than fabricating a date.
+  target_model_version: "0.2.0"
+  display_name: OMOP Condition Occurrence (Slice 0)
+  owner: sema-mapping-team@datadepo.us
+  vocabulary_release: omop-vocab-2024
+vocabularies:
+  - name: OMOP-Condition
+    source: EXTERNAL
+entities:
+  - qualified_name: omop.person
+    kind: TABLE_ROW
+    properties:
+      - name: person_id
+        type: integer
+        nullable: false
+    obligation:
+      required_fields: [person_id]
+      primary_key: NATURAL_KEY
+    context_card:
+      card_version: "1.0.0"
+      description: OMOP person table; FK target for condition_occurrence.
+  - qualified_name: omop.condition_occurrence
+    kind: TABLE_ROW
+    properties:
+      - name: condition_occurrence_id
+        type: integer
+        nullable: false
+      - name: person_id
+        type: integer
+        nullable: false
+      - name: condition_concept_id
+        type: integer
+        nullable: false
+        synonyms: [cancer_type_code, diagnosis_concept]
+        vocabulary_binding:
+          # `vocabulary` is a domain-governed identity label, NOT a resolution
+          # filter: `standard_domain_governed: true` declares (machine-readably)
+          # that acceptance is governed by standardness + domain, so a code may
+          # resolve to a standard Condition concept in SNOMED OR ICDO3 and both
+          # are correct.
+          vocabulary: OMOP-Condition
+          domain: Condition
+          require_standard: true
+          standard_domain_governed: true
+          resolver_policy_ref: omop.oncotree_condition
+      - name: condition_start_date
+        # D4 (S1-00): no absolute date exists in the cBio source (only relative
+        # day-offsets against an undisclosed reference, no anchor). Nullable, and
+        # dropped from required_fields — Gate-D-lite reports the null rate
+        # honestly; the code never fabricates a date.
+        type: date
+        nullable: true
+    obligation:
+      required_fields:
+        - condition_occurrence_id
+        - person_id
+        - condition_concept_id
+      primary_key: NATURAL_KEY
+      foreign_keys:
+        - referenced_entity: omop.person
+          join_keys: [["person_id", "person_id"]]
+      domain_constraints:
+        - property_name: condition_concept_id
+          domain_id: Condition
+    context_card:
+      card_version: "1.0.0"
+      description: >
+        OMOP condition_occurrence; one row per recorded condition. Slice-0
+        target for OncoTree -> OMOP standard Condition concept_id resolution
+        (valid + standard + domain=Condition; SNOMED or ICDO3 both acceptable).
+      obligation_summary: >
+        Required PK, person FK, start date, and a valid+standard OMOP Condition
+        concept (vocabulary-agnostic; SNOMED or ICDO3 via the oncology extension).

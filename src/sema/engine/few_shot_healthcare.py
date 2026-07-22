@@ -1,6 +1,6 @@
 """Healthcare few-shot examples for staged L2 prompts.
 
-Examples sourced from cBioPortal analyst questions; cover the
+Examples sourced from oncology warehouse analyst questions; cover the
 clinical-genomics shapes (patient, sample, mutation, treatment, structural
 variant) plus MSK CHORD-introduced shapes (lab timelines, procedures,
 performance status, biomarker states, segmented CNA). Stage arrays live in

@@ -80,7 +80,7 @@ _HEALTHCARE_VOCAB_HINTS = (
     "  - HGNC gene symbol namespaces\n"
     "  - LOINC-like measurement/lab test concepts\n"
     "  - Cancer staging systems (AJCC, TNM)\n"
-    "  - Cancer classification systems (OncoTree, ICD-O)\n"
+    "  - Cancer classification/morphology systems (ICD-O and similar)\n"
     "Remember: name semantic families, not specific ontologies, "
     "unless the column header or values explicitly identify one."
 )

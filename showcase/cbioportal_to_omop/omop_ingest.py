@@ -8,7 +8,7 @@ from urllib.request import urlopen
 import pyarrow as pa
 
 from sema.ingest.duckdb_staging import Staging
-from sema.ingest.omop_utils import (
+from showcase.cbioportal_to_omop.omop_ingest_utils import (
     CDM_FIELD_CSV_URL_TEMPLATE,
     CDM_REPO_URL_TEMPLATE,
     load_field_level_comments,

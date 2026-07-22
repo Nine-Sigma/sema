@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from sema.ingest.duckdb_staging import Staging
-from sema.ingest.omop import (
+from showcase.cbioportal_to_omop.omop_ingest import (
     ingest_cdm_schema,
     load_field_level_comments,
     parse_postgres_ddl,
@@ -122,7 +122,7 @@ class TestIngestCdmSchema:
             "PERSON,person_id,Primary key for the person table\n",
             encoding="utf-8",
         )
-        with patch("sema.ingest.omop.fetch_cdm_artifacts") as mock_fetch:
+        with patch("showcase.cbioportal_to_omop.omop_ingest.fetch_cdm_artifacts") as mock_fetch:
             mock_fetch.return_value = (ddl, fields_csv)
             ingest_cdm_schema(version="5.4", staging=staging)
 
@@ -138,7 +138,7 @@ class TestIngestCdmSchema:
         fields_csv.write_text("cdmTableName,cdmFieldName,userGuidance\n", encoding="utf-8")
 
         mock_fetch = MagicMock(return_value=(ddl, fields_csv))
-        with patch("sema.ingest.omop.fetch_cdm_artifacts", mock_fetch):
+        with patch("showcase.cbioportal_to_omop.omop_ingest.fetch_cdm_artifacts", mock_fetch):
             ingest_cdm_schema(version="5.3", staging=staging)
 
         mock_fetch.assert_called_once()

@@ -1,0 +1,65 @@
+oncotree_code,name,mainType,tissue,ncit,umls,row_count,gold_concept_id,gold_label,notes
+LUAD,Lung Adenocarcinoma,Non-Small Cell Lung Cancer,Lung,C3512,C0152013,5957,,,
+COAD,Colon Adenocarcinoma,Colorectal Cancer,Bowel,C4349,C0338106,3352,,,
+IDC,Breast Invasive Ductal Carcinoma,Breast Cancer,Breast,C4194,C1134719,3350,,,
+PRAD,Prostate Adenocarcinoma,Prostate Cancer,Prostate,C2919,C0007112,3177,,,
+PAAD,Pancreatic Adenocarcinoma,Pancreatic Cancer,Pancreas,C8294,C0281361,2703,,,
+READ,Rectal Adenocarcinoma,Colorectal Cancer,Bowel,C9383,C0149978,1321,,,
+BRCA,Invasive Breast Carcinoma,Breast Cancer,Breast,C9245,C0853879,967,,,
+LUSC,Lung Squamous Cell Carcinoma,Non-Small Cell Lung Cancer,Lung,C3493,C0149782,822,,,
+COADREAD,Colorectal Adenocarcinoma,Colorectal Cancer,Bowel,C5105,C1319315,716,,,
+GBM,"Glioblastoma, IDH-Wildtype",Glioma,CNS/Brain,C3058,C0017636,592,,,"code REVOKED in latest OncoTree; refs shown are from successor GB (Glioblastoma, IDH-Wildtype)"
+ILC,Breast Invasive Lobular Carcinoma,Breast Cancer,Breast,C7950,C0279565,538,,,
+NSCLC,Non-Small Cell Lung Cancer,Non-Small Cell Lung Cancer,Lung,C2926,C0007131,499,,,
+PANET,Pancreatic Neuroendocrine Tumor,Pancreatic Cancer,Pancreas,C27720,C1337011,259,,,
+BRCNOS,"Breast Invasive Carcinoma, NOS",Breast Cancer,Breast,,,215,,,no NCIt ref in OncoTree
+LUNE,Large Cell Neuroendocrine Carcinoma,Non-Small Cell Lung Cancer,Lung,C6875,C1265996,134,,,
+BRCANOS,"Breast Invasive Cancer, NOS",Breast Cancer,Breast,,,130,,,no NCIt ref in OncoTree
+MACR,Mucinous Adenocarcinoma of the Colon and Rectum,Colorectal Cancer,Bowel,C43585,C1707439,113,,,
+LUCA,Lung Carcinoid,Non-Small Cell Lung Cancer,Lung,C4038,C0280089,91,,,
+MDLC,Breast Mixed Ductal and Lobular Carcinoma,Breast Cancer,Breast,C5160,CL007210,86,,,
+NSCLCPD,Poorly Differentiated Non-Small Cell Lung Cancer,Non-Small Cell Lung Cancer,Lung,,,77,,,no NCIt ref in OncoTree
+LUAS,Lung Adenosquamous Carcinoma,Non-Small Cell Lung Cancer,Lung,C9133,C0279557,56,,,
+PAASC,Adenosquamous Carcinoma of the Pancreas,Pancreatic Cancer,Pancreas,C5721,C1335299,50,,,
+LUPC,Pleomorphic Carcinoma of the Lung,Non-Small Cell Lung Cancer,Lung,C45542,C1711397,45,,,
+ALUCA,Atypical Lung Carcinoid,Non-Small Cell Lung Cancer,Lung,C45551,C1708766,43,,,
+PAAC,Acinar Cell Carcinoma of the Pancreas,Pancreatic Cancer,Pancreas,C7977,C0279661,43,,,
+LNET,Lung Neuroendocrine Tumor,Non-Small Cell Lung Cancer,Lung,C5670,C1334452,32,,,
+MBC,Metaplastic Breast Cancer,Breast Cancer,Breast,C5164,C1334708,31,,,
+UCP,Undifferentiated Carcinoma of the Pancreas,Pancreatic Cancer,Pancreas,C5722,C1336861,25,,,
+CMC,Medullary Carcinoma of the Colon,Colorectal Cancer,Bowel,C60641,C1880119,21,,,
+PRNE,Prostate Neuroendocrine Carcinoma,Prostate Cancer,Prostate,C5545,C1335515,19,,,
+SARCL,Sarcomatoid Carcinoma of the Lung,Non-Small Cell Lung Cancer,Lung,C45540,C1708781,19,,,
+SRCCR,Signet Ring Cell Adenocarcinoma of the Colon and Rectum,Colorectal Cancer,Bowel,C9168|C7967,C0279654|C1707436,19,,,multiple NCIt refs (ambiguous)
+PRSCC,Prostate Small Cell Carcinoma,Prostate Cancer,Prostate,C6766,C1300585,15,,,
+IMMC,Breast Invasive Mixed Mucinous Carcinoma,Breast Cancer,Breast,C9131,C1334807,14,,,
+ACBC,Adenoid Cystic Breast Cancer,Breast Cancer,Breast,C5130,C1332167,10,,,
+IPMN,Intraductal Papillary Mucinous Neoplasm,Pancreatic Cancer,Pancreas,C38342,C1518869,10,,,
+LCLC,Large Cell Lung Carcinoma,Non-Small Cell Lung Cancer,Lung,C4450,C0345958,7,,,
+LUACC,Adenoid Cystic Carcinoma of the Lung,Non-Small Cell Lung Cancer,Lung,C5666,C1334439,7,,,
+PANEC,Pancreatic Neuroendocrine Carcinoma,Pancreatic Cancer,Pancreas,,,7,,,no NCIt ref in OncoTree
+BNNOS,"Breast Neoplasm, NOS",Breast Cancer,Breast,,,6,,,no NCIt ref in OncoTree
+LAIS,Lung Adenocarcinoma In Situ,Non-Small Cell Lung Cancer,Lung,,,6,,,no NCIt ref in OncoTree
+MMBC,Mixed Type Metaplastic Breast Cancer,Breast Cancer,Breast,C40364,C1513365,6,,,
+LECLC,Lymphoepithelioma-like Carcinoma of the Lung,Non-Small Cell Lung Cancer,Lung,C45519,C1708792,5,,,
+SPN,Solid Pseudopapillary Neoplasm of the Pancreas,Pancreatic Cancer,Pancreas,C37212,C1336030,5,,,
+SPCC,Spindle Cell Carcinoma of the Lung,Non-Small Cell Lung Cancer,Lung,C45541,C1708784,4,,,
+PB,Pancreatoblastoma,Pancreatic Cancer,Pancreas,C4265,C0334489,3,,,
+BRAME,Adenomyoepithelioma of the Breast,Breast Cancer,Breast,C6899,C1510795,2,,,
+CSNOS,"Breast Invasive Carcinosarcoma, NOS",Breast Cancer,Breast,,,2,,,no NCIt ref in OncoTree
+DCIS,Breast Ductal Carcinoma In Situ,Breast Cancer,Breast,C2924,C0007124,2,,,
+JSCB,Juvenile Secretory Carcinoma of the Breast,Breast Cancer,Breast,,,2,,,no NCIt ref in OncoTree
+LUMEC,Mucoepidermoid Carcinoma of the Lung,Non-Small Cell Lung Cancer,Lung,C45544,C1708778,2,,,
+MCN,Mucinous Cystic Neoplasm,Pancreatic Cancer,Pancreas,C41247,C1518872,2,,,
+SPC,Solid Papillary Carcinoma of the Breast,Breast Cancer,Breast,C6870,C1336027,2,,,
+BLCLC,Basaloid Large Cell Carcinoma of the Lung,Non-Small Cell Lung Cancer,Lung,C7266,C1332463,1,,,
+CAIS,Colon Adenocarcinoma In Situ,Colorectal Cancer,Bowel,,,1,,,no NCIt ref in OncoTree
+ITPN,Intraductal Tubulopapillary Neoplasm,Pancreatic Cancer,Pancreas,,,1,,,no NCIt ref in OncoTree
+MASC,Metaplastic Adenosquamous Carcinoma,Breast Cancer,Breast,C40361,C1510796,1,,,
+MASCC,Metaplastic Adenocarcinoma with Spindle Cell Differentiation,Breast Cancer,Breast,C40358,C1519487,1,,,
+MCS,Metaplastic Carcinosarcoma,Breast Cancer,Breast,,,1,,,no NCIt ref in OncoTree
+MSCC,Metaplastic Squamous Cell Carcinoma,Breast Cancer,Breast,C5177,C1336079,1,,,
+NUTCL,NUT Carcinoma of the Lung,Non-Small Cell Lung Cancer,Lung,,,1,,,no NCIt ref in OncoTree
+OSGCT,Osteoclastic Giant Cell Tumor,Pancreatic Cancer,Pancreas,,,1,,,no NCIt ref in OncoTree
+PD,Paget Disease of the Nipple,Breast Cancer,Breast,C3301,C1704323,1,,,
+PPB,Pleuropulmonary Blastoma,Non-Small Cell Lung Cancer,Lung,C5669,C1266144,1,,,

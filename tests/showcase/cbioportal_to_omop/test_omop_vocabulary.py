@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from sema.ingest.duckdb_staging import Staging
-from sema.ingest.omop import ingest_vocabulary
+from showcase.cbioportal_to_omop.omop_ingest import ingest_vocabulary
 
 
 def _write_vocab_csv(path: Path, header: list[str], rows: list[list[str]]) -> None:

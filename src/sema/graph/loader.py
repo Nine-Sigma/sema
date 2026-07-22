@@ -632,6 +632,52 @@ class GraphLoader:
         )
         _lu.delete_orphaned_nodes(self)
 
+    def delete_table_scoped(
+        self,
+        catalog: str,
+        schema_name: str,
+        table_name: str,
+        table_ref: str,
+        preserve_assertions: bool = False,
+    ) -> None:
+        """Remove ONE table's graph footprint, leaving sibling tables intact.
+
+        Resume cleanup uses this: only tables actually re-run (no cached
+        assertions) are cleared; tables with assertions are left untouched
+        and re-materialized from the cache. Unlike ``delete_study_scoped``
+        this never runs the schema-wide ``{source_schema}`` edge sweep — that
+        blast radius is what wiped every sibling table (bug-368).
+
+        Anchors on this table's physical ``:Table`` / ``:Column`` nodes
+        (keyed by name/schema/catalog, never shared across tables) and its
+        ``:Assertion`` subject_ref. Their detach-delete drops this table's
+        ``ENTITY_ON_TABLE`` / ``PROPERTY_ON_COLUMN`` edges; shared semantic
+        nodes (``:Entity`` / ``:Term`` unified across tables) are removed only
+        by the orphan sweep, and only once nothing else references them.
+        """
+        from sema.graph import loader_utils as _lu
+        if not preserve_assertions:
+            self._run(
+                "MATCH (a:Assertion {source_schema: $schema}) "
+                "WHERE a.subject_ref = $ref "
+                "OR a.subject_ref STARTS WITH $ref_slash "
+                "DETACH DELETE a",
+                schema=schema_name,
+                ref=table_ref,
+                ref_slash=table_ref + "/",
+            )
+        self._run(
+            "MATCH (c:Column {table_name: $table, schema_name: $schema, "
+            "catalog: $catalog}) DETACH DELETE c",
+            table=table_name, schema=schema_name, catalog=catalog,
+        )
+        self._run(
+            "MATCH (t:Table {name: $table, schema_name: $schema, "
+            "catalog: $catalog}) DETACH DELETE t",
+            table=table_name, schema=schema_name, catalog=catalog,
+        )
+        _lu.delete_orphaned_nodes(self)
+
     def has_assertions(self, table_ref: str) -> bool:
         table_ref_slash = table_ref + "/"
         with self._driver.session() as session:

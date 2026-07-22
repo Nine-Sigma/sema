@@ -50,6 +50,7 @@ def _binding_op(
         domain=b.domain,
         require_standard=b.require_standard,
         allow_zero_default=b.allow_zero_default,
+        standard_domain_governed=b.standard_domain_governed,
         effective_date_ref=b.effective_date_ref,
         resolver_policy_ref=b.resolver_policy_ref,
     )

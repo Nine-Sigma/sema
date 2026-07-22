@@ -20,7 +20,6 @@ from sema.ingest.comment_recovery import (
 )
 from sema.ingest.databricks_push import Bridge, PushError
 from sema.ingest.duckdb_staging import Staging
-from sema.ingest.omop import ingest_cdm_schema, ingest_vocabulary
 from sema.ingest.study_registry import StudyRegistry
 from sema.log import logger
 from sema.models.config import IngestConfig
@@ -103,6 +102,16 @@ def ingest_omop_cmd(
     duckdb_path: str | None,
 ) -> None:
     """Download OMOP CDM schema and (optionally) load Athena vocabulary into DuckDB staging."""
+    try:
+        from showcase.cbioportal_to_omop.omop_ingest import (
+            ingest_cdm_schema,
+            ingest_vocabulary,
+        )
+    except ImportError:
+        raise click.ClickException(
+            "The cBioPortal→OMOP showcase is not importable. Run from a source "
+            "checkout where the 'showcase/' directory is on sys.path."
+        ) from None
     staging = Staging(_load_ingest_config(duckdb_path).duckdb_path)
     try:
         ingest_cdm_schema(version=cdm_version, staging=staging)
