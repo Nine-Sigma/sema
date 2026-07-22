@@ -44,6 +44,8 @@ MANIFEST = (
 _CONDITION_PROPERTY = "condition_concept_id"
 _CONDITION_DOMAIN = "Condition"
 _CONDITION_VOCABULARY = "OMOP-Condition"
+_START_DATE_PROPERTY = "condition_start_date"
+_EXPECTED_MODEL_VERSION = "0.2.0"
 
 
 def _load() -> InMemoryGraphWriter:
@@ -101,6 +103,42 @@ def test_target_obligation_requires_condition_concept_id() -> None:
         if isinstance(op, TargetObligationOp) and op.target_entity == qname
     )
     assert _CONDITION_PROPERTY in obligation.payload["required_fields"]
+
+
+def test_model_version_bumped_to_0_2_0_for_d4() -> None:
+    # D4: the nullable-date contract change is an explicit version bump, not a
+    # silent runtime relaxation.
+    prop = next(op for op in _load().ops if isinstance(op, PropertyOp))
+    assert prop.target_model_version == _EXPECTED_MODEL_VERSION
+
+
+def test_condition_start_date_is_nullable_d4() -> None:
+    # S1-00 proved no absolute date (nor anchor) exists in the cBio source;
+    # D4 versions the contract to nullable rather than fabricating a date.
+    qname = _entity_qname()
+    prop = next(
+        op
+        for op in _load().ops
+        if isinstance(op, PropertyOp)
+        and op.parent_entity_qualified_name == qname
+        and op.name == _START_DATE_PROPERTY
+    )
+    assert prop.nullable is True
+
+
+def test_condition_start_date_dropped_from_required_fields_d4() -> None:
+    qname = _entity_qname()
+    obligation = next(
+        op
+        for op in _load().ops
+        if isinstance(op, TargetObligationOp) and op.target_entity == qname
+    )
+    required = obligation.payload["required_fields"]
+    assert _START_DATE_PROPERTY not in required
+    # the other three OMOP-shape requirements stay required.
+    assert {"condition_occurrence_id", "person_id", _CONDITION_PROPERTY}.issubset(
+        set(required)
+    )
 
 
 def test_vocabulary_binding_op_carries_condition_binding() -> None:

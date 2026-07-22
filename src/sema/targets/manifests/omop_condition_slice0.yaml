@@ -25,7 +25,10 @@
 manifest_version: 1
 descriptor:
   target_model_id: omop-condition-slice0
-  target_model_version: "0.1.0"
+  # 0.2.0 (Slice-1, D4): condition_start_date relaxed to nullable — S1-00 proved
+  # the cBio source carries no absolute date and no anchor to derive one from, so
+  # the contract is versioned rather than fabricating a date.
+  target_model_version: "0.2.0"
   display_name: OMOP Condition Occurrence (Slice 0)
   owner: sema-mapping-team@datadepo.us
   vocabulary_release: omop-vocab-2024
@@ -70,14 +73,17 @@ entities:
           standard_domain_governed: true
           resolver_policy_ref: omop.oncotree_condition
       - name: condition_start_date
+        # D4 (S1-00): no absolute date exists in the cBio source (only relative
+        # day-offsets against an undisclosed reference, no anchor). Nullable, and
+        # dropped from required_fields — Gate-D-lite reports the null rate
+        # honestly; the code never fabricates a date.
         type: date
-        nullable: false
+        nullable: true
     obligation:
       required_fields:
         - condition_occurrence_id
         - person_id
         - condition_concept_id
-        - condition_start_date
       primary_key: NATURAL_KEY
       foreign_keys:
         - referenced_entity: omop.person
