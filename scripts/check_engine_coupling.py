@@ -56,6 +56,8 @@ R29_POLICY = EngineCouplingPolicy(
         "src/sema/engine",
         "src/sema/resolve/engine.py",
         "src/sema/resolve/assembler.py",
+        "src/sema/resolve/identity_registry.py",
+        "src/sema/resolve/identity_registry_utils.py",
         "src/sema/compile",
         "src/sema/targets",
     ),
