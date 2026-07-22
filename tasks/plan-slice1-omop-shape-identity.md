@@ -1,6 +1,8 @@
 # Plan — Slice 1: materialize cBioPortal → OMOP **table shape** (condition_occurrence + person), full identity resolution
 
-> Date: 2026-07-22 · Status: **Stage A DONE (S1-01..S1-08 live) · Stage B S1-10 engine DONE (code+tests), live run GATED** · Branch: `ralph/feat/omop-shape-identity`
+> Date: 2026-07-22 · Status: **SLICE-1 COMPLETE — S1-10 LIVE collapse DONE. omop_stage_a on Databricks:
+> person 53,562 (19,567 cross-study duplicates retired) · condition_occurrence 79,371 · 0 orphans · both
+> studies Gate-D-lite PASS · idempotent.** Branch: `ralph/feat/omop-shape-identity`
 > Follows: `tasks/prd-sema-mapping-slice0.md` (§4 "Out of scope" parks exactly this),
 > `tasks/decision-slice0-omop-target.md`, `tasks/plan-slice0-full-repoint.md` (executed).
 > Durable record (docs/ and .wolf/ are gitignored). Mirrors the slice-0 story style.
@@ -39,14 +41,40 @@
      `sema ingest omop` lazy-imports `omop_ingest`. A wheel install without `showcase/` still loads.
 
 **What is NOT done / NEXT SESSION:**
-- **S1-10 LIVE run is GATED** on ingesting `msk_impact_50k_2026` into Databricks (S1-09 measured 19,567
-  shared MSK patients from the datahub, but the study is NOT yet in the warehouse) AND a dedup
-  gold/adjudication set. Until then the collapse is proven only on DuckDB fixtures. Live command when
-  data lands: `sema collapse-omop-identities --backend databricks --study-schema cbioportal_msk_chord_2024
-  --study-schema cbioportal_msk_impact_50k_2026 --identity-namespace msk_dmp --strict`.
-- Legacy `workspace.cbioportal` GBM-duplicate schema still needs dropping (hygiene; S1-09 side-finding).
-- Core-code unit tests still import `showcase.cbioportal_to_omop.omop_policy` as a fixture (acceptable —
-  tests are R29-allowlisted and not shipped); a future generic test fixture would remove that coupling.
+- **UPDATE 2026-07-22 (session 2, revised) — S1-10 live preconditions are now BOTH met.** Token
+  refreshed (`.env` `DATABRICKS_TOKEN` valid; note a stale copy may linger in the shell env — dotenv does
+  not override it, so run sema with the shell var unset if pushes fail on "Invalid access token").
+  1. **msk_impact is already fully + faithfully in Databricks** — `workspace.cbioportal_msk_impact_50k_2026`
+     row counts match local DuckDB exactly (patient 48,179 · sample 54,331 · mutation 479,147 · cna
+     29,393,071 · cna_segmented 3,038,461 · gene_panel_matrix 162,993). Verified SERVER-SIDE:
+     chord 24,950 ∩ impact 48,179 = **19,567 overlap** holds in Databricks. No re-push needed (push is
+     idempotent DROP+CREATE if you ever want to force one).
+  2. **Dedup adjudication set BUILT — verdict PASS** at `eval-runs/s1-10-dedup-adjudication/`
+     (summary.json + decisions.csv + REVIEW.md). 19,567 merges; sex corroboration 19,437 MATCH /
+     **0 MISMATCH** / 130 missing (100% of known agree); OncoTree 18,530 overlap / 1,037 disjoint
+     (expected biology) / 0 no-data; all over-collapse guards clean (P- namespace only, 0 blank,
+     0 cross-namespace GBM/TCGA collision, PATIENT_ID a true 1-row PK in both). 0 rows need review.
+  → **S1-10 LIVE COLLAPSE DONE (2026-07-22 session 2).** Terminal state verified on Databricks
+    `workspace.omop_stage_a`: person **53,562** · condition_occurrence **79,371** (chord 25,040 + impact
+    54,331) · 0 orphans · 0 shared patient_keys split across >1 person_id (full dedup) · both studies
+    Gate-D-lite PASS · idempotent replay collapses 0.
+  → **GOTCHA (cost me a false-start): the collapse presupposes BOTH studies are already through Stage A.**
+    Running `collapse-omop-identities` before fitting the 2nd study registers nothing for it, so its
+    rebuild writes 0 rows and STRICT-fails (`written 0 != source 54331`). Correct full sequence for a new
+    study X in an existing namespace:
+    1. `sema fit --backend duckdb --manifest showcase/cbioportal_to_omop/manifests/omop_condition_slice0.yaml
+       --study-schema X` (deterministic OncoTree→OMOP resolve; upserts value-mapping decisions for X's
+       codes — impact needed 446 new codes, 99.9% resolved to real concepts, 66 rows→concept 0).
+    2. `sema fit-omop-shape --backend databricks --study-schema X --run-id … --strict` (Stage A: registers
+       X's persons, rebuilds `person` from the FULL registry [multi-study safe — replace_parent uses the
+       whole registry, write_child is per-scope], writes X's condition scope).
+    3. `sema collapse-omop-identities --backend databricks --study-schema … (all studies) …
+       --identity-namespace … --strict`.
+- Legacy `workspace.cbioportal` GBM-duplicate schema: **DROPPED 2026-07-22 (session 2)** after verifying
+  it was a pure duplicate (585 `TCGA-*` patients, 100% subset of `cbioportal_gbm_tcga_pan_can_atlas_2018`,
+  which is preserved). `SHOW SCHEMAS IN workspace` now lists only the three properly-namespaced studies.
+- Core-test → `showcase.cbioportal_to_omop.omop_policy` coupling: **DEFERRED per user decision
+  (2026-07-22 session 2)** — plan marks it acceptable (R29-allowlisted, not shipped); revisit later.
 
 ## Goal
 
