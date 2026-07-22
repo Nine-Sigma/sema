@@ -118,18 +118,36 @@ committed per story, full unit suite green (2216 passed), R29 + mypy clean, new-
 concept_id 0** (D8; exactly the 7 NO_MAP rows S1-00 found) ✓; Gate-D-lite PASS on all three checks.
 The identity registry now lives in `poc.duckdb` `sema_identity.entity_identity` (DuckDB-canonical, correct).
 
+## S1-08 status (2026-07-22 session 3) — LIVE Databricks run COMPLETE ✅
+
+Stage A is fully done (S1-01…S1-08). The FK-closed OMOP shape now materializes live in Databricks.
+
+**What shipped:** (a) `FkBackend` strategy (`src/sema/compile/fk_backend.py` + `fk_backend_utils.py`),
+mirroring `StagingBackend` — DuckDB temp-swap vs Databricks atomic Delta `INSERT … REPLACE WHERE` (no
+`BEGIN/COMMIT`, no client temp table); `FkClosedCompiler(backend=…)` and `run_fk_closed_qa(backend=…)`
+are now dialect-agnostic. (b) Registry→Databricks bridge (`src/sema/resolve/identity_bridge.py`): mirrors
+the DuckDB-canonical registry into a Delta table (`CREATE OR REPLACE TABLE` + batched `INSERT VALUES`)
+before the write, so the parent `SELECT DISTINCT entity_id` and child FK join can read it in-warehouse.
+(c) Live-run harness `src/sema/pipeline/fit_omop_shape.py` + CLI `sema fit-omop-shape`
+(`src/sema/cli_fit_omop.py`, `cli_fit_omop_utils.py`); OMOP physical specs via `make_omop_fk_specs()` in
+the R29-allowlisted policy.
+
+**Live result** (`sema fit-omop-shape --backend databricks --study-schema cbioportal_msk_chord_2024
+--omop-schema omop_stage_a --strict`, exit 0): `workspace.omop_stage_a.person` = 24,950 rows (24,950
+distinct); `condition_occurrence` = 25,040 rows, 25,040/25,040 distinct surrogate PKs; **exactly 7 rows →
+concept_id 0** (the 1 NO_MAP OncoTree code × 7 source rows), 57 distinct real concepts; all
+`condition_start_date` NULL (D4); 0 FK orphans; Gate-D-lite PASS (fk_closure, required_not_null,
+missing_key_disposition `25040 + 0 = 25040`). Bridged 24,950 registry rows. **Re-ran twice → identical
+counts** (idempotent scoped `REPLACE WHERE`). Matches the DuckDB pre-live gate exactly.
+
+**Gotchas confirmed this run:** the SQL warehouse cold-starts — first connect threw `RequestError`;
+retry with ~20s backoff connected clean. Registry namespace MUST equal the source schema
+(`cbioportal_msk_chord_2024`) so the live resolve reuses the gate-populated entity_ids and mints nothing.
+
 ## Open items / next steps (ordered)
 
 1. ~~Verify the msk_impact Databricks push~~ — **DONE** (2026-07-22 12:08, all 6 tables verified).
-2. **S1-08 — LIVE Databricks run (the one remaining Stage A story).** The compiler currently writes
-   DuckDB only. Two things needed: (a) **bridge the DuckDB-canonical identity registry into Databricks**
-   — `fk_closed_compiler_utils.replace_parent_sql`/the reg INNER JOIN read the registry via SQL, which
-   only works when registry + target share one database (the fit path). For Databricks, push the registry
-   `(source_namespace, source_entity_key, entity_id)` to a `workspace` table first (mirror the
-   value_mapping VALUES-inline or a small `sema push`), then person = `SELECT DISTINCT entity_id`; (b) a
-   **Delta-flavored ordered write** (no `BEGIN/COMMIT`; `INSERT … REPLACE WHERE` per study; temp VIEW not
-   TEMP TABLE; surrogate via `conv(...)` — already emitted by `surrogate_row_id_expr(dialect="databricks")`).
-   Then run live on `cbioportal_msk_chord_2024`, assert the same row-count identity + FK-validity + idempotent re-run. **Token dance still applies** (force fresh `DATABRICKS_TOKEN` from `.env`).
+2. ~~**S1-08 — LIVE Databricks run**~~ — **DONE** (2026-07-22 session 3; see the S1-08 status section above).
 3. **Execute Stage B (S1-10) — now in scope:** deterministic same-namespace person collapse across
    msk_chord + msk_impact (~19.5k shared `P-*` patients). Remap the uid→person_id registry level;
    rebuild `condition_occurrence`. Probabilistic dedup stays deferred.

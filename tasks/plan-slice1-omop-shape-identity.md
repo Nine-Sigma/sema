@@ -196,7 +196,7 @@ Two consequences (the collapse mechanism, now backed by a real 19,567-patient ov
    condition not) to prove no invalid cross-table state survives a retry.
 7. **S1-07 — Gate-D-lite extension** ✅ DONE — FK-closure + required-field null-rate checks for the
    full obligation (not just the concept column); include the missing-key disposition count.
-8. **S1-08 — LIVE Databricks run** ⏳ REMAINING (local real-data gate PASSED on poc.duckdb; needs registry→Databricks bridge + Delta ordered write — see handoff) — full OMOP-shape write for a real study (`msk_chord_2024`);
+8. **S1-08 — LIVE Databricks run** ✅ DONE (2026-07-22; registry bridge + Delta `REPLACE WHERE` via the `FkBackend` strategy; `sema fit-omop-shape` on `cbioportal_msk_chord_2024` → 24,950 persons / 25,040 conditions, 7→concept_id 0, 0 FK orphans, Gate-D-lite PASS, idempotent re-run — see handoff) — full OMOP-shape write for a real study (`msk_chord_2024`);
    **row-count identity accounts for the missing-key disposition:** `written_condition_rows +
    MISSING_PERSON_KEY_review_rows = source_condition_rows` (plain equality with source only holds
    when the S1-00 blank-key rate is zero); FK-valid at rest; idempotent re-run. Pre-live gates from
