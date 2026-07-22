@@ -1,9 +1,52 @@
 # Plan — Slice 1: materialize cBioPortal → OMOP **table shape** (condition_occurrence + person), full identity resolution
 
-> Date: 2026-07-22 · Status: **planning** · Branch: TBD (`{author}/feat/omop-shape-identity`, from `main` after slice-0 merges)
+> Date: 2026-07-22 · Status: **Stage A DONE (S1-01..S1-08 live) · Stage B S1-10 engine DONE (code+tests), live run GATED** · Branch: `ralph/feat/omop-shape-identity`
 > Follows: `tasks/prd-sema-mapping-slice0.md` (§4 "Out of scope" parks exactly this),
 > `tasks/decision-slice0-omop-target.md`, `tasks/plan-slice0-full-repoint.md` (executed).
 > Durable record (docs/ and .wolf/ are gitignored). Mirrors the slice-0 story style.
+
+## HANDOFF — session end 2026-07-22 (read this first)
+
+**What shipped this session (all green: 2263 unit tests, mypy strict, R29 guard clean):**
+1. **S1-10 Stage B deterministic person collapse — engine complete, TDD.** New GENERIC core:
+   - `resolve/identity_collapse.py` + `_utils.py` — `compute_collapse_plan(rows, namespace_grouping)`
+     buckets registry rows by `(identity_namespace, source_entity_key)`, survivor = MIN entity_id;
+     `collapse_identities(registry, namespace_grouping=…)` applies it. Over-collapse guardrails frozen
+     by test: exact-key only, NEVER across identity namespaces, ungrouped schema = its own namespace,
+     idempotent replay. R29-scanned (names no OMOP/cBio literal).
+   - `IdentityRegistry.remap_entity_ids(remaps)` — generic UPDATE of `entity_id` outside the grain
+     (`update_entity_id_sql`); returns rows actually changed (no-op when already at target).
+   - `FkClosedCompiler.rebuild_after_collapse(...)` — the H1 fix: on a collapse the parent SHRINKS,
+     so rebuild ALL child scopes FIRST, then shrink the parent ONCE, then assert FK-closed. Proven
+     end-to-end in `tests/unit/test_stage_b_rebuild.py`: PK stable, FK recomputed, dup person retired,
+     0 orphans, event rows preserved.
+   - Pipeline entry `run_stage_b_collapse(requests, namespace_grouping=…, …)` in
+     `pipeline/fk_closed_fit.py` (collapse → optional Databricks bridge → rebuild-all → per-study
+     Gate-D-lite). CLI `sema collapse-omop-identities` (`--study-schema … --identity-namespace …`),
+     DuckDB + Databricks paths both tested.
+2. **Architecture: cBioPortal→OMOP is now a SHOWCASE, not core** (user directive — SEMA core must map
+   ANY source→ANY ontology; OMOP/cBio is an *example*). Relocated OUT of `src/sema/` into
+   `showcase/cbioportal_to_omop/`: `omop_policy.py` (was `resolve/policies/omop.py`), `omop_ingest*.py`
+   (was `ingest/omop*`), `slice0_fit*.py` (was `pipeline/fit_slice0*`), `cli_slice0.py`/`cli_omop_shape*`
+   /`cli_omop_collapse.py` (were `cli_fit*`/`cli_collapse_omop`), `manifests/omop_condition_slice0.yaml`.
+   Showcase-subject tests moved to `tests/showcase/cbioportal_to_omop/`.
+   - The generic FK-closed harness stayed in core, RENAMED `pipeline/fit_omop_shape.py` →
+     `pipeline/fk_closed_fit.py`; symbols `OmopShapeRequest/Result`→`FkClosedFitRequest/Result`,
+     `run_omop_shape_fit`→`run_fk_closed_fit`. It names no OMOP literal (specs arrive from the caller).
+   - Wiring uses the existing lazy/optional-import convention (`cli_ingest.py`): `sema.cli` registers
+     showcase commands via `_register_showcase_commands` (try/except ImportError); the generic policy
+     registry `resolve/policies/__init__.py` lazy-loads the OMOP factory via `_load_showcase_factories`;
+     `sema ingest omop` lazy-imports `omop_ingest`. A wheel install without `showcase/` still loads.
+
+**What is NOT done / NEXT SESSION:**
+- **S1-10 LIVE run is GATED** on ingesting `msk_impact_50k_2026` into Databricks (S1-09 measured 19,567
+  shared MSK patients from the datahub, but the study is NOT yet in the warehouse) AND a dedup
+  gold/adjudication set. Until then the collapse is proven only on DuckDB fixtures. Live command when
+  data lands: `sema collapse-omop-identities --backend databricks --study-schema cbioportal_msk_chord_2024
+  --study-schema cbioportal_msk_impact_50k_2026 --identity-namespace msk_dmp --strict`.
+- Legacy `workspace.cbioportal` GBM-duplicate schema still needs dropping (hygiene; S1-09 side-finding).
+- Core-code unit tests still import `showcase.cbioportal_to_omop.omop_policy` as a fixture (acceptable —
+  tests are R29-allowlisted and not shipped); a future generic test fixture would remove that coupling.
 
 ## Goal
 
@@ -208,18 +251,18 @@ Two consequences (the collapse mechanism, now backed by a real 19,567-patient ov
    of chord)**, cross-namespace overlap 0. **Verdict: with msk_impact ingested, Stage B deterministic
    same-namespace collapse is IN scope and REQUIRED.** Side-finding: the legacy `cbioportal` schema
    duplicates GBM and should be dropped (hygiene), NOT run through person dedup.
-10. **S1-10+ — Deterministic same-namespace collapse** — **IN SCOPE** once `msk_impact_50k_2026`
-    is ingested (S1-09 measured 19,567 shared MSK patients). Build the deterministic collapse
-    (remap the uid→person_id registry level for identical `P-*` keys across MSK studies); the
-    probabilistic judge stays deferred (no cross-namespace signal). Spec: deterministic collapse
-    (remap the uid→person_id registry level), then gated judge; over-collapse guardrails; review
-    surfacing. **Materialization semantics (from the H1 correction):** a registry remap does not
-    edit persisted rows, so dedup **rebuilds `condition_occurrence`** for the affected source scope
-    through the current registry (preserving each `condition_occurrence_id`, recomputing its
-    `person_id`) and **replaces `omop.person`** with surviving canonical persons, retiring orphaned
-    person rows. FK-validity re-asserted after rebuild. **Precondition:** a dedup gold/adjudication
-    set exists before this ships — Stage B precision needs labels the way Producer #2 does; Stage A
-    identity does not (self-consistent, like slice-0).
+10. **S1-10 — Deterministic same-namespace collapse** — **ENGINE DONE 2026-07-22 (code + TDD, DuckDB);
+    LIVE run GATED on msk_impact ingest + gold set.** Built the deterministic collapse (remap the
+    uid→entity_id registry level for identical `P-*` keys across MSK studies via
+    `resolve/identity_collapse.py`); the probabilistic judge stays deferred (no cross-namespace signal).
+    Over-collapse guardrails + review surfacing (collapse summary: collapsed_person_count, retired ids)
+    landed. **Materialization semantics (H1 correction) — implemented in
+    `FkClosedCompiler.rebuild_after_collapse`:** a registry remap does not edit persisted rows, so dedup
+    **rebuilds the child (`condition_occurrence`)** for all affected scopes through the current registry
+    (preserving each `condition_occurrence_id`, recomputing its `person_id`), children FIRST, then
+    **shrinks `omop.person`** to surviving canonical persons (retiring orphans), FK-validity re-asserted
+    once at rest. **Precondition still open:** a dedup gold/adjudication set + `msk_impact_50k_2026`
+    ingested before the live run (see HANDOFF). The gated judge is a future slice.
 
 ## Open decisions to lock before executing
 
