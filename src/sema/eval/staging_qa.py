@@ -12,13 +12,11 @@ from __future__ import annotations
 from typing import Any, Sequence
 
 from sema.compile.compiler_utils import StagingColumns
+from sema.compile.fk_backend import DUCKDB_FK_BACKEND, FkBackend, FkCursor
 from sema.compile.fk_closed_compiler_utils import (
     ChildSourceSpec,
     ChildTableSpec,
     ParentTableSpec,
-    count_child_scope_sql,
-    missing_key_count_sql,
-    orphan_fk_count_sql,
 )
 from sema.compile.staging_backend import (
     DUCKDB_BACKEND,
@@ -46,11 +44,6 @@ __all__ = [
 ]
 
 
-def _scalar(conn: Any, sql: str, params: Sequence[Any] | None = None) -> int:
-    row = conn.execute(sql, params).fetchone() if params else conn.execute(sql).fetchone()
-    return int(row[0]) if row else 0
-
-
 def count_column_nulls(
     conn: Any,
     schema: str,
@@ -76,26 +69,23 @@ def count_column_nulls(
 
 
 def run_fk_closed_qa(
-    conn: Any,
+    conn: FkCursor,
     *,
     parent: ParentTableSpec,
     child: ChildTableSpec,
     source: ChildSourceSpec,
     required_fields: Sequence[str],
     source_row_count: int,
+    backend: FkBackend = DUCKDB_FK_BACKEND,
 ) -> StagingQAReport:
     """Gate-D-lite over the FK-closed shape (S1-07): closure + required-null +
-    missing-key accounting, scoped to one study."""
-    orphans = _scalar(conn, orphan_fk_count_sql(parent, child))
-    missing = _scalar(conn, missing_key_count_sql(source))
-    written = _scalar(conn, count_child_scope_sql(child), [source.schema])
-    null_counts = count_column_nulls(
-        conn,
-        child.schema,
-        child.table,
-        required_fields,
-        scope_column=child.scope_schema_column,
-        scope_value=source.schema,
+    missing-key accounting, scoped to one study. ``backend`` selects the warehouse
+    (DuckDB for the fit gate, Databricks for the live S1-08 run)."""
+    orphans = backend.orphan_fk_count(conn, parent, child)
+    missing = backend.missing_key_count(conn, source)
+    written = backend.child_scope_count(conn, child, source.schema)
+    null_counts = backend.column_null_counts(
+        conn, child, required_fields, source.schema
     )
     return StagingQAReport(
         checks=(
