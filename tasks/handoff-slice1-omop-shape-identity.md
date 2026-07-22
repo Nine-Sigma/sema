@@ -96,13 +96,40 @@ All six tables landed with row counts matching target exactly (the push verifies
 
 `cbioportal_msk_impact_50k_2026` is now fully materialized in both DuckDB and Databricks `workspace`.
 
+## Stage A status (2026-07-22 session 2) — S1-01…S1-07 DONE + real-data gate PASSED
+
+Branch `ralph/feat/omop-shape-identity` (from slice-0 HEAD; slice-0 not yet on main). All TDD,
+committed per story, full unit suite green (2216 passed), R29 + mypy clean, new-module coverage 95%.
+
+| story | delivered | file(s) |
+|---|---|---|
+| S1-01 | generic 2-level identity registry (get-or-create, D1/D7) | `resolve/identity_registry{,_utils}.py` |
+| S1-02 | deterministic identity resolver; blank key→review (D5) | `resolve/identity_resolver.py`, `policies/omop.py` |
+| S1-03 | `omop.person` via existing assembler + `compile_projection` | `policies/omop.py` (person builders) |
+| S1-04 | manifest 0.1.0→0.2.0, `condition_start_date` nullable (D4) | `targets/manifests/omop_condition_slice0.yaml` |
+| S1-05 | source-row surrogate PK (md5 content hash, DuckDB/Spark-portable, person_id-independent) | `compile/row_surrogate.py` |
+| S1-06 | FK-closed compiler: ordered person→condition write, registry FK join, NO_MAP→0 (D8), NULL date, per-study scope, FK assert, mid-failure recovery | `compile/fk_closed_compiler{,_utils}.py` |
+| S1-07 | Gate-D-lite extension: FK-closure + required-not-null + missing-key accounting | `eval/staging_qa{,_utils}.py` |
+
+**Real-data pre-live gate (the whole chain end-to-end on `~/.sema/poc.duckdb`, msk_chord):**
+25,040 sample rows → identity resolve → 24,950 persons (0 review) → FK-closed materialize into
+`omop_stage_a.person` (24,950) + `omop_stage_a.condition_occurrence` (25,040). Row-count identity
+`25,040 + 0 = 25,040` ✓; FK closure 0 orphans ✓; surrogate PK 25,040/25,040 distinct ✓; **7 rows →
+concept_id 0** (D8; exactly the 7 NO_MAP rows S1-00 found) ✓; Gate-D-lite PASS on all three checks.
+The identity registry now lives in `poc.duckdb` `sema_identity.entity_identity` (DuckDB-canonical, correct).
+
 ## Open items / next steps (ordered)
 
 1. ~~Verify the msk_impact Databricks push~~ — **DONE** (2026-07-22 12:08, all 6 tables verified).
-2. **Execute Stage A** (S1-01…S1-08 in the plan): generic identity registry → deterministic resolver
-   → person obligation/assertions (reuse US-014 `compile_projection`) → **manifest 0.2.0 (D4 date
-   nullable)** → surrogate PK from `SAMPLE_ID` → ordered multi-table FK-closed compiler → Gate-D-lite
-   extension → live Databricks run. Wire NO_MAP → concept_id 0 (D8).
+2. **S1-08 — LIVE Databricks run (the one remaining Stage A story).** The compiler currently writes
+   DuckDB only. Two things needed: (a) **bridge the DuckDB-canonical identity registry into Databricks**
+   — `fk_closed_compiler_utils.replace_parent_sql`/the reg INNER JOIN read the registry via SQL, which
+   only works when registry + target share one database (the fit path). For Databricks, push the registry
+   `(source_namespace, source_entity_key, entity_id)` to a `workspace` table first (mirror the
+   value_mapping VALUES-inline or a small `sema push`), then person = `SELECT DISTINCT entity_id`; (b) a
+   **Delta-flavored ordered write** (no `BEGIN/COMMIT`; `INSERT … REPLACE WHERE` per study; temp VIEW not
+   TEMP TABLE; surrogate via `conv(...)` — already emitted by `surrogate_row_id_expr(dialect="databricks")`).
+   Then run live on `cbioportal_msk_chord_2024`, assert the same row-count identity + FK-validity + idempotent re-run. **Token dance still applies** (force fresh `DATABRICKS_TOKEN` from `.env`).
 3. **Execute Stage B (S1-10) — now in scope:** deterministic same-namespace person collapse across
    msk_chord + msk_impact (~19.5k shared `P-*` patients). Remap the uid→person_id registry level;
    rebuild `condition_occurrence`. Probabilistic dedup stays deferred.

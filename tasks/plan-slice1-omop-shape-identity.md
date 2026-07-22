@@ -165,38 +165,38 @@ Two consequences (the collapse mechanism, now backed by a real 19,567-patient ov
      materializes directly from `patient` with full FK closure.**
    - **NO_MAP — 7 rows carry `condition_concept_id = NULL`** (crosswalk gaps), which violates the
      manifest's non-null `condition_concept_id`. **→ new decision D8.**
-1. **S1-01 — Generic identity registry** (`resolve/identity_registry.py`, NOT `person_store.py` —
+1. **S1-01 — Generic identity registry** ✅ DONE (`resolve/identity_registry.py`, NOT `person_store.py` —
    D6/R29; §-frozen columns, drift test). Mirror `value_mapping_store.py`; DuckDB canonical;
    single-writer with atomic get-or-create on the transactional unique key (D7). **Two-level schema**
    (`(source_namespace, patient_key)`→`source_patient_uid`→`person_id`) so Stage B remaps level-2.
    `source_namespace` = the per-study source schema (confirmed in S1-00). *No resolver yet.*
-2. **S1-02 — Deterministic identity resolver** — `(source_namespace, patient_key) → source_patient_uid
+2. **S1-02 — Deterministic identity resolver** ✅ DONE — `(source_namespace, patient_key) → source_patient_uid
    → person_id` (registry-assigned, NOT a hash); writes the registry; missing/blank patient keys
    route to the NO_MAP/review artifact (defined outcome, never a synthetic person, never a silent
    drop). The `person`/`MISSING_PERSON_KEY` binding is supplied by the policy layer, not the resolver.
-3. **S1-03 — Person obligation + assertions** — satisfy the manifest `omop.person` obligation.
+3. **S1-03 — Person obligation + assertions** ✅ DONE — satisfy the manifest `omop.person` obligation.
    `Slice0PlanAssembler` is already obligation-agnostic (it groups by target property and folds any
    `TargetObligation`), so this story is *feeding* it the person/date/PK assertions + the expanded
    obligation, NOT rewriting the assembler. Reuse `compile_projection` (US-014) for the person table.
-4. **S1-04 — Event-date field (D4 RESOLVED → contract change, not a copy).** S1-00 proved no
+4. **S1-04 — Event-date field ✅ DONE (D4 RESOLVED → contract change, not a copy).** S1-00 proved no
    absolute date exists, so this story is the manifest `0.2.0` revision (`condition_start_date`
    → `nullable:true`, dropped from `required_fields`) + optionally staging the raw relative
    offset in a provenance column. There is no source column to `DIRECT_COPY`.
-5. **S1-05 — Surrogate PK** — deterministic `condition_occurrence_id` derived from **stable
+5. **S1-05 — Surrogate PK** ✅ DONE — deterministic `condition_occurrence_id` derived from **stable
    source-row identity** (`source_schema, source_table, SAMPLE_ID` — S1-00 confirmed `SAMPLE_ID`
    is a clean 25,040/25,040 key), NEVER from the resolved `person_id` (which Stage B may remap).
    Also thread `PATIENT_ID`→`source_patient_key` and `SAMPLE_ID`→`source_row_ref` into staging;
    S1-00 found both columns exist but are currently 100% NULL. Idempotent across re-runs and dedup.
-6. **S1-06 — Multi-table FK-closed compiler** — person→condition **ordered** write (person swapped
+6. **S1-06 — Multi-table FK-closed compiler** ✅ DONE — person→condition **ordered** write (person swapped
    in first; no claim of cross-table atomicity on Databricks); idempotent; assert FK validity
    (no orphan `person_id`) at rest. **Swap scope is per-study (per source schema)** to match
    slice-0's scoped-swap grain — the person snapshot for a study must contain every person its
    condition rows reference, so a multi-study warehouse never orphans another study's conditions.
    Integration tests cover both the happy path **and** a mid-sequence failure (person swapped,
    condition not) to prove no invalid cross-table state survives a retry.
-7. **S1-07 — Gate-D-lite extension** — FK-closure + required-field null-rate checks for the
+7. **S1-07 — Gate-D-lite extension** ✅ DONE — FK-closure + required-field null-rate checks for the
    full obligation (not just the concept column); include the missing-key disposition count.
-8. **S1-08 — LIVE Databricks run** — full OMOP-shape write for a real study (`msk_chord_2024`);
+8. **S1-08 — LIVE Databricks run** ⏳ REMAINING (local real-data gate PASSED on poc.duckdb; needs registry→Databricks bridge + Delta ordered write — see handoff) — full OMOP-shape write for a real study (`msk_chord_2024`);
    **row-count identity accounts for the missing-key disposition:** `written_condition_rows +
    MISSING_PERSON_KEY_review_rows = source_condition_rows` (plain equality with source only holds
    when the S1-00 blank-key rate is zero); FK-valid at rest; idempotent re-run. Pre-live gates from
