@@ -103,6 +103,13 @@ class FkClosedCompiler:
         LAST, so no not-yet-rebuilt sibling scope is left referencing a retired
         parent. The child's surrogate PK is preserved (source-derived, S1-05);
         each row's FK is recomputed from the current registry.
+
+        ``sources`` MUST be the COMPLETE, DISTINCT set of studies referencing
+        ``parent``. The ``_assert_fk_closed`` guard is not a full check: it
+        catches an omitted study ONLY if that study still references a retired
+        id — a survivors-only omission, or an empty collapse, leaves stale child
+        rows undetected. Duplicate sources cause duplicate rewrites and inflated
+        ``child_rows``. The caller owns completeness and distinctness.
         """
         child_rows = 0
         missing = 0

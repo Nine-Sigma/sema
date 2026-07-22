@@ -8,8 +8,11 @@ concrete :class:`~sema.resolve.policy.ResolverPolicy` via the binding's
 
 from __future__ import annotations
 
+import importlib.util
 from typing import Callable
 
+from sema._showcase_path import ensure_showcase_importable
+from sema.log import logger
 from sema.models.target.vocab_binding import VocabularyBindingDecl
 from sema.resolve.policy import ResolverPolicy
 
@@ -25,12 +28,16 @@ _FACTORIES: dict[str, PolicyFactory] = {}
 def _load_showcase_factories() -> None:
     if _FACTORIES:
         return
+    ensure_showcase_importable()
+    if importlib.util.find_spec("showcase") is None:
+        return
     try:
         from showcase.cbioportal_to_omop.omop_policy import (
             OMOP_ONCOTREE_CONDITION_REF,
             make_omop_oncotree_condition_policy,
         )
-    except ImportError:
+    except ImportError as exc:
+        logger.warning(f"showcase present but omop_policy failed to import: {exc}")
         return
     _FACTORIES[OMOP_ONCOTREE_CONDITION_REF] = make_omop_oncotree_condition_policy
 

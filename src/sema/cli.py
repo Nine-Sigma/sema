@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 from typing import Any
 
 import click
 from pydantic import SecretStr
+
+from sema._showcase_path import ensure_showcase_importable
+from sema.log import logger
 
 from sema.models.config import (
     BuildConfig,
@@ -351,13 +355,17 @@ def _register_showcase_commands(group: click.Group) -> None:
     they live in ``showcase/`` and are imported optionally: a wheel install
     without the showcase simply omits them rather than failing to load the CLI.
     """
+    ensure_showcase_importable()
+    if importlib.util.find_spec("showcase") is None:
+        return
     try:
         from showcase.cbioportal_to_omop.cli_slice0 import fit_cmd
         from showcase.cbioportal_to_omop.cli_omop_shape import fit_omop_shape_cmd
         from showcase.cbioportal_to_omop.cli_omop_collapse import (
             collapse_omop_identities_cmd,
         )
-    except ImportError:
+    except ImportError as exc:
+        logger.warning(f"showcase present but failed to import; commands omitted: {exc}")
         return
     group.add_command(fit_cmd, name="fit")
     group.add_command(fit_omop_shape_cmd, name="fit-omop-shape")

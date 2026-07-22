@@ -7,6 +7,7 @@ one fewer person, per-study Gate-D-lite still green, idempotent replay.
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 
 import duckdb
@@ -149,3 +150,19 @@ class TestStageBPipeline:
         )
         assert result.collapse.collapsed_person_count == 0
         assert _person_count(conn) == 4
+
+    def test_divergent_shape_rejected(
+        self, staged: tuple[duckdb.DuckDBPyConnection, list[FkClosedFitRequest]]
+    ) -> None:
+        conn, requests = staged
+        # rebuild borrows the head's decisions/no_map_default for ALL sources, so
+        # a request that disagrees would be silently rewritten under the head's
+        # policy. The guard must reject it rather than the first request winning.
+        divergent = dataclasses.replace(requests[1], no_map_default=999)
+        with pytest.raises(ValueError, match="same shape"):
+            run_stage_b_collapse(
+                [requests[0], divergent],
+                namespace_grouping=_GROUPING,
+                registry=IdentityRegistry(conn),
+                target_cursor=conn,
+            )

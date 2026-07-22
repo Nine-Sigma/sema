@@ -147,6 +147,37 @@ class StageBResult:
     registry_rows_bridged: int
 
 
+def _shape_key(request: FkClosedFitRequest) -> tuple[object, ...]:
+    return (
+        request.parent,
+        request.child,
+        request.registry_spec,
+        tuple(request.decisions),
+        request.no_map_default,
+    )
+
+
+def _require_uniform_shape(
+    requests: Sequence[FkClosedFitRequest], head: FkClosedFitRequest
+) -> None:
+    """Fail if any request disagrees with ``head`` on the borrowed rebuild shape.
+
+    ``rebuild_after_collapse`` applies ``head``'s parent/child/registry specs,
+    decisions, and no-map default to every source. A divergent request would be
+    silently rewritten under the head's policy, so reject it up front. Compared
+    pairwise because ``decisions`` / ``null_columns`` are unhashable.
+    """
+    head_key = _shape_key(head)
+    offenders = [
+        r.source.schema for r in requests if _shape_key(r) != head_key
+    ]
+    if offenders:
+        raise ValueError(
+            "run_stage_b_collapse requires all studies to share the same shape "
+            f"(parent/child/registry/decisions/no_map_default); diverging: {offenders}"
+        )
+
+
 def run_stage_b_collapse(
     requests: Sequence[FkClosedFitRequest],
     *,
@@ -167,8 +198,9 @@ def run_stage_b_collapse(
     """
     if not requests:
         raise ValueError("run_stage_b_collapse requires at least one study request")
-    collapse = collapse_identities(registry, namespace_grouping=namespace_grouping)
     head = requests[0]
+    _require_uniform_shape(requests, head)
+    collapse = collapse_identities(registry, namespace_grouping=namespace_grouping)
 
     bridged = 0
     if bridge:
