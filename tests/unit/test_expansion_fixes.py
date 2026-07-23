@@ -68,7 +68,8 @@ class TestTermGovernedValues:
                     {"vocabulary_name": "Gender"},
                     {"vocabulary_name": "State"},
                 ]
-            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+            if ("MEMBER_OF" in query and "HAS_VALUE_SET" in query
+                    and "MAPS_TO_CONCEPT" not in query):
                 governed_calls.append(params.get("vocabulary_name"))
             return []
 
@@ -103,7 +104,8 @@ class TestTermGovernedValues:
         captured: dict = {}
 
         def run_query(query, **params):
-            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+            if ("MEMBER_OF" in query and "HAS_VALUE_SET" in query
+                    and "MAPS_TO_CONCEPT" not in query):
                 captured["vocab"] = params.get("vocabulary_name")
             return []
 
@@ -137,7 +139,8 @@ class TestTermGovernedValues:
         self, mock_engine,
     ) -> None:
         def run_query(query, **params):
-            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+            if ("MEMBER_OF" in query and "HAS_VALUE_SET" in query
+                    and "MAPS_TO_CONCEPT" not in query):
                 return [
                     {"column_name": "gender", "table_name": "patient",
                      "value_set_name": "gender_values"},
@@ -166,7 +169,8 @@ class TestTermGovernedValues:
                     {"vocabulary_name": "Gender"},
                     {"vocabulary_name": "State"},
                 ]
-            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+            if ("MEMBER_OF" in query and "HAS_VALUE_SET" in query
+                    and "MAPS_TO_CONCEPT" not in query):
                 col = (
                     "gender" if params.get("vocabulary_name") == "Gender"
                     else "state"
@@ -219,7 +223,8 @@ class TestTermGovernedValues:
         captured: dict = {}
 
         def run_query(query, **params):
-            if "MEMBER_OF" in query and "HAS_VALUE_SET" in query:
+            if ("MEMBER_OF" in query and "HAS_VALUE_SET" in query
+                    and "MAPS_TO_CONCEPT" not in query):
                 captured["query"] = query
                 captured["params"] = params
                 return [

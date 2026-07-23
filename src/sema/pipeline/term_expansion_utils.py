@@ -78,7 +78,60 @@ def _expand_term_hit(
         )
     if len(resolution.names) > 1:
         _mark_ambiguous(results, code)
+    results.extend(
+        _expand_source_term_bridge(
+            engine, code,
+            hit.get("status", "auto"), hit.get("confidence", 0.5),
+        )
+    )
     return results
+
+
+def _expand_source_term_bridge(
+    engine: RetrievalEngine,
+    code: str,
+    status: str,
+    confidence: float,
+) -> list[dict[str, Any]]:
+    """Cross the value bridge: a SOURCE term → its target concept + column.
+
+    Surfaces a ``value`` candidate carrying the target concept code and the
+    governed target Column/Table, so a query phrased in source terms resolves
+    to the concept_id to filter. ``source`` marks the trace as a bridge
+    traversal (not a lexical concept-name match).
+    """
+    if not code:
+        return []
+    try:
+        rows = engine._run_query(
+            CypherQueries.resolve_concept_for_source_term(),
+            code=code, source_vocabulary=None,
+        )
+    except Exception:
+        return []
+
+    bridged: list[dict[str, Any]] = []
+    for r in rows:
+        col = r.get("column_name", "")
+        table = r.get("table_name", "")
+        if not col or not table:
+            continue
+        bridged.append({
+            "type": "value",
+            "property_name": col,
+            "column": col,
+            "table": table,
+            "schema": r.get("schema_name", ""),
+            "code": r.get("concept_code", ""),
+            "label": r.get("concept_label", ""),
+            "vocabulary": r.get("concept_vocabulary"),
+            "bridged_from": code,
+            "source": "retrieval_concept_bridge",
+            "status": status,
+            "confidence": confidence,
+            "confidence_policy": "semantic",
+        })
+    return bridged
 
 
 def _term_vocabularies(

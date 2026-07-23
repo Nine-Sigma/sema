@@ -364,12 +364,16 @@ def _register_showcase_commands(group: click.Group) -> None:
         from showcase.cbioportal_to_omop.cli_omop_collapse import (
             collapse_omop_identities_cmd,
         )
+        from showcase.cbioportal_to_omop.materialize_target_graph import (
+            materialize_target_graph_cmd,
+        )
     except ImportError as exc:
         logger.warning(f"showcase present but failed to import; commands omitted: {exc}")
         return
     group.add_command(fit_cmd, name="fit")
     group.add_command(fit_omop_shape_cmd, name="fit-omop-shape")
     group.add_command(collapse_omop_identities_cmd, name="collapse-omop-identities")
+    group.add_command(materialize_target_graph_cmd, name="materialize-target-graph")
 
 
 cli.add_command(_ingest_group, name="ingest")
