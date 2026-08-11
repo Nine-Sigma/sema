@@ -31,7 +31,7 @@ from sema.targets.normalizer import TargetModelNormalizer
 pytestmark = pytest.mark.integration
 
 _MANIFEST = (
-    Path(__file__).resolve().parents[1]
+    Path(__file__).resolve().parents[2]
     / "showcase" / "cbioportal_to_omop" / "manifests"
     / "omop_condition_slice0.yaml"
 )
@@ -87,7 +87,7 @@ def _context(policy) -> ResolveContext:
         vocabulary_ref="target.vocabulary.SNOMED",
         vocab_binding="omop.condition_occurrence.condition_concept_id",
         vocab_release=_VOCAB_RELEASE,
-        resolver_policy_ref=policy.resolver_policy_ref,
+        resolver_policy_ref=policy.binding.resolver_policy_ref,
         run_id="run-1",
         provenance=prov,
     )
@@ -111,7 +111,7 @@ def _seed_store(policy) -> ValueMappingStore:
                 no_map_reason=None,
                 confidence=1.0,
                 status=Status.auto_accepted,
-                resolver_policy_ref=policy.resolver_policy_ref,
+                resolver_policy_ref=policy.binding.resolver_policy_ref,
                 run_id="run-1",
             )
         ]
