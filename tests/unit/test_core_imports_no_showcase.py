@@ -20,7 +20,10 @@ pytestmark = pytest.mark.unit
 
 _SRC = Path(__file__).resolve().parents[2] / "src" / "sema"
 
-_GENERIC_GRAPH_MODULES = (
+# Tripwire: these MUST be among the discovered modules. If recursive discovery
+# ever finds fewer files (wrong path, empty dir), the guard would false-green;
+# asserting these are present keeps it fail-loud.
+_KNOWN_GENERIC_GRAPH_MODULES = (
     "graph/concept_source.py",
     "graph/concept_value_set.py",
     "graph/cross_layer_bridge.py",
@@ -73,8 +76,17 @@ def test_no_core_module_imports_showcase_at_module_scope() -> None:
 
 
 def test_generic_graph_modules_name_no_domain_literal() -> None:
+    # Discover recursively (not a fixed list) so any current OR future module
+    # under src/sema/graph/ is guarded the moment it lands.
+    discovered = {
+        path.relative_to(_SRC).as_posix()
+        for path in (_SRC / "graph").rglob("*.py")
+    }
+    missing = [m for m in _KNOWN_GENERIC_GRAPH_MODULES if m not in discovered]
+    assert not missing, f"guard discovery lost known modules: {missing}"
+
     offenders: list[str] = []
-    for rel in _GENERIC_GRAPH_MODULES:
+    for rel in sorted(discovered):
         text = (_SRC / rel).read_text(encoding="utf-8")
         for literal in _DOMAIN_LITERALS:
             if literal in text:
