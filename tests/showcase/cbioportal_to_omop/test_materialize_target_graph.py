@@ -13,6 +13,7 @@ from sema.cli import cli
 from sema.resolve.value_mapping_store_utils import ResolutionStatus, ValueMapping
 from showcase.cbioportal_to_omop.materialize_target_graph import (
     OmopConceptSource,
+    observed_source_codes,
     value_mappings_to_specs,
 )
 
@@ -52,6 +53,49 @@ def test_value_mappings_to_specs_excludes_no_map() -> None:
         ("GBM", "4001458"), ("ASTR", "4001459"),
     }
     assert all(b.concept_code != "None" for b in bridges)
+
+
+def test_value_mappings_to_specs_scopes_to_observed_codes() -> None:
+    """The store is study-independent; a study must not bridge codes it never
+    staged (bug-435)."""
+    mappings = [
+        _mapping("GBM", 4001458, ResolutionStatus.RESOLVED),
+        _mapping("ASTR", 4001459, ResolutionStatus.RESOLVED),
+    ]
+    fields, bridges = value_mappings_to_specs(mappings, observed_codes={"GBM"})
+    assert [b.source_code for b in bridges] == ["GBM"]
+    assert set(fields[0].concept_codes) == {"4001458"}
+
+
+def test_value_mappings_to_specs_unscoped_by_default() -> None:
+    mappings = [_mapping("GBM", 4001458, ResolutionStatus.RESOLVED)]
+    _, bridges = value_mappings_to_specs(mappings)
+    assert [b.source_code for b in bridges] == ["GBM"]
+
+
+def _staging_conn() -> Any:
+    conn = duckdb.connect(":memory:")
+    conn.execute("CREATE SCHEMA sema_staging")
+    conn.execute(
+        "CREATE TABLE sema_staging.condition_staging "
+        "(source_schema VARCHAR, source_oncotree_code VARCHAR)"
+    )
+    conn.execute(
+        "INSERT INTO sema_staging.condition_staging VALUES "
+        "('study_a', 'GBM'), ('study_a', 'GBM'), ('study_a', 'ASTR'), "
+        "('study_b', 'LUAD'), ('study_b', NULL)"
+    )
+    return conn
+
+
+def test_observed_source_codes_is_per_study_and_distinct() -> None:
+    conn = _staging_conn()
+    assert observed_source_codes(conn, source_schema="study_a") == {"GBM", "ASTR"}
+    assert observed_source_codes(conn, source_schema="study_b") == {"LUAD"}
+
+
+def test_observed_source_codes_unknown_study_is_empty() -> None:
+    assert observed_source_codes(_staging_conn(), source_schema="nope") == set()
 
 
 def _omop_conn() -> Any:

@@ -12,7 +12,7 @@ boundary; core stays agnostic.
 from __future__ import annotations
 
 import os
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -38,11 +38,28 @@ _CONCEPT_VOCABULARY = "OMOP"
 _CONCEPT_FIELD = "condition_concept_id"
 _CONDITION_ENTITY = "omop.condition_occurrence"
 _PERSON_ENTITY = "omop.person"
+_STAGING_TABLE = "sema_staging.condition_staging"
+
+
+def observed_source_codes(conn: Any, *, source_schema: str) -> set[str]:
+    """Distinct source codes one study actually staged.
+
+    The value-mapping store holds a *crosswalk* (code -> concept), true
+    regardless of who used it. Which codes a study *contains* is staging's
+    fact, and it is what scopes that study's bridge edges.
+    """
+    rows = conn.execute(
+        f"SELECT DISTINCT source_oncotree_code FROM {_STAGING_TABLE} "
+        "WHERE source_schema = ?",
+        [source_schema],
+    ).fetchall()
+    return {str(r[0]) for r in rows if r[0] is not None}
 
 
 def value_mappings_to_specs(
     mappings: Sequence[ValueMapping],
     *,
+    observed_codes: Collection[str] | None = None,
     entity_qualified_name: str = _CONDITION_ENTITY,
     property_name: str = _CONCEPT_FIELD,
 ) -> tuple[list[ConceptFieldSpec], list[ValueBridgeSpec]]:
@@ -50,11 +67,19 @@ def value_mappings_to_specs(
 
     NO_MAP rows (``concept_id is None``) are excluded — an unmapped value is
     absent from the index, never a null placeholder (Slice-2 principle).
+
+    ``observed_codes`` scopes the result to the values a study actually staged;
+    unscoped, a study would bridge every code in the store, asserting mappings
+    it never contained (bug-435). ``None`` disables scoping.
     """
     resolved = [
         m for m in mappings
         if m.resolution_status is not ResolutionStatus.NO_MAP
         and m.concept_id is not None
+        and (
+            observed_codes is None
+            or m.normalized_source_value in observed_codes
+        )
     ]
     codes = tuple(dict.fromkeys(str(m.concept_id) for m in resolved))
     bridges = [
@@ -187,11 +212,15 @@ def materialize_target_graph_cmd(
         ),
     )
     conn = duckdb.connect(str(duckdb_path))
-    mappings = [
-        m for m in _read_value_mappings(conn)
-        if m.normalized_source_value  # scope: this store's resolved rows
-    ]
-    concept_fields, value_bridges = value_mappings_to_specs(mappings)
+    observed = observed_source_codes(conn, source_schema=study_schema)
+    if not observed:
+        raise click.ClickException(
+            f"no staged rows for source schema {study_schema!r} — ingest and "
+            "resolve it before materializing its bridge"
+        )
+    concept_fields, value_bridges = value_mappings_to_specs(
+        _read_value_mappings(conn), observed_codes=observed
+    )
 
     cursor = open_databricks_cursor(DatabricksConfig(), catalog=catalog)
     driver = _neo4j_driver()
@@ -223,5 +252,6 @@ __all__ = [
     "DatabricksCatalogSource",
     "OmopConceptSource",
     "materialize_target_graph_cmd",
+    "observed_source_codes",
     "value_mappings_to_specs",
 ]
