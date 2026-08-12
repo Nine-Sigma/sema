@@ -16,6 +16,7 @@ import pytest
 
 from sema.compile.compiler import TransformCompiler
 from sema.compile.compiler_utils import CompileContext, SourceTableSpec
+from sema.eval.goldset_snapshot import current_snapshot_rows_path
 from sema.eval.mapping_goldset import GoldSet, load_gold_set
 from sema.eval.staging_qa import run_staging_qa
 from sema.eval.staging_qa_utils import QAOutcome
@@ -43,7 +44,7 @@ from tests.integration._omop_binding import build_condition_binding
 pytestmark = pytest.mark.integration
 
 _DB = Path.home() / ".sema" / "poc.duckdb"
-_GOLD = Path(__file__).resolve().parents[1] / "data" / "gold" / "oncotree_condition_slice0.jsonl"
+_GOLD = current_snapshot_rows_path()
 _COLS = OMOP_STAGING_COLUMNS
 
 

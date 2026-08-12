@@ -22,6 +22,7 @@ import pytest
 
 from sema.eval.mapping_report import build_mapping_report, decisions_from_store
 from sema.eval.mapping_report_utils import AcceptanceVerdict
+from sema.eval.goldset_snapshot import current_snapshot_rows_path
 from sema.eval.mapping_goldset import GoldSet, load_gold_set
 from sema.models.planner.provenance import Provenance, RunProvenance, SourceScope
 from sema.resolve.engine import VocabularyResolver
@@ -38,7 +39,7 @@ from tests.integration._omop_binding import build_condition_binding
 pytestmark = pytest.mark.integration
 
 _DB = Path.home() / ".sema" / "poc.duckdb"
-_GOLD = Path(__file__).resolve().parents[1] / "data" / "gold" / "oncotree_condition_slice0.jsonl"
+_GOLD = current_snapshot_rows_path()
 _VOCAB_RELEASE = "omop-vocab-2024"
 _POLICY_REF = OMOP_ONCOTREE_CONDITION_REF
 _TARGET_PROPERTY_REF = "target.stage.condition_concept_id"

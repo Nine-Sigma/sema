@@ -38,6 +38,7 @@ __all__ = [
     "GOLD_ROOT",
     "GoldSetSnapshot",
     "SnapshotInvariantError",
+    "current_snapshot_rows_path",
     "load_current_snapshot",
     "load_snapshot",
     "resolve_current_version",
@@ -84,6 +85,10 @@ def snapshot_dir(version: str, root: Path = GOLD_ROOT) -> Path:
 
 def load_current_snapshot(root: Path = GOLD_ROOT) -> GoldSetSnapshot:
     return load_snapshot(snapshot_dir(resolve_current_version(root), root))
+
+
+def current_snapshot_rows_path(root: Path = GOLD_ROOT) -> Path:
+    return snapshot_dir(resolve_current_version(root), root) / _ROWS_FILE
 
 
 def load_snapshot(directory: str | Path) -> GoldSetSnapshot:

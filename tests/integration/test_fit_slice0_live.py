@@ -16,6 +16,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from sema.eval.goldset_snapshot import current_snapshot_rows_path
 from sema.eval.mapping_goldset import GoldSet, load_gold_set
 from sema.eval.staging_qa_utils import QAOutcome
 from sema.models.planner.mapping_plan import MappingAssertion, MappingPlan
@@ -30,12 +31,7 @@ from sema.resolve.vocab_store import open_duckdb_vocab_store, VocabStore
 pytestmark = pytest.mark.integration
 
 _DB = Path.home() / ".sema" / "poc.duckdb"
-_GOLD = (
-    Path(__file__).resolve().parents[1]
-    / "data"
-    / "gold"
-    / "oncotree_condition_slice0.jsonl"
-)
+_GOLD = current_snapshot_rows_path()
 _MANIFEST = (
     Path(__file__).resolve().parents[2]
     / "showcase" / "cbioportal_to_omop" / "manifests"
