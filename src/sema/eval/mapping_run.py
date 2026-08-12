@@ -20,10 +20,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from sema.eval.goldset_snapshot_utils import GoldSetHeader
 from sema.eval.mapping_goldset_utils import Decision
 from sema.eval.mapping_report_utils import MappingReport
 
@@ -71,10 +73,16 @@ def write_eval_run(
     report: MappingReport,
     subject: EvaluationSubject,
     decisions: Iterable[Decision],
-    gold_rows_sha256: str,
-    universe_sha256: str,
+    header: GoldSetHeader,
+    resolver_run_ids: Sequence[str] = (),
 ) -> Path:
-    """Write one immutable, self-describing evaluation run to ``root/<run_id>/``."""
+    """Write one immutable, self-describing evaluation run to ``root/<run_id>/``.
+
+    ``resolver_run_ids`` are the store's own ``run_id``s for the graded rows.
+    ``GRAIN_KEY`` excludes ``run_id`` and ``upsert_sql`` overwrites in place, so
+    the store cannot prove afterwards which execution produced a decision — this
+    is the only place that record survives. ``run_id`` above is the EVAL's.
+    """
     directory = Path(root) / run_id
     directory.mkdir(parents=True)
     graded = [_decision_to_json(d) for d in decisions]
@@ -83,9 +91,13 @@ def write_eval_run(
         "subject": subject.as_dict(),
         "gold_set": {
             "snapshot_version": report.snapshot_version,
-            "rows_sha256": gold_rows_sha256,
-            "universe_sha256": universe_sha256,
+            "rows_sha256": header.rows_sha256,
+            "universe_sha256": header.universe_sha256,
+            "vocab_release": header.vocab_release,
+            "target_vocabulary": header.target_vocabulary,
+            "target_domain": header.target_domain,
         },
+        "resolver_run_ids": list(resolver_run_ids),
         "decision_count": len(graded),
         "decisions_sha256": _decisions_digest(graded),
         "verdict": report.verdict.value,

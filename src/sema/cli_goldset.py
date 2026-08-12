@@ -15,19 +15,17 @@ import click
 
 from sema.eval.goldset_drift import goldset_drift_report
 from sema.eval.goldset_ops import SnapshotDraft, observe, publish, re_scope, re_tier
-from sema.eval.goldset_snapshot import (
-    GOLD_ROOT,
-    current_snapshot_rows_path,
-    load_current_snapshot,
-)
+from sema.eval.goldset_snapshot import GOLD_ROOT, load_current_snapshot
 from sema.eval.goldset_source import SourceKind, SourceSpec, enumerate_scoped_codes
 from sema.eval.mapping_goldset import GoldSet
-from sema.eval.mapping_report import report_from_store
 from sema.eval.goldset_worksheet import (
+    SourceContext,
     apply_labels,
     build_worksheet,
     challenge_codes_needing_review,
+    reference_tissues,
 )
+from sema.log import logger
 from sema.eval.mapping_run import EvaluationSubject, write_eval_run
 
 _VERSION = click.option("--version", required=True, help="New snapshot version (never reused).")
@@ -138,16 +136,45 @@ def worksheet_cmd(db: str, head_size: int, output_path: str) -> None:
                 "WHERE vocabulary_id = 'OncoTree'"
             ).fetchall()
         )
-    codes = build_worksheet(
-        snapshot, output_path, head_size=head_size, source_names=names
+        main_types = _source_main_types(con, snapshot.header.source_of_truth.scope_values)
+    context = SourceContext(
+        names=names, main_types=main_types, tissues=reference_tissues(GOLD_ROOT)
     )
-    missing = [c for c in codes if c not in names]
+    codes = build_worksheet(snapshot, output_path, head_size=head_size, context=context)
+    gaps = "\n".join(
+        f"  no {column} for {len(missing)}: {missing}"
+        for column, missing in context.missing(codes).items()
+        if missing
+    )
     click.echo(
         f"wrote {len(codes)} rows to {output_path}\n"
-        f"  no OncoTree name available for {len(missing)}: {missing}\n"
+        f"{gaps}\n"
+        "  a blank cell means NOT LOOKED UP, not 'no such context exists' — fill the\n"
+        "  gaps above from the OncoTree browser before labelling those codes.\n"
         "  no candidate target concepts are pre-filled, and the challenge stratum is\n"
         "  interleaved — both deliberate, so the oracle stays independent."
     )
+
+
+def _source_main_types(con: Any, scope_values: tuple[str, ...]) -> dict[str, str]:
+    """OncoTree ``mainType`` per code, read from the declared scope's own samples.
+
+    ``sample.CANCER_TYPE`` IS OncoTree's ``mainType`` and is source-side data, so
+    it carries none of the target-vocabulary anchoring D4 rules out. Studies whose
+    sample table lacks the column are skipped rather than failing the worksheet.
+    """
+    main_types: dict[str, str] = {}
+    for schema in scope_values:
+        try:
+            rows = con.execute(
+                "SELECT ONCOTREE_CODE, ANY_VALUE(CANCER_TYPE) "
+                f'FROM "{schema}".sample WHERE CANCER_TYPE IS NOT NULL GROUP BY 1'
+            ).fetchall()
+        except Exception as exc:  # noqa: BLE001 - a missing study is a gap, not a failure
+            logger.warning("no source main types from {}: {}", schema, exc)
+            continue
+        main_types.update({str(code): str(value) for code, value in rows})
+    return main_types
 
 
 @goldset_group.command("apply-labels")
@@ -158,11 +185,12 @@ def apply_labels_cmd(worksheet_path: str, version: str, date: str) -> None:
     """Apply a curator's completed worksheet as a NEW snapshot."""
     draft = apply_labels(load_current_snapshot(GOLD_ROOT), worksheet_path, version=version, date=date)
     _publish(draft)
-    pending = challenge_codes_needing_review(draft.rows)
+    pending = challenge_codes_needing_review(draft.rows, draft.header.challenge_codes)
     if pending:
         click.echo(
-            f"  {len(pending)} labelled challenge codes still lack a second reviewer "
-            f"({', '.join(pending)}); the verdict will read `unadjudicated`."
+            f"  {len(pending)} of {len(draft.header.challenge_codes)} declared challenge "
+            f"codes still lack a label and a second reviewer ({', '.join(pending)}); "
+            "the verdict will read `unadjudicated`."
         )
 
 
@@ -190,7 +218,8 @@ def mapping_report_cmd(
     """Grade the value-mapping store against the current gold-set snapshot."""
     import duckdb
 
-    from sema.eval.mapping_report import decisions_from_store
+    from sema.eval.mapping_report import build_mapping_report, mappings_for_subject
+    from sema.eval.mapping_report_utils import decision_from_value_mapping
     from sema.resolve.value_mapping_store import ValueMappingStore
 
     subject = EvaluationSubject(
@@ -200,19 +229,33 @@ def mapping_report_cmd(
         vocab_release=vocab_release,
     )
     snapshot = load_current_snapshot(GOLD_ROOT)
+    if subject.vocab_release != snapshot.header.vocab_release:
+        raise click.ClickException(
+            f"the graded subject is pinned to {subject.vocab_release} but the gold set "
+            f"{snapshot.header.snapshot_version} keys its concept ids to "
+            f"{snapshot.header.vocab_release}. A gold_concept_id is meaningless without "
+            "the release that minted it, so grading across releases would report "
+            "vocabulary churn as resolver error. Re-snapshot the gold set, or grade the "
+            "release it pins."
+        )
     store = ValueMappingStore(duckdb.connect(store_path), schema=schema, table=table)
     try:
-        report = report_from_store(
-            store, current_snapshot_rows_path(GOLD_ROOT), subject=subject,
-            snapshot_version=snapshot.header.snapshot_version,
-        )
-        decisions = decisions_from_store(store, subject)
+        mappings = mappings_for_subject(store, subject)
     finally:
         store.close()
+    decisions = [decision_from_value_mapping(m) for m in mappings]
+    frozen = {*snapshot.header.tier_codes, *snapshot.header.challenge_codes}
+    report = build_mapping_report(
+        GoldSet(snapshot.rows),
+        decisions,
+        snapshot_version=snapshot.header.snapshot_version,
+        challenge_codes=snapshot.header.challenge_codes,
+        tail_universe=tuple(e.code for e in snapshot.universe if e.code not in frozen),
+    )
     directory = write_eval_run(
         output_dir, run_id=run_id, report=report, subject=subject, decisions=decisions,
-        gold_rows_sha256=snapshot.header.rows_sha256,
-        universe_sha256=snapshot.header.universe_sha256,
+        header=snapshot.header,
+        resolver_run_ids=sorted({m.run_id for m in mappings}),
     )
     click.echo(report.human_summary())
     click.echo(f"\nrun written to {directory}")

@@ -21,6 +21,7 @@ from sema.eval.goldset_snapshot import write_snapshot
 from sema.eval.goldset_source import SourceKind, SourceSpec
 from sema.eval.goldset_worksheet import WORKSHEET_COLUMNS
 from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow, TierState
+from sema.models.planner.lifecycle import Status
 
 pytestmark = pytest.mark.unit
 
@@ -83,6 +84,19 @@ def db(tmp_path: Path) -> str:
     )
     con.execute(
         "INSERT INTO vocabulary_omop.concept VALUES ('LUAD', 'Lung Adenocarcinoma', 'OncoTree')"
+    )
+    con.execute("CREATE SCHEMA study_a")
+    con.execute(
+        "CREATE TABLE study_a.sample "
+        "(ONCOTREE_CODE VARCHAR, CANCER_TYPE VARCHAR, CANCER_TYPE_DETAILED VARCHAR)"
+    )
+    con.executemany(
+        "INSERT INTO study_a.sample VALUES (?, ?, ?)",
+        [
+            ["LUAD", "Non-Small Cell Lung Cancer", "Lung Adenocarcinoma"],
+            ["COAD", "Colorectal Cancer", "Colon Adenocarcinoma"],
+            ["ODD", None, None],
+        ],
     )
     con.execute("CREATE TABLE _counts (code VARCHAR, n BIGINT)")
     con.executemany("INSERT INTO _counts VALUES (?, ?)", [[c, n] for c, n in _COUNTS.items()])
@@ -180,6 +194,52 @@ def test_the_worksheet_is_blank_and_carries_source_context(
     assert all(r["gold_concept_id"] == "" for r in rows)
 
 
+def test_the_worksheet_carries_the_main_type_a_reviewer_needs(
+    gold_root: Path, db: str, tmp_path: Path
+) -> None:
+    """D4's anti-anchoring rule requires source-side context, since candidate
+    targets are the resolver's own answers. A code and a name is not enough."""
+    output_path = tmp_path / "ws.csv"
+
+    _run("goldset", "worksheet", "--db", db, "--head-size", "2", "--output", str(output_path))
+    by_code = {
+        r["oncotree_code"]: r for r in csv.DictReader(output_path.open(encoding="utf-8"))
+    }
+
+    assert by_code["LUAD"]["main_type"] == "Non-Small Cell Lung Cancer"
+    assert by_code["COAD"]["main_type"] == "Colorectal Cancer"
+
+
+def test_the_worksheet_takes_tissue_from_the_reference_csv(
+    gold_root: Path, db: str, tmp_path: Path
+) -> None:
+    (gold_root / "oncotree_reference_test.csv").write_text(
+        "oncotree_code,name,mainType,tissue\nLUAD,Lung Adenocarcinoma,x,Lung\n",
+        encoding="utf-8",
+    )
+    output_path = tmp_path / "ws.csv"
+
+    _run("goldset", "worksheet", "--db", db, "--head-size", "2", "--output", str(output_path))
+    by_code = {
+        r["oncotree_code"]: r for r in csv.DictReader(output_path.open(encoding="utf-8"))
+    }
+
+    assert by_code["LUAD"]["tissue"] == "Lung"
+
+
+def test_the_worksheet_names_the_context_it_could_not_fill(
+    gold_root: Path, db: str, tmp_path: Path
+) -> None:
+    """A silently blank column reads as 'no context exists', not 'not looked up'."""
+    output = _run(
+        "goldset", "worksheet", "--db", db, "--head-size", "2",
+        "--output", str(tmp_path / "ws.csv"),
+    )
+
+    assert "tissue" in output
+    assert "3" in output, "all three codes lack a tissue with no reference CSV present"
+
+
 def test_apply_labels_publishes_a_labelled_snapshot(
     gold_root: Path, db: str, tmp_path: Path
 ) -> None:
@@ -205,7 +265,84 @@ def test_apply_labels_publishes_a_labelled_snapshot(
     snapshot = load_snapshot(snapshot_dir("v2", gold_root))
 
     assert snapshot.by_code()["ODD"].gold_label is GoldLabel.NO_MAP
-    assert "lack a second reviewer" in output, "the unadjudicated gap is surfaced"
+    assert "second reviewer" in output, "the unadjudicated gap is surfaced"
+    assert "1 of 1 declared challenge codes" in output
+
+
+# --- the target-side pin is enforced, not merely recorded --------------------
+
+
+@pytest.fixture()
+def store(tmp_path: Path) -> str:
+    from sema.resolve.value_mapping_store import ValueMappingStore
+    from sema.resolve.value_mapping_store_utils import ResolutionStatus, ValueMapping
+
+    path = tmp_path / "store.duckdb"
+    con = duckdb.connect(str(path))
+    mapping_store = ValueMappingStore(con)
+    mapping_store.upsert(
+        [
+            ValueMapping(
+                source_vocabulary="OncoTree",
+                normalized_source_value=code,
+                target_property_ref="target.stage.condition_concept_id",
+                target_field="condition_concept_id",
+                vocab_binding="binding.condition",
+                concept_id=concept,
+                vocab_release="omop-vocab-2024",
+                valid_start=None,
+                valid_end=None,
+                resolution_status=ResolutionStatus.RESOLVED,
+                no_map_reason=None,
+                confidence=1.0,
+                status=Status.auto_accepted,
+                resolver_policy_ref="omop.oncotree_condition",
+                run_id="resolver-run-7",
+            )
+            for code, concept in (("LUAD", 45768916), ("COAD", 4180790))
+        ]
+    )
+    mapping_store.close()
+    return str(path)
+
+
+def _report_args(store_path: str, out: Path, release: str) -> list[str]:
+    return [
+        "mapping-report", "--store", store_path,
+        "--source-vocabulary", "OncoTree",
+        "--target-property-ref", "target.stage.condition_concept_id",
+        "--resolver-policy-ref", "omop.oncotree_condition",
+        "--vocab-release", release,
+        "--run-id", "run-1", "--output-dir", str(out),
+    ]
+
+
+def test_mapping_report_refuses_a_release_the_snapshot_does_not_pin(
+    gold_root: Path, store: str, tmp_path: Path
+) -> None:
+    """A gold_concept_id is meaningless without the release that minted it, so
+    grading a 2025 decision set on 2024 keys reads vocabulary churn as error."""
+    result = CliRunner().invoke(
+        eval_group, _report_args(store, tmp_path / "runs", "omop-vocab-2025")
+    )
+
+    assert result.exit_code != 0
+    assert "omop-vocab-2025" in result.output
+    assert "omop-vocab-2024" in result.output
+
+
+def test_mapping_report_records_both_target_pins(
+    gold_root: Path, store: str, tmp_path: Path
+) -> None:
+    out = tmp_path / "runs"
+    _run(*_report_args(store, out, "omop-vocab-2024"))
+
+    manifest = json.loads((out / "run-1" / "run.json").read_text(encoding="utf-8"))
+
+    assert manifest["gold_set"]["vocab_release"] == "omop-vocab-2024"
+    assert manifest["gold_set"]["target_vocabulary"] == "SNOMED"
+    assert manifest["gold_set"]["target_domain"] == "Condition"
+    assert manifest["resolver_run_ids"] == ["resolver-run-7"]
 
 
 def test_apply_labels_refuses_a_label_without_provenance(

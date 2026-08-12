@@ -67,28 +67,79 @@ class AcceptanceVerdict(str, Enum):
 MIN_SECOND_REVIEWED_HEAD_LABELS = 10
 
 
-def adjudication_qualifiers(rows: Sequence[GoldRow]) -> tuple[str, ...]:
-    """``('unadjudicated',)`` unless the G-05 second-review floor was met."""
-    labelled = [r for r in rows if r.gold_label is not GoldLabel.UNLABELLED]
-    if not labelled:
+def adjudication_qualifiers(
+    rows: Sequence[GoldRow],
+    challenge_codes: Sequence[str] | None = None,
+) -> tuple[str, ...]:
+    """``('unadjudicated',)`` unless the G-05 second-review floor was met.
+
+    The floor is defined over the snapshot's DECLARATION, not over whatever has
+    been labelled so far, because every row-derived shortcut silently weakens it:
+
+    * ``challenge_codes`` must come from ``GoldSetHeader.challenge_codes``. A
+      declared challenge code that also ranks inside the head (live case:
+      ``IMMC``) resolves to ``IN_TIER``, so a ``tier_state`` check could never
+      demand its review — and an entirely unlabelled stratum passed vacuously.
+    * the head sample size is ``min(10, len(head))`` over the WHOLE head; taken
+      over the labelled head it collapsed to "all of whatever you've labelled".
+    * an out-of-tier label is not evidence of an adjudicated oracle.
+    """
+    declared = (
+        frozenset(challenge_codes)
+        if challenge_codes is not None
+        else frozenset(r.oncotree_code for r in rows if r.tier_state is TierState.CHALLENGE)
+    )
+    head = [r for r in rows if r.tier_state is TierState.IN_TIER]
+    labelled_head = [r for r in head if r.gold_label is not GoldLabel.UNLABELLED]
+    if not labelled_head:
         return ("unadjudicated",)
-    challenge = [r for r in labelled if r.tier_state is TierState.CHALLENGE]
-    if any(not r.second_reviewer for r in challenge):
+    if codes_needing_second_review(rows, declared):
         return ("unadjudicated",)
-    head = [r for r in labelled if r.tier_state is TierState.IN_TIER]
-    reviewed = sum(1 for r in head if r.second_reviewer)
+    reviewed = sum(1 for r in labelled_head if r.second_reviewer)
     if reviewed < min(MIN_SECOND_REVIEWED_HEAD_LABELS, len(head)):
         return ("unadjudicated",)
     return ()
 
 
-def tail_sample(rows: Sequence[GoldRow], snapshot_version: str, size: int = 20) -> tuple[str, ...]:
-    """A deterministic, NEVER-gating sample of out-of-tier codes.
+def codes_needing_second_review(
+    rows: Sequence[GoldRow],
+    challenge_codes: Sequence[str] | frozenset[str],
+) -> list[str]:
+    """Declared challenge codes not yet labelled AND second-reviewed.
 
-    The only stratum that speaks to "confidently wrong in the tail". Derived from
-    the frozen snapshot so it is reproducible without being a second benchmark.
+    Unlabelled counts as needing review: a wrong gold ``NO_MAP`` scores
+    ``fp_map`` straight against a correctly-mapped code, so this stratum is the
+    one place a single bad label damages ``mapped_precision`` directly.
     """
-    codes = [r.oncotree_code for r in rows if r.tier_state is TierState.OUT_OF_TIER]
+    by_code = {r.oncotree_code: r for r in rows}
+    return sorted(
+        code
+        for code in challenge_codes
+        if (row := by_code.get(code)) is None
+        or row.gold_label is GoldLabel.UNLABELLED
+        or not row.second_reviewer
+    )
+
+
+def tail_sample(
+    rows: Sequence[GoldRow],
+    snapshot_version: str,
+    size: int = 20,
+    tail_universe: Sequence[str] | None = None,
+) -> tuple[str, ...]:
+    """A deterministic, NEVER-gating sample of codes outside the frozen populations.
+
+    The only stratum that speaks to "confidently wrong in the tail" — so it must be
+    drawn from the universe manifest's tail when one is available. Drawing from the
+    gold rows alone samples the codes that happened to be in a PRIOR scope, which is
+    a biased slice of the tail rather than a sample of it.
+
+    Derived from the frozen snapshot (version + manifest) so it is reproducible
+    without becoming a second benchmark.
+    """
+    codes = list(tail_universe) if tail_universe is not None else [
+        r.oncotree_code for r in rows if r.tier_state is TierState.OUT_OF_TIER
+    ]
     ranked = sorted(
         codes, key=lambda c: hashlib.sha256(f"{snapshot_version}:{c}".encode()).hexdigest()
     )
@@ -113,13 +164,30 @@ def decision_from_value_mapping(mapping: ValueMapping) -> Decision:
 def evaluate_acceptance(
     matrix: ConfusionMatrix | None,
     coverage_fraction: float,
+    *,
+    ungraded_codes: Sequence[str] = (),
 ) -> tuple[AcceptanceVerdict, str]:
-    """Apply the §1.5(f) acceptance gate to one confusion matrix + coverage."""
+    """Apply the §1.5(f) acceptance gate to one confusion matrix + coverage.
+
+    ``ungraded_codes`` are acceptance-eligible codes that carry a human label but
+    no decision in the graded subject. Labelling them is not the same as grading
+    them: without this check a subject matching only part of the store (a
+    mistyped ``resolver_policy_ref``, a release the store never held) reports
+    100% coverage and a flawless matrix over whatever it happened to find.
+    """
     if coverage_fraction < 1.0:
         return (
             AcceptanceVerdict.PROVISIONAL_NOT_ACCEPTED,
-            f"labelled gold coverage {coverage_fraction:.1%} < 100% of observed "
-            "distinct codes; the US-002 human-label gate is incomplete",
+            f"labelled gold coverage {coverage_fraction:.1%} < 100% of the frozen "
+            "tier (D1(x)); the US-002 human-label gate is incomplete",
+        )
+    if ungraded_codes:
+        listed = ", ".join(sorted(ungraded_codes)[:10])
+        return (
+            AcceptanceVerdict.RUNNING_NOT_ACCEPTED,
+            f"{len(ungraded_codes)} labelled code(s) in the frozen tier have no "
+            f"decision in the graded subject ({listed}); the decision set does "
+            "not cover the population the verdict would certify",
         )
     assert matrix is not None  # full coverage implies a scored matrix
     precision = matrix.mapped_precision
@@ -163,6 +231,8 @@ class MappingReport:
     qualifiers: tuple[str, ...] = ()
     tail_sample_codes: tuple[str, ...] = ()
     tail_sample_labelled: int = 0
+    tail_sample_unlabellable: int = 0
+    ungraded_codes: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -175,6 +245,11 @@ class MappingReport:
                 "total": self.total_codes,
                 "fraction": self.coverage_fraction,
                 "unlabelled_codes": list(self.unlabelled_codes),
+            },
+            "graded": {
+                "scored": self.score.scored_codes,
+                "of": self.total_codes,
+                "ungraded_codes": list(self.ungraded_codes),
             },
             "thresholds": {
                 "mapped_precision": MIN_MAPPED_PRECISION,
@@ -191,9 +266,15 @@ class MappingReport:
                     "gating": False,
                     "codes": list(self.tail_sample_codes),
                     "labelled": self.tail_sample_labelled,
+                    "without_a_gold_row": self.tail_sample_unlabellable,
+                    "scored_codes": self.score.tail_scored_codes,
+                    "distinct_code": self.score.tail_distinct_code.as_dict(),
                     "note": (
                         "informational only — the frozen head is selected by row "
-                        "frequency and says nothing about the distinct-code tail"
+                        "frequency and says nothing about the distinct-code tail. "
+                        "`without_a_gold_row` codes cannot be labelled until the "
+                        "snapshot carries a row for them, so a zero labelled count "
+                        "is not evidence that the tail is clean"
                     ),
                 },
             },
@@ -214,6 +295,15 @@ class MappingReport:
         m = self.score.distinct_code
         return (m.wrong + m.fn + m.fp_map) > 0
 
+    def _ungraded_note(self) -> str:
+        """Name the labelled-but-ungraded codes inline — a gap buried in JSON was
+        indistinguishable from a complete run."""
+        if not self.ungraded_codes:
+            return ""
+        listed = ", ".join(self.ungraded_codes[:10])
+        more = "" if len(self.ungraded_codes) <= 10 else ", …"
+        return f" — {len(self.ungraded_codes)} labelled but ungraded: {listed}{more}"
+
     def human_summary(self) -> str:
         m = self.score.distinct_code
         qualified = " ".join(f"[{q}]" for q in self.qualifiers)
@@ -223,6 +313,8 @@ class MappingReport:
             f"  reason: {self.verdict_reason}",
             f"  coverage: labelled {self.labelled_count}/{self.total_codes} "
             f"({self.coverage_fraction:.1%})",
+            f"  graded: {self.score.scored_codes}/{self.total_codes} of the frozen "
+            f"tier scored{self._ungraded_note()}",
             "  distinct-code metrics:",
             f"    mapped_precision    = {_pct(m.mapped_precision)}",
             f"    mapped_recall       = {_pct(m.mapped_recall)}",
@@ -231,7 +323,9 @@ class MappingReport:
             f"  strata: head {self.score.scored_codes} scored (gating) / "
             f"challenge {self.score.challenge_scored_codes} scored / "
             f"random tail {len(self.tail_sample_codes)} sampled, "
-            f"{self.tail_sample_labelled} labelled (never gating)",
+            f"{self.tail_sample_labelled} labelled, {self.score.tail_scored_codes} "
+            f"scored, {self.tail_sample_unlabellable} carry no gold row yet "
+            "(never gating)",
             f"  NOTE: {STRUCTURAL_PRECISION_CAVEAT}",
         ]
         return "\n".join(lines)

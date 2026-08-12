@@ -25,9 +25,11 @@ from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow, TierState
 __all__ = [
     "GoldSetHeader",
     "UniverseEntry",
+    "canonical_universe_key",
     "ordered_rows_digest",
     "row_from_json",
     "row_to_json",
+    "tier_row_share",
     "universe_digest",
 ]
 
@@ -185,3 +187,26 @@ def ordered_rows_digest(rows: list[GoldRow]) -> str:
 
 def universe_digest(universe: tuple[UniverseEntry, ...]) -> str:
     return _digest([e.as_dict() for e in universe])
+
+
+def canonical_universe_key(entry: UniverseEntry) -> tuple[int, str]:
+    """Canonical manifest order: richest code first, then code. Ordering is what
+    makes two manifests diffable across snapshots."""
+    return (-entry.frozen_row_count, entry.code)
+
+
+def tier_row_share(
+    tier_codes: tuple[str, ...],
+    universe: tuple[UniverseEntry, ...],
+) -> float:
+    """The frozen tier's share of the manifest's rows.
+
+    One definition, used both to stamp ``tier_achieved_row_share`` and to assert it
+    on load: a snapshot that replaced every count beneath a carried-forward share
+    contradicted its own manifest, and the CLI echoed the stale figure.
+    """
+    total = sum(e.frozen_row_count for e in universe)
+    if total == 0:
+        return 0.0
+    tier = set(tier_codes)
+    return sum(e.frozen_row_count for e in universe if e.code in tier) / total

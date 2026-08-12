@@ -27,6 +27,7 @@ from sema.eval.goldset_snapshot_utils import (
     GoldSetHeader,
     UniverseEntry,
     canonical_sort_key,
+    canonical_universe_key,
     ordered_rows_digest,
     row_from_json,
     row_to_json,
@@ -120,16 +121,17 @@ def write_snapshot(
             f"{path} is already published; emit a new snapshot_version instead"
         )
     ordered = sorted(rows, key=canonical_sort_key)
-    assert_snapshot_invariants(header, ordered, universe)
+    manifest = tuple(sorted(universe, key=canonical_universe_key))
+    assert_snapshot_invariants(header, ordered, manifest)
     stamped = header.with_digests(
-        rows=ordered_rows_digest(ordered), universe=universe_digest(universe)
+        rows=ordered_rows_digest(ordered), universe=universe_digest(manifest)
     )
     path.mkdir(parents=True)
     (path / _META_FILE).write_text(
         json.dumps(stamped.as_dict(), indent=2) + "\n", encoding="utf-8"
     )
     _write_jsonl(path / _ROWS_FILE, [row_to_json(r) for r in ordered])
-    _write_jsonl(path / _UNIVERSE_FILE, [e.as_dict() for e in universe])
+    _write_jsonl(path / _UNIVERSE_FILE, [e.as_dict() for e in manifest])
     return stamped
 
 

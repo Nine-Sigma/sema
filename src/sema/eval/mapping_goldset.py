@@ -61,6 +61,18 @@ def score_eligible(row: GoldRow) -> bool:
     return row.tier_state in (TierState.IN_TIER, TierState.CHALLENGE)
 
 
+def tail_scorable(row: GoldRow) -> bool:
+    """An out-of-tier row a human HAS labelled — the informational tail stratum.
+
+    Safe to score precisely because it is labelled: the §1.5(f) hazard is that an
+    *unlabelled* out-of-tier code reads as gold-NO_MAP through ``classify_cell`` and
+    lands in ``fp_map``. A real label carries a real answer, and it lands in a matrix
+    of its own — the tail can now show "confidently wrong" instead of only listing
+    codes. ``RETIRED`` stays out: it left the scope, so nothing live grades it.
+    """
+    return row.tier_state is TierState.OUT_OF_TIER and row.gold_label is not GoldLabel.UNLABELLED
+
+
 @dataclass
 class GoldSet:
     """A loaded gold set with labelled/unlabelled accounting (the human gate).
@@ -137,6 +149,9 @@ class GoldSetReport:
     challenge_distinct_code: ConfusionMatrix = field(default_factory=ConfusionMatrix)
     challenge_row_weighted: ConfusionMatrix = field(default_factory=ConfusionMatrix)
     challenge_scored_codes: int = 0
+    tail_distinct_code: ConfusionMatrix = field(default_factory=ConfusionMatrix)
+    tail_row_weighted: ConfusionMatrix = field(default_factory=ConfusionMatrix)
+    tail_scored_codes: int = 0
     unscored_unlabelled: list[str] = field(default_factory=list)
     unscored_out_of_scope: list[str] = field(default_factory=list)
     decisions_without_gold: list[str] = field(default_factory=list)
@@ -152,6 +167,11 @@ class GoldSetReport:
                 "distinct_code": self.challenge_distinct_code.as_dict(),
                 "row_weighted": self.challenge_row_weighted.as_dict(),
                 "scored_codes": self.challenge_scored_codes,
+            },
+            "tail": {
+                "distinct_code": self.tail_distinct_code.as_dict(),
+                "row_weighted": self.tail_row_weighted.as_dict(),
+                "scored_codes": self.tail_scored_codes,
             },
             "unscored_unlabelled": self.unscored_unlabelled,
             "unscored_out_of_scope": self.unscored_out_of_scope,
@@ -172,7 +192,9 @@ def score(
     excluded and surfaced as remaining work.
     """
     gold_by_code = {g.oncotree_code: g for g in gold_rows}
-    scored_codes = {c for c, g in gold_by_code.items() if score_eligible(g)}
+    scored_codes = {
+        c for c, g in gold_by_code.items() if score_eligible(g) or tail_scorable(g)
+    }
     dec_by_code = _decisions_by_code(decisions, scored_codes)
 
     report = GoldSetReport(
@@ -183,7 +205,7 @@ def score(
     report.decisions_without_gold = sorted(set(dec_by_code) - set(gold_by_code))
 
     for code, gold in gold_by_code.items():
-        if not score_eligible(gold):
+        if not score_eligible(gold) and not tail_scorable(gold):
             report.unscored_out_of_scope.append(code)
             continue
         if gold.gold_label is GoldLabel.UNLABELLED:
@@ -235,6 +257,11 @@ def _accumulate(
         report.challenge_distinct_code.add(cell, 1.0)
         report.challenge_row_weighted.add(cell, float(gold.row_count))
         report.challenge_scored_codes += 1
+        return
+    if gold.tier_state is TierState.OUT_OF_TIER:
+        report.tail_distinct_code.add(cell, 1.0)
+        report.tail_row_weighted.add(cell, float(gold.row_count))
+        report.tail_scored_codes += 1
         return
     report.distinct_code.add(cell, 1.0)
     report.row_weighted.add(cell, float(gold.row_count))

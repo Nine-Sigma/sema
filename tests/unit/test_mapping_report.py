@@ -22,6 +22,7 @@ from sema.eval.mapping_goldset_utils import (
     GoldLabel,
     GoldRow,
     ResolutionStatus,
+    TierState,
 )
 from sema.eval.mapping_run import EvaluationSubject
 from sema.eval.mapping_report import (
@@ -272,6 +273,71 @@ def test_full_coverage_undefined_precision_is_running() -> None:
 def test_evaluate_acceptance_thresholds_are_the_documented_values() -> None:
     assert MIN_MAPPED_PRECISION == pytest.approx(0.95)
     assert MIN_AUTO_RESOLUTION_RATE == pytest.approx(0.70)
+
+
+# --- the decision set must cover the population it certifies -----------------
+
+
+def test_a_labelled_head_code_with_no_decision_blocks_acceptance() -> None:
+    """Fully labelled + perfect on what WAS graded is not the same as graded.
+
+    A partially-matching evaluation subject (a mistyped --resolver-policy-ref,
+    a store missing a release) yields exactly this: coverage 1.0, a flawless
+    matrix, and half the frozen head silently absent from it.
+    """
+    gold, decisions = _all_correct([("A", 10), ("B", 20)])
+
+    report = build_mapping_report(GoldSet(gold), decisions[:1])
+
+    assert report.coverage_fraction == pytest.approx(1.0)
+    assert report.score.distinct_code.mapped_precision == pytest.approx(1.0)
+    assert report.verdict is AcceptanceVerdict.RUNNING_NOT_ACCEPTED
+    assert report.ungraded_codes == ("B",)
+    assert "B" in report.verdict_reason
+
+
+def test_the_ungraded_gap_is_visible_in_the_human_summary() -> None:
+    """It was previously reachable only by digging through report.json."""
+    gold, decisions = _all_correct([("A", 10), ("B", 20)])
+
+    summary = build_mapping_report(GoldSet(gold), decisions[:1]).human_summary()
+
+    assert "graded" in summary
+    assert "B" in summary
+
+
+def test_a_complete_decision_set_still_reaches_accepted() -> None:
+    gold, decisions = _all_correct([("A", 10), ("B", 20)])
+
+    report = build_mapping_report(GoldSet(gold), decisions)
+
+    assert report.ungraded_codes == ()
+    assert report.verdict is AcceptanceVerdict.ACCEPTED
+
+
+def test_an_ungraded_challenge_code_does_not_block_acceptance() -> None:
+    """Only the acceptance population gates; the challenge stratum never does."""
+    gold, decisions = _all_correct([("A", 10), ("B", 20)])
+    gold.append(
+        replace(
+            _gold("UESL", None, GoldLabel.NO_MAP),
+            tier_state=TierState.CHALLENGE,
+        )
+    )
+
+    report = build_mapping_report(GoldSet(gold), decisions)
+
+    assert report.ungraded_codes == ()
+    assert report.score.labelled_without_decision == ["UESL"]
+    assert report.verdict is AcceptanceVerdict.ACCEPTED
+
+
+def test_evaluate_acceptance_reports_the_frozen_head_not_observed_codes() -> None:
+    """D1(x): the denominator is the frozen tier, so the reason must say so."""
+    _, reason = evaluate_acceptance(None, 0.5)
+
+    assert "frozen" in reason
+    assert "observed distinct codes" not in reason
 
 
 def test_evaluate_acceptance_boundary_exactly_at_thresholds_accepts() -> None:

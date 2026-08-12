@@ -31,6 +31,7 @@ from sema.eval.goldset_snapshot_utils import (
     GoldSetHeader,
     UniverseEntry,
     ordered_rows_digest,
+    tier_row_share,
 )
 from sema.eval.goldset_source import SourceSpec
 from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow, TierState
@@ -94,9 +95,21 @@ def observe(
     version: str,
     date: str,
 ) -> SnapshotDraft:
-    """Re-stamp weights against the same declared scope and frozen populations."""
-    header = replace(snapshot.header, snapshot_version=version, snapshot_date=date)
-    universe = _universe(observed, keep_zero=(*header.tier_codes, *header.challenge_codes))
+    """Re-stamp weights against the same declared scope and frozen populations.
+
+    The header's declared code lists are NOT rewritten — that is what keeps two
+    observations comparable. But a code that has left the scope is retired rather
+    than held at zero rows: held, its row-weighted contribution vanished while it
+    still demanded a human label for a code no longer in the data, capping coverage
+    below 1.0 permanently and making the acceptance gate unreachable.
+    """
+    universe = _universe(observed)
+    header = replace(
+        snapshot.header,
+        snapshot_version=version,
+        snapshot_date=date,
+        tier_achieved_row_share=tier_row_share(snapshot.header.tier_codes, universe),
+    )
     return _build(header, snapshot.rows, universe, observed)
 
 
@@ -170,10 +183,8 @@ def publish(root: Path, draft: SnapshotDraft) -> Path:
     return directory
 
 
-def _universe(observed: dict[str, int], keep_zero: tuple[str, ...] = ()) -> tuple[UniverseEntry, ...]:
-    counts = {code: observed.get(code, 0) for code in keep_zero}
-    counts.update(observed)
-    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+def _universe(observed: dict[str, int]) -> tuple[UniverseEntry, ...]:
+    ordered = sorted(observed.items(), key=lambda item: (-item[1], item[0]))
     return tuple(UniverseEntry(code, count) for code, count in ordered)
 
 

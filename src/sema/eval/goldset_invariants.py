@@ -17,6 +17,8 @@ from sema.eval.goldset_snapshot_utils import (
     GoldSetHeader,
     UniverseEntry,
     canonical_sort_key,
+    canonical_universe_key,
+    tier_row_share,
 )
 from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow, TierState
 
@@ -24,8 +26,12 @@ __all__ = [
     "SnapshotInvariantError",
     "assert_row_integrity",
     "assert_snapshot_invariants",
+    "assert_universe_integrity",
     "derive_states",
 ]
+
+# Floats round-trip exactly through JSON, so the share needs no real slack.
+_SHARE_TOLERANCE = 1e-9
 
 
 class SnapshotInvariantError(ValueError):
@@ -64,8 +70,47 @@ def assert_snapshot_invariants(
 ) -> None:
     """Raise :class:`SnapshotInvariantError` on any breach of the contract."""
     assert_row_integrity(rows)
+    assert_universe_integrity(universe)
     _assert_labels(rows)
+    _assert_declaration(header, universe)
     _assert_states(header, rows, universe)
+
+
+def assert_universe_integrity(universe: tuple[UniverseEntry, ...]) -> None:
+    """The manifest is a contract, not a listing.
+
+    A duplicate code is the corruption no digest can see: consumers disagree on it
+    — :meth:`GoldSetSnapshot.universe_row_total` sums both entries while the drift
+    report's ``{code: count}`` dict last-wins — so one artifact yields two
+    different denominators.
+    """
+    seen: set[str] = set()
+    for entry in universe:
+        if entry.code in seen:
+            raise SnapshotInvariantError(f"duplicate universe code: {entry.code}")
+        seen.add(entry.code)
+        if entry.frozen_row_count < 0:
+            raise SnapshotInvariantError(
+                f"{entry.code}: negative frozen_row_count {entry.frozen_row_count}"
+            )
+    if list(universe) != sorted(universe, key=canonical_universe_key):
+        raise SnapshotInvariantError("universe manifest is not in canonical order")
+
+
+def _assert_declaration(header: GoldSetHeader, universe: tuple[UniverseEntry, ...]) -> None:
+    """The header's own numbers must agree with the manifest beneath them."""
+    for name, codes in (("tier", header.tier_codes), ("challenge", header.challenge_codes)):
+        if len(set(codes)) != len(codes):
+            raise SnapshotInvariantError(
+                f"duplicate code in the frozen {name} population; its length is "
+                "reported as the population size"
+            )
+    achieved = tier_row_share(header.tier_codes, universe)
+    if abs(header.tier_achieved_row_share - achieved) > _SHARE_TOLERANCE:
+        raise SnapshotInvariantError(
+            f"declared tier achieved_row_share {header.tier_achieved_row_share} "
+            f"contradicts the universe manifest, which makes it {achieved}"
+        )
 
 
 def assert_row_integrity(rows: list[GoldRow]) -> None:
@@ -118,9 +163,15 @@ def _assert_states(
     universe: tuple[UniverseEntry, ...],
 ) -> None:
     manifest = {e.code for e in universe}
+    by_state = {r.oncotree_code: r.tier_state for r in rows}
     for code in (*header.tier_codes, *header.challenge_codes):
-        if code not in manifest:
-            raise SnapshotInvariantError(f"frozen population code {code} is not in the universe")
+        if code in manifest:
+            continue
+        if by_state.get(code) is not TierState.RETIRED:
+            raise SnapshotInvariantError(
+                f"frozen population code {code} left the declared scope, so it must "
+                "carry a RETIRED row — dropping it would discard the label it earned"
+            )
     states = derive_states(header, universe, frozenset(r.oncotree_code for r in rows))
     by_code = {r.oncotree_code: r for r in rows}
     for code, state in states.items():

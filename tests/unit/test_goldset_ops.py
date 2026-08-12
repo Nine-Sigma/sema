@@ -137,12 +137,35 @@ def test_observe_never_writes_a_gold_concept_id(published: Path) -> None:
     assert labels["LUAD"] == (45768916, GoldLabel.RESOLVED)
 
 
-def test_observe_keeps_the_tier_frozen_when_a_code_disappears(published: Path) -> None:
+def test_observe_retires_a_head_code_that_disappears(published: Path) -> None:
+    """Keeping it IN_TIER at zero rows was the worst of both: its row-weighted
+    contribution vanished while it still demanded a human label for a code that is
+    no longer in the scope — capping coverage below 1.0 permanently."""
     prior = load_snapshot(snapshot_dir("v1", published))
     draft = observe(prior, {"LUAD": 250, "RARE": 10}, version="v2", date="2026-09-01")
+    retired = draft.by_code()["COAD"]
 
-    assert draft.by_code()["COAD"].tier_state is TierState.IN_TIER
-    assert {e.code: e.frozen_row_count for e in draft.universe}["COAD"] == 0
+    assert retired.tier_state is TierState.RETIRED
+    assert "COAD" not in {e.code for e in draft.universe}
+    assert draft.header.tier_codes == prior.header.tier_codes, "the DECLARATION is not rewritten"
+
+
+def test_observe_preserves_a_retired_codes_last_known_weight(published: Path) -> None:
+    prior = load_snapshot(snapshot_dir("v1", published))
+    draft = observe(prior, {"COAD": 100, "RARE": 10}, version="v2", date="2026-09-01")
+
+    assert draft.by_code()["LUAD"].row_count == 100, "a zeroed weight is not a measurement"
+    assert draft.by_code()["LUAD"].gold_concept_id == 45768916
+
+
+def test_observe_recomputes_the_achieved_tier_share(published: Path) -> None:
+    """It carried the prior share forward while replacing every count beneath it, so
+    a published snapshot contradicted its own universe manifest."""
+    prior = load_snapshot(snapshot_dir("v1", published))
+    draft = observe(prior, {"LUAD": 100, "COAD": 100, "RARE": 800}, version="v2", date="2026-09-01")
+
+    assert draft.header.tier_achieved_row_share == pytest.approx(200 / 1000)
+    assert draft.header.tier_achieved_row_share != prior.header.tier_achieved_row_share
 
 
 def test_observe_is_idempotent(published: Path) -> None:

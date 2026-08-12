@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from sema.eval.goldset_snapshot_utils import GoldSetHeader
+from sema.eval.goldset_source import SourceKind, SourceSpec
 from sema.eval.mapping_goldset import GoldSet
 from sema.eval.mapping_goldset_utils import (
     Decision,
@@ -38,6 +40,31 @@ _SUBJECT = EvaluationSubject(
     target_property_ref="target.condition_occurrence_staging.condition_concept_id",
     resolver_policy_ref="omop.oncotree_condition",
     vocab_release="omop-vocab-2024",
+)
+
+_HEADER = GoldSetHeader(
+    snapshot_version="2026-08-11-staging",
+    snapshot_date="2026-08-11",
+    source_of_truth=SourceSpec(
+        kind=SourceKind.STAGING,
+        table="sema_staging.condition_staging",
+        code_column="source_oncotree_code",
+        scope_column="source_schema",
+        scope_values=("cbioportal_msk_chord_2024",),
+    ),
+    target_vocabulary="SNOMED",
+    target_domain="Condition",
+    vocab_release="omop-vocab-2024",
+    oracle_source="human curation",
+    oracle_version="unlabelled",
+    tier_codes=(),
+    challenge_codes=(),
+    tier_target_row_share=0.95,
+    tier_achieved_row_share=0.95,
+    min_frozen_tier_row_share=0.90,
+    max_unseen_code_share=0.10,
+    rows_sha256="abc123",
+    universe_sha256="def456",
 )
 
 
@@ -149,6 +176,66 @@ def test_every_labelled_challenge_code_must_be_second_reviewed() -> None:
     assert "unadjudicated" in report.qualifiers
 
 
+def test_an_entirely_unlabelled_challenge_stratum_stays_unadjudicated() -> None:
+    """Filtering to labelled rows first made the challenge check vacuous: with no
+    challenge label at all there was nothing to find missing a reviewer."""
+    gold = GoldSet(
+        _head(12, "sam") + [_row("UESL", TierState.CHALLENGE) for _ in range(1)]
+    )
+
+    report = build_mapping_report(gold, _decisions(12), challenge_codes=("UESL",))
+
+    assert "unadjudicated" in report.qualifiers
+
+
+def test_a_challenge_code_that_sits_in_the_head_still_needs_a_reviewer() -> None:
+    """Live case IMMC: declared in the header's challenge list, but derive_states
+    resolves it to IN_TIER, so a tier_state check can never demand its review."""
+    gold = GoldSet(
+        _head(12, "sam")
+        + [_row("IMMC", TierState.IN_TIER, GoldLabel.RESOLVED, 777, None)]
+    )
+
+    report = build_mapping_report(
+        gold, [*_decisions(12), _decision("IMMC", 777)], challenge_codes=("IMMC",)
+    )
+
+    assert "unadjudicated" in report.qualifiers
+
+
+def test_the_head_review_floor_is_the_frozen_head_not_what_has_been_labelled() -> None:
+    """3 labelled-and-reviewed head codes cleared a floor of 10 because the floor
+    was min(10, len(LABELLED head)) rather than min(10, len(head))."""
+    gold = GoldSet(
+        _head(3, "sam")
+        + [_row(f"U{i}", TierState.IN_TIER) for i in range(134)]
+    )
+
+    report = build_mapping_report(gold, _decisions(3))
+
+    assert "unadjudicated" in report.qualifiers
+
+
+def test_a_small_head_may_be_fully_reviewed_below_the_nominal_floor() -> None:
+    """The floor is a sample size, not an absolute: a 4-code head needs 4."""
+    report = build_mapping_report(GoldSet(_head(4, "sam")), _decisions(4))
+
+    assert "unadjudicated" not in report.qualifiers
+
+
+def test_an_out_of_tier_label_alone_does_not_count_as_an_adjudicated_oracle() -> None:
+    """`labelled` spanned every row, so one out-of-tier label with zero head
+    labels satisfied the non-empty check and both strata checks vacuously."""
+    gold = GoldSet(
+        [_row("RARE", TierState.OUT_OF_TIER, GoldLabel.RESOLVED, 5, "sam")]
+        + [_row(f"U{i}", TierState.IN_TIER) for i in range(137)]
+    )
+
+    report = build_mapping_report(gold, [])
+
+    assert "unadjudicated" in report.qualifiers
+
+
 # --- three strata, reported separately --------------------------------------
 
 
@@ -189,6 +276,79 @@ def test_the_random_tail_sample_is_deterministic_per_snapshot() -> None:
     assert first.tail_sample_codes != other.tail_sample_codes
 
 
+def test_a_labelled_tail_code_is_scored_into_its_own_matrix() -> None:
+    """The stratum billed as 'the only thing that speaks to confidently wrong in the
+    tail' could not: score() dropped every OUT_OF_TIER row, so the report emitted a
+    list of codes and a labelled count and no metric at all."""
+    gold = GoldSet(
+        _head(12, "sam")
+        + [_row("RARE", TierState.OUT_OF_TIER, GoldLabel.RESOLVED, 500)]
+    )
+
+    report = build_mapping_report(
+        gold, [*_decisions(12), _decision("RARE", 999)]  # confidently wrong
+    )
+
+    assert report.score.tail_distinct_code.wrong == 1
+    assert report.score.tail_distinct_code.mapped_precision == pytest.approx(0.0)
+    assert report.score.tail_scored_codes == 1
+
+
+def test_a_labelled_tail_code_cannot_move_the_gating_matrix() -> None:
+    """The §1.5(f) hazard still holds: out-of-tier rows stay out of the primary
+    matrix, they just get one of their own."""
+    head_only = build_mapping_report(GoldSet(_head(12, "sam")), _decisions(12))
+    with_tail = build_mapping_report(
+        GoldSet(_head(12, "sam") + [_row("RARE", TierState.OUT_OF_TIER, GoldLabel.RESOLVED, 5)]),
+        [*_decisions(12), _decision("RARE", 999)],
+    )
+
+    assert with_tail.score.distinct_code.as_dict() == head_only.score.distinct_code.as_dict()
+    assert with_tail.verdict is head_only.verdict
+    assert with_tail.ungraded_codes == ()
+
+
+def test_a_retired_code_is_never_scored_even_when_labelled() -> None:
+    """It left the declared scope, so there is nothing live to grade it against."""
+    gold = GoldSet(_head(12, "sam") + [_row("GBM", TierState.RETIRED, GoldLabel.RESOLVED, 7)])
+
+    report = build_mapping_report(gold, [*_decisions(12), _decision("GBM", 7)])
+
+    assert report.score.tail_scored_codes == 0
+    assert "GBM" in report.score.unscored_out_of_scope
+
+
+def test_the_tail_sample_is_drawn_from_the_universe_manifest() -> None:
+    """Sampling only existing gold rows drew from codes that happened to be in a
+    PRIOR scope — a biased slice of the tail, not a sample of it."""
+    gold = GoldSet(_head(2, "sam") + [_row("LEGACY", TierState.OUT_OF_TIER)])
+    manifest = tuple(f"T{i}" for i in range(300))
+
+    report = build_mapping_report(
+        gold, _decisions(2), snapshot_version="v1", tail_universe=manifest
+    )
+
+    assert len(report.tail_sample_codes) == 20
+    assert set(report.tail_sample_codes) <= set(manifest)
+
+
+def test_the_tail_sample_says_which_codes_are_not_yet_labellable() -> None:
+    """A sampled manifest code with no gold row cannot be labelled, so a zero
+    labelled count must not read as 'looked at and found clean'."""
+    gold = GoldSet(_head(2, "sam") + [_row("T7", TierState.OUT_OF_TIER)])
+
+    report = build_mapping_report(
+        gold, _decisions(2), snapshot_version="v1",
+        tail_universe=tuple(f"T{i}" for i in range(300)),
+    )
+    stratum = report.as_dict()["strata"]["random_tail"]
+
+    assert stratum["labelled"] == 0
+    assert stratum["without_a_gold_row"] == len(report.tail_sample_codes) - (
+        1 if "T7" in report.tail_sample_codes else 0
+    )
+
+
 def test_the_random_tail_never_touches_the_primary_matrix() -> None:
     head_only = build_mapping_report(GoldSet(_head(12, "sam")), _decisions(12))
     with_tail = build_mapping_report(
@@ -214,8 +374,8 @@ def test_an_eval_run_records_everything_needed_to_re_verify_it(tmp_path: Path) -
         report=report,
         subject=_SUBJECT,
         decisions=_decisions(3),
-        gold_rows_sha256="abc123",
-        universe_sha256="def456",
+        header=_HEADER,
+        resolver_run_ids=["resolver-run-7"],
     )
     manifest = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
 
@@ -225,7 +385,14 @@ def test_an_eval_run_records_everything_needed_to_re_verify_it(tmp_path: Path) -
         "snapshot_version": "2026-08-11-staging",
         "rows_sha256": "abc123",
         "universe_sha256": "def456",
+        "vocab_release": "omop-vocab-2024",
+        "target_vocabulary": "SNOMED",
+        "target_domain": "Condition",
     }
+    assert manifest["resolver_run_ids"] == ["resolver-run-7"], (
+        "the store overwrites decisions in place under one grain key, so the run "
+        "artifact is the only surviving record of which execution was graded"
+    )
     assert manifest["decisions_sha256"]
     assert manifest["decision_count"] == 3
     assert (run_dir / "decisions.jsonl").read_text(encoding="utf-8").count("\n") == 3
@@ -236,7 +403,7 @@ def test_an_eval_run_is_never_overwritten(tmp_path: Path) -> None:
     report = build_mapping_report(GoldSet(_head(1, "sam")), _decisions(1))
     args = dict(
         run_id="run-1", report=report, subject=_SUBJECT, decisions=_decisions(1),
-        gold_rows_sha256="a", universe_sha256="b",
+        header=_HEADER,
     )
     write_eval_run(tmp_path, **args)  # type: ignore[arg-type]
 
@@ -246,7 +413,7 @@ def test_an_eval_run_is_never_overwritten(tmp_path: Path) -> None:
 
 def test_the_decision_digest_is_order_independent(tmp_path: Path) -> None:
     report = build_mapping_report(GoldSet(_head(3, "sam")), _decisions(3))
-    common = dict(report=report, subject=_SUBJECT, gold_rows_sha256="a", universe_sha256="b")
+    common = dict(report=report, subject=_SUBJECT, header=_HEADER)
 
     forward = write_eval_run(tmp_path, run_id="a", decisions=_decisions(3), **common)  # type: ignore[arg-type]
     reverse = write_eval_run(

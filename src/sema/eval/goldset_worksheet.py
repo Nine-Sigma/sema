@@ -18,14 +18,23 @@ from __future__ import annotations
 
 import csv
 import hashlib
-from dataclasses import replace
+from collections.abc import Sequence
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from sema.eval.goldset_ops import SnapshotDraft
 from sema.eval.goldset_snapshot import GoldSetSnapshot
-from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow, TierState
+from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow
+from sema.eval.mapping_report_utils import codes_needing_second_review
 
-__all__ = ["WORKSHEET_COLUMNS", "apply_labels", "build_worksheet", "worksheet_codes"]
+__all__ = [
+    "WORKSHEET_COLUMNS",
+    "SourceContext",
+    "apply_labels",
+    "build_worksheet",
+    "reference_tissues",
+    "worksheet_codes",
+]
 
 WORKSHEET_COLUMNS = (
     "oncotree_code",
@@ -55,19 +64,62 @@ def worksheet_codes(snapshot: GoldSetSnapshot, head_size: int) -> list[str]:
     )
 
 
+@dataclass(frozen=True)
+class SourceContext:
+    """Per-code source-side context a curator needs to look a target up alone.
+
+    All three come from the SOURCE side — the OncoTree concept's own name, the
+    study's ``CANCER_TYPE`` (OncoTree's ``mainType``), and the tissue from the
+    shipped reference CSV. None is derived from ``concept_relationship 'Maps to'``,
+    which is the resolver's own path: pre-filling that would hand the reviewer
+    the answer to rubber-stamp.
+    """
+
+    names: dict[str, str] = field(default_factory=dict)
+    main_types: dict[str, str] = field(default_factory=dict)
+    tissues: dict[str, str] = field(default_factory=dict)
+
+    def missing(self, codes: Sequence[str]) -> dict[str, list[str]]:
+        """Which codes lack which column — a blank cell must not read as 'none exists'."""
+        return {
+            column: [c for c in codes if not source.get(c)]
+            for column, source in (
+                ("oncotree_name", self.names),
+                ("main_type", self.main_types),
+                ("tissue", self.tissues),
+            )
+        }
+
+
+def reference_tissues(root: Path) -> dict[str, str]:
+    """Tissue per code from the shipped ``oncotree_reference_*.csv`` files.
+
+    OncoTree ancestry is absent from this OMOP build, so the reference CSV is the
+    only tissue source — and it covers only part of any tier, which is why
+    :meth:`SourceContext.missing` reports the shortfall rather than shipping
+    blanks that look like absence.
+    """
+    tissues: dict[str, str] = {}
+    for path in sorted(root.glob("oncotree_reference_*.csv")):
+        with path.open(encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                tissue = (row.get("tissue") or "").strip()
+                if tissue:
+                    tissues[(row.get("oncotree_code") or "").strip()] = tissue
+    return tissues
+
+
 def build_worksheet(
     snapshot: GoldSetSnapshot,
     path: str | Path,
     *,
     head_size: int = 50,
+    context: SourceContext | None = None,
     source_names: dict[str, str] | None = None,
-    source_main_types: dict[str, str] | None = None,
-    source_tissues: dict[str, str] | None = None,
 ) -> list[str]:
     """Write a blank labelling worksheet for tier 1. Returns the codes included."""
-    names = source_names or {}
-    main_types = source_main_types or {}
-    tissues = source_tissues or {}
+    resolved = context or SourceContext(names=source_names or {})
+    names, main_types, tissues = resolved.names, resolved.main_types, resolved.tissues
     codes = worksheet_codes(snapshot, head_size)
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -157,12 +209,14 @@ def _assert_complete(code: str, label: GoldLabel, entry: dict[str, str]) -> None
         raise ValueError(f"{code}: NO_MAP must not carry a target concept")
 
 
-def challenge_codes_needing_review(rows: list[GoldRow]) -> list[str]:
-    """Labelled challenge codes with no second reviewer — the acceptance-gating set."""
-    return sorted(
-        r.oncotree_code
-        for r in rows
-        if r.tier_state is TierState.CHALLENGE
-        and r.gold_label is not GoldLabel.UNLABELLED
-        and not r.second_reviewer
-    )
+def challenge_codes_needing_review(
+    rows: list[GoldRow],
+    challenge_codes: Sequence[str],
+) -> list[str]:
+    """Declared challenge codes not yet labelled AND second-reviewed.
+
+    Reads the header's declared list, never ``tier_state``: a challenge code that
+    also ranks inside the frozen head (live case ``IMMC``) is ``IN_TIER``, so a
+    state check would silently exempt it from the review it most needs.
+    """
+    return codes_needing_second_review(rows, challenge_codes)

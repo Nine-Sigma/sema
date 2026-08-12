@@ -134,8 +134,13 @@ def test_challenge_rows_do_not_block_acceptance() -> None:
 # --- scoring eligibility ----------------------------------------------------
 
 
-def test_out_of_tier_and_retired_codes_are_never_scored() -> None:
-    """The OUT_OF_TIER-as-a-GoldLabel hazard: they must not become fp_map."""
+def test_out_of_tier_and_retired_codes_never_enter_the_primary_matrix() -> None:
+    """The OUT_OF_TIER-as-a-GoldLabel hazard: they must not become fp_map HERE.
+
+    A labelled out-of-tier row is still scored — into the tail matrix, which is what
+    lets the tail stratum say anything at all — but it cannot touch the gating one.
+    A retired code stays unscored: it left the scope, so nothing live grades it.
+    """
     gold = [
         *_head_labelled(),
         _row("RARE", TierState.OUT_OF_TIER, GoldLabel.NO_MAP, row_count=2),
@@ -153,7 +158,21 @@ def test_out_of_tier_and_retired_codes_are_never_scored() -> None:
     assert report.distinct_code.fp_map == 0
     assert report.distinct_code.mapped_precision == pytest.approx(1.0)
     assert report.scored_codes == 2
-    assert report.unscored_out_of_scope == ["GBM", "RARE"]
+    assert report.unscored_out_of_scope == ["GBM"]
+    assert report.tail_distinct_code.fp_map == 1, "the tail records what the gate ignores"
+    assert report.tail_scored_codes == 1
+
+
+def test_an_unlabelled_out_of_tier_code_is_scored_nowhere() -> None:
+    """Unlabelled is the actual hazard: classify_cell would read it as gold-NO_MAP."""
+    gold = [*_head_labelled(), _row("RARE", TierState.OUT_OF_TIER, row_count=2)]
+    decisions = [_resolved("LUAD", 45768916), _resolved("COAD", 4180790), _resolved("RARE", 999)]
+
+    report = score(gold, decisions)
+
+    assert report.tail_scored_codes == 0
+    assert report.distinct_code.fp_map == 0
+    assert report.unscored_out_of_scope == ["RARE"]
 
 
 def test_a_challenge_row_cannot_move_any_primary_matrix_value() -> None:
