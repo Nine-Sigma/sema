@@ -22,8 +22,9 @@ import pytest
 
 from sema.eval.mapping_report import build_mapping_report, decisions_from_store
 from sema.eval.mapping_report_utils import AcceptanceVerdict
-from sema.eval.goldset_snapshot import current_snapshot_rows_path
+from sema.eval.goldset_snapshot import current_snapshot_rows_path, load_current_snapshot
 from sema.eval.mapping_goldset import GoldSet, load_gold_set
+from sema.eval.mapping_run import EvaluationSubject
 from sema.models.planner.provenance import Provenance, RunProvenance, SourceScope
 from sema.resolve.engine import VocabularyResolver
 from sema.resolve.engine_utils import ResolveContext
@@ -41,6 +42,7 @@ pytestmark = pytest.mark.integration
 _DB = Path.home() / ".sema" / "poc.duckdb"
 _GOLD = current_snapshot_rows_path()
 _VOCAB_RELEASE = "omop-vocab-2024"
+_SOURCE_VOCABULARY = "OncoTree"
 _POLICY_REF = OMOP_ONCOTREE_CONDITION_REF
 _TARGET_PROPERTY_REF = "target.stage.condition_concept_id"
 
@@ -84,22 +86,26 @@ def test_mapping_report_over_real_decisions(tmp_path: Path) -> None:
     vstore = open_duckdb_vocab_store(str(_DB), schema=OMOP_VOCAB_SCHEMA)
     resolver = VocabularyResolver(vstore, policy)
 
-    gold = GoldSet(load_gold_set(_GOLD))
+    snapshot = load_current_snapshot()
+    gold = GoldSet(snapshot.rows)
     codes = sorted({r.oncotree_code for r in gold.rows})
 
     vm_conn = duckdb.connect(str(tmp_path / "value_mapping.duckdb"))
     store = ValueMappingStore(vm_conn)
     resolver.resolve_and_store(codes, store, _context())
 
-    decisions = decisions_from_store(
-        store,
+    subject = EvaluationSubject(
+        source_vocabulary=_SOURCE_VOCABULARY,
         target_property_ref=_TARGET_PROPERTY_REF,
         resolver_policy_ref=_POLICY_REF,
         vocab_release=_VOCAB_RELEASE,
     )
+    decisions = decisions_from_store(store, subject)
     assert len(decisions) == len(codes)
 
-    report = build_mapping_report(gold, decisions)
+    report = build_mapping_report(
+        gold, decisions, snapshot_version=snapshot.header.snapshot_version
+    )
     print(report.human_summary())
 
     if report.coverage_fraction >= 1.0:
