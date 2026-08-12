@@ -96,6 +96,7 @@ class GoldRow:
     curator: str | None = None
     review_date: str | None = None
     evidence: str | None = None
+    second_reviewer: str | None = None
 
 
 @dataclass(frozen=True)

@@ -16,12 +16,15 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from sema.eval.mapping_goldset import GoldSet, load_gold_set, score
-from sema.eval.mapping_goldset_utils import Decision
+from sema.eval.mapping_goldset_utils import Decision, GoldLabel
 from sema.eval.mapping_report_utils import (
     MappingReport,
+    adjudication_qualifiers,
     decision_from_value_mapping,
     evaluate_acceptance,
+    tail_sample,
 )
+from sema.eval.mapping_run import EvaluationSubject
 from sema.resolve.value_mapping_store import ValueMappingStore
 
 __all__ = [
@@ -33,35 +36,31 @@ __all__ = [
 
 def decisions_from_store(
     store: ValueMappingStore,
-    *,
-    source_vocabulary: str | None = None,
-    target_property_ref: str | None = None,
-    resolver_policy_ref: str | None = None,
-    vocab_release: str | None = None,
+    subject: EvaluationSubject,
 ) -> list[Decision]:
-    """Read the store's resolved rows as scoring decisions (optionally scoped)."""
-    decisions: list[Decision] = []
-    for mapping in store.read_all():
-        if source_vocabulary is not None and mapping.source_vocabulary != source_vocabulary:
-            continue
-        if target_property_ref is not None and mapping.target_property_ref != target_property_ref:
-            continue
-        if resolver_policy_ref is not None and mapping.resolver_policy_ref != resolver_policy_ref:
-            continue
-        if vocab_release is not None and mapping.vocab_release != vocab_release:
-            continue
-        decisions.append(decision_from_value_mapping(mapping))
-    return decisions
+    """Read exactly the store rows that belong to one evaluation subject."""
+    return [
+        decision_from_value_mapping(mapping)
+        for mapping in store.read_all()
+        if mapping.source_vocabulary == subject.source_vocabulary
+        and mapping.target_property_ref == subject.target_property_ref
+        and mapping.resolver_policy_ref == subject.resolver_policy_ref
+        and mapping.vocab_release == subject.vocab_release
+    ]
 
 
 def build_mapping_report(
     gold: GoldSet,
     decisions: Iterable[Decision],
+    *,
+    snapshot_version: str = "",
 ) -> MappingReport:
     """Score decisions against the gold set and apply the acceptance gate."""
     score_report = score(gold.rows, decisions)
     coverage = gold.coverage_fraction()
     verdict, reason = evaluate_acceptance(score_report.distinct_code, coverage)
+    sample = tail_sample(gold.rows, snapshot_version)
+    by_code = gold.by_code()
     return MappingReport(
         score=score_report,
         coverage_fraction=coverage,
@@ -70,6 +69,12 @@ def build_mapping_report(
         verdict=verdict,
         verdict_reason=reason,
         unlabelled_codes=tuple(gold.unlabelled_codes()),
+        snapshot_version=snapshot_version,
+        qualifiers=adjudication_qualifiers(gold.rows),
+        tail_sample_codes=sample,
+        tail_sample_labelled=sum(
+            1 for c in sample if by_code[c].gold_label is not GoldLabel.UNLABELLED
+        ),
     )
 
 
@@ -77,18 +82,11 @@ def report_from_store(
     store: ValueMappingStore,
     gold_path: str | Path,
     *,
-    source_vocabulary: str | None = None,
-    target_property_ref: str | None = None,
-    resolver_policy_ref: str | None = None,
-    vocab_release: str | None = None,
+    subject: EvaluationSubject,
+    snapshot_version: str = "",
 ) -> MappingReport:
-    """Convenience: read the gold set + scoped store decisions and report."""
+    """Read the gold set + the subject's store decisions and report."""
     gold = GoldSet(load_gold_set(gold_path))
-    decisions = decisions_from_store(
-        store,
-        source_vocabulary=source_vocabulary,
-        target_property_ref=target_property_ref,
-        resolver_policy_ref=resolver_policy_ref,
-        vocab_release=vocab_release,
+    return build_mapping_report(
+        gold, decisions_from_store(store, subject), snapshot_version=snapshot_version
     )
-    return build_mapping_report(gold, decisions)

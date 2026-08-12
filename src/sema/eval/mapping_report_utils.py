@@ -16,6 +16,8 @@ reported but is deliberately NOT a gating threshold.
 
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -24,7 +26,10 @@ from sema.eval.mapping_goldset import GoldSetReport
 from sema.eval.mapping_goldset_utils import (
     ConfusionMatrix,
     Decision,
+    GoldLabel,
+    GoldRow,
     ResolutionStatus,
+    TierState,
 )
 from sema.resolve.value_mapping_store_utils import ValueMapping
 
@@ -43,11 +48,51 @@ STRUCTURAL_PRECISION_CAVEAT = (
 
 
 class AcceptanceVerdict(str, Enum):
-    """Whether the run may be called 'accepted' — never self-certified."""
+    """Whether the run may be called 'accepted' — never self-certified.
 
-    ACCEPTED = "accepted"
+    Acceptance is scope-qualified by name. A bare ``accepted`` over a head chosen
+    *by row frequency* would overclaim: it says nothing about the distinct-code
+    tail, and ``per_bucket`` only buckets rows that were labelled and scored, so
+    it is not evidence about an unlabelled one either.
+    """
+
+    ACCEPTED = "accepted_for_frozen_frequency_head"
     PROVISIONAL_NOT_ACCEPTED = "provisional — not accepted"
     RUNNING_NOT_ACCEPTED = "running, not accepted"
+
+
+# Second-review floor before a verdict may drop the ``unadjudicated`` qualifier:
+# every labelled challenge code (a wrong gold NO_MAP scores fp_map directly
+# against a correctly-mapped code) plus a sample of head labels.
+MIN_SECOND_REVIEWED_HEAD_LABELS = 10
+
+
+def adjudication_qualifiers(rows: Sequence[GoldRow]) -> tuple[str, ...]:
+    """``('unadjudicated',)`` unless the G-05 second-review floor was met."""
+    labelled = [r for r in rows if r.gold_label is not GoldLabel.UNLABELLED]
+    if not labelled:
+        return ("unadjudicated",)
+    challenge = [r for r in labelled if r.tier_state is TierState.CHALLENGE]
+    if any(not r.second_reviewer for r in challenge):
+        return ("unadjudicated",)
+    head = [r for r in labelled if r.tier_state is TierState.IN_TIER]
+    reviewed = sum(1 for r in head if r.second_reviewer)
+    if reviewed < min(MIN_SECOND_REVIEWED_HEAD_LABELS, len(head)):
+        return ("unadjudicated",)
+    return ()
+
+
+def tail_sample(rows: Sequence[GoldRow], snapshot_version: str, size: int = 20) -> tuple[str, ...]:
+    """A deterministic, NEVER-gating sample of out-of-tier codes.
+
+    The only stratum that speaks to "confidently wrong in the tail". Derived from
+    the frozen snapshot so it is reproducible without being a second benchmark.
+    """
+    codes = [r.oncotree_code for r in rows if r.tier_state is TierState.OUT_OF_TIER]
+    ranked = sorted(
+        codes, key=lambda c: hashlib.sha256(f"{snapshot_version}:{c}".encode()).hexdigest()
+    )
+    return tuple(sorted(ranked[:size]))
 
 
 def decision_from_value_mapping(mapping: ValueMapping) -> Decision:
@@ -114,11 +159,17 @@ class MappingReport:
     verdict: AcceptanceVerdict
     verdict_reason: str
     unlabelled_codes: tuple[str, ...] = ()
+    snapshot_version: str = ""
+    qualifiers: tuple[str, ...] = ()
+    tail_sample_codes: tuple[str, ...] = ()
+    tail_sample_labelled: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "verdict": self.verdict.value,
             "verdict_reason": self.verdict_reason,
+            "qualifiers": list(self.qualifiers),
+            "snapshot_version": self.snapshot_version,
             "coverage": {
                 "labelled": self.labelled_count,
                 "total": self.total_codes,
@@ -130,6 +181,22 @@ class MappingReport:
                 "auto_resolution_rate": MIN_AUTO_RESOLUTION_RATE,
             },
             "metrics": self.score.as_dict(),
+            "strata": {
+                "frozen_head": {"gating": True, "scored_codes": self.score.scored_codes},
+                "challenge": {
+                    "gating": False,
+                    "scored_codes": self.score.challenge_scored_codes,
+                },
+                "random_tail": {
+                    "gating": False,
+                    "codes": list(self.tail_sample_codes),
+                    "labelled": self.tail_sample_labelled,
+                    "note": (
+                        "informational only — the frozen head is selected by row "
+                        "frequency and says nothing about the distinct-code tail"
+                    ),
+                },
+            },
             "structural_precision_caveat": STRUCTURAL_PRECISION_CAVEAT,
         }
 
@@ -149,8 +216,10 @@ class MappingReport:
 
     def human_summary(self) -> str:
         m = self.score.distinct_code
+        qualified = " ".join(f"[{q}]" for q in self.qualifiers)
         lines = [
-            f"Mapping eval report — VERDICT: {self.verdict.value}",
+            f"Mapping eval report — VERDICT: {self.verdict.value} {qualified}".rstrip(),
+            f"  gold set: {self.snapshot_version or 'unversioned'}",
             f"  reason: {self.verdict_reason}",
             f"  coverage: labelled {self.labelled_count}/{self.total_codes} "
             f"({self.coverage_fraction:.1%})",
@@ -159,6 +228,10 @@ class MappingReport:
             f"    mapped_recall       = {_pct(m.mapped_recall)}",
             f"    auto_resolution_rate= {_pct(m.auto_resolution_rate)}",
             f"    no_map_accuracy     = {_pct(m.no_map_accuracy)} (reported separately)",
+            f"  strata: head {self.score.scored_codes} scored (gating) / "
+            f"challenge {self.score.challenge_scored_codes} scored / "
+            f"random tail {len(self.tail_sample_codes)} sampled, "
+            f"{self.tail_sample_labelled} labelled (never gating)",
             f"  NOTE: {STRUCTURAL_PRECISION_CAVEAT}",
         ]
         return "\n".join(lines)

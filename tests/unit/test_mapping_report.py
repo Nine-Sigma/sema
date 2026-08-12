@@ -8,6 +8,8 @@ human-labelled gold coverage it is ``provisional — not accepted``.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import json
 from pathlib import Path
 
@@ -21,6 +23,7 @@ from sema.eval.mapping_goldset_utils import (
     GoldRow,
     ResolutionStatus,
 )
+from sema.eval.mapping_run import EvaluationSubject
 from sema.eval.mapping_report import (
     build_mapping_report,
     decisions_from_store,
@@ -85,6 +88,14 @@ def _all_correct(codes: list[tuple[str, int]]) -> tuple[list[GoldRow], list[Deci
         for c, cid in codes
     ]
     return gold, decisions
+
+
+_SUBJECT = EvaluationSubject(
+    source_vocabulary="OncoTree",
+    target_property_ref="target.stage.condition_concept_id",
+    resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
+    vocab_release="vocab-2024",
+)
 
 
 def _value_mapping(
@@ -336,13 +347,13 @@ def test_decisions_from_store_reads_value_mapping_store(tmp_path: Path) -> None:
             _value_mapping("ZZZ", None, StoreResolutionStatus.NO_MAP),
         ]
     )
-    decisions = decisions_from_store(store)
+    decisions = decisions_from_store(store, _SUBJECT)
     by_code = {d.source_code: d for d in decisions}
     assert by_code["LUAD"].concept_id == 45768916
     assert by_code["ZZZ"].resolution_status is ResolutionStatus.NO_MAP
 
     # Both gold codes RESOLVED + correctly auto-accepted -> precision 1.0, auto 1.0.
-    decisions = decisions_from_store(store)
+    decisions = decisions_from_store(store, _SUBJECT)
     luad = next(d for d in decisions if d.source_code == "LUAD")
     gold = GoldSet([_gold("LUAD", 45768916, GoldLabel.RESOLVED)])
     report = build_mapping_report(gold, [luad])
@@ -365,7 +376,7 @@ def test_decisions_from_store_scope_filter(tmp_path: Path) -> None:
         ]
     )
     scoped = decisions_from_store(
-        store, target_property_ref="target.other.some_concept_id"
+        store, replace(_SUBJECT, target_property_ref="target.other.some_concept_id")
     )
     assert [d.concept_id for d in scoped] == [2]
     store.close()
@@ -375,18 +386,12 @@ def test_decisions_from_store_all_scope_filters(tmp_path: Path) -> None:
     conn = duckdb.connect(str(tmp_path / "vm.duckdb"))
     store = ValueMappingStore(conn)
     store.upsert([_value_mapping("LUAD", 1, StoreResolutionStatus.RESOLVED)])
-    assert decisions_from_store(store, source_vocabulary="Other") == []
+    assert decisions_from_store(store, replace(_SUBJECT, source_vocabulary="Other")) == []
     assert (
-        decisions_from_store(store, resolver_policy_ref="other.policy") == []
+        decisions_from_store(store, replace(_SUBJECT, resolver_policy_ref="other.policy")) == []
     )
-    assert decisions_from_store(store, vocab_release="vocab-1999") == []
-    kept = decisions_from_store(
-        store,
-        source_vocabulary="OncoTree",
-        resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
-        vocab_release="vocab-2024",
-    )
-    assert [d.concept_id for d in kept] == [1]
+    assert decisions_from_store(store, replace(_SUBJECT, vocab_release="vocab-1999")) == []
+    assert [d.concept_id for d in decisions_from_store(store, _SUBJECT)] == [1]
     store.close()
 
 
@@ -410,7 +415,7 @@ def test_report_from_store_reads_gold_file(tmp_path: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
-    report = report_from_store(store, gold_path)
+    report = report_from_store(store, gold_path, subject=_SUBJECT)
     assert report.verdict is AcceptanceVerdict.ACCEPTED
     assert report.score.distinct_code.tp == 1
     store.close()

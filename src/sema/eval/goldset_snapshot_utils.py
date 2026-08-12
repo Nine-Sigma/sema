@@ -142,6 +142,7 @@ def row_to_json(row: GoldRow) -> dict[str, Any]:
         "curator": row.curator,
         "review_date": row.review_date,
         "evidence": row.evidence,
+        "second_reviewer": row.second_reviewer,
         "notes": row.notes,
     }
 
@@ -159,6 +160,7 @@ def row_from_json(obj: dict[str, Any]) -> GoldRow:
         curator=_optional_str(obj.get("curator")),
         review_date=_optional_str(obj.get("review_date")),
         evidence=_optional_str(obj.get("evidence")),
+        second_reviewer=_optional_str(obj.get("second_reviewer")),
     )
 
 
