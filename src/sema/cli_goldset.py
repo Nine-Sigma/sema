@@ -23,6 +23,11 @@ from sema.eval.goldset_snapshot import (
 from sema.eval.goldset_source import SourceKind, SourceSpec, enumerate_scoped_codes
 from sema.eval.mapping_goldset import GoldSet
 from sema.eval.mapping_report import report_from_store
+from sema.eval.goldset_worksheet import (
+    apply_labels,
+    build_worksheet,
+    challenge_codes_needing_review,
+)
 from sema.eval.mapping_run import EvaluationSubject, write_eval_run
 
 _VERSION = click.option("--version", required=True, help="New snapshot version (never reused).")
@@ -43,7 +48,7 @@ def goldset_group() -> None:
 @_DB
 def drift_cmd(db: str) -> None:
     """Report weight drift and benchmark freshness against live data."""
-    snapshot = load_current_snapshot()
+    snapshot = load_current_snapshot(GOLD_ROOT)
     with _connect(db) as con:
         observed = dict(enumerate_scoped_codes(con, snapshot.header.source_of_truth))
     report = goldset_drift_report(snapshot, observed, snapshot.header.source_of_truth)
@@ -56,7 +61,7 @@ def drift_cmd(db: str) -> None:
 @_DATE
 def observe_cmd(db: str, version: str, date: str) -> None:
     """Re-stamp row counts. Frozen populations do not move."""
-    snapshot = load_current_snapshot()
+    snapshot = load_current_snapshot(GOLD_ROOT)
     with _connect(db) as con:
         observed = dict(enumerate_scoped_codes(con, snapshot.header.source_of_truth))
     _publish(observe(snapshot, observed, version=version, date=date))
@@ -69,7 +74,7 @@ def observe_cmd(db: str, version: str, date: str) -> None:
 @_SHARE
 def re_tier_cmd(db: str, version: str, date: str, target_row_share: float) -> None:
     """Recompute the frozen head. A NEW benchmark: scores are not comparable."""
-    snapshot = load_current_snapshot()
+    snapshot = load_current_snapshot(GOLD_ROOT)
     with _connect(db) as con:
         observed = dict(enumerate_scoped_codes(con, snapshot.header.source_of_truth))
     _publish(
@@ -103,7 +108,7 @@ def re_scope_cmd(
     scope_values: tuple[str, ...],
 ) -> None:
     """Change the declared source of truth. Retires codes that leave it."""
-    snapshot = load_current_snapshot()
+    snapshot = load_current_snapshot(GOLD_ROOT)
     spec = SourceSpec(
         kind=SourceKind(kind), table=table, code_column=code_column,
         scope_column=scope_column, scope_values=tuple(scope_values),
@@ -117,6 +122,48 @@ def re_scope_cmd(
             challenge_codes=snapshot.header.challenge_codes,
         )
     )
+
+
+@goldset_group.command("worksheet")
+@_DB
+@click.option("--head-size", default=50, show_default=True, type=int)
+@click.option("--output", "output_path", required=True, type=click.Path())
+def worksheet_cmd(db: str, head_size: int, output_path: str) -> None:
+    """Write a blank tier-1 labelling worksheet (source-side context only)."""
+    snapshot = load_current_snapshot(GOLD_ROOT)
+    with _connect(db) as con:
+        names = dict(
+            con.execute(
+                "SELECT concept_code, concept_name FROM vocabulary_omop.concept "
+                "WHERE vocabulary_id = 'OncoTree'"
+            ).fetchall()
+        )
+    codes = build_worksheet(
+        snapshot, output_path, head_size=head_size, source_names=names
+    )
+    missing = [c for c in codes if c not in names]
+    click.echo(
+        f"wrote {len(codes)} rows to {output_path}\n"
+        f"  no OncoTree name available for {len(missing)}: {missing}\n"
+        "  no candidate target concepts are pre-filled, and the challenge stratum is\n"
+        "  interleaved — both deliberate, so the oracle stays independent."
+    )
+
+
+@goldset_group.command("apply-labels")
+@click.option("--worksheet", "worksheet_path", required=True, type=click.Path(exists=True))
+@_VERSION
+@_DATE
+def apply_labels_cmd(worksheet_path: str, version: str, date: str) -> None:
+    """Apply a curator's completed worksheet as a NEW snapshot."""
+    draft = apply_labels(load_current_snapshot(GOLD_ROOT), worksheet_path, version=version, date=date)
+    _publish(draft)
+    pending = challenge_codes_needing_review(draft.rows)
+    if pending:
+        click.echo(
+            f"  {len(pending)} labelled challenge codes still lack a second reviewer "
+            f"({', '.join(pending)}); the verdict will read `unadjudicated`."
+        )
 
 
 @click.command("mapping-report")
@@ -152,11 +199,11 @@ def mapping_report_cmd(
         resolver_policy_ref=resolver_policy_ref,
         vocab_release=vocab_release,
     )
-    snapshot = load_current_snapshot()
+    snapshot = load_current_snapshot(GOLD_ROOT)
     store = ValueMappingStore(duckdb.connect(store_path), schema=schema, table=table)
     try:
         report = report_from_store(
-            store, current_snapshot_rows_path(), subject=subject,
+            store, current_snapshot_rows_path(GOLD_ROOT), subject=subject,
             snapshot_version=snapshot.header.snapshot_version,
         )
         decisions = decisions_from_store(store, subject)

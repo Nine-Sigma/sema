@@ -376,14 +376,37 @@ Acceptance criteria (+ all Global Standards):
   `auto_resolution_rate`, and `no_map_accuracy` compute to the **§1.5 values**; a
   predicted `NO_MAP` is **TN** when gold is `NO_MAP` and **FN** (recall miss) when gold is
   a real concept (never silently dropped); `no_map_accuracy` is reported **separately**.
-- Gold set artifact `tests/data/gold/oncotree_condition_slice0.jsonl` (or `.csv`): one
-  row per **distinct** observed `ONCOTREE_CODE`, columns
-  `oncotree_code, gold_concept_id, gold_label (RESOLVED|NO_MAP), row_count, notes`.
-  Distinct codes enumerated from `~/.sema/poc.duckdb` `cbioportal_*` (document the query).
-  Hand-labelling **may** start with a documented subset (≥ the top codes by `row_count`
-  covering ≥80% of rows) — but per §1.5(f), subset metrics are **provisional only**;
-  acceptance thresholds (US-012) require 100% distinct-code coverage. Record the subset
-  and its coverage.
+- Gold set artifact: a **frozen snapshot** under
+  `tests/data/gold/snapshots/<snapshot_version>/`, with `current.json` naming the active
+  version. Each snapshot carries `oncotree_condition_slice0.jsonl` (one row per code in
+  its declared scope), `meta.json` (the declaration), and `universe.jsonl` (a
+  `{code, frozen_row_count}` manifest of **every** code in scope).
+  Row columns: `oncotree_code, gold_concept_id, target_concept_code, gold_label
+  (RESOLVED|NO_MAP|UNLABELLED), tier_state, row_count, curator, review_date, evidence,
+  second_reviewer, notes`.
+  Distinct codes are enumerated from an **executable source specification** in the
+  header (`source_of_truth`: `raw_samples` over `<schema>.sample`, or `staging` over
+  `sema_staging.condition_staging` keyed by the `source_schema` column) — never by
+  auto-discovering whatever `cbioportal_*` schemas happen to be loaded, which made the
+  scope a function of the last ingest.
+- **AMENDMENT (2026-08-11, D1(x) of `tasks/plan-goldset-drift.md`): acceptance coverage
+  is 100% of the frozen tier, not 100% of observed distinct codes.** The original rule
+  is retained in spirit — nothing is accepted on a partially-labelled population — but
+  its denominator is now the snapshot's frozen frequency head, an explicit code list in
+  the header that is **never recomputed at test time** (a frequency-defined tier is
+  itself ingest-sensitive, so recomputing it re-introduces the drift the declaration
+  removes). Out-of-tier and retired codes are *accounted for*, not coverage misses.
+  Rationale: labelling all 509 in-scope codes is not affordable at Slice-0, and under
+  the unamended rule `evaluate_acceptance` gates on `coverage_fraction >= 1.0` over
+  every artifact row — so retaining out-of-tier rows as `UNLABELLED` (which "retired,
+  never deleted" requires) capped coverage at 137/181 permanently and made `ACCEPTED`
+  unreachable however well the head was labelled.
+  The ≥80%-of-rows documented-subset floor **still binds** and now binds the *starting*
+  tier: the current head is 137 codes / 95.0% of staged rows, and G-05's tier 1 is the
+  top 50 (84.1% of rows) plus the 12 declared-uncertain codes.
+  Consequently the verdict is emitted as `accepted_for_frozen_frequency_head` with the
+  snapshot version — never a bare `accepted` — since a head chosen by row frequency is
+  no evidence about the distinct-code tail.
 - **Human-label checkpoint (acceptance-blocking; not Ralph-automatable).**
   `gold_concept_id` / `gold_label` are an **external oracle** — they must be
   hand-labelled by a human or imported from a trusted crosswalk, **never** generated

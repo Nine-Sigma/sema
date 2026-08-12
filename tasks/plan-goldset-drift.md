@@ -1,5 +1,41 @@
 # Plan — gold-set drift: restore the OncoTree mapping oracle
 
+## Implementation status — 2026-08-11
+
+**G-01 … G-04, G-06, G-07 are implemented and merged. G-05 (labelling) is open — by
+design: it is a human gate, and this work deliberately did not touch a label.**
+
+Decisions taken: **D1(x)** (PRD amended — acceptance coverage is 100% of the frozen tier;
+see `tasks/prd-sema-mapping-slice0.md`), **D3(ii)** (staging scope), **D4(b)** (human
+curation), **D5** (artifact stays under `tests/data/gold/`, now as versioned snapshots).
+
+What shipped:
+
+- `tests/data/gold/snapshots/2026-08-11-raw2study/` — the prior 64-code artifact, sealed
+  byte-identical with the header and manifest that make its real contract explicit. It met
+  that contract exactly (64/64 codes, 64/64 row counts); the scope declaration was what
+  broke, not coverage.
+- `tests/data/gold/snapshots/2026-08-11-staging/` — current. 509-code universe, frozen
+  137-code head at **95.02%** of staged rows, 11 challenge-only codes, 32 out-of-tier,
+  `GBM` retired. **181 rows, 0 labelled.**
+- `sema eval goldset drift | observe | re-tier | re-scope | worksheet | apply-labels`
+  and `sema eval mapping-report`.
+- `tests/data/gold/worksheets/tier1-2026-08-11-staging.csv` — the 62-code tier-1
+  worksheet (top-50 head + 12 challenge), blank, interleaved, no candidate targets.
+
+**One measured correction to this plan.** Out-of-tier is **32**, not 34, and the artifact
+is **181 rows**, not 172: `MASC` and `PANEC` are existing gold codes that are *also*
+challenge codes, so under G-03's disjoint states they take `CHALLENGE`, not
+`OUT_OF_TIER`. States: 137 in-tier + 11 challenge + 32 out-of-tier + 1 retired.
+
+The live figures the plan predicted were otherwise exact: 509 codes / 79,371 rows, tier
+137 @ 95.02%, 12 declared-uncertain decisions, `GBM` the sole retirement.
+
+Current honest state: `provisional — not accepted [unadjudicated]`, coverage 0/137. The
+instrument is repaired and the needle is at zero, which is what G-05 is for.
+
+---
+
 Status: proposed, 2026-08-11. Revised three times on 2026-08-11 after three adversarial reviews,
 each re-measuring every claim against `~/.sema/poc.duckdb` and the source (see the three
 "Corrections" sections at the end for what changed and why). Pass 2 reversed the labelling-cost
@@ -549,53 +585,53 @@ study is ignored" cannot be staged against a live personal DB at all.
 
 ## Definition of done
 
-- [ ] `tests/integration/test_mapping_goldset_coverage.py` passes against current `poc.duckdb`.
-- [ ] The same contract is verified **without** `poc.duckdb` — fixture-backed, so it holds off this
+- [x] `tests/integration/test_mapping_goldset_coverage.py` passes against current `poc.duckdb`.
+- [x] The same contract is verified **without** `poc.duckdb` — fixture-backed, so it holds off this
       machine.
-- [ ] Ingesting a new `cbioportal_*` study does not red the **snapshot-integrity** suite (proved by
+- [x] Ingesting a new `cbioportal_*` study does not red the **snapshot-integrity** suite (proved by
       G-07's test, not by hope) — while the separately-named **benchmark-freshness** check is free
       to red, with both thresholds declared in the artifact header.
-- [ ] **Two frozen populations, never merged**: `acceptance_eligible` (head-137) gates the verdict;
+- [x] **Two frozen populations, never merged**: `acceptance_eligible` (head-137) gates the verdict;
       `score_eligible` (head ∪ 12 challenge) is scored, with the challenge stratum reported in its
       own matrix. Proved by a test that a challenge row cannot move any primary-matrix value.
-- [ ] A **universe manifest** freezes `{code, frozen_row_count}` for all 509 codes, and the four
+- [x] A **universe manifest** freezes `{code, frozen_row_count}` for all 509 codes, and the four
       states (in-tier / challenge / out-of-tier / retired) partition it exactly.
-- [ ] The report names an explicit **evaluation-subject key** (all 5 grain fields), **raises** on
+- [x] The report names an explicit **evaluation-subject key** (all 5 grain fields), **raises** on
       duplicate decisions per eligible code, and writes an immutable self-describing run to
       `eval-runs/` including the graded decision set.
-- [ ] Refresh **emits a new snapshot version**; the prior snapshot file is byte-identical after.
+- [x] Refresh **emits a new snapshot version**; the prior snapshot file is byte-identical after.
       `observe` / `re-tier` / `re-scope` are separate named operations.
-- [ ] The verdict is **scope-qualified** (`accepted_for_frozen_frequency_head` + snapshot version),
+- [x] The verdict is **scope-qualified** (`accepted_for_frozen_frequency_head` + snapshot version),
       carries `unadjudicated` when independent review was skipped, and reports head / challenge /
       random-tail strata separately.
-- [ ] Gold-set artifact declares its scope, snapshot date, source of truth, **and its frozen tier
+- [x] Gold-set artifact declares its scope, snapshot date, source of truth, **and its frozen tier
       membership** (tier is never recomputed at test time).
-- [ ] `row_count` drift is *reported* with a number, not asserted to zero.
-- [ ] Coverage stated as row-weighted share against a declared tier; out-of-tier codes accounted for.
-- [ ] **Tier/retirement eligibility flows through `coverage_fraction()`, `unlabelled_codes()`, the
+- [x] `row_count` drift is *reported* with a number, not asserted to zero.
+- [x] Coverage stated as row-weighted share against a declared tier; out-of-tier codes accounted for.
+- [x] **Tier/retirement eligibility flows through `coverage_fraction()`, `unlabelled_codes()`, the
       report totals, and the acceptance gate — not `score()` alone** (G-02). Proved by a test that
       an all-in-tier-labelled artifact reaches `ACCEPTED`, not `provisional`.
-- [ ] Every label carries curator, date, and evidence; every `NO_MAP` carries an explicit
+- [ ] **(G-05, open — human gate)** Every label carries curator, date, and evidence; every `NO_MAP` carries an explicit
       justification of absence. All 12 challenge codes + ~10 sampled head labels independently
       second-reviewed — **or** the verdict says `unadjudicated`.
-- [ ] **The oracle actually grades something.** Not satisfiable at zero labels:
+- [ ] **(G-05, open — human gate) The oracle actually grades something.** Not satisfiable at zero labels:
       - `labelled_count > 0` and **≥80% of in-scope rows** covered by labelled codes (the PRD's
         documented-subset floor), i.e. G-05's top-50 tier complete;
       - all **12** declared-uncertain decisions (5 `review_pending`, 7 `NO_MAP`) labelled;
       - at least one scored decision appears in the report (`scored_codes > 0`).
       The eventual **acceptance** target (100% of the frozen tier) is tracked separately — this
       checkbox is the floor below which G-01…G-04 are machinery with no needle.
-- [ ] Artifact invariants asserted on load: unique codes, disjoint/exhaustive tier states, canonical
+- [x] Artifact invariants asserted on load: unique codes, disjoint/exhaustive tier states, canonical
       ordering, label↔concept consistency; projection hash taken over the ordered rows, not a dict.
-- [ ] D1's conflict with the PRD resolved in writing — either the PRD is amended (option x) or the
+- [x] D1's conflict with the PRD resolved in writing — either the PRD is amended (option x) or the
       tier is demoted to a labelling order (option y). Not left implicit.
-- [ ] Re-scaffold and refresh are idempotent and provably label-preserving.
-- [ ] **No `gold_concept_id` is ever written by Sema's resolver, nor by `refresh-goldset`** —
+- [x] Re-scaffold and refresh are idempotent and provably label-preserving.
+- [x] **No `gold_concept_id` is ever written by Sema's resolver, nor by `refresh-goldset`** —
       enforced by a projection-hash test, not a convention.
-- [ ] D4 resolved and recorded here. The independence check is **done and negative**: no route
+- [x] D4 resolved and recorded here. The independence check is **done and negative**: no route
       inside `poc.duckdb` is independent of the resolver, so the chosen oracle must be human
       curation or a genuinely external file.
-- [ ] mypy strict + unit suite green; coverage ≥ 85%.
+- [x] mypy strict + unit suite green; coverage ≥ 85%.
 
 ## Out of scope
 
