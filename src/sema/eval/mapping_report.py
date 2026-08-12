@@ -66,7 +66,7 @@ def build_mapping_report(
         score=score_report,
         coverage_fraction=coverage,
         labelled_count=gold.labelled_count,
-        total_codes=len(gold.rows),
+        total_codes=gold.total_eligible_codes,
         verdict=verdict,
         verdict_reason=reason,
         unlabelled_codes=tuple(gold.unlabelled_codes()),

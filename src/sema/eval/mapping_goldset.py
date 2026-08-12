@@ -36,6 +36,7 @@ from sema.eval.mapping_goldset_utils import (
     Decision,
     GoldLabel,
     GoldRow,
+    TierState,
     classify_cell,
     derive_zone,
     frequency_bucket,
@@ -69,44 +70,94 @@ def _row_from_json(obj: dict[str, Any]) -> GoldRow:
     )
 
 
+def acceptance_eligible(row: GoldRow) -> bool:
+    """The frozen frequency head — the ONLY population that gates the verdict."""
+    return row.tier_state is TierState.IN_TIER
+
+
+def score_eligible(row: GoldRow) -> bool:
+    """Head + challenge stratum — scored, but reported in separate matrices."""
+    return row.tier_state in (TierState.IN_TIER, TierState.CHALLENGE)
+
+
 @dataclass
 class GoldSet:
-    """A loaded gold set with labelled/unlabelled accounting (the human gate)."""
+    """A loaded gold set with labelled/unlabelled accounting (the human gate).
+
+    Every count here is scoped to :func:`acceptance_eligible`. Out-of-tier and
+    retired rows are *accounted for*, never coverage misses: counting them would
+    cap coverage below 1.0 permanently and make the acceptance gate unreachable
+    however well the head is labelled.
+    """
 
     rows: list[GoldRow]
 
     def by_code(self) -> dict[str, GoldRow]:
         return {r.oncotree_code: r for r in self.rows}
 
+    def acceptance_rows(self) -> list[GoldRow]:
+        return [r for r in self.rows if acceptance_eligible(r)]
+
+    @property
+    def total_eligible_codes(self) -> int:
+        return len(self.acceptance_rows())
+
     @property
     def labelled_count(self) -> int:
-        return sum(1 for r in self.rows if r.gold_label is not GoldLabel.UNLABELLED)
+        return sum(
+            1 for r in self.acceptance_rows() if r.gold_label is not GoldLabel.UNLABELLED
+        )
 
     def labelled_rows(self) -> list[GoldRow]:
         return [r for r in self.rows if r.gold_label is not GoldLabel.UNLABELLED]
 
     def unlabelled_codes(self) -> list[str]:
-        return [
+        """In-tier gaps only — this is remaining WORK, not an inventory."""
+        return sorted(
             r.oncotree_code
-            for r in self.rows
+            for r in self.acceptance_rows()
             if r.gold_label is GoldLabel.UNLABELLED
-        ]
+        )
+
+    def challenge_codes(self) -> list[str]:
+        return self._codes(TierState.CHALLENGE)
+
+    def out_of_tier_codes(self) -> list[str]:
+        return self._codes(TierState.OUT_OF_TIER)
+
+    def retired_codes(self) -> list[str]:
+        return self._codes(TierState.RETIRED)
+
+    def _codes(self, state: TierState) -> list[str]:
+        return sorted(r.oncotree_code for r in self.rows if r.tier_state is state)
 
     def coverage_fraction(self) -> float:
-        if not self.rows:
+        eligible = self.total_eligible_codes
+        if not eligible:
             return 0.0
-        return self.labelled_count / len(self.rows)
+        return self.labelled_count / eligible
 
 
 @dataclass
 class GoldSetReport:
-    """§1.5(f) metrics at three granularities + scoring accounting."""
+    """§1.5(f) metrics at three granularities + scoring accounting.
+
+    ``distinct_code`` / ``row_weighted`` / ``per_bucket`` cover the acceptance
+    population ONLY. The challenge stratum is scored into its own matrices: it is
+    the only population that can grade ``NO_MAP`` at all (every live resolver
+    ``NO_MAP`` ranks outside the head), and keeping it separate is what stops the
+    system under test from choosing its own benchmark membership.
+    """
 
     distinct_code: ConfusionMatrix
     row_weighted: ConfusionMatrix
     per_bucket: dict[str, ConfusionMatrix]
     scored_codes: int = 0
+    challenge_distinct_code: ConfusionMatrix = field(default_factory=ConfusionMatrix)
+    challenge_row_weighted: ConfusionMatrix = field(default_factory=ConfusionMatrix)
+    challenge_scored_codes: int = 0
     unscored_unlabelled: list[str] = field(default_factory=list)
+    unscored_out_of_scope: list[str] = field(default_factory=list)
     decisions_without_gold: list[str] = field(default_factory=list)
     labelled_without_decision: list[str] = field(default_factory=list)
 
@@ -116,7 +167,13 @@ class GoldSetReport:
             "row_weighted": self.row_weighted.as_dict(),
             "per_bucket": {k: v.as_dict() for k, v in self.per_bucket.items()},
             "scored_codes": self.scored_codes,
+            "challenge": {
+                "distinct_code": self.challenge_distinct_code.as_dict(),
+                "row_weighted": self.challenge_row_weighted.as_dict(),
+                "scored_codes": self.challenge_scored_codes,
+            },
             "unscored_unlabelled": self.unscored_unlabelled,
+            "unscored_out_of_scope": self.unscored_out_of_scope,
             "decisions_without_gold": self.decisions_without_gold,
             "labelled_without_decision": self.labelled_without_decision,
         }
@@ -128,22 +185,26 @@ def score(
 ) -> GoldSetReport:
     """Score predicted decisions against the gold set per §1.5(f).
 
-    Unit of evaluation = distinct source code. ``UNLABELLED`` gold rows are
-    excluded (never scored) and surfaced in ``unscored_unlabelled``.
+    Unit of evaluation = distinct source code. Rows outside ``score_eligible``
+    are never scored (they would otherwise land in ``fp_map`` via
+    ``classify_cell`` and collapse ``mapped_precision``); ``UNLABELLED`` rows are
+    excluded and surfaced as remaining work.
     """
     gold_by_code = {g.oncotree_code: g for g in gold_rows}
-    dec_by_code = {d.source_code: d for d in decisions}
+    scored_codes = {c for c, g in gold_by_code.items() if score_eligible(g)}
+    dec_by_code = _decisions_by_code(decisions, scored_codes)
 
     report = GoldSetReport(
         distinct_code=ConfusionMatrix(),
         row_weighted=ConfusionMatrix(),
         per_bucket={},
     )
-    report.decisions_without_gold = sorted(
-        set(dec_by_code) - set(gold_by_code)
-    )
+    report.decisions_without_gold = sorted(set(dec_by_code) - set(gold_by_code))
 
     for code, gold in gold_by_code.items():
+        if not score_eligible(gold):
+            report.unscored_out_of_scope.append(code)
+            continue
         if gold.gold_label is GoldLabel.UNLABELLED:
             report.unscored_unlabelled.append(code)
             continue
@@ -152,11 +213,32 @@ def score(
             report.labelled_without_decision.append(code)
             continue
         _accumulate(report, gold, decision)
-        report.scored_codes += 1
 
-    report.unscored_unlabelled.sort()
+    for bucket in (report.unscored_unlabelled, report.unscored_out_of_scope):
+        bucket.sort()
     report.labelled_without_decision.sort()
     return report
+
+
+def _decisions_by_code(
+    decisions: Iterable[Decision],
+    scored_codes: set[str],
+) -> dict[str, Decision]:
+    """Index decisions, refusing to last-wins on a code that will be scored.
+
+    A store holding two policies or vocabulary releases would otherwise blend
+    two resolvers into one matrix, with the winner decided by DuckDB row order.
+    """
+    by_code: dict[str, Decision] = {}
+    for decision in decisions:
+        code = decision.source_code
+        if code in by_code and code in scored_codes:
+            raise ValueError(
+                f"{code}: more than one decision for a scored code — narrow the "
+                "evaluation subject key so exactly one resolver is graded"
+            )
+        by_code[code] = decision
+    return by_code
 
 
 def _accumulate(
@@ -168,10 +250,15 @@ def _accumulate(
         decision.status, decision.resolution_status, decision.concept_id
     )
     cell = classify_cell(gold, zone, decision.concept_id)
+    if gold.tier_state is TierState.CHALLENGE:
+        report.challenge_distinct_code.add(cell, 1.0)
+        report.challenge_row_weighted.add(cell, float(gold.row_count))
+        report.challenge_scored_codes += 1
+        return
     report.distinct_code.add(cell, 1.0)
     report.row_weighted.add(cell, float(gold.row_count))
-    bucket = frequency_bucket(gold.row_count)
-    report.per_bucket.setdefault(bucket, ConfusionMatrix()).add(cell, 1.0)
+    report.per_bucket.setdefault(frequency_bucket(gold.row_count), ConfusionMatrix()).add(cell, 1.0)
+    report.scored_codes += 1
 
 
 # --- live distinct-code enumeration (integration / scaffolding) -------------
