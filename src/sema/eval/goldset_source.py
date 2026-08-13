@@ -23,11 +23,14 @@ from enum import Enum
 from typing import Any, Protocol
 
 __all__ = [
+    "MainTypeReport",
     "SourceKind",
     "SourceSpec",
     "discover_oncotree_schemas",
     "enumerate_scoped_codes",
+    "raw_samples_view",
     "scoped_enumeration_sql",
+    "source_main_types",
 ]
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
@@ -119,6 +122,91 @@ def enumerate_scoped_codes(cursor: _Cursor, spec: SourceSpec) -> list[tuple[str,
     """Enumerate ``(code, row_count)`` over a declared scope, richest first."""
     cursor.execute(scoped_enumeration_sql(spec))
     return [(str(row[0]), int(row[1])) for row in cursor.fetchall()]
+
+
+@dataclass(frozen=True)
+class MainTypeReport:
+    """Per-code source-side main types, plus the scopes that could not be read.
+
+    Separated because a total failure and a total gap are different facts: the
+    worksheet must not present "no main type exists" when what happened is that
+    every study raised.
+    """
+
+    main_types: dict[str, str]
+    failures: dict[str, str]
+
+
+def source_main_types(
+    cursor: _Cursor,
+    spec: SourceSpec,
+    *,
+    main_type_column: str = "CANCER_TYPE",
+) -> MainTypeReport:
+    """One source-side descriptive value per code, over a DECLARED scope.
+
+    ``sample.CANCER_TYPE`` IS OncoTree's ``mainType`` and is source-side data, so
+    it carries none of the target-vocabulary anchoring D4 rules out. Rendered per
+    :class:`SourceKind` through the same validated identifiers as every other SQL
+    path here — interpolating ``scope_values`` into a ``FROM`` clause worked only
+    while a staging scope's study values happened to also be schema names.
+    """
+    code = _identifier(spec.code_column)
+    main_type = _identifier(main_type_column)
+    main_types: dict[str, str] = {}
+    failures: dict[str, str] = {}
+    for value in spec.scope_values:
+        sql = _main_type_sql(spec, value, code=code, main_type=main_type)
+        try:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+        except Exception as exc:  # noqa: BLE001 — collected and reported, never dropped
+            failures[value] = f"{type(exc).__name__}: {exc}"
+            continue
+        main_types.update({str(c): str(v) for c, v in rows})
+    return MainTypeReport(main_types=main_types, failures=failures)
+
+
+def _main_type_sql(spec: SourceSpec, value: str, *, code: str, main_type: str) -> str:
+    select = f"SELECT {code}, ANY_VALUE({main_type})"
+    if spec.kind is SourceKind.RAW_SAMPLES:
+        source = f"{_identifier(value)}.{_identifier(spec.table)}"
+        predicate = f"{main_type} IS NOT NULL"
+    else:
+        if spec.scope_column is None:
+            raise ValueError("staging specs require a scope_column")
+        source = _identifier(spec.table)
+        predicate = (
+            f"{_identifier(spec.scope_column)} = '{_identifier(value)}' "
+            f"AND {main_type} IS NOT NULL"
+        )
+    return f"{select} FROM {source} WHERE {predicate} GROUP BY 1"
+
+
+def raw_samples_view(
+    spec: SourceSpec,
+    *,
+    table: str = "sample",
+    code_column: str = "ONCOTREE_CODE",
+) -> SourceSpec:
+    """The same declared scope addressed as raw ``sample`` tables.
+
+    G-01's two shapes describe the same gold set, so a staging scope's study
+    values are also the raw study schemas. Source-side context (main type) only
+    exists on the raw side, and stating that conversion here makes the assumption
+    explicit and testable instead of hiding it inside a SQL string.
+    """
+    if spec.kind is SourceKind.RAW_SAMPLES:
+        return spec
+    from dataclasses import replace
+
+    return replace(
+        spec,
+        kind=SourceKind.RAW_SAMPLES,
+        table=table,
+        code_column=code_column,
+        scope_column=None,
+    )
 
 
 def discover_oncotree_schemas(cursor: _Cursor) -> list[str]:

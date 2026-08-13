@@ -16,7 +16,13 @@ import click
 from sema.eval.goldset_drift import goldset_drift_report
 from sema.eval.goldset_ops import SnapshotDraft, observe, publish, re_scope, re_tier
 from sema.eval.goldset_snapshot import GOLD_ROOT, load_current_snapshot
-from sema.eval.goldset_source import SourceKind, SourceSpec, enumerate_scoped_codes
+from sema.eval.goldset_source import (
+    SourceKind,
+    SourceSpec,
+    enumerate_scoped_codes,
+    raw_samples_view,
+    source_main_types,
+)
 from sema.eval.mapping_goldset import GoldSet
 from sema.eval.goldset_worksheet import (
     SourceContext,
@@ -138,18 +144,33 @@ def worksheet_cmd(db: str, head_size: int, output_path: str) -> None:
                 "WHERE vocabulary_id = 'OncoTree'"
             ).fetchall()
         )
-        main_types = _source_main_types(con, snapshot.header.source_of_truth.scope_values)
+        # Main type is source-side context, and only the raw sample tables carry
+        # it — the staging table the scope is declared against does not.
+        main_type_report = source_main_types(
+            con, raw_samples_view(snapshot.header.source_of_truth)
+        )
     context = SourceContext(
-        names=names, main_types=main_types, tissues=reference_tissues(GOLD_ROOT)
+        names=names,
+        main_types=main_type_report.main_types,
+        tissues=reference_tissues(GOLD_ROOT),
     )
+    for scope, reason in main_type_report.failures.items():
+        logger.warning("no source main types from {}: {}", scope, reason)
     codes = build_worksheet(snapshot, output_path, head_size=head_size, context=context)
     gaps = "\n".join(
         f"  no {column} for {len(missing)}: {missing}"
         for column, missing in context.missing(codes).items()
         if missing
     )
+    unreadable = (
+        f"  {len(main_type_report.failures)} scope(s) could not be read for main_type: "
+        f"{sorted(main_type_report.failures)} — those blanks are a FAILURE, not a gap\n"
+        if main_type_report.failures
+        else ""
+    )
     click.echo(
         f"wrote {len(codes)} rows to {output_path}\n"
+        f"{unreadable}"
         f"  pins and filling rules: {instructions_path(Path(output_path))}\n"
         f"{gaps}\n"
         "  a blank cell means NOT LOOKED UP, not 'no such context exists' — fill the\n"
@@ -157,27 +178,6 @@ def worksheet_cmd(db: str, head_size: int, output_path: str) -> None:
         "  no candidate target concepts are pre-filled, and the challenge stratum is\n"
         "  interleaved — both deliberate, so the oracle stays independent."
     )
-
-
-def _source_main_types(con: Any, scope_values: tuple[str, ...]) -> dict[str, str]:
-    """OncoTree ``mainType`` per code, read from the declared scope's own samples.
-
-    ``sample.CANCER_TYPE`` IS OncoTree's ``mainType`` and is source-side data, so
-    it carries none of the target-vocabulary anchoring D4 rules out. Studies whose
-    sample table lacks the column are skipped rather than failing the worksheet.
-    """
-    main_types: dict[str, str] = {}
-    for schema in scope_values:
-        try:
-            rows = con.execute(
-                "SELECT ONCOTREE_CODE, ANY_VALUE(CANCER_TYPE) "
-                f'FROM "{schema}".sample WHERE CANCER_TYPE IS NOT NULL GROUP BY 1'
-            ).fetchall()
-        except Exception as exc:  # noqa: BLE001 - a missing study is a gap, not a failure
-            logger.warning("no source main types from {}: {}", schema, exc)
-            continue
-        main_types.update({str(code): str(value) for code, value in rows})
-    return main_types
 
 
 @goldset_group.command("apply-labels")

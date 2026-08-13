@@ -20,6 +20,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,7 +32,11 @@ from sema.eval.goldset_snapshot_utils import GoldSetHeader
 from sema.eval.mapping_goldset_utils import Decision
 from sema.eval.mapping_report_utils import MappingReport
 
-__all__ = ["EvaluationSubject", "write_eval_run"]
+__all__ = ["EvalRunExistsError", "EvaluationSubject", "write_eval_run"]
+
+
+class EvalRunExistsError(FileExistsError):
+    """A run artifact already exists under that ``run_id``. Runs are immutable."""
 
 
 @dataclass(frozen=True)
@@ -83,8 +90,13 @@ def write_eval_run(
     the store cannot prove afterwards which execution produced a decision — this
     is the only place that record survives. ``run_id`` above is the EVAL's.
     """
-    directory = Path(root) / run_id
-    directory.mkdir(parents=True)
+    parent = Path(root)
+    directory = parent / run_id
+    if directory.exists():
+        raise EvalRunExistsError(
+            f"eval run {run_id} already exists at {directory}; a run is written "
+            "once and never rewritten — use a new --run-id"
+        )
     graded = [_decision_to_json(d) for d in decisions]
     manifest = {
         "run_id": run_id,
@@ -103,11 +115,31 @@ def write_eval_run(
         "verdict": report.verdict.value,
         "qualifiers": list(report.qualifiers),
     }
-    (directory / "run.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    (directory / "report.json").write_text(
-        json.dumps(report.as_dict(), indent=2) + "\n", encoding="utf-8"
-    )
-    (directory / "decisions.jsonl").write_text(
-        "".join(json.dumps(d) + "\n" for d in graded), encoding="utf-8"
+    _publish_run(
+        parent,
+        directory,
+        {
+            "run.json": json.dumps(manifest, indent=2) + "\n",
+            "report.json": json.dumps(report.as_dict(), indent=2) + "\n",
+            "decisions.jsonl": "".join(json.dumps(d) + "\n" for d in graded),
+        },
     )
     return directory
+
+
+def _publish_run(parent: Path, directory: Path, files: dict[str, str]) -> None:
+    """Write to a temp sibling, then rename into place — all three files or none.
+
+    A run written file-by-file could be interrupted between them, leaving a
+    partial artifact that satisfied the "already exists" refusal and so blocked
+    the retry that would have completed it.
+    """
+    parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{directory.name}.", dir=parent))
+    try:
+        for name, body in files.items():
+            (staging / name).write_text(body, encoding="utf-8")
+        os.replace(staging, directory)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise

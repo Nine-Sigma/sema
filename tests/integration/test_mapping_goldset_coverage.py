@@ -63,11 +63,27 @@ def test_a_code_below_the_tier_is_accounted_for_not_a_coverage_failure(live) -> 
 
 
 def test_the_declared_scope_still_enumerates_the_frozen_universe(live) -> None:  # type: ignore[no-untyped-def]
-    """Membership drift is an error; row_count drift is a reported number."""
-    snapshot, observed = live
-    frozen = {e.code for e in snapshot.universe}
+    """A NEW code is tolerated up to the header's own declared ceiling.
 
-    assert set(observed) == frozen
+    Asserting exact equality reddened at the first code to appear in scope,
+    which made the declared ``max_unseen_code_share`` dead policy: the header
+    said 10% was acceptable and the suite said 0% was. A code that has
+    DISAPPEARED is still an error — the artifact froze a weight for it.
+    """
+    from sema.eval.goldset_drift import goldset_drift_report
+
+    snapshot, observed = live
+    report = goldset_drift_report(snapshot, observed, snapshot.header.source_of_truth)
+
+    assert not report.codes_disappeared, (
+        f"codes frozen in the manifest have left the declared scope: "
+        f"{report.codes_disappeared}"
+    )
+    assert report.unseen_code_share <= snapshot.header.max_unseen_code_share, (
+        f"{report.unseen_code_share:.1%} of observed codes are outside the frozen "
+        f"universe, above the declared {snapshot.header.max_unseen_code_share:.1%} "
+        f"ceiling: {report.codes_added[:10]} — re-snapshot via `re-scope`"
+    )
 
 
 def test_row_count_drift_is_reported_never_asserted_equal(live) -> None:  # type: ignore[no-untyped-def]

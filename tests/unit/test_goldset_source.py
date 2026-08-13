@@ -19,7 +19,9 @@ from sema.eval.goldset_source import (
     SourceSpec,
     discover_oncotree_schemas,
     enumerate_scoped_codes,
+    raw_samples_view,
     scoped_enumeration_sql,
+    source_main_types,
 )
 
 pytestmark = pytest.mark.unit
@@ -46,9 +48,14 @@ def con() -> duckdb.DuckDBPyConnection:
     conn = duckdb.connect(":memory:")
     for schema, codes in _RAW_SAMPLES.items():
         conn.execute(f"CREATE SCHEMA {schema}")
-        conn.execute(f"CREATE TABLE {schema}.sample (ONCOTREE_CODE VARCHAR)")
+        conn.execute(
+            f"CREATE TABLE {schema}.sample (ONCOTREE_CODE VARCHAR, CANCER_TYPE VARCHAR)"
+        )
         for code in codes:
-            conn.execute(f"INSERT INTO {schema}.sample VALUES (?)", [code])
+            conn.execute(
+                f"INSERT INTO {schema}.sample VALUES (?, ?)",
+                [code, None if code is None else f"main type of {code.strip()}"],
+            )
     conn.execute("CREATE SCHEMA sema_staging")
     conn.execute(
         "CREATE TABLE sema_staging.condition_staging "
@@ -184,3 +191,59 @@ def test_discovery_still_available_for_refresh(con) -> None:  # type: ignore[no-
         "cbioportal_study_b",
         "cbioportal_study_c",
     ]
+
+
+# --- source-side main types -------------------------------------------------
+
+
+def test_main_types_are_read_from_the_declared_scope(con) -> None:  # type: ignore[no-untyped-def]
+    report = source_main_types(con, _raw_spec("cbioportal_study_a", "cbioportal_study_b"))
+
+    assert report.main_types["LUAD"] == "main type of LUAD"
+    assert report.main_types["GBM"] == "main type of GBM"
+    assert "IDC" not in report.main_types, "an unlisted study leaked into the scope"
+    assert report.failures == {}
+
+
+def test_a_scope_that_cannot_be_read_is_reported_not_swallowed(con) -> None:  # type: ignore[no-untyped-def]
+    """A blanket except made a TOTAL failure look identical to a total gap."""
+    report = source_main_types(con, _raw_spec("cbioportal_study_a", "cbioportal_no_such"))
+
+    assert report.main_types["LUAD"] == "main type of LUAD"
+    assert list(report.failures) == ["cbioportal_no_such"]
+    assert report.failures["cbioportal_no_such"]
+
+
+def test_main_type_identifiers_are_validated_at_the_boundary(con) -> None:  # type: ignore[no-untyped-def]
+    spec = _raw_spec("a'; DROP TABLE x --")
+
+    with pytest.raises(ValueError, match="identifier"):
+        source_main_types(con, spec)
+
+
+def test_main_types_read_a_staging_scope_through_its_scope_column(con) -> None:  # type: ignore[no-untyped-def]
+    """The staging shape is a filter on one table, not a schema name in a FROM."""
+    con.execute("ALTER TABLE sema_staging.condition_staging ADD COLUMN CANCER_TYPE VARCHAR")
+    con.execute(
+        "UPDATE sema_staging.condition_staging SET CANCER_TYPE = 'staged main type'"
+    )
+
+    report = source_main_types(con, _staging_spec("cbioportal_study_a"))
+
+    assert report.main_types == {"LUAD": "staged main type", "COAD": "staged main type"}
+
+
+def test_a_staging_scope_can_be_viewed_as_its_raw_sample_tables() -> None:
+    """The two shapes describe the same gold set, so the study values carry over."""
+    view = raw_samples_view(_staging_spec("cbioportal_study_a", "cbioportal_study_b"))
+
+    assert view.kind is SourceKind.RAW_SAMPLES
+    assert view.table == "sample"
+    assert view.code_column == "ONCOTREE_CODE"
+    assert view.scope_values == ("cbioportal_study_a", "cbioportal_study_b")
+
+
+def test_a_raw_samples_spec_is_already_its_own_view() -> None:
+    spec = _raw_spec("cbioportal_study_a")
+
+    assert raw_samples_view(spec) is spec

@@ -29,7 +29,11 @@ from sema.eval.mapping_goldset_utils import (
 )
 from sema.eval.mapping_report import build_mapping_report
 from sema.eval.mapping_report_utils import AcceptanceVerdict
-from sema.eval.mapping_run import EvaluationSubject, write_eval_run
+from sema.eval.mapping_run import (
+    EvalRunExistsError,
+    EvaluationSubject,
+    write_eval_run,
+)
 from sema.models.planner.lifecycle import Status
 
 pytestmark = pytest.mark.unit
@@ -477,8 +481,43 @@ def test_an_eval_run_is_never_overwritten(tmp_path: Path) -> None:
     )
     write_eval_run(tmp_path, **args)  # type: ignore[arg-type]
 
-    with pytest.raises(FileExistsError):
+    with pytest.raises(EvalRunExistsError, match="run-1"):
         write_eval_run(tmp_path, **args)  # type: ignore[arg-type]
+
+
+def test_a_refused_rewrite_leaves_the_run_directory_intact(tmp_path: Path) -> None:
+    """The bare mkdir raised only AFTER a partial write on some paths, leaving a
+    half-written run that blocked the retry it forced."""
+    report = build_mapping_report(GoldSet(_head(1, "sam")), _decisions(1))
+    args = dict(
+        run_id="run-1", report=report, subject=_SUBJECT, decisions=_decisions(1),
+        header=_HEADER,
+    )
+    directory = write_eval_run(tmp_path, **args)  # type: ignore[arg-type]
+    before = (directory / "run.json").read_text(encoding="utf-8")
+
+    with pytest.raises(EvalRunExistsError):
+        write_eval_run(tmp_path, **args)  # type: ignore[arg-type]
+
+    assert (directory / "run.json").read_text(encoding="utf-8") == before
+    assert not [p for p in tmp_path.iterdir() if p.name != "run-1"], (
+        "a failed write must leave no temporary sibling behind"
+    )
+
+
+def test_a_run_becomes_visible_only_once_it_is_complete(tmp_path: Path) -> None:
+    """The directory appears under its run_id atomically, fully written."""
+    report = build_mapping_report(GoldSet(_head(1, "sam")), _decisions(1))
+    directory = write_eval_run(
+        tmp_path, run_id="run-2", report=report, subject=_SUBJECT,
+        decisions=_decisions(1), header=_HEADER,
+    )
+
+    assert directory == tmp_path / "run-2"
+    assert sorted(p.name for p in directory.iterdir()) == [
+        "decisions.jsonl", "report.json", "run.json",
+    ]
+    assert [p.name for p in tmp_path.iterdir()] == ["run-2"]
 
 
 def test_the_decision_digest_is_order_independent(tmp_path: Path) -> None:
