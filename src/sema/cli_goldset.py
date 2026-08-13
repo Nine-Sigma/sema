@@ -20,9 +20,11 @@ from sema.eval.goldset_source import SourceKind, SourceSpec, enumerate_scoped_co
 from sema.eval.mapping_goldset import GoldSet
 from sema.eval.goldset_worksheet import (
     SourceContext,
+    TargetFacts,
     apply_labels,
     build_worksheet,
     challenge_codes_needing_review,
+    instructions_path,
     reference_tissues,
 )
 from sema.log import logger
@@ -148,6 +150,7 @@ def worksheet_cmd(db: str, head_size: int, output_path: str) -> None:
     )
     click.echo(
         f"wrote {len(codes)} rows to {output_path}\n"
+        f"  pins and filling rules: {instructions_path(Path(output_path))}\n"
         f"{gaps}\n"
         "  a blank cell means NOT LOOKED UP, not 'no such context exists' — fill the\n"
         "  gaps above from the OncoTree browser before labelling those codes.\n"
@@ -179,11 +182,17 @@ def _source_main_types(con: Any, scope_values: tuple[str, ...]) -> dict[str, str
 
 @goldset_group.command("apply-labels")
 @click.option("--worksheet", "worksheet_path", required=True, type=click.Path(exists=True))
+@_DB
 @_VERSION
 @_DATE
-def apply_labels_cmd(worksheet_path: str, version: str, date: str) -> None:
+def apply_labels_cmd(worksheet_path: str, db: str, version: str, date: str) -> None:
     """Apply a curator's completed worksheet as a NEW snapshot."""
-    draft = apply_labels(load_current_snapshot(GOLD_ROOT), worksheet_path, version=version, date=date)
+    snapshot = load_current_snapshot(GOLD_ROOT)
+    with _connect(db) as con:
+        targets = _target_facts(con)
+    draft = apply_labels(
+        snapshot, worksheet_path, version=version, date=date, targets=targets
+    )
     _publish(draft)
     pending = challenge_codes_needing_review(draft.rows, draft.header.challenge_codes)
     if pending:
@@ -192,6 +201,27 @@ def apply_labels_cmd(worksheet_path: str, version: str, date: str) -> None:
             f"codes still lack a label and a second reviewer ({', '.join(pending)}); "
             "the verdict will read `unadjudicated`."
         )
+
+
+def _target_facts(con: Any) -> dict[int, TargetFacts]:
+    """What the OMOP vocabulary says about every concept a label could name.
+
+    Read once, passed in as data: the artifact modules that validate a label stay
+    pure, so snapshot integrity keeps holding off-machine.
+    """
+    rows = con.execute(
+        "SELECT concept_id, concept_code, vocabulary_id, domain_id, standard_concept "
+        "FROM vocabulary_omop.concept WHERE concept_id IS NOT NULL"
+    ).fetchall()
+    return {
+        int(concept_id): TargetFacts(
+            concept_code=str(code),
+            vocabulary=str(vocabulary),
+            domain=str(domain),
+            standard=str(standard) == "S",
+        )
+        for concept_id, code, vocabulary, domain, standard in rows
+    }
 
 
 @click.command("mapping-report")

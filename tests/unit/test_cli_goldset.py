@@ -80,10 +80,15 @@ def db(tmp_path: Path) -> str:
     con.execute("CREATE SCHEMA vocabulary_omop")
     con.execute(
         "CREATE TABLE vocabulary_omop.concept "
-        "(concept_code VARCHAR, concept_name VARCHAR, vocabulary_id VARCHAR)"
+        "(concept_id BIGINT, concept_code VARCHAR, concept_name VARCHAR, "
+        "vocabulary_id VARCHAR, domain_id VARCHAR, standard_concept VARCHAR)"
     )
-    con.execute(
-        "INSERT INTO vocabulary_omop.concept VALUES ('LUAD', 'Lung Adenocarcinoma', 'OncoTree')"
+    con.executemany(
+        "INSERT INTO vocabulary_omop.concept VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            [777926, "LUAD", "Lung Adenocarcinoma", "OncoTree", "Condition", None],
+            [45768916, "254626006", "Adenocarcinoma of lung", "SNOMED", "Condition", "S"],
+        ],
     )
     con.execute("CREATE SCHEMA study_a")
     con.execute(
@@ -250,6 +255,7 @@ def test_apply_labels_publishes_a_labelled_snapshot(
         writer.writerow(
             {
                 "oncotree_code": "ODD",
+                "snapshot_version": "v1",
                 "gold_label": "NO_MAP",
                 "curator": "dean",
                 "review_date": "2026-09-01",
@@ -259,7 +265,7 @@ def test_apply_labels_publishes_a_labelled_snapshot(
         )
 
     output = _run(
-        "goldset", "apply-labels", "--worksheet", str(worksheet),
+        "goldset", "apply-labels", "--worksheet", str(worksheet), "--db", db,
         "--version", "v2", "--date", "2026-09-01",
     )
     snapshot = load_snapshot(snapshot_dir("v2", gold_root))
@@ -345,20 +351,74 @@ def test_mapping_report_records_both_target_pins(
     assert manifest["resolver_run_ids"] == ["resolver-run-7"]
 
 
-def test_apply_labels_refuses_a_label_without_provenance(
-    gold_root: Path, tmp_path: Path
-) -> None:
+def _worksheet_file(tmp_path: Path, **row: str) -> Path:
     worksheet = tmp_path / "bad.csv"
     with worksheet.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(WORKSHEET_COLUMNS))
         writer.writeheader()
-        writer.writerow({"oncotree_code": "LUAD", "gold_label": "NO_MAP"})
+        writer.writerow(row)
+    return worksheet
 
-    result = CliRunner().invoke(
+
+def _apply(worksheet: Path, db: str) -> object:
+    return CliRunner().invoke(
         eval_group,
-        ["goldset", "apply-labels", "--worksheet", str(worksheet),
+        ["goldset", "apply-labels", "--worksheet", str(worksheet), "--db", db,
          "--version", "v2", "--date", "2026-09-01"],
     )
 
+
+def test_apply_labels_refuses_a_label_without_provenance(
+    gold_root: Path, db: str, tmp_path: Path
+) -> None:
+    worksheet = _worksheet_file(
+        tmp_path, oncotree_code="LUAD", snapshot_version="v1", gold_label="NO_MAP"
+    )
+
+    result = _apply(worksheet, db)
+
     assert result.exit_code != 0
     assert "annotation floor" in str(result.exception)
+
+
+def test_apply_labels_checks_the_concept_the_label_names(
+    gold_root: Path, db: str, tmp_path: Path
+) -> None:
+    """A transposed digit must be an error, not an oracle."""
+    worksheet = _worksheet_file(
+        tmp_path,
+        oncotree_code="LUAD",
+        snapshot_version="v1",
+        gold_label="RESOLVED",
+        gold_concept_id="45768916",
+        target_concept_code="254626000",
+        curator="dean",
+        review_date="2026-09-01",
+        evidence="SNOMED browser",
+    )
+
+    result = _apply(worksheet, db)
+
+    assert result.exit_code != 0
+    assert "254626006" in str(result.exception)
+
+
+def test_apply_labels_accepts_a_label_that_matches_the_vocabulary(
+    gold_root: Path, db: str, tmp_path: Path
+) -> None:
+    worksheet = _worksheet_file(
+        tmp_path,
+        oncotree_code="LUAD",
+        snapshot_version="v1",
+        gold_label="RESOLVED",
+        gold_concept_id="45768916",
+        target_concept_code="254626006",
+        curator="dean",
+        review_date="2026-09-01",
+        evidence="SNOMED browser",
+    )
+
+    result = _apply(worksheet, db)
+
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert load_snapshot(snapshot_dir("v2", gold_root)).by_code()["LUAD"].gold_concept_id == 45768916

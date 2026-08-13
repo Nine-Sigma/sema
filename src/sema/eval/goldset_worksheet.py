@@ -18,22 +18,26 @@ from __future__ import annotations
 
 import csv
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from sema.eval.goldset_ops import SnapshotDraft
 from sema.eval.goldset_snapshot import GoldSetSnapshot
+from sema.eval.goldset_snapshot_utils import GoldSetHeader
 from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow
 from sema.eval.adjudication import codes_needing_second_review
 
 __all__ = [
     "WORKSHEET_COLUMNS",
     "SourceContext",
+    "TargetFacts",
     "apply_labels",
     "build_worksheet",
+    "instructions_path",
     "reference_tissues",
     "worksheet_codes",
+    "write_instructions",
 ]
 
 WORKSHEET_COLUMNS = (
@@ -41,6 +45,7 @@ WORKSHEET_COLUMNS = (
     "oncotree_name",
     "main_type",
     "tissue",
+    "snapshot_version",
     "gold_label",
     "gold_concept_id",
     "target_concept_code",
@@ -133,9 +138,81 @@ def build_worksheet(
                     "oncotree_name": names.get(code, ""),
                     "main_type": main_types.get(code, ""),
                     "tissue": tissues.get(code, ""),
+                    "snapshot_version": snapshot.header.snapshot_version,
                 }
             )
+    write_instructions(snapshot.header, target, len(codes))
     return codes
+
+
+def instructions_path(worksheet: Path) -> Path:
+    """The sidecar a worksheet is delivered with — same name, ``.instructions.md``."""
+    return worksheet.with_name(f"{worksheet.name}.instructions.md")
+
+
+def write_instructions(header: GoldSetHeader, worksheet: Path, code_count: int) -> Path:
+    """Write the worksheet's sidecar. Returns the path written."""
+    path = instructions_path(worksheet)
+    path.write_text(_instructions(header, code_count), encoding="utf-8")
+    return path
+
+
+def _instructions(header: GoldSetHeader, code_count: int) -> str:
+    """The pins the curator must honour, delivered WITH the worksheet.
+
+    Stated in the artifact rather than in a handoff message: a label is only
+    interpretable against the release that minted its concept id, and a
+    worksheet outlives whatever conversation shipped it.
+    """
+    labels = ", ".join(l.value for l in GoldLabel if l is not GoldLabel.UNLABELLED)
+    return "\n".join(
+        [
+            f"# Labelling worksheet — {header.snapshot_version}",
+            "",
+            f"- **snapshot_version**: `{header.snapshot_version}` — pre-filled in every",
+            "  row. Do not edit it: it is what binds these labels to this snapshot.",
+            f"- **target vocabulary**: `{header.target_vocabulary}`",
+            f"- **target domain**: `{header.target_domain}`",
+            f"- **vocabulary release**: `{header.vocab_release}` — a `gold_concept_id` is",
+            "  meaningless without it, so a concept id from another release is not a label",
+            "  for this gold set.",
+            f"- **rows to label**: {code_count}",
+            "",
+            "## Filling a row",
+            "",
+            f"1. `gold_label` is one of: {labels}. Leave it blank for a row you have not",
+            "   answered — `UNLABELLED` is a scaffold state, not a curator's answer.",
+            f"2. `RESOLVED` needs BOTH `gold_concept_id` and `target_concept_code` (the",
+            f"   durable {header.target_vocabulary} code, which survives a release change),",
+            f"   and the concept must be standard and in the {header.target_domain} domain.",
+            "3. `NO_MAP` is a positive claim, not a blank: it carries NO target concept and",
+            "   still requires `evidence` saying what you looked for and why nothing fits.",
+            "   A wrong NO_MAP scores directly against a correctly-mapped code.",
+            "4. `curator`, `review_date` and `evidence` are the annotation floor — every",
+            "   label needs all three.",
+            "5. `second_reviewer` must be someone OTHER than the curator; your own name",
+            "   there adjudicates nothing.",
+            "",
+            "No candidate targets are pre-filled and the rows are interleaved: both",
+            "deliberate, so the oracle stays independent of the resolver being graded.",
+            "",
+        ]
+    )
+
+
+@dataclass(frozen=True)
+class TargetFacts:
+    """What the target vocabulary says about one concept id.
+
+    Passed in as data — the pure artifact modules take no database dependency,
+    which is also why this check does not live in ``goldset_invariants``:
+    snapshot integrity is fixture-backed and must hold off-machine.
+    """
+
+    concept_code: str
+    vocabulary: str
+    domain: str
+    standard: bool
 
 
 def apply_labels(
@@ -144,13 +221,22 @@ def apply_labels(
     *,
     version: str,
     date: str,
+    targets: Mapping[int, TargetFacts] | None = None,
 ) -> SnapshotDraft:
-    """Apply a curator's completed worksheet, emitting a NEW snapshot draft."""
+    """Apply a curator's completed worksheet, emitting a NEW snapshot draft.
+
+    ``targets`` — when supplied — checks each RESOLVED label against the concept
+    it names, so a transposed digit becomes an error rather than an oracle.
+    """
     labels = _read_worksheet(Path(worksheet))
     by_code = {r.oncotree_code: r for r in snapshot.rows}
     unknown = sorted(set(labels) - set(by_code))
     if unknown:
         raise ValueError(f"worksheet labels codes outside the snapshot: {unknown}")
+    for code, entry in labels.items():
+        _assert_snapshot_pin(code, entry, snapshot.header.snapshot_version)
+        if targets is not None:
+            _assert_target_facts(code, entry, snapshot.header, targets)
     rows = [
         _apply(row, labels[row.oncotree_code]) if row.oncotree_code in labels else row
         for row in snapshot.rows
@@ -207,6 +293,58 @@ def _assert_complete(code: str, label: GoldLabel, entry: dict[str, str]) -> None
             )
     elif entry.get("gold_concept_id") or entry.get("target_concept_code"):
         raise ValueError(f"{code}: NO_MAP must not carry a target concept")
+
+
+def _assert_snapshot_pin(code: str, entry: dict[str, str], version: str) -> None:
+    """Labels belong to ONE snapshot; applied to another they describe other data."""
+    stamped = entry.get("snapshot_version", "")
+    if not stamped:
+        raise ValueError(
+            f"{code}: the row carries no snapshot_version — rebuild the worksheet "
+            f"from {version} rather than editing an older one"
+        )
+    if stamped != version:
+        raise ValueError(
+            f"{code}: labelled against snapshot {stamped}, but this is {version}; "
+            "the frozen populations and row counts differ between them"
+        )
+
+
+def _assert_target_facts(
+    code: str,
+    entry: dict[str, str],
+    header: GoldSetHeader,
+    targets: Mapping[int, TargetFacts],
+) -> None:
+    if GoldLabel(entry["gold_label"]) is not GoldLabel.RESOLVED:
+        return
+    concept_id = int(entry["gold_concept_id"])
+    facts = targets.get(concept_id)
+    if facts is None:
+        raise ValueError(
+            f"{code}: gold_concept_id {concept_id} is absent from "
+            f"{header.vocab_release}"
+        )
+    if facts.concept_code != entry["target_concept_code"]:
+        raise ValueError(
+            f"{code}: concept {concept_id} carries code {facts.concept_code}, not "
+            f"the {entry['target_concept_code']} the worksheet names"
+        )
+    if facts.vocabulary != header.target_vocabulary:
+        raise ValueError(
+            f"{code}: concept {concept_id} is {facts.vocabulary}, not "
+            f"{header.target_vocabulary}"
+        )
+    if facts.domain != header.target_domain:
+        raise ValueError(
+            f"{code}: concept {concept_id} is in the {facts.domain} domain, not "
+            f"{header.target_domain}"
+        )
+    if not facts.standard:
+        raise ValueError(
+            f"{code}: concept {concept_id} is not standard, so it cannot be the "
+            "target a mapping is graded against"
+        )
 
 
 def challenge_codes_needing_review(

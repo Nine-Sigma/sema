@@ -25,6 +25,7 @@ from sema.eval.goldset_snapshot_utils import GoldSetHeader, UniverseEntry
 from sema.eval.goldset_source import SourceKind, SourceSpec
 from sema.eval.goldset_worksheet import (
     WORKSHEET_COLUMNS,
+    TargetFacts,
     apply_labels,
     build_worksheet,
     worksheet_codes,
@@ -159,6 +160,7 @@ def _completed(tmp_path: Path, **overrides: str) -> Path:
         "oncotree_name": "Lung Adenocarcinoma",
         "main_type": "",
         "tissue": "",
+        "snapshot_version": "v1",
         "gold_label": "RESOLVED",
         "gold_concept_id": "45768916",
         "target_concept_code": "254626006",
@@ -219,3 +221,107 @@ def test_applying_an_empty_worksheet_changes_no_label(tmp_path: Path) -> None:
     draft = apply_labels(_snapshot(), empty, version="v2", date="2026-08-12")
 
     assert label_projection_digest(draft.rows) == label_projection_digest(_snapshot().rows)
+
+
+# --- the worksheet carries the pins -----------------------------------------
+
+
+_TARGETS = {
+    45768916: TargetFacts(
+        concept_code="254626006",
+        vocabulary="SNOMED",
+        domain="Condition",
+        standard=True,
+    )
+}
+
+
+def test_the_worksheet_stamps_the_snapshot_it_was_built_from(tmp_path: Path) -> None:
+    for row in _worksheet(tmp_path):
+        assert row["snapshot_version"] == "v1"
+
+
+def test_labels_cannot_be_applied_to_a_different_snapshot(tmp_path: Path) -> None:
+    """62 labels applied to the wrong snapshot are 62 labels about other data."""
+    path = _completed(tmp_path, snapshot_version="v0")
+
+    with pytest.raises(ValueError, match="v0"):
+        apply_labels(_snapshot(), path, version="v2", date="2026-08-12")
+
+
+def test_an_unstamped_worksheet_row_is_refused(tmp_path: Path) -> None:
+    path = _completed(tmp_path, snapshot_version="")
+
+    with pytest.raises(ValueError, match="snapshot_version"):
+        apply_labels(_snapshot(), path, version="v2", date="2026-08-12")
+
+
+def test_the_worksheet_ships_its_own_instructions(tmp_path: Path) -> None:
+    """The pins a curator must honour cannot live only in a reviewer's memory."""
+    path = tmp_path / "worksheet.csv"
+    build_worksheet(_snapshot(), path)
+    instructions = (tmp_path / "worksheet.csv.instructions.md").read_text(encoding="utf-8")
+
+    assert "v1" in instructions
+    assert "SNOMED" in instructions and "Condition" in instructions
+    assert "omop-vocab-2024" in instructions
+    assert "RESOLVED" in instructions and "NO_MAP" in instructions
+    assert "evidence" in instructions
+
+
+def test_a_label_is_checked_against_the_target_it_names(tmp_path: Path) -> None:
+    draft = apply_labels(
+        _snapshot(), _completed(tmp_path), version="v2", date="2026-08-12",
+        targets=_TARGETS,
+    )
+
+    assert draft.by_code()["LUAD"].gold_concept_id == 45768916
+
+
+def test_a_concept_id_that_does_not_carry_the_named_code_is_rejected(
+    tmp_path: Path,
+) -> None:
+    path = _completed(tmp_path, target_concept_code="999999")
+
+    with pytest.raises(ValueError, match="254626006"):
+        apply_labels(
+            _snapshot(), path, version="v2", date="2026-08-12", targets=_TARGETS
+        )
+
+
+def test_a_concept_from_the_wrong_vocabulary_is_rejected(tmp_path: Path) -> None:
+    targets = {45768916: replace(_TARGETS[45768916], vocabulary="ICD10CM")}
+
+    with pytest.raises(ValueError, match="SNOMED"):
+        apply_labels(
+            _snapshot(), _completed(tmp_path), version="v2", date="2026-08-12",
+            targets=targets,
+        )
+
+
+def test_a_concept_from_the_wrong_domain_is_rejected(tmp_path: Path) -> None:
+    targets = {45768916: replace(_TARGETS[45768916], domain="Observation")}
+
+    with pytest.raises(ValueError, match="Condition"):
+        apply_labels(
+            _snapshot(), _completed(tmp_path), version="v2", date="2026-08-12",
+            targets=targets,
+        )
+
+
+def test_a_non_standard_concept_is_rejected(tmp_path: Path) -> None:
+    targets = {45768916: replace(_TARGETS[45768916], standard=False)}
+
+    with pytest.raises(ValueError, match="standard"):
+        apply_labels(
+            _snapshot(), _completed(tmp_path), version="v2", date="2026-08-12",
+            targets=targets,
+        )
+
+
+def test_a_concept_id_absent_from_the_vocabulary_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="45768916"):
+        apply_labels(
+            _snapshot(), _completed(tmp_path), version="v2", date="2026-08-12",
+            targets={},
+        )
