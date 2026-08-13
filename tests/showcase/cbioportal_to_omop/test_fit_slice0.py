@@ -24,7 +24,10 @@ from sema.eval.staging_qa_utils import QAOutcome
 from sema.models.planner.mapping_plan import MappingAssertion, MappingPlan
 from sema.models.planner.patterns import MappingPattern
 from showcase.cbioportal_to_omop.slice0_fit import FitResult, run_fit
-from showcase.cbioportal_to_omop.slice0_fit_utils import build_slice0_fit_request
+from showcase.cbioportal_to_omop.slice0_fit_utils import (
+    DEFAULT_VOCAB_RELEASE,
+    build_slice0_fit_request,
+)
 from sema.resolve.engine import VocabularyResolver
 from sema.resolve.vocab_store_utils import ConceptRow
 
@@ -104,7 +107,8 @@ def _grading() -> GradingContext:
                 GoldRow("LUAD", int(_STANDARD_ID), GoldLabel.RESOLVED, 2),
                 GoldRow("ZZZZ", None, GoldLabel.NO_MAP, 1),
             ]
-        )
+        ),
+        vocab_release=DEFAULT_VOCAB_RELEASE,
     )
 
 
@@ -262,7 +266,8 @@ def test_strict_report_ignores_stale_store_rows_absent_from_this_run(
                 GoldRow("ZZZZ", None, GoldLabel.NO_MAP, 1),
                 GoldRow("OTHER", 999999, GoldLabel.RESOLVED, 1),
             ]
-        )
+        ),
+        vocab_release=DEFAULT_VOCAB_RELEASE,
     )
     # Run 1 leaves a stale OTHER -> NO_MAP row in the shared store.
     _run_codes(conn, ["LUAD", "ZZZZ", "OTHER"], grading)

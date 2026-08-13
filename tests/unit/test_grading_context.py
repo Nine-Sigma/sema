@@ -28,6 +28,7 @@ from sema.eval.mapping_report import (
     report_for_snapshot,
 )
 from sema.models.planner.lifecycle import Status
+from sema.resolve.value_mapping_store_utils import ValueMapping
 
 pytestmark = pytest.mark.unit
 
@@ -83,9 +84,11 @@ def _labelled(code: str, concept: int | None, state: TierState, count: int) -> G
     )
 
 
-def _snapshot(rows: list[GoldRow] | None = None) -> GoldSetSnapshot:
+def _snapshot(
+    rows: list[GoldRow] | None = None, header: GoldSetHeader | None = None
+) -> GoldSetSnapshot:
     return GoldSetSnapshot(
-        header=_header(),
+        header=header or _header(),
         rows=rows
         or [
             GoldRow("LUAD", None, GoldLabel.UNLABELLED, 100, tier_state=TierState.IN_TIER),
@@ -105,6 +108,26 @@ def _decision(
         status=Status.auto_accepted,
         resolution_status=res,
         no_map_reason="dead end" if res is ResolutionStatus.NO_MAP else None,
+    )
+
+
+def _mapping(code: str, release: str) -> ValueMapping:
+    return ValueMapping(
+        source_vocabulary="OncoTree",
+        normalized_source_value=code,
+        target_property_ref="omop.condition_occurrence.condition_concept_id",
+        target_field="condition_concept_id",
+        vocab_binding="SNOMED/Condition",
+        concept_id=45768916,
+        vocab_release=release,
+        valid_start=None,
+        valid_end=None,
+        resolution_status=ResolutionStatus.RESOLVED,
+        no_map_reason=None,
+        confidence=1.0,
+        status=Status.auto_accepted,
+        resolver_policy_ref="policy-v1",
+        run_id="run-1",
     )
 
 
@@ -186,3 +209,60 @@ def test_tail_sample_is_drawn_from_the_manifest_tail() -> None:
     context = GradingContext.from_snapshot(_snapshot())
     report = report_for_snapshot(context, [], graded_release="omop-vocab-2024")
     assert report.tail_sample_codes == ("RARE",)
+
+
+# --- the pin needs something to pin to --------------------------------------
+
+
+def test_a_snapshot_with_no_declared_release_cannot_grade_its_own_labels() -> None:
+    """An undeclared release silently skipped the pin altogether.
+
+    ``if context.vocab_release and ...`` reads as "check when we can", which made
+    a header missing the one field the pin is built on indistinguishable from a
+    header that matched. Labels without a release are ungradable, not universally
+    gradable.
+    """
+    context = GradingContext.from_snapshot(_snapshot(header=_header(vocab_release="")))
+
+    with pytest.raises(GradingReleaseError, match="declares no vocab_release"):
+        report_for_snapshot(context, [], graded_release="omop-vocab-2024")
+
+
+def test_an_empty_context_still_grades_without_a_release() -> None:
+    """No oracle, no pin — the one case where an absent release is honest."""
+    report = report_for_snapshot(
+        GradingContext.empty(), [_decision("LUAD", 1)], graded_release="anything"
+    )
+
+    assert report.labelled_count == 0
+
+
+# --- the graded release is read off the rows, not off a flag ----------------
+
+
+def test_graded_release_of_reads_the_release_the_rows_carry() -> None:
+    from sema.eval.mapping_report import graded_release_of
+
+    rows = [_mapping("LUAD", "omop-vocab-2024"), _mapping("COAD", "omop-vocab-2024")]
+
+    assert graded_release_of(rows, fallback="ignored") == "omop-vocab-2024"
+
+
+def test_graded_release_of_falls_back_only_when_nothing_was_graded() -> None:
+    from sema.eval.mapping_report import graded_release_of
+
+    assert graded_release_of([], fallback="omop-vocab-2024") == "omop-vocab-2024"
+
+
+def test_two_releases_in_one_decision_set_are_refused_not_sampled() -> None:
+    """Reading ``run_mappings[0]`` pinned the first row and graded all of them.
+
+    That is the blend ``EvaluationSubject`` exists to prevent, arriving through
+    the pin that was supposed to catch it.
+    """
+    from sema.eval.mapping_report import graded_release_of
+
+    rows = [_mapping("LUAD", "omop-vocab-2024"), _mapping("COAD", "omop-vocab-2025")]
+
+    with pytest.raises(GradingReleaseError, match="omop-vocab-2025"):
+        graded_release_of(rows, fallback="omop-vocab-2024")

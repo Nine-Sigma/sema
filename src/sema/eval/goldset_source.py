@@ -90,6 +90,19 @@ def _identifier(value: str) -> str:
     return value
 
 
+def _literal(value: str) -> str:
+    """Quote a scope value used as a string LITERAL, not as an identifier.
+
+    Validating these with the identifier regex was safe by accident and wrong by
+    construction: it rejected any legitimate study id carrying a hyphen or a
+    leading digit, and only looked correct while every declared scope value
+    happened to also be a schema name.
+    """
+    if "'" in value or "\\" in value or any(c < " " for c in value):
+        raise ValueError(f"invalid SQL string literal: {value!r}")
+    return f"'{value}'"
+
+
 _COUNT_TEMPLATE = (
     "SELECT code, COUNT(*) AS row_count FROM ({inner}) "
     "WHERE code IS NOT NULL AND TRIM(code) <> '' "
@@ -110,7 +123,7 @@ def scoped_enumeration_sql(spec: SourceSpec) -> str:
     else:
         if spec.scope_column is None:
             raise ValueError("staging specs require a scope_column")
-        values = ", ".join(f"'{_identifier(v)}'" for v in spec.scope_values)
+        values = ", ".join(_literal(v) for v in spec.scope_values)
         inner = (
             f"SELECT {code} AS code FROM {table} "
             f"WHERE {_identifier(spec.scope_column)} IN ({values})"
@@ -177,7 +190,7 @@ def _main_type_sql(spec: SourceSpec, value: str, *, code: str, main_type: str) -
             raise ValueError("staging specs require a scope_column")
         source = _identifier(spec.table)
         predicate = (
-            f"{_identifier(spec.scope_column)} = '{_identifier(value)}' "
+            f"{_identifier(spec.scope_column)} = {_literal(value)} "
             f"AND {main_type} IS NOT NULL"
         )
     return f"{select} FROM {source} WHERE {predicate} GROUP BY 1"

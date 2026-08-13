@@ -532,3 +532,42 @@ def test_the_decision_digest_is_order_independent(tmp_path: Path) -> None:
     assert json.loads((forward / "run.json").read_text())["decisions_sha256"] == json.loads(
         (reverse / "run.json").read_text()
     )["decisions_sha256"]
+
+
+def test_an_interrupted_run_write_leaves_nothing_behind(tmp_path: Path) -> None:
+    """All three files or none — a partial run blocked the retry that completed it."""
+    from sema.eval.mapping_run import write_eval_run
+
+    gold = GoldSet(_head(2, "sam"))
+    report = build_mapping_report(gold, _decisions(2))
+
+    class _Exploding:
+        def __iter__(self) -> object:
+            raise OSError("store vanished mid-read")
+
+    with pytest.raises(OSError, match="store vanished"):
+        write_eval_run(
+            tmp_path / "runs", run_id="r1", report=report, subject=_SUBJECT,
+            decisions=_Exploding(),  # type: ignore[arg-type]
+            header=_HEADER,
+        )
+
+    assert not (tmp_path / "runs" / "r1").exists()
+    assert list((tmp_path / "runs").iterdir()) == []
+
+
+def test_a_published_run_is_readable_by_anyone_who_can_read_the_directory(
+    tmp_path: Path,
+) -> None:
+    """``mkdtemp`` is 0700; the run artifact is evidence others must be able to read."""
+    import stat
+
+    from sema.eval.mapping_run import write_eval_run
+
+    gold = GoldSet(_head(2, "sam"))
+    directory = write_eval_run(
+        tmp_path / "runs", run_id="r1", report=build_mapping_report(gold, _decisions(2)),
+        subject=_SUBJECT, decisions=_decisions(2), header=_HEADER,
+    )
+
+    assert stat.S_IMODE(directory.stat().st_mode) & 0o055 == 0o055

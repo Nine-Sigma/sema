@@ -24,14 +24,15 @@ from sema.eval.goldset_source import (
     source_main_types,
 )
 from sema.eval.mapping_goldset import GoldSet
+from sema.eval.adjudication import codes_needing_second_review
 from sema.eval.goldset_worksheet import (
     SourceContext,
     TargetFacts,
     apply_labels,
     build_worksheet,
-    challenge_codes_needing_review,
     instructions_path,
     reference_tissues,
+    worksheet_concept_ids,
 )
 from sema.log import logger
 from sema.eval.mapping_run import EvaluationSubject, write_eval_run
@@ -189,12 +190,12 @@ def apply_labels_cmd(worksheet_path: str, db: str, version: str, date: str) -> N
     """Apply a curator's completed worksheet as a NEW snapshot."""
     snapshot = load_current_snapshot(GOLD_ROOT)
     with _connect(db) as con:
-        targets = _target_facts(con)
+        targets = _target_facts(con, worksheet_concept_ids(worksheet_path))
     draft = apply_labels(
         snapshot, worksheet_path, version=version, date=date, targets=targets
     )
     _publish(draft)
-    pending = challenge_codes_needing_review(draft.rows, draft.header.challenge_codes)
+    pending = codes_needing_second_review(draft.rows, draft.header.challenge_codes)
     if pending:
         click.echo(
             f"  {len(pending)} of {len(draft.header.challenge_codes)} declared challenge "
@@ -203,15 +204,24 @@ def apply_labels_cmd(worksheet_path: str, db: str, version: str, date: str) -> N
         )
 
 
-def _target_facts(con: Any) -> dict[int, TargetFacts]:
-    """What the OMOP vocabulary says about every concept a label could name.
+def _target_facts(con: Any, concept_ids: set[int]) -> dict[int, TargetFacts]:
+    """What the OMOP vocabulary says about the concepts THIS worksheet names.
 
     Read once, passed in as data: the artifact modules that validate a label stay
     pure, so snapshot integrity keeps holding off-machine.
+
+    Scoped to the named ids because the table is not small — the live build holds
+    ~10M concepts, so reading it whole to check a few dozen labels put gigabytes
+    through a Python dict on the curator's machine.
     """
+    if not concept_ids:
+        return {}
+    ordered = sorted(concept_ids)
+    placeholders = ", ".join("?" for _ in ordered)
     rows = con.execute(
         "SELECT concept_id, concept_code, vocabulary_id, domain_id, standard_concept "
-        "FROM vocabulary_omop.concept WHERE concept_id IS NOT NULL"
+        f"FROM vocabulary_omop.concept WHERE concept_id IN ({placeholders})",
+        ordered,
     ).fetchall()
     return {
         int(concept_id): TargetFacts(
@@ -251,6 +261,7 @@ def mapping_report_cmd(
     from sema.eval.mapping_report import (
         GradingContext,
         GradingReleaseError,
+        graded_release_of,
         mappings_for_subject,
         report_for_snapshot,
     )
@@ -264,7 +275,14 @@ def mapping_report_cmd(
         vocab_release=vocab_release,
     )
     snapshot = load_current_snapshot(GOLD_ROOT)
-    store = ValueMappingStore(duckdb.connect(store_path), schema=schema, table=table)
+    # Read-only: US-006 is the store's sole writer, and grading must not take a
+    # write lock on the artifact it is only reading.
+    store = ValueMappingStore(
+        duckdb.connect(store_path, read_only=True),
+        schema=schema,
+        table=table,
+        read_only=True,
+    )
     try:
         mappings = mappings_for_subject(store, subject)
     finally:
@@ -274,7 +292,8 @@ def mapping_report_cmd(
         report = report_for_snapshot(
             GradingContext.from_snapshot(snapshot),
             decisions,
-            graded_release=subject.vocab_release,
+            # Off the graded rows, not off the flag that selected them.
+            graded_release=graded_release_of(mappings, fallback=subject.vocab_release),
         )
     except GradingReleaseError as exc:
         raise click.ClickException(str(exc)) from exc

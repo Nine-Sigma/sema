@@ -96,6 +96,13 @@ def assert_universe_integrity(universe: tuple[UniverseEntry, ...]) -> None:
 
 def _assert_declaration(header: GoldSetHeader, universe: tuple[UniverseEntry, ...]) -> None:
     """The header's own numbers must agree with the manifest beneath them."""
+    if not header.vocab_release:
+        raise SnapshotInvariantError(
+            "the header declares no vocab_release; a gold_concept_id is a bare "
+            "integer without the release that minted it, so an unpinned snapshot "
+            "grades every release alike and reports vocabulary churn as resolver "
+            "error"
+        )
     for name, codes in (("tier", header.tier_codes), ("challenge", header.challenge_codes)):
         if len(set(codes)) != len(codes):
             raise SnapshotInvariantError(

@@ -401,3 +401,61 @@ def test_a_declared_tier_code_absent_from_the_universe_must_be_retired(
 
     with pytest.raises(SnapshotInvariantError, match="COAD"):
         write_snapshot(tmp_path / "snap", _header(tier_achieved_row_share=100 / 102), rows, universe)
+
+
+def test_an_interrupted_publish_leaves_no_directory_to_block_the_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A partial snapshot satisfied the "already published" refusal forever.
+
+    ``write_eval_run`` was made all-or-nothing for exactly this; the snapshot
+    writer is the artifact with a version number it can permanently burn.
+    """
+    import sema.eval.goldset_snapshot as module
+
+    calls: list[Path] = []
+
+    def _explode(path: Path, payload: object) -> None:
+        calls.append(path)
+        if len(calls) == 2:
+            raise OSError("disk full")
+        path.write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setattr(module, "_write_jsonl", _explode)
+    directory = tmp_path / "snap"
+
+    with pytest.raises(OSError, match="disk full"):
+        write_snapshot(directory, _header(), _rows(), _UNIVERSE)
+
+    assert not directory.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_header_that_declares_no_vocabulary_release_is_rejected(tmp_path: Path) -> None:
+    """The release pin is skipped when the header declares nothing to pin to.
+
+    Same shape as the blank ``rows_sha256`` hole: an undeclared release made an
+    unpinnable snapshot indistinguishable from a pinned one, and grading across
+    releases reports vocabulary churn as resolver error.
+    """
+    with pytest.raises(SnapshotInvariantError, match="vocab_release"):
+        write_snapshot(tmp_path / "snap", _header(vocab_release=""), _rows(), _UNIVERSE)
+
+
+def test_losing_a_publish_race_is_the_already_published_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two writers both pass the exists check; the loser must not get a raw OSError."""
+    import sema.eval.goldset_snapshot_utils as utils
+
+    directory = tmp_path / "snap"
+
+    def _lose(src: object, dst: object) -> None:
+        directory.mkdir(parents=True)
+        (directory / "meta.json").write_text("{}", encoding="utf-8")
+        raise OSError("directory not empty")
+
+    monkeypatch.setattr(utils.os, "replace", _lose)
+
+    with pytest.raises(SnapshotInvariantError, match="already published"):
+        write_snapshot(directory, _header(), _rows(), _UNIVERSE)

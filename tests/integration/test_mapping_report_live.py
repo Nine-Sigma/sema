@@ -20,8 +20,16 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from sema.eval.mapping_report import build_mapping_report, decisions_from_store
-from sema.eval.mapping_report_utils import AcceptanceVerdict
+from sema.eval.mapping_report import (
+    GradingContext,
+    graded_release_of,
+    mappings_for_subject,
+    report_for_snapshot,
+)
+from sema.eval.mapping_report_utils import (
+    AcceptanceVerdict,
+    decision_from_value_mapping,
+)
 from sema.eval.goldset_snapshot import current_snapshot_rows_path, load_current_snapshot
 from sema.eval.mapping_goldset import GoldSet, load_gold_set
 from sema.eval.mapping_run import EvaluationSubject
@@ -100,11 +108,16 @@ def test_mapping_report_over_real_decisions(tmp_path: Path) -> None:
         resolver_policy_ref=_POLICY_REF,
         vocab_release=_VOCAB_RELEASE,
     )
-    decisions = decisions_from_store(store, subject)
+    # Through the pinned entry point, not around it: this is the live rehearsal
+    # of what `sema eval goldset mapping-report` does in production.
+    mappings = mappings_for_subject(store, subject)
+    decisions = [decision_from_value_mapping(m) for m in mappings]
     assert len(decisions) == len(codes)
 
-    report = build_mapping_report(
-        gold, decisions, snapshot_version=snapshot.header.snapshot_version
+    report = report_for_snapshot(
+        GradingContext.from_snapshot(snapshot),
+        decisions,
+        graded_release=graded_release_of(mappings, fallback=subject.vocab_release),
     )
     print(report.human_summary())
 

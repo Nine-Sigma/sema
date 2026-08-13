@@ -43,6 +43,7 @@ __all__ = [
     "GradingReleaseError",
     "build_mapping_report",
     "decisions_from_store",
+    "graded_release_of",
     "mappings_for_subject",
     "report_for_snapshot",
     "report_from_store",
@@ -103,9 +104,18 @@ def report_for_snapshot(
 ) -> MappingReport:
     """The single graded entry point: pin the release, then score every stratum.
 
-    ``graded_release`` is read from the decisions' own store rows rather than
-    from a caller's intent, so the pin is evidence about what was graded.
+    ``graded_release`` must come from the store rows that were graded — see
+    :func:`graded_release_of` — never from a caller's intent, so the pin is
+    evidence about what was graded rather than a restatement of a flag.
     """
+    if context.gold.rows and not context.vocab_release:
+        raise GradingReleaseError(
+            f"the gold set {context.snapshot_version or '(unversioned)'} carries "
+            f"{len(context.gold.rows)} rows but declares no vocab_release, so its "
+            "concept ids cannot be pinned to anything. Skipping the check here "
+            "would make an unpinnable snapshot indistinguishable from a matching "
+            "one. Re-snapshot it with the release that minted its labels."
+        )
     if context.vocab_release and graded_release != context.vocab_release:
         raise GradingReleaseError(
             f"the graded subject is pinned to {graded_release or '(unstated)'} but "
@@ -122,6 +132,32 @@ def report_for_snapshot(
         challenge_codes=context.challenge_codes,
         tail_universe=context.tail_universe,
     )
+
+
+def graded_release_of(
+    mappings: Sequence[ValueMapping],
+    *,
+    fallback: str,
+) -> str:
+    """The one vocabulary release the graded store rows were resolved against.
+
+    Reading ``mappings[0]`` pinned the first row and then graded all of them:
+    a decision set spanning two releases passed the pin and blended two
+    resolvers into one matrix, which is the failure
+    :class:`~sema.eval.mapping_run.EvaluationSubject` exists to prevent —
+    arriving through the check meant to catch it.
+
+    ``fallback`` applies only when nothing was graded, where there is no row to
+    read a release off and no matrix for a wrong one to corrupt.
+    """
+    releases = sorted({m.vocab_release for m in mappings})
+    if len(releases) > 1:
+        raise GradingReleaseError(
+            f"the decision set spans {len(releases)} vocabulary releases "
+            f"({', '.join(releases)}); one matrix cannot grade two resolvers. "
+            "Narrow the evaluation subject to a single vocab_release."
+        )
+    return releases[0] if releases else fallback
 
 
 def mappings_for_subject(
@@ -186,10 +222,17 @@ def build_mapping_report(
         snapshot_version=snapshot_version,
         qualifiers=adjudication_qualifiers(gold.rows, challenge_codes),
         tail_sample_codes=sample,
+        # The three counts partition the draw: a code with a row but no answer
+        # yet belonged to neither of the other two and simply vanished.
         tail_sample_labelled=sum(
             1
             for c in sample
             if c in by_code and by_code[c].gold_label is not GoldLabel.UNLABELLED
+        ),
+        tail_sample_unlabelled=sum(
+            1
+            for c in sample
+            if c in by_code and by_code[c].gold_label is GoldLabel.UNLABELLED
         ),
         tail_sample_unlabellable=sum(1 for c in sample if c not in by_code),
         ungraded_codes=ungraded,

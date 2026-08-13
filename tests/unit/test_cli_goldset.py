@@ -422,3 +422,32 @@ def test_apply_labels_accepts_a_label_that_matches_the_vocabulary(
 
     assert result.exit_code == 0, result.output + str(result.exception)
     assert load_snapshot(snapshot_dir("v2", gold_root)).by_code()["LUAD"].gold_concept_id == 45768916
+
+
+def test_target_facts_reads_only_the_concepts_a_worksheet_names(db: str) -> None:
+    """A curator labels dozens of codes; the OMOP vocabulary holds ~10M concepts.
+
+    Reading the whole table to validate them put gigabytes through a Python dict
+    for a check that touches a handful of ids.
+    """
+    from sema.cli_goldset import _target_facts
+
+    con = duckdb.connect(db, read_only=True)
+    try:
+        facts = _target_facts(con, {45768916})
+    finally:
+        con.close()
+
+    assert set(facts) == {45768916}
+    assert facts[45768916].concept_code == "254626006"
+
+
+def test_target_facts_reads_nothing_when_no_label_names_a_concept(db: str) -> None:
+    """A worksheet of pure NO_MAP labels must not touch the vocabulary at all."""
+    from sema.cli_goldset import _target_facts
+
+    class _Refusing:
+        def execute(self, *args: object, **kwargs: object) -> object:
+            raise AssertionError("the vocabulary must not be queried")
+
+    assert _target_facts(_Refusing(), set()) == {}

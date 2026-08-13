@@ -263,6 +263,20 @@ def _summary(result: FitResult) -> dict[str, object]:
         "staging": f"{result.staging_schema}.{result.staging_table}",
         "gate_d_lite": result.qa.as_dict(),
         "conformance": result.conformance.as_dict(),
+        # A gate that could not fail must say so. Without `--gold-snapshot` there
+        # is no oracle, so `--strict` passes the gold check vacuously, and a
+        # silent pass is indistinguishable from a graded one.
+        "gold_gate": (
+            {"ran": True, "snapshot_version": result.report.snapshot_version}
+            if result.report.snapshot_version
+            else {
+                "ran": False,
+                "reason": (
+                    "no --gold-snapshot was given, so nothing was graded against a "
+                    "human label and --strict cannot fail on one"
+                ),
+            }
+        ),
         "eval": {
             **result.report.as_dict(),
             "note": (

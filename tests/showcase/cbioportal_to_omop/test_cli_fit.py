@@ -182,6 +182,10 @@ def test_fit_strict_passes_on_conformance_without_gold(
     summary = json.loads(result.output)
     assert summary["conformance"]["passed"] is True
     assert summary["conformance"]["violations"] == []
+    # The gold check passed because there was no oracle — say so, or a vacuous
+    # pass is indistinguishable from a graded one.
+    assert summary["gold_gate"]["ran"] is False
+    assert "--gold-snapshot" in summary["gold_gate"]["reason"]
 
 
 def _fit_argv(db: Path, snapshot: Path) -> list[str]:

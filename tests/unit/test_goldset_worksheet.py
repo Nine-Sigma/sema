@@ -325,3 +325,89 @@ def test_a_concept_id_absent_from_the_vocabulary_is_rejected(tmp_path: Path) -> 
             _snapshot(), _completed(tmp_path), version="v2", date="2026-08-12",
             targets={},
         )
+
+
+# --- the worksheet is the only hand-edited input in the chain ---------------
+
+
+def _csv(path: Path, fieldnames: list[str], row: dict[str, str]) -> Path:
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow(row)
+    return path
+
+
+def test_a_worksheet_missing_a_column_is_named_not_a_keyerror(tmp_path: Path) -> None:
+    """A curator's spreadsheet round-trip can drop or rename a column.
+
+    ``row_from_json`` was hardened to refuse a key it cannot hold; this is the
+    same artifact arriving from a human, and it went in unchecked — a dropped
+    column surfaced as ``KeyError: 'gold_concept_id'`` from deep inside the apply.
+    """
+    columns = [c for c in WORKSHEET_COLUMNS if c != "gold_concept_id"]
+    path = _csv(
+        tmp_path / "w.csv",
+        columns,
+        {
+            "oncotree_code": "LUAD", "snapshot_version": "v1", "gold_label": "NO_MAP",
+            "curator": "dean", "review_date": "2026-08-12", "evidence": "nothing fits",
+        },
+    )
+
+    with pytest.raises(ValueError, match="gold_concept_id"):
+        apply_labels(_snapshot(), path, version="v2", date="2026-08-12")
+
+
+def test_a_worksheet_carrying_an_unknown_column_is_refused(tmp_path: Path) -> None:
+    """An unknown column is a field the artifact silently fails to account for."""
+    path = _csv(
+        tmp_path / "w.csv",
+        [*WORKSHEET_COLUMNS, "resolver_suggestion"],
+        {
+            "oncotree_code": "LUAD", "snapshot_version": "v1", "gold_label": "NO_MAP",
+            "curator": "dean", "review_date": "2026-08-12", "evidence": "nothing fits",
+            "resolver_suggestion": "45768916",
+        },
+    )
+
+    with pytest.raises(ValueError, match="resolver_suggestion"):
+        apply_labels(_snapshot(), path, version="v2", date="2026-08-12")
+
+
+def test_the_concept_ids_a_worksheet_names_can_be_read_without_applying_it(
+    tmp_path: Path,
+) -> None:
+    """So the target facts can be fetched for those ids and nothing else.
+
+    Reading every concept in the vocabulary to check a few dozen labels put a
+    ~10M-row table through a Python dict on a curator's laptop.
+    """
+    from sema.eval.goldset_worksheet import worksheet_concept_ids
+
+    assert worksheet_concept_ids(_completed(tmp_path)) == {45768916}
+
+
+def test_an_unparseable_concept_id_is_reported_by_code(tmp_path: Path) -> None:
+    from sema.eval.goldset_worksheet import worksheet_concept_ids
+
+    with pytest.raises(ValueError, match="LUAD"):
+        worksheet_concept_ids(_completed(tmp_path, gold_concept_id="SNOMED:254626006"))
+
+
+def test_a_worksheet_with_no_header_row_is_refused(tmp_path: Path) -> None:
+    path = tmp_path / "empty.csv"
+    path.write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="no header row"):
+        apply_labels(_snapshot(), path, version="v2", date="2026-08-12")
+
+
+def test_a_no_map_worksheet_names_no_concept_to_look_up(tmp_path: Path) -> None:
+    from sema.eval.goldset_worksheet import worksheet_concept_ids
+
+    path = _completed(
+        tmp_path, gold_label="NO_MAP", gold_concept_id="", target_concept_code=""
+    )
+
+    assert worksheet_concept_ids(path) == set()

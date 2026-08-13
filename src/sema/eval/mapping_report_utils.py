@@ -169,6 +169,7 @@ class MappingReport:
     qualifiers: tuple[str, ...] = ()
     tail_sample_codes: tuple[str, ...] = ()
     tail_sample_labelled: int = 0
+    tail_sample_unlabelled: int = 0
     tail_sample_unlabellable: int = 0
     ungraded_codes: tuple[str, ...] = ()
     declared_challenge_codes: tuple[str, ...] = ()
@@ -210,13 +211,15 @@ class MappingReport:
                     "gating": False,
                     "codes": list(self.tail_sample_codes),
                     "labelled": self.tail_sample_labelled,
+                    "unlabelled": self.tail_sample_unlabelled,
                     "without_a_gold_row": self.tail_sample_unlabellable,
                     "note": (
                         "the universe-manifest draw — informational only. The frozen "
                         "head is selected by row frequency and says nothing about the "
-                        "distinct-code tail. `without_a_gold_row` codes cannot be "
-                        "labelled until the snapshot carries a row for them, so a zero "
-                        "labelled count is not evidence that the tail is clean"
+                        "distinct-code tail. The three counts partition `codes`: "
+                        "`without_a_gold_row` cannot be labelled until the snapshot "
+                        "carries a row, `unlabelled` has one and no human answer yet, "
+                        "so a zero labelled count is not evidence that the tail is clean"
                     ),
                 },
                 "labelled_tail_census": {
@@ -324,7 +327,8 @@ class MappingReport:
             f"    no_map_accuracy     = {_pct(m.no_map_accuracy)} (reported separately)",
             f"  strata: head {self.score.scored_codes} scored (gating) / "
             f"random tail sample {len(self.tail_sample_codes)} drawn, "
-            f"{self.tail_sample_labelled} labelled, {self.tail_sample_unlabellable} "
+            f"{self.tail_sample_labelled} labelled, {self.tail_sample_unlabelled} "
+            f"unlabelled, {self.tail_sample_unlabellable} "
             f"carry no gold row yet / labelled tail census "
             f"{self.score.tail_scored_codes} scored (never gating)",
             *self._challenge_lines(),

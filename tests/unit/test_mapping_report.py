@@ -551,3 +551,39 @@ def test_mapping_report_is_frozen_dataclass() -> None:
     assert isinstance(report, MappingReport)
     with pytest.raises(Exception):
         report.verdict = AcceptanceVerdict.ACCEPTED  # type: ignore[misc]
+
+
+def test_the_tail_sample_accounts_for_every_code_it_drew() -> None:
+    """Drawn = labelled + unlabelled + without-a-gold-row.
+
+    Reporting only "labelled" and "carry no gold row" let a drawn code that HAS a
+    row and is simply unlabelled fall out of the summary entirely — on the live
+    snapshot, 20 drawn reported as 0 labelled and 18 rowless, with 2 unaccounted.
+    """
+    def _labelled(code: str, concept: int, state: TierState) -> GoldRow:
+        return GoldRow(
+            code, concept, GoldLabel.RESOLVED, 1, tier_state=state,
+            target_concept_code=str(concept), curator="dean",
+            review_date="2026-08-12", evidence="browser",
+        )
+
+    gold = [
+        _labelled("LUAD", 45768916, TierState.IN_TIER),
+        _labelled("SEEN", 4180790, TierState.OUT_OF_TIER),
+        GoldRow("BLANK", None, GoldLabel.UNLABELLED, 1, tier_state=TierState.OUT_OF_TIER),
+    ]
+    report = build_mapping_report(
+        GoldSet(gold), [], snapshot_version="v1", tail_universe=["SEEN", "BLANK", "GONE"]
+    )
+
+    assert set(report.tail_sample_codes) == {"SEEN", "BLANK", "GONE"}
+    assert report.tail_sample_labelled == 1
+    assert report.tail_sample_unlabelled == 1
+    assert report.tail_sample_unlabellable == 1
+    total = (
+        report.tail_sample_labelled
+        + report.tail_sample_unlabelled
+        + report.tail_sample_unlabellable
+    )
+    assert total == len(report.tail_sample_codes)
+    assert "1 labelled, 1 unlabelled, 1 carry no gold row" in report.human_summary()

@@ -31,6 +31,7 @@ from sema.eval.goldset_snapshot_utils import (
     file_digest,
     row_from_json,
     row_to_json,
+    staged_publish,
 )
 from sema.eval.mapping_goldset_utils import GoldRow, TierState
 
@@ -116,28 +117,30 @@ def write_snapshot(
     rows: list[GoldRow],
     universe: tuple[UniverseEntry, ...],
 ) -> GoldSetHeader:
-    """Publish a new snapshot. Refuses to overwrite an existing one."""
+    """Publish a new snapshot, all three files or none. Never overwrites one."""
     path = Path(directory)
-    if path.exists():
-        raise SnapshotInvariantError(
-            f"{path} is already published; emit a new snapshot_version instead"
-        )
     ordered = sorted(rows, key=canonical_sort_key)
     manifest = tuple(sorted(universe, key=canonical_universe_key))
     assert_snapshot_invariants(header, ordered, manifest)
-    path.mkdir(parents=True)
-    # Data first, then the digests OF WHAT WAS WRITTEN, then the header carrying
-    # them: stamping a projection before the write left the header attesting to
-    # bytes no one had produced yet.
-    _write_jsonl(path / _ROWS_FILE, [row_to_json(r) for r in ordered])
-    _write_jsonl(path / _UNIVERSE_FILE, [e.as_dict() for e in manifest])
-    stamped = header.with_digests(
-        rows=file_digest(path / _ROWS_FILE),
-        universe=file_digest(path / _UNIVERSE_FILE),
-    )
-    (path / _META_FILE).write_text(
-        json.dumps(stamped.as_dict(), indent=2) + "\n", encoding="utf-8"
-    )
+
+    def _conflict() -> BaseException:
+        return SnapshotInvariantError(
+            f"{path} is already published; emit a new snapshot_version instead"
+        )
+
+    with staged_publish(path, conflict=_conflict) as staging:
+        # Data first, then the digests OF WHAT WAS WRITTEN, then the header
+        # carrying them: stamping a projection before the write left the header
+        # attesting to bytes no one had produced yet.
+        _write_jsonl(staging / _ROWS_FILE, [row_to_json(r) for r in ordered])
+        _write_jsonl(staging / _UNIVERSE_FILE, [e.as_dict() for e in manifest])
+        stamped = header.with_digests(
+            rows=file_digest(staging / _ROWS_FILE),
+            universe=file_digest(staging / _UNIVERSE_FILE),
+        )
+        (staging / _META_FILE).write_text(
+            json.dumps(stamped.as_dict(), indent=2) + "\n", encoding="utf-8"
+        )
     return stamped
 
 

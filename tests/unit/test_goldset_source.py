@@ -247,3 +247,27 @@ def test_a_raw_samples_spec_is_already_its_own_view() -> None:
     spec = _raw_spec("cbioportal_study_a")
 
     assert raw_samples_view(spec) is spec
+
+
+def test_a_scope_value_that_is_not_an_identifier_is_still_a_valid_filter() -> None:
+    """Scope values are string LITERALS, not identifiers.
+
+    Validating them with the identifier regex rejected any legitimate study id
+    carrying a hyphen or a leading digit — safe, but wrong, and it only looked
+    correct while every declared study happened to also be a schema name.
+    """
+    sql = scoped_enumeration_sql(_staging_spec("msk-chord-2024", "2024_impact"))
+
+    assert "'msk-chord-2024'" in sql
+    assert "'2024_impact'" in sql
+
+
+def test_a_scope_value_carrying_a_quote_is_refused() -> None:
+    with pytest.raises(ValueError, match="literal"):
+        scoped_enumeration_sql(_staging_spec("a' OR '1'='1"))
+
+
+def test_a_scope_schema_must_still_be_an_identifier() -> None:
+    """The raw shape interpolates the scope value as a SCHEMA, so it stays strict."""
+    with pytest.raises(ValueError, match="identifier"):
+        scoped_enumeration_sql(_raw_spec("study-a"))

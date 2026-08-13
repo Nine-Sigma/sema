@@ -31,7 +31,11 @@ from sema.compile.staging_backend import (
     StagingBackend,
     StagingCursor,
 )
-from sema.eval.mapping_report import GradingContext, report_for_snapshot
+from sema.eval.mapping_report import (
+    GradingContext,
+    graded_release_of,
+    report_for_snapshot,
+)
 from sema.eval.conformance import ConformanceReport, assert_contract_conformance
 from sema.eval.mapping_report_utils import (
     MappingReport,
@@ -197,9 +201,7 @@ def run_fit(
     report = report_for_snapshot(
         request.grading,
         [decision_from_value_mapping(mapping) for mapping in run_mappings],
-        graded_release=(
-            run_mappings[0].vocab_release if run_mappings else ctx.vocab_release
-        ),
+        graded_release=graded_release_of(run_mappings, fallback=ctx.vocab_release),
     )
     conformance = assert_contract_conformance(
         run_mappings, resolver.vocab_store, request.policy

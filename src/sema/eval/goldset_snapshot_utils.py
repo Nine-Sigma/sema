@@ -16,6 +16,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
+import tempfile
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -32,6 +37,7 @@ __all__ = [
     "ordered_rows_digest",
     "row_from_json",
     "row_to_json",
+    "staged_publish",
     "tier_row_share",
 ]
 
@@ -221,6 +227,39 @@ def ordered_rows_digest(rows: list[GoldRow]) -> str:
 def file_digest(path: Path) -> str:
     """SHA-256 over the file's BYTES — the artifact itself, not a projection of it."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@contextmanager
+def staged_publish(
+    directory: Path,
+    *,
+    conflict: Callable[[], BaseException],
+) -> Iterator[Path]:
+    """Build an immutable directory in a temp sibling, then rename it into place.
+
+    Every artifact under ``eval/`` is written once and refuses to overwrite
+    itself, which turns a half-written directory into a permanent block: it
+    satisfies the refusal, so the retry that would have completed it is rejected,
+    and the version number is burned. Yields the staging path; the rename happens
+    only if the body returns. ``conflict`` builds the caller's own already-exists
+    error, raised both for a directory that is already there and for a rename
+    that loses a race to one.
+    """
+    if directory.exists():
+        raise conflict()
+    directory.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{directory.name}.", dir=directory.parent))
+    try:
+        yield staging
+        # mkdtemp is 0700; a published artifact is evidence others must read.
+        staging.chmod(0o755)
+        try:
+            os.replace(staging, directory)
+        except OSError as exc:
+            raise conflict() from exc
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
 
 
 def canonical_universe_key(entry: UniverseEntry) -> tuple[int, str]:

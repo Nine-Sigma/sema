@@ -26,7 +26,6 @@ from sema.eval.goldset_ops import SnapshotDraft
 from sema.eval.goldset_snapshot import GoldSetSnapshot
 from sema.eval.goldset_snapshot_utils import GoldSetHeader
 from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow
-from sema.eval.adjudication import codes_needing_second_review
 
 __all__ = [
     "WORKSHEET_COLUMNS",
@@ -37,6 +36,7 @@ __all__ = [
     "instructions_path",
     "reference_tissues",
     "worksheet_codes",
+    "worksheet_concept_ids",
     "write_instructions",
 ]
 
@@ -251,8 +251,17 @@ def apply_labels(
 
 
 def _read_worksheet(path: Path) -> dict[str, dict[str, str]]:
+    """Read a curator's completed worksheet, refusing a shape it cannot hold.
+
+    The only hand-edited artifact in the chain, and the one that went in
+    unchecked: a spreadsheet round-trip that dropped a column surfaced as a bare
+    ``KeyError`` from inside the apply, and an added one was read as data no
+    reader accounts for. Same rule as :func:`row_from_json`, one layer out.
+    """
     with path.open(encoding="utf-8", newline="") as handle:
-        rows = [r for r in csv.DictReader(handle) if (r.get("gold_label") or "").strip()]
+        reader = csv.DictReader(handle)
+        _assert_columns(path, reader.fieldnames)
+        rows = [r for r in reader if (r.get("gold_label") or "").strip()]
     labels: dict[str, dict[str, str]] = {}
     for row in rows:
         code = (row.get("oncotree_code") or "").strip()
@@ -260,6 +269,38 @@ def _read_worksheet(path: Path) -> dict[str, dict[str, str]]:
             raise ValueError(f"{code}: worksheet carries more than one label")
         labels[code] = {k: (v or "").strip() for k, v in row.items()}
     return labels
+
+
+def _assert_columns(path: Path, fieldnames: Sequence[str] | None) -> None:
+    if not fieldnames:
+        raise ValueError(f"{path}: the worksheet has no header row")
+    present = {(name or "").strip() for name in fieldnames}
+    missing = sorted(set(WORKSHEET_COLUMNS) - present)
+    unknown = sorted(present - set(WORKSHEET_COLUMNS))
+    if missing or unknown:
+        raise ValueError(
+            f"{path}: the worksheet columns do not match the shipped worksheet — "
+            f"missing {missing}, unknown {unknown}. Re-export from the worksheet "
+            "the snapshot shipped rather than reshaping it."
+        )
+
+
+def worksheet_concept_ids(worksheet: str | Path) -> set[int]:
+    """Every ``gold_concept_id`` a completed worksheet names.
+
+    Read before applying so the target facts can be fetched for exactly these
+    concepts: the vocabulary holds ~10M rows and a worksheet names a few dozen,
+    so loading the table to validate them is gigabytes for a handful of lookups.
+    """
+    ids: set[int] = set()
+    for code, entry in _read_worksheet(Path(worksheet)).items():
+        raw = entry.get("gold_concept_id", "")
+        if not raw:
+            continue
+        if not raw.isdigit():
+            raise ValueError(f"{code}: gold_concept_id {raw!r} is not a concept id")
+        ids.add(int(raw))
+    return ids
 
 
 def _apply(row: GoldRow, entry: dict[str, str]) -> GoldRow:
@@ -345,16 +386,3 @@ def _assert_target_facts(
             f"{code}: concept {concept_id} is not standard, so it cannot be the "
             "target a mapping is graded against"
         )
-
-
-def challenge_codes_needing_review(
-    rows: list[GoldRow],
-    challenge_codes: Sequence[str],
-) -> list[str]:
-    """Declared challenge codes not yet labelled AND second-reviewed.
-
-    Reads the header's declared list, never ``tier_state``: a challenge code that
-    also ranks inside the frozen head (live case ``IMMC``) is ``IN_TIER``, so a
-    state check would silently exempt it from the review it most needs.
-    """
-    return codes_needing_second_review(rows, challenge_codes)
