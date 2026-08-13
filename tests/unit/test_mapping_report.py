@@ -203,6 +203,52 @@ def test_gold_no_map_predicted_resolved_is_a_contradiction() -> None:
     assert report.has_labelled_contradiction() is True
 
 
+def test_contradiction_strata_names_the_head() -> None:
+    gold = [_gold("A", 10, GoldLabel.RESOLVED)]
+    decisions = [_decision("A", 99, Status.auto_accepted, ResolutionStatus.RESOLVED)]
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.contradiction_strata() == ("head",)
+
+
+def test_contradiction_strata_is_empty_when_every_label_agrees() -> None:
+    gold, decisions = _all_correct([("A", 10)])
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.contradiction_strata() == ()
+    assert report.has_labelled_contradiction() is False
+
+
+def test_a_labelled_tail_contradiction_is_not_invisible() -> None:
+    """The reproduction that started this: the head matrix alone said 'clean'."""
+    gold = [
+        _gold("A", 10, GoldLabel.RESOLVED),
+        replace(
+            _gold("T", 20, GoldLabel.RESOLVED),
+            tier_state=TierState.OUT_OF_TIER,
+        ),
+    ]
+    decisions = [
+        _decision("A", 10, Status.auto_accepted, ResolutionStatus.RESOLVED),
+        _decision("T", 999, Status.auto_accepted, ResolutionStatus.RESOLVED),
+    ]
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.score.distinct_code.wrong == 0
+    assert report.contradiction_strata() == ("tail",)
+    assert report.has_labelled_contradiction() is True
+
+
+def test_head_and_challenge_contradictions_are_both_named() -> None:
+    gold = [
+        _gold("A", 10, GoldLabel.RESOLVED),
+        replace(_gold("C", None, GoldLabel.NO_MAP), tier_state=TierState.CHALLENGE),
+    ]
+    decisions = [
+        _decision("A", 99, Status.auto_accepted, ResolutionStatus.RESOLVED),
+        _decision("C", 77, Status.auto_accepted, ResolutionStatus.RESOLVED),
+    ]
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.contradiction_strata() == ("head", "challenge")
+
+
 # --- acceptance thresholds + coverage gate ----------------------------------
 
 

@@ -162,7 +162,7 @@ def decision_from_value_mapping(mapping: ValueMapping) -> Decision:
 
 
 def evaluate_acceptance(
-    matrix: ConfusionMatrix | None,
+    matrix: ConfusionMatrix,
     coverage_fraction: float,
     *,
     ungraded_codes: Sequence[str] = (),
@@ -189,7 +189,6 @@ def evaluate_acceptance(
             f"decision in the graded subject ({listed}); the decision set does "
             "not cover the population the verdict would certify",
         )
-    assert matrix is not None  # full coverage implies a scored matrix
     precision = matrix.mapped_precision
     auto = matrix.auto_resolution_rate
     if precision is None or auto is None:
@@ -281,19 +280,37 @@ class MappingReport:
             "structural_precision_caveat": STRUCTURAL_PRECISION_CAVEAT,
         }
 
-    def has_labelled_contradiction(self) -> bool:
-        """True if any LABELLED gold code contradicts the resolver output.
+    def contradiction_strata(self) -> tuple[str, ...]:
+        """Every scored stratum in which a human label contradicts the resolver.
 
         Contradiction = scored cells where a human label disagrees with the
         prediction: ``wrong`` (mapped to the wrong concept), ``fn`` (gold
         RESOLVED but we said NO_MAP), ``fp_map`` (gold NO_MAP but we mapped).
-        ``recall_miss`` (Zone-2 review-pending) is EXCLUDED by design. Fires at
-        any ``labelled_count > 0``; full coverage is required only to GRANT the
-        ACCEPTED verdict, never to start honoring labels. This — not the
-        ACCEPTED verdict — is what gates ``sema fit --strict`` on gold.
+        ``recall_miss`` (Zone-2 review-pending) is EXCLUDED by design.
+
+        All three matrices are read, not just the head: the challenge stratum is
+        the only one that can grade a gold ``NO_MAP`` at all, and a labelled tail
+        code is a real human answer. Reading the head alone let a resolver that
+        contradicted every challenge label still report clean.
         """
-        m = self.score.distinct_code
-        return (m.wrong + m.fn + m.fp_map) > 0
+        return tuple(
+            name
+            for name, matrix in (
+                ("head", self.score.distinct_code),
+                ("challenge", self.score.challenge_distinct_code),
+                ("tail", self.score.tail_distinct_code),
+            )
+            if (matrix.wrong + matrix.fn + matrix.fp_map) > 0
+        )
+
+    def has_labelled_contradiction(self) -> bool:
+        """True if any LABELLED gold code contradicts the resolver output.
+
+        Fires at any ``labelled_count > 0``; full coverage is required only to
+        GRANT the ACCEPTED verdict, never to start honoring labels. This — not
+        the ACCEPTED verdict — is what gates ``sema fit --strict`` on gold.
+        """
+        return bool(self.contradiction_strata())
 
     def _ungraded_note(self) -> str:
         """Name the labelled-but-ungraded codes inline — a gap buried in JSON was

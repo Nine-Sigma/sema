@@ -218,7 +218,12 @@ def mapping_report_cmd(
     """Grade the value-mapping store against the current gold-set snapshot."""
     import duckdb
 
-    from sema.eval.mapping_report import build_mapping_report, mappings_for_subject
+    from sema.eval.mapping_report import (
+        GradingContext,
+        GradingReleaseError,
+        mappings_for_subject,
+        report_for_snapshot,
+    )
     from sema.eval.mapping_report_utils import decision_from_value_mapping
     from sema.resolve.value_mapping_store import ValueMappingStore
 
@@ -229,29 +234,20 @@ def mapping_report_cmd(
         vocab_release=vocab_release,
     )
     snapshot = load_current_snapshot(GOLD_ROOT)
-    if subject.vocab_release != snapshot.header.vocab_release:
-        raise click.ClickException(
-            f"the graded subject is pinned to {subject.vocab_release} but the gold set "
-            f"{snapshot.header.snapshot_version} keys its concept ids to "
-            f"{snapshot.header.vocab_release}. A gold_concept_id is meaningless without "
-            "the release that minted it, so grading across releases would report "
-            "vocabulary churn as resolver error. Re-snapshot the gold set, or grade the "
-            "release it pins."
-        )
     store = ValueMappingStore(duckdb.connect(store_path), schema=schema, table=table)
     try:
         mappings = mappings_for_subject(store, subject)
     finally:
         store.close()
     decisions = [decision_from_value_mapping(m) for m in mappings]
-    frozen = {*snapshot.header.tier_codes, *snapshot.header.challenge_codes}
-    report = build_mapping_report(
-        GoldSet(snapshot.rows),
-        decisions,
-        snapshot_version=snapshot.header.snapshot_version,
-        challenge_codes=snapshot.header.challenge_codes,
-        tail_universe=tuple(e.code for e in snapshot.universe if e.code not in frozen),
-    )
+    try:
+        report = report_for_snapshot(
+            GradingContext.from_snapshot(snapshot),
+            decisions,
+            graded_release=subject.vocab_release,
+        )
+    except GradingReleaseError as exc:
+        raise click.ClickException(str(exc)) from exc
     directory = write_eval_run(
         output_dir, run_id=run_id, report=report, subject=subject, decisions=decisions,
         header=snapshot.header,

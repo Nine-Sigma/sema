@@ -16,8 +16,8 @@ import pytest
 
 from sema.compile.compiler import TransformCompiler
 from sema.compile.compiler_utils import CompileContext, SourceTableSpec
-from sema.eval.goldset_snapshot import current_snapshot_rows_path
-from sema.eval.mapping_goldset import GoldSet, load_gold_set
+from sema.eval.goldset_snapshot import current_snapshot_rows_path, load_current_snapshot
+from sema.eval.mapping_goldset import GoldSet
 from sema.eval.staging_qa import run_staging_qa
 from sema.eval.staging_qa_utils import QAOutcome
 from sema.models.planner._enums import MaterializationMode, PrimaryKeyStrategy
@@ -180,7 +180,9 @@ def test_staging_qa_passes_then_fails_on_corruption(tmp_path: Path) -> None:
         staging_table="condition_staging",
     )
 
-    gold = GoldSet(rows=load_gold_set(_GOLD)) if _GOLD.exists() else GoldSet(rows=[])
+    # Load through the hardened snapshot reader (digests + invariants), never
+    # the bare JSONL: the rows alone cannot prove they are the published ones.
+    gold = GoldSet(load_current_snapshot().rows) if _GOLD.exists() else GoldSet(rows=[])
 
     clean = run_staging_qa(
         work,

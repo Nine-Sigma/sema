@@ -13,7 +13,9 @@ The metric math is NOT re-derived here: :func:`build_mapping_report` calls
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from sema.eval.mapping_goldset import (
     GoldSet,
@@ -33,12 +35,93 @@ from sema.eval.mapping_run import EvaluationSubject
 from sema.resolve.value_mapping_store import ValueMappingStore
 from sema.resolve.value_mapping_store_utils import ValueMapping
 
+if TYPE_CHECKING:  # importing the loader here would cycle back through eval
+    from sema.eval.goldset_snapshot import GoldSetSnapshot
+
 __all__ = [
+    "GradingContext",
+    "GradingReleaseError",
     "build_mapping_report",
     "decisions_from_store",
     "mappings_for_subject",
+    "report_for_snapshot",
     "report_from_store",
 ]
+
+
+class GradingReleaseError(ValueError):
+    """The graded subject is not keyed to the release the gold set pins.
+
+    A ``gold_concept_id`` is a bare integer, meaningless without the vocabulary
+    release that minted it, so grading across releases reports vocabulary churn
+    as resolver error. The pin lives here rather than in one CLI because every
+    caller that grades must honour it.
+    """
+
+
+@dataclass(frozen=True)
+class GradingContext:
+    """Everything a snapshot declares about how its labels must be graded.
+
+    The strata a report can see are a property of the DECLARATION, not of the
+    rows: ``challenge_codes`` and ``tail_universe`` come from the header and the
+    universe manifest, neither of which survives a bare JSONL read. Passing this
+    one object is what keeps ``sema fit --strict`` and ``sema eval goldset
+    mapping-report`` on the same grading path.
+    """
+
+    gold: GoldSet
+    snapshot_version: str = ""
+    challenge_codes: tuple[str, ...] = ()
+    tail_universe: tuple[str, ...] | None = None
+    vocab_release: str = ""
+
+    @classmethod
+    def from_snapshot(cls, snapshot: GoldSetSnapshot) -> GradingContext:
+        frozen = {*snapshot.header.tier_codes, *snapshot.header.challenge_codes}
+        return cls(
+            gold=GoldSet(snapshot.rows),
+            snapshot_version=snapshot.header.snapshot_version,
+            challenge_codes=snapshot.header.challenge_codes,
+            tail_universe=tuple(
+                e.code for e in snapshot.universe if e.code not in frozen
+            ),
+            vocab_release=snapshot.header.vocab_release,
+        )
+
+    @classmethod
+    def empty(cls) -> GradingContext:
+        """Grade against no oracle at all — no labels, so no stratum and no pin."""
+        return cls(gold=GoldSet(rows=[]))
+
+
+def report_for_snapshot(
+    context: GradingContext,
+    decisions: Iterable[Decision],
+    *,
+    graded_release: str,
+) -> MappingReport:
+    """The single graded entry point: pin the release, then score every stratum.
+
+    ``graded_release`` is read from the decisions' own store rows rather than
+    from a caller's intent, so the pin is evidence about what was graded.
+    """
+    if context.vocab_release and graded_release != context.vocab_release:
+        raise GradingReleaseError(
+            f"the graded subject is pinned to {graded_release or '(unstated)'} but "
+            f"the gold set {context.snapshot_version or '(unversioned)'} keys its "
+            f"concept ids to {context.vocab_release}. A gold_concept_id is "
+            "meaningless without the release that minted it, so grading across "
+            "releases would report vocabulary churn as resolver error. "
+            "Re-snapshot the gold set, or grade the release it pins."
+        )
+    return build_mapping_report(
+        context.gold,
+        decisions,
+        snapshot_version=context.snapshot_version,
+        challenge_codes=context.challenge_codes,
+        tail_universe=context.tail_universe,
+    )
 
 
 def mappings_for_subject(

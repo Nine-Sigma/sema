@@ -31,8 +31,7 @@ from sema.compile.staging_backend import (
     StagingBackend,
     StagingCursor,
 )
-from sema.eval.mapping_goldset import GoldSet
-from sema.eval.mapping_report import build_mapping_report
+from sema.eval.mapping_report import GradingContext, report_for_snapshot
 from sema.eval.conformance import ConformanceReport, assert_contract_conformance
 from sema.eval.mapping_report_utils import (
     MappingReport,
@@ -72,7 +71,7 @@ class FitRequest:
     row_identity: RowIdentity
     staging_schema: str
     staging_table: str
-    gold: GoldSet
+    grading: GradingContext
     nodes: MappingNodes
     constant_assertions: list[MappingAssertion] = field(default_factory=list)
 
@@ -185,7 +184,7 @@ def run_fit(
         source_schema=request.source.schema,
         source_table=request.source.table,
         expected_row_count=request.source_row_count,
-        gold_set=request.gold,
+        gold_set=request.grading.gold,
         backend=staging_backend,
     )
 
@@ -193,9 +192,14 @@ def run_fit(
     # Reading the whole store would let a stale row for a code absent from the
     # current source contradict a gold label and fail --strict (bug-369 F1
     # follow-up); run_mappings is exactly the current run/property/policy grain.
-    report = build_mapping_report(
-        request.gold,
+    # The release is read off the store rows themselves, so the gold set's pin is
+    # checked against what was actually graded rather than against intent.
+    report = report_for_snapshot(
+        request.grading,
         [decision_from_value_mapping(mapping) for mapping in run_mappings],
+        graded_release=(
+            run_mappings[0].vocab_release if run_mappings else ctx.vocab_release
+        ),
     )
     conformance = assert_contract_conformance(
         run_mappings, resolver.vocab_store, request.policy

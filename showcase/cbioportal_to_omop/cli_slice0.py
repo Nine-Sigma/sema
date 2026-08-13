@@ -28,7 +28,8 @@ from sema.compile.staging_backend import (
     DUCKDB_BACKEND,
     StagingBackend,
 )
-from sema.eval.mapping_goldset import GoldSet, load_gold_set
+from sema.eval.goldset_snapshot import load_snapshot
+from sema.eval.mapping_report import GradingContext
 from sema.models.config import DatabricksConfig
 from showcase.cbioportal_to_omop.slice0_fit import FitResult, run_fit
 from showcase.cbioportal_to_omop.slice0_fit_utils import (
@@ -75,11 +76,16 @@ _DEFAULT_DUCKDB = Path.home() / ".sema" / "poc.duckdb"
 @click.option("--source-table", default="sample", show_default=True, help="Source table name.")
 @click.option("--value-column", default="ONCOTREE_CODE", show_default=True, help="Source code column.")
 @click.option(
-    "--gold",
-    "gold_path",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    "--gold-snapshot",
+    "gold_snapshot",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
     default=None,
-    help="Gold-set JSONL for Gate D-lite / eval reconciliation (optional).",
+    help=(
+        "Published gold-set snapshot DIRECTORY for Gate D-lite / eval "
+        "reconciliation (optional). A bare JSONL is not accepted: without the "
+        "header there is no release pin and no challenge/tail declaration, so "
+        "the labels would be graded more weakly than they were curated."
+    ),
 )
 @click.option("--staging-schema", default="sema_staging", show_default=True)
 @click.option("--staging-table", default="condition_staging", show_default=True)
@@ -101,19 +107,23 @@ def fit_cmd(
     study_schema: str | None,
     source_table: str,
     value_column: str,
-    gold_path: Path | None,
+    gold_snapshot: Path | None,
     staging_schema: str,
     staging_table: str,
     strict: bool,
 ) -> None:
     """Run the full resolve->...->eval chain for one study."""
-    gold = GoldSet(rows=load_gold_set(gold_path)) if gold_path else GoldSet(rows=[])
+    grading = (
+        GradingContext.from_snapshot(load_snapshot(gold_snapshot))
+        if gold_snapshot
+        else GradingContext.empty()
+    )
     common: dict[str, Any] = dict(
         manifest_path=manifest_path,
         study_schema=study_schema,
         source_table=source_table,
         value_column=value_column,
-        gold=gold,
+        grading=grading,
         staging_schema=staging_schema,
         staging_table=staging_table,
     )
@@ -149,15 +159,16 @@ def _enforce_strict(result: FitResult) -> None:
         reasons.append(
             f"contract conformance: {len(result.conformance.violations)} violation(s)"
         )
-    if result.report.has_labelled_contradiction():
-        reasons.append("labelled gold contradiction")
+    strata = result.report.contradiction_strata()
+    if strata:
+        reasons.append(f"labelled gold contradiction ({', '.join(strata)})")
     if reasons:
         click.echo("STRICT FAIL — " + "; ".join(reasons), err=True)
         sys.exit(3)
 
 
 def _run_duckdb(duckdb_path: Path, *, manifest_path: Path, study_schema: str | None,
-                source_table: str, value_column: str, gold: GoldSet,
+                source_table: str, value_column: str, grading: GradingContext,
                 staging_schema: str, staging_table: str) -> FitResult:
     path = Path(duckdb_path).expanduser()
     if not path.exists():
@@ -173,7 +184,7 @@ def _run_duckdb(duckdb_path: Path, *, manifest_path: Path, study_schema: str | N
         return _execute(
             store, conn, conn, DUCKDB_BACKEND,
             manifest_path=manifest_path, schema=schema, source_table=source_table,
-            value_column=value_column, codes=codes, row_count=row_count, gold=gold,
+            value_column=value_column, codes=codes, row_count=row_count, grading=grading,
             staging_schema=staging_schema, staging_table=staging_table,
         )
     finally:
@@ -182,7 +193,8 @@ def _run_duckdb(duckdb_path: Path, *, manifest_path: Path, study_schema: str | N
 
 def _run_databricks(duckdb_path: Path, catalog: str | None, *, manifest_path: Path,
                     study_schema: str | None, source_table: str, value_column: str,
-                    gold: GoldSet, staging_schema: str, staging_table: str) -> FitResult:
+                    grading: GradingContext, staging_schema: str,
+                    staging_table: str) -> FitResult:
     if not study_schema:
         click.echo("Error: --study-schema is required for the databricks backend", err=True)
         sys.exit(2)
@@ -203,7 +215,7 @@ def _run_databricks(duckdb_path: Path, catalog: str | None, *, manifest_path: Pa
         return _execute(
             vocab, store_conn, cursor, DATABRICKS_BACKEND,
             manifest_path=manifest_path, schema=study_schema, source_table=source_table,
-            value_column=value_column, codes=codes, row_count=row_count, gold=gold,
+            value_column=value_column, codes=codes, row_count=row_count, grading=grading,
             staging_schema=staging_schema, staging_table=staging_table,
         )
     finally:
@@ -213,7 +225,7 @@ def _run_databricks(duckdb_path: Path, catalog: str | None, *, manifest_path: Pa
 def _execute(vocab_store: VocabStore, store_conn: duckdb.DuckDBPyConnection,
              staging_conn: Any, backend: StagingBackend, *, manifest_path: Path,
              schema: str, source_table: str, value_column: str, codes: list[str],
-             row_count: int, gold: GoldSet, staging_schema: str,
+             row_count: int, grading: GradingContext, staging_schema: str,
              staging_table: str) -> FitResult:
     policy, request = build_slice0_fit_request(
         manifest_path=manifest_path,
@@ -222,7 +234,7 @@ def _execute(vocab_store: VocabStore, store_conn: duckdb.DuckDBPyConnection,
         value_column=value_column,
         source_codes=codes,
         source_row_count=row_count,
-        gold=gold,
+        grading=grading,
         staging_schema=staging_schema,
         staging_table=staging_table,
     )
