@@ -194,7 +194,7 @@ def test_re_tier_moves_the_benchmark_and_keeps_displaced_rows(published: Path) -
     prior = load_snapshot(snapshot_dir("v1", published))
     draft = re_tier(
         prior, {"LUAD": 100, "COAD": 1, "RARE": 1}, version="v2", date="2026-09-01",
-        target_row_share=0.95,
+        target_row_share=0.95, challenge_codes=prior.header.challenge_codes,
     )
 
     assert draft.header.tier_codes == ("LUAD",)
@@ -207,6 +207,7 @@ def test_re_tier_admits_new_codes_as_unlabelled(published: Path) -> None:
     draft = re_tier(
         prior, {"NEW": 500, "LUAD": 100, "COAD": 100, "RARE": 10}, version="v2",
         date="2026-09-01", target_row_share=0.95,
+        challenge_codes=prior.header.challenge_codes,
     )
     new_row = draft.by_code()["NEW"]
 
@@ -226,6 +227,36 @@ def test_re_tier_can_declare_a_challenge_stratum(published: Path) -> None:
     assert draft.header.challenge_codes == ("RARE",)
 
 
+def test_re_tier_requires_the_challenge_declaration(published: Path) -> None:
+    """A ``None`` default emptied the whole declaration for any non-CLI caller."""
+    prior = load_snapshot(snapshot_dir("v1", published))
+    with pytest.raises(TypeError):
+        re_tier(  # type: ignore[call-arg]
+            prior, _OBSERVED, version="v2", date="2026-09-01", target_row_share=0.95
+        )
+
+
+def test_a_declared_challenge_code_never_leaves_the_declaration(
+    published: Path,
+) -> None:
+    """Filtering the declaration to observed codes forgave the stratum silently.
+
+    ``derive_states`` + ``_assert_states`` already require a departed code to
+    carry a RETIRED row, so keeping it declared is what makes re-tier and
+    re-scope agree with the invariant ``observe`` already honours.
+    """
+    prior = load_snapshot(snapshot_dir("v1", published))
+    draft = re_scope(
+        prior, {"COAD": 100, "RARE": 10}, _spec("study_b"), version="v2",
+        date="2026-09-01", target_row_share=0.95, challenge_codes=("LUAD",),
+    )
+
+    assert draft.header.challenge_codes == ("LUAD",)
+    assert draft.by_code()["LUAD"].tier_state is TierState.RETIRED
+    publish(published, draft)
+    assert load_snapshot(snapshot_dir("v2", published)).header.challenge_codes == ("LUAD",)
+
+
 # --- re-scope ---------------------------------------------------------------
 
 
@@ -235,6 +266,7 @@ def test_re_scope_retires_a_code_that_left_the_scope(published: Path) -> None:
     draft = re_scope(
         prior, {"COAD": 100, "RARE": 10}, _spec("study_b"), version="v2",
         date="2026-09-01", target_row_share=0.95,
+        challenge_codes=prior.header.challenge_codes,
     )
     retired = draft.by_code()["LUAD"]
 
@@ -247,7 +279,7 @@ def test_re_scope_records_the_new_source_of_truth(published: Path) -> None:
     prior = load_snapshot(snapshot_dir("v1", published))
     draft = re_scope(
         prior, {"COAD": 100}, _spec("study_b"), version="v2", date="2026-09-01",
-        target_row_share=0.95,
+        target_row_share=0.95, challenge_codes=prior.header.challenge_codes,
     )
 
     assert draft.header.source_of_truth.scope_values == ("study_b",)
@@ -287,7 +319,8 @@ def test_publishing_over_an_existing_version_is_refused(published: Path) -> None
 def test_a_published_draft_reloads_clean(published: Path) -> None:
     prior = load_snapshot(snapshot_dir("v1", published))
     publish(published, re_tier(prior, {"LUAD": 100, "COAD": 1, "RARE": 1},
-                               version="v2", date="2026-09-01", target_row_share=0.95))
+                               version="v2", date="2026-09-01", target_row_share=0.95,
+                               challenge_codes=prior.header.challenge_codes))
 
     reloaded = load_snapshot(snapshot_dir("v2", published))
 

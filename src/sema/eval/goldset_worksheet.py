@@ -25,7 +25,7 @@ from pathlib import Path
 from sema.eval.goldset_ops import SnapshotDraft
 from sema.eval.goldset_snapshot import GoldSetSnapshot
 from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow
-from sema.eval.mapping_report_utils import codes_needing_second_review
+from sema.eval.adjudication import codes_needing_second_review
 
 __all__ = [
     "WORKSHEET_COLUMNS",

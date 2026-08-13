@@ -26,7 +26,6 @@ from sema.eval.mapping_goldset import GoldSetReport
 from sema.eval.mapping_goldset_utils import (
     ConfusionMatrix,
     Decision,
-    GoldLabel,
     GoldRow,
     ResolutionStatus,
     TierState,
@@ -59,66 +58,6 @@ class AcceptanceVerdict(str, Enum):
     ACCEPTED = "accepted_for_frozen_frequency_head"
     PROVISIONAL_NOT_ACCEPTED = "provisional — not accepted"
     RUNNING_NOT_ACCEPTED = "running, not accepted"
-
-
-# Second-review floor before a verdict may drop the ``unadjudicated`` qualifier:
-# every labelled challenge code (a wrong gold NO_MAP scores fp_map directly
-# against a correctly-mapped code) plus a sample of head labels.
-MIN_SECOND_REVIEWED_HEAD_LABELS = 10
-
-
-def adjudication_qualifiers(
-    rows: Sequence[GoldRow],
-    challenge_codes: Sequence[str] | None = None,
-) -> tuple[str, ...]:
-    """``('unadjudicated',)`` unless the G-05 second-review floor was met.
-
-    The floor is defined over the snapshot's DECLARATION, not over whatever has
-    been labelled so far, because every row-derived shortcut silently weakens it:
-
-    * ``challenge_codes`` must come from ``GoldSetHeader.challenge_codes``. A
-      declared challenge code that also ranks inside the head (live case:
-      ``IMMC``) resolves to ``IN_TIER``, so a ``tier_state`` check could never
-      demand its review — and an entirely unlabelled stratum passed vacuously.
-    * the head sample size is ``min(10, len(head))`` over the WHOLE head; taken
-      over the labelled head it collapsed to "all of whatever you've labelled".
-    * an out-of-tier label is not evidence of an adjudicated oracle.
-    """
-    declared = (
-        frozenset(challenge_codes)
-        if challenge_codes is not None
-        else frozenset(r.oncotree_code for r in rows if r.tier_state is TierState.CHALLENGE)
-    )
-    head = [r for r in rows if r.tier_state is TierState.IN_TIER]
-    labelled_head = [r for r in head if r.gold_label is not GoldLabel.UNLABELLED]
-    if not labelled_head:
-        return ("unadjudicated",)
-    if codes_needing_second_review(rows, declared):
-        return ("unadjudicated",)
-    reviewed = sum(1 for r in labelled_head if r.second_reviewer)
-    if reviewed < min(MIN_SECOND_REVIEWED_HEAD_LABELS, len(head)):
-        return ("unadjudicated",)
-    return ()
-
-
-def codes_needing_second_review(
-    rows: Sequence[GoldRow],
-    challenge_codes: Sequence[str] | frozenset[str],
-) -> list[str]:
-    """Declared challenge codes not yet labelled AND second-reviewed.
-
-    Unlabelled counts as needing review: a wrong gold ``NO_MAP`` scores
-    ``fp_map`` straight against a correctly-mapped code, so this stratum is the
-    one place a single bad label damages ``mapped_precision`` directly.
-    """
-    by_code = {r.oncotree_code: r for r in rows}
-    return sorted(
-        code
-        for code in challenge_codes
-        if (row := by_code.get(code)) is None
-        or row.gold_label is GoldLabel.UNLABELLED
-        or not row.second_reviewer
-    )
 
 
 def tail_sample(

@@ -120,7 +120,7 @@ def re_tier(
     version: str,
     date: str,
     target_row_share: float,
-    challenge_codes: tuple[str, ...] | None = None,
+    challenge_codes: tuple[str, ...],
 ) -> SnapshotDraft:
     """Recompute the frozen head — a new benchmark, not a refreshed one."""
     return _retarget(
@@ -138,7 +138,7 @@ def re_scope(
     version: str,
     date: str,
     target_row_share: float,
-    challenge_codes: tuple[str, ...] | None = None,
+    challenge_codes: tuple[str, ...],
 ) -> SnapshotDraft:
     """Change the declared source of truth, retiring codes that leave it."""
     return _retarget(
@@ -155,17 +155,24 @@ def _retarget(
     version: str,
     date: str,
     target_row_share: float,
-    challenge_codes: tuple[str, ...] | None,
+    challenge_codes: tuple[str, ...],
 ) -> SnapshotDraft:
+    """Rebuild the declaration. A declared code NEVER leaves it.
+
+    Filtering to observed codes silently emptied the challenge stratum when a
+    code left the scope, while ``observe`` retired it and kept it declared —
+    two operations disagreeing about the same departure. ``derive_states`` +
+    ``_assert_states`` already require a departed code to carry a RETIRED row,
+    so the declaration is safe to carry forward verbatim.
+    """
     tier, achieved = select_tier(list(observed.items()), target_row_share)
-    declared = tuple(c for c in (challenge_codes or ()) if c in observed)
     header = replace(
         snapshot.header,
         snapshot_version=version,
         snapshot_date=date,
         source_of_truth=spec,
         tier_codes=tier,
-        challenge_codes=declared,
+        challenge_codes=challenge_codes,
         tier_target_row_share=target_row_share,
         tier_achieved_row_share=achieved,
     )

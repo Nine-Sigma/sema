@@ -24,9 +24,9 @@ from sema.eval.mapping_goldset import (
     score,
 )
 from sema.eval.mapping_goldset_utils import Decision, GoldLabel
+from sema.eval.adjudication import adjudication_qualifiers
 from sema.eval.mapping_report_utils import (
     MappingReport,
-    adjudication_qualifiers,
     decision_from_value_mapping,
     evaluate_acceptance,
     tail_sample,
