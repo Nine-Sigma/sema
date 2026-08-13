@@ -23,8 +23,8 @@ from sema.eval.mapping_goldset import (
     load_gold_set,
     score,
 )
-from sema.eval.mapping_goldset_utils import Decision, GoldLabel
-from sema.eval.adjudication import adjudication_qualifiers
+from sema.eval.mapping_goldset_utils import Decision, GoldLabel, TierState
+from sema.eval.adjudication import adjudication_qualifiers, retired_challenge_codes
 from sema.eval.mapping_report_utils import (
     MappingReport,
     decision_from_value_mapping,
@@ -174,6 +174,7 @@ def build_mapping_report(
         score_report.distinct_code, coverage, ungraded_codes=ungraded
     )
     sample = tail_sample(gold.rows, snapshot_version, tail_universe=tail_universe)
+    declared_challenge = tuple(challenge_codes or ())
     return MappingReport(
         score=score_report,
         coverage_fraction=coverage,
@@ -192,6 +193,15 @@ def build_mapping_report(
         ),
         tail_sample_unlabellable=sum(1 for c in sample if c not in by_code),
         ungraded_codes=ungraded,
+        declared_challenge_codes=declared_challenge,
+        challenge_codes_in_head=tuple(
+            code
+            for code in declared_challenge
+            if code in by_code and by_code[code].tier_state is TierState.IN_TIER
+        ),
+        retired_challenge_codes=tuple(
+            retired_challenge_codes(gold.rows, declared_challenge)
+        ),
     )
 
 

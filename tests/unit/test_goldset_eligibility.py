@@ -237,21 +237,61 @@ def test_duplicate_decisions_for_an_eligible_code_raise() -> None:
         score(_head_labelled(), decisions)
 
 
-def test_gate_d_lite_does_not_count_a_retired_code_as_a_coverage_miss() -> None:
-    """The fifth call site: a code that left the scope is not staging debt."""
+def test_gate_d_lite_forgives_a_retired_code_staged_as_no_map() -> None:
+    """The fifth call site: a code that left the scope is not staging debt.
+
+    The prior version of this test asserted ``"GBM" not in staged_no_map`` while
+    never staging GBM, so it passed no matter what the check did.
+    """
     from sema.eval.staging_qa_utils import StagingRow, check_no_map_accounting
 
-    gold = GoldSet([*_head_labelled(), _row("GBM", TierState.RETIRED, row_count=7)])
+    gold = GoldSet(
+        [*_head_labelled(), _row("GBM", TierState.RETIRED, GoldLabel.RESOLVED, 4)]
+    )
     staged = [
         StagingRow(source_value="LUAD", target_value=45768916, resolution_status="RESOLVED"),
-        StagingRow(source_value="COAD", target_value=4180790, resolution_status="RESOLVED"),
+        StagingRow(source_value="GBM", target_value=None, resolution_status="NO_MAP"),
     ]
 
     check = check_no_map_accounting(staged, gold)
 
     assert check.passed
-    assert "GBM" not in check.details["staged_no_map"]
-    assert gold.unlabelled_codes() == []
+    assert "GBM" in check.details["staged_no_map"]
+    assert check.details["retired_no_map"] == ["GBM"]
+
+
+def test_gate_d_lite_still_fails_an_out_of_tier_code_staged_as_no_map() -> None:
+    """RETIRED is the ONLY exemption — not an eligibility filter.
+
+    A labelled OUT_OF_TIER (or CHALLENGE) code the gold set calls RESOLVED and
+    staging calls NO_MAP is a real contradiction about live data.
+    """
+    from sema.eval.staging_qa_utils import StagingRow, check_no_map_accounting
+
+    gold = GoldSet(
+        [*_head_labelled(), _row("RARE", TierState.OUT_OF_TIER, GoldLabel.RESOLVED, 9)]
+    )
+    staged = [
+        StagingRow(source_value="RARE", target_value=None, resolution_status="NO_MAP"),
+    ]
+
+    check = check_no_map_accounting(staged, gold)
+
+    assert not check.passed
+    assert check.details["gold_resolved_but_no_map"] == ["RARE"]
+
+
+def test_gate_d_lite_still_fails_a_challenge_code_staged_as_no_map() -> None:
+    from sema.eval.staging_qa_utils import StagingRow, check_no_map_accounting
+
+    gold = GoldSet(
+        [*_head_labelled(), _row("UESL", TierState.CHALLENGE, GoldLabel.RESOLVED, 3)]
+    )
+    staged = [
+        StagingRow(source_value="UESL", target_value=None, resolution_status="NO_MAP"),
+    ]
+
+    assert not check_no_map_accounting(staged, gold).passed
 
 
 def test_duplicate_decisions_outside_the_scored_populations_are_ignored() -> None:

@@ -171,6 +171,9 @@ class MappingReport:
     tail_sample_labelled: int = 0
     tail_sample_unlabellable: int = 0
     ungraded_codes: tuple[str, ...] = ()
+    declared_challenge_codes: tuple[str, ...] = ()
+    challenge_codes_in_head: tuple[str, ...] = ()
+    retired_challenge_codes: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -198,21 +201,33 @@ class MappingReport:
                 "frozen_head": {"gating": True, "scored_codes": self.score.scored_codes},
                 "challenge": {
                     "gating": False,
+                    "declared": list(self.declared_challenge_codes),
+                    "also_in_head": list(self.challenge_codes_in_head),
+                    "retired": list(self.retired_challenge_codes),
                     "scored_codes": self.score.challenge_scored_codes,
                 },
-                "random_tail": {
+                "random_tail_sample": {
                     "gating": False,
                     "codes": list(self.tail_sample_codes),
                     "labelled": self.tail_sample_labelled,
                     "without_a_gold_row": self.tail_sample_unlabellable,
+                    "note": (
+                        "the universe-manifest draw — informational only. The frozen "
+                        "head is selected by row frequency and says nothing about the "
+                        "distinct-code tail. `without_a_gold_row` codes cannot be "
+                        "labelled until the snapshot carries a row for them, so a zero "
+                        "labelled count is not evidence that the tail is clean"
+                    ),
+                },
+                "labelled_tail_census": {
+                    "gating": False,
                     "scored_codes": self.score.tail_scored_codes,
                     "distinct_code": self.score.tail_distinct_code.as_dict(),
                     "note": (
-                        "informational only — the frozen head is selected by row "
-                        "frequency and says nothing about the distinct-code tail. "
-                        "`without_a_gold_row` codes cannot be labelled until the "
-                        "snapshot carries a row for them, so a zero labelled count "
-                        "is not evidence that the tail is clean"
+                        "every labelled out-of-tier row, self-selected by whoever "
+                        "labelled it — NOT the random draw above. Reporting both under "
+                        "one key let the matrix named for the random sample be "
+                        "populated from a curator's own choice of codes"
                     ),
                 },
             },
@@ -260,6 +275,37 @@ class MappingReport:
         more = "" if len(self.ungraded_codes) <= 10 else ", …"
         return f" — {len(self.ungraded_codes)} labelled but ungraded: {listed}{more}"
 
+    def _challenge_lines(self) -> list[str]:
+        """The challenge stratum, stated as DECLARED rather than as scored.
+
+        Its metrics are the only ones that can grade a ``NO_MAP`` at all — every
+        live resolver NO_MAP ranks outside the head, so the head's
+        ``no_map_accuracy`` is permanently ``n/a``. And the declared population
+        is not the gradable one: a code that also ranks inside the head (live
+        case ``IMMC``) is graded there, and a retired one is graded nowhere.
+        """
+        c = self.score.challenge_distinct_code
+        declared = len(self.declared_challenge_codes)
+        elsewhere = (
+            f", {len(self.challenge_codes_in_head)} also in the head and graded "
+            f"there ({', '.join(self.challenge_codes_in_head)})"
+            if self.challenge_codes_in_head
+            else ""
+        )
+        retired = (
+            f", {len(self.retired_challenge_codes)} retired "
+            f"({', '.join(self.retired_challenge_codes)})"
+            if self.retired_challenge_codes
+            else ""
+        )
+        return [
+            f"  challenge stratum: {declared} declared{elsewhere}{retired} — "
+            f"{self.score.challenge_scored_codes} scored here (never gating)",
+            f"    challenge mapped_precision = {_pct(c.mapped_precision)}",
+            f"    challenge no_map_accuracy   = {_pct(c.no_map_accuracy)} "
+            "(the only stratum that can grade a NO_MAP)",
+        ]
+
     def human_summary(self) -> str:
         m = self.score.distinct_code
         qualified = " ".join(f"[{q}]" for q in self.qualifiers)
@@ -277,11 +323,11 @@ class MappingReport:
             f"    auto_resolution_rate= {_pct(m.auto_resolution_rate)}",
             f"    no_map_accuracy     = {_pct(m.no_map_accuracy)} (reported separately)",
             f"  strata: head {self.score.scored_codes} scored (gating) / "
-            f"challenge {self.score.challenge_scored_codes} scored / "
-            f"random tail {len(self.tail_sample_codes)} sampled, "
-            f"{self.tail_sample_labelled} labelled, {self.score.tail_scored_codes} "
-            f"scored, {self.tail_sample_unlabellable} carry no gold row yet "
-            "(never gating)",
+            f"random tail sample {len(self.tail_sample_codes)} drawn, "
+            f"{self.tail_sample_labelled} labelled, {self.tail_sample_unlabellable} "
+            f"carry no gold row yet / labelled tail census "
+            f"{self.score.tail_scored_codes} scored (never gating)",
+            *self._challenge_lines(),
             f"  NOTE: {STRUCTURAL_PRECISION_CAVEAT}",
         ]
         return "\n".join(lines)

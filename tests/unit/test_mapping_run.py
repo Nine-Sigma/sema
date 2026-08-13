@@ -261,8 +261,8 @@ def test_the_three_strata_are_reported_separately() -> None:
 
     assert payload["metrics"]["distinct_code"]["scored"] == 12
     assert payload["metrics"]["challenge"]["scored_codes"] == 1
-    assert payload["strata"]["random_tail"]["gating"] is False
-    assert 0 < len(payload["strata"]["random_tail"]["codes"]) <= 20
+    assert payload["strata"]["random_tail_sample"]["gating"] is False
+    assert 0 < len(payload["strata"]["random_tail_sample"]["codes"]) <= 20
 
 
 def test_the_random_tail_sample_is_deterministic_per_snapshot() -> None:
@@ -341,12 +341,82 @@ def test_the_tail_sample_says_which_codes_are_not_yet_labellable() -> None:
         gold, _decisions(2), snapshot_version="v1",
         tail_universe=tuple(f"T{i}" for i in range(300)),
     )
-    stratum = report.as_dict()["strata"]["random_tail"]
+    stratum = report.as_dict()["strata"]["random_tail_sample"]
 
     assert stratum["labelled"] == 0
     assert stratum["without_a_gold_row"] == len(report.tail_sample_codes) - (
         1 if "T7" in report.tail_sample_codes else 0
     )
+
+
+def test_the_random_draw_and_the_labelled_census_are_separate_keys() -> None:
+    """One key carried both, so the matrix named for the RANDOM draw was populated
+    from whatever a curator happened to choose to label."""
+    gold = GoldSet(
+        _head(2, "sam")
+        + [_row("RARE", TierState.OUT_OF_TIER, GoldLabel.RESOLVED, 500)]
+    )
+
+    payload = build_mapping_report(
+        gold,
+        [*_decisions(2), _decision("RARE", 999)],
+        snapshot_version="v1",
+        tail_universe=tuple(f"T{i}" for i in range(300)),
+    ).as_dict()
+
+    assert "random_tail" not in payload["strata"]
+    draw = payload["strata"]["random_tail_sample"]
+    census = payload["strata"]["labelled_tail_census"]
+    assert "RARE" not in draw["codes"], "RARE is not in the manifest that was drawn from"
+    assert draw["labelled"] == 0
+    assert census["scored_codes"] == 1
+    assert census["distinct_code"]["wrong"] == 1
+
+
+def test_the_summary_reports_the_challenge_metrics() -> None:
+    """Challenge is the only stratum that can grade NO_MAP; the head's is n/a."""
+    gold = GoldSet(
+        _head(12, "sam")
+        + [_row("UESL", TierState.CHALLENGE, GoldLabel.NO_MAP, second_reviewer="sam")]
+    )
+    graded = [
+        *_decisions(12),
+        Decision(
+            source_code="UESL",
+            concept_id=None,
+            status=Status.auto_accepted,
+            resolution_status=ResolutionStatus.NO_MAP,
+            no_map_reason="no acceptable target",
+        ),
+    ]
+
+    summary = build_mapping_report(gold, graded, challenge_codes=("UESL",)).human_summary()
+
+    assert "challenge mapped_precision" in summary
+    assert "challenge no_map_accuracy   = 100.0%" in summary
+
+
+def test_the_summary_states_the_declared_challenge_population_honestly() -> None:
+    """Live case IMMC: declared challenge AND inside the head, so it is graded in
+    the head — 12 declared codes can yield at most 11 challenge rows."""
+    gold = GoldSet(
+        _head(12, "sam")
+        + [_row("IMMC", TierState.IN_TIER, GoldLabel.RESOLVED, 777, "sam")]
+        + [_row("GONE", TierState.RETIRED, GoldLabel.NO_MAP, second_reviewer="sam")]
+    )
+
+    report = build_mapping_report(
+        gold,
+        [*_decisions(12), _decision("IMMC", 777)],
+        challenge_codes=("IMMC", "GONE", "UESL"),
+    )
+    summary = report.human_summary()
+
+    assert report.retired_challenge_codes == ("GONE",)
+    assert "3 declared" in summary
+    assert "IMMC" in summary and "GONE" in summary
+    assert report.as_dict()["strata"]["challenge"]["retired"] == ["GONE"]
+    assert report.as_dict()["strata"]["challenge"]["also_in_head"] == ["IMMC"]
 
 
 def test_the_random_tail_never_touches_the_primary_matrix() -> None:

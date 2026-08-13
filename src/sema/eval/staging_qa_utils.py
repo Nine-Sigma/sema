@@ -19,7 +19,7 @@ from enum import Enum
 from typing import Any, Sequence
 
 from sema.eval.mapping_goldset import GoldSet
-from sema.eval.mapping_goldset_utils import GoldLabel
+from sema.eval.mapping_goldset_utils import GoldLabel, TierState
 
 _NO_MAP = "NO_MAP"
 _RESOLVED = "RESOLVED"
@@ -193,23 +193,37 @@ def check_missing_key_disposition(
 
 
 def check_no_map_accounting(rows: Sequence[StagingRow], gold_set: GoldSet) -> QACheck:
-    """Reconcile staged NO_MAP codes against the gold set (US-002)."""
+    """Reconcile staged NO_MAP codes against the gold set (US-002).
+
+    ``RETIRED`` is the ONLY exemption, and it is not an eligibility filter: a
+    retired code left the declared scope, so its preserved label describes data
+    the gate is no longer measuring. Every other state — including OUT_OF_TIER
+    and CHALLENGE — carries a human answer about live data, and a labelled
+    RESOLVED code staged as NO_MAP is a real contradiction wherever it sits.
+    """
     gold_by_code = gold_set.by_code()
     staged_no_map = sorted({r.source_value for r in rows if r.resolution_status == _NO_MAP})
-    gold_resolved_but_no_map = [
+    retired_no_map = [
         code
         for code in staged_no_map
+        if code in gold_by_code and gold_by_code[code].tier_state is TierState.RETIRED
+    ]
+    graded = [code for code in staged_no_map if code not in retired_no_map]
+    gold_resolved_but_no_map = [
+        code
+        for code in graded
         if code in gold_by_code
         and gold_by_code[code].gold_label is GoldLabel.RESOLVED
     ]
     no_map_without_gold = [
         code
-        for code in staged_no_map
+        for code in graded
         if code in gold_by_code
         and gold_by_code[code].gold_label is GoldLabel.UNLABELLED
     ]
     details: dict[str, Any] = {
         "staged_no_map": staged_no_map,
+        "retired_no_map": retired_no_map,
         "gold_resolved_but_no_map": gold_resolved_but_no_map,
         "no_map_unlabelled_gold": no_map_without_gold,
     }
