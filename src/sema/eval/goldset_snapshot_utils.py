@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from sema.eval.goldset_source import SourceSpec
@@ -24,14 +25,19 @@ from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow, TierState
 
 __all__ = [
     "GoldSetHeader",
+    "SnapshotInvariantError",
     "UniverseEntry",
     "canonical_universe_key",
+    "file_digest",
     "ordered_rows_digest",
     "row_from_json",
     "row_to_json",
     "tier_row_share",
-    "universe_digest",
 ]
+
+
+class SnapshotInvariantError(ValueError):
+    """A gold-set snapshot violates its own declared contract."""
 
 _STATE_RANK = {
     TierState.IN_TIER: 0,
@@ -149,7 +155,34 @@ def row_to_json(row: GoldRow) -> dict[str, Any]:
     }
 
 
+_ROW_KEYS = frozenset(
+    {
+        "oncotree_code",
+        "gold_concept_id",
+        "target_concept_code",
+        "gold_label",
+        "tier_state",
+        "row_count",
+        "curator",
+        "review_date",
+        "evidence",
+        "second_reviewer",
+        "notes",
+    }
+)
+
+
 def row_from_json(obj: dict[str, Any]) -> GoldRow:
+    """Parse one artifact row, refusing anything the row shape cannot hold.
+
+    A key the parser drops is a field the artifact silently fails to account
+    for — and the reader downstream may not be this one.
+    """
+    unknown = sorted(set(obj) - _ROW_KEYS)
+    if unknown:
+        raise SnapshotInvariantError(
+            f"{obj.get('oncotree_code', '?')}: unknown gold row key(s) {unknown}"
+        )
     concept = obj.get("gold_concept_id")
     return GoldRow(
         oncotree_code=str(obj["oncotree_code"]),
@@ -185,8 +218,9 @@ def ordered_rows_digest(rows: list[GoldRow]) -> str:
     return _digest([row_to_json(r) for r in rows])
 
 
-def universe_digest(universe: tuple[UniverseEntry, ...]) -> str:
-    return _digest([e.as_dict() for e in universe])
+def file_digest(path: Path) -> str:
+    """SHA-256 over the file's BYTES — the artifact itself, not a projection of it."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def canonical_universe_key(entry: UniverseEntry) -> tuple[int, str]:

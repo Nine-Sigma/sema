@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from sema.eval.goldset_snapshot_utils import (
     GoldSetHeader,
+    SnapshotInvariantError,
     UniverseEntry,
     canonical_sort_key,
     canonical_universe_key,
@@ -32,10 +33,6 @@ __all__ = [
 
 # Floats round-trip exactly through JSON, so the share needs no real slack.
 _SHARE_TOLERANCE = 1e-9
-
-
-class SnapshotInvariantError(ValueError):
-    """A gold-set snapshot violates its own declared contract."""
 
 
 def derive_states(

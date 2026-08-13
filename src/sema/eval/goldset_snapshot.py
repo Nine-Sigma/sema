@@ -28,10 +28,9 @@ from sema.eval.goldset_snapshot_utils import (
     UniverseEntry,
     canonical_sort_key,
     canonical_universe_key,
-    ordered_rows_digest,
+    file_digest,
     row_from_json,
     row_to_json,
-    universe_digest,
 )
 from sema.eval.mapping_goldset_utils import GoldRow, TierState
 
@@ -103,7 +102,10 @@ def load_snapshot(directory: str | Path) -> GoldSetSnapshot:
         UniverseEntry(str(o["code"]), int(o["frozen_row_count"]))
         for o in _read_jsonl(path / _UNIVERSE_FILE)
     )
-    _assert_digests(header, rows, universe)
+    # Row integrity first: a duplicated or reordered row is reported as that
+    # specific corruption rather than as an unexplained hash diff.
+    assert_row_integrity(rows)
+    _assert_digests(header, path)
     assert_snapshot_invariants(header, rows, universe)
     return GoldSetSnapshot(header=header, rows=rows, universe=universe)
 
@@ -123,28 +125,41 @@ def write_snapshot(
     ordered = sorted(rows, key=canonical_sort_key)
     manifest = tuple(sorted(universe, key=canonical_universe_key))
     assert_snapshot_invariants(header, ordered, manifest)
-    stamped = header.with_digests(
-        rows=ordered_rows_digest(ordered), universe=universe_digest(manifest)
-    )
     path.mkdir(parents=True)
+    # Data first, then the digests OF WHAT WAS WRITTEN, then the header carrying
+    # them: stamping a projection before the write left the header attesting to
+    # bytes no one had produced yet.
+    _write_jsonl(path / _ROWS_FILE, [row_to_json(r) for r in ordered])
+    _write_jsonl(path / _UNIVERSE_FILE, [e.as_dict() for e in manifest])
+    stamped = header.with_digests(
+        rows=file_digest(path / _ROWS_FILE),
+        universe=file_digest(path / _UNIVERSE_FILE),
+    )
     (path / _META_FILE).write_text(
         json.dumps(stamped.as_dict(), indent=2) + "\n", encoding="utf-8"
     )
-    _write_jsonl(path / _ROWS_FILE, [row_to_json(r) for r in ordered])
-    _write_jsonl(path / _UNIVERSE_FILE, [e.as_dict() for e in manifest])
     return stamped
 
 
-def _assert_digests(
-    header: GoldSetHeader,
-    rows: list[GoldRow],
-    universe: tuple[UniverseEntry, ...],
-) -> None:
-    assert_row_integrity(rows)
-    if header.rows_sha256 and header.rows_sha256 != ordered_rows_digest(rows):
-        raise SnapshotInvariantError("rows_sha256 does not match the gold rows on disk")
-    if header.universe_sha256 and header.universe_sha256 != universe_digest(universe):
-        raise SnapshotInvariantError("universe_sha256 does not match the universe manifest")
+def _assert_digests(header: GoldSetHeader, path: Path) -> None:
+    """Verify the header against the files' bytes. An empty digest is a failure.
+
+    Treating a blank digest as "nothing to check" made an unstamped header
+    indistinguishable from a verified one — the single edit that disabled the
+    whole guard.
+    """
+    for field_name, filename, declared in (
+        ("rows_sha256", _ROWS_FILE, header.rows_sha256),
+        ("universe_sha256", _UNIVERSE_FILE, header.universe_sha256),
+    ):
+        if not declared:
+            raise SnapshotInvariantError(
+                f"{field_name} is empty; the snapshot cannot verify its own artifact"
+            )
+        if declared != file_digest(path / filename):
+            raise SnapshotInvariantError(
+                f"{field_name} does not match the bytes of {filename}"
+            )
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

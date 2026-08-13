@@ -179,6 +179,6 @@
     "min_frozen_tier_row_share": 0.9,
     "max_unseen_code_share": 0.1
   },
-  "rows_sha256": "617e9b263349bd0e7888d1bb2e07a1b5be19c362af769bb9392e02fb6a0d4d91",
-  "universe_sha256": "8302c3153114df6cbcf3439ce31e096dbd82c3314a44864c8a2509c09c62117f"
+  "rows_sha256": "7b94f9125892d6ef16437fd0eb5ff2a4968a70930678a1dfbb10eba2cd97ffd8",
+  "universe_sha256": "c2b975ca6f86de6e67f4502e597b8b2c26ea71d26f0061793f80711efe49fa48"
 }

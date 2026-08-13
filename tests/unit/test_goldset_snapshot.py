@@ -25,8 +25,9 @@ from sema.eval.goldset_snapshot_utils import (
     GoldSetHeader,
     UniverseEntry,
     canonical_universe_key,
+    file_digest,
     ordered_rows_digest,
-    universe_digest,
+    row_from_json,
 )
 from sema.eval.goldset_source import SourceKind, SourceSpec
 from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow, TierState
@@ -249,14 +250,57 @@ def test_tampering_with_a_row_is_detected(tmp_path: Path) -> None:
         load_snapshot(directory)
 
 
-def test_digests_are_written_into_the_header(tmp_path: Path) -> None:
+def test_digests_bind_the_bytes_that_were_written(tmp_path: Path) -> None:
+    """The digest must verify the ARTIFACT, not a re-projection of it.
+
+    Digesting ``row_to_json`` output re-derives the payload from the parsed rows,
+    so anything the parser drops — an injected key, a reordered field, trailing
+    junk — is invisible to it. Hashing the file bytes cannot look away.
+    """
     directory = _write(tmp_path)
     header = json.loads((directory / "meta.json").read_text(encoding="utf-8"))
 
-    assert header["rows_sha256"] == ordered_rows_digest(_rows())
-    assert header["universe_sha256"] == universe_digest(
-        tuple(sorted(_UNIVERSE, key=canonical_universe_key))
+    assert header["rows_sha256"] == file_digest(
+        directory / "oncotree_condition_slice0.jsonl"
     )
+    assert header["universe_sha256"] == file_digest(directory / "universe.jsonl")
+
+
+def test_an_empty_digest_is_not_a_pass(tmp_path: Path) -> None:
+    """An unstamped header used to SKIP verification instead of failing it."""
+    directory = _write(tmp_path)
+    meta = directory / "meta.json"
+    header = json.loads(meta.read_text(encoding="utf-8"))
+    header["rows_sha256"] = ""
+    meta.write_text(json.dumps(header, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(SnapshotInvariantError, match="rows_sha256"):
+        load_snapshot(directory)
+
+
+def test_an_injected_row_key_is_refused_at_the_parser(tmp_path: Path) -> None:
+    """A key the parser silently drops is a field the artifact cannot account for."""
+    with pytest.raises(SnapshotInvariantError, match="surprise"):
+        row_from_json(
+            {
+                "oncotree_code": "LUAD",
+                "gold_concept_id": None,
+                "gold_label": "UNLABELLED",
+                "row_count": 1,
+                "surprise": "smuggled",
+            }
+        )
+
+
+def test_whitespace_reformatting_of_the_rows_file_is_detected(tmp_path: Path) -> None:
+    directory = _write(tmp_path)
+    rows_file = directory / "oncotree_condition_slice0.jsonl"
+    rows_file.write_text(
+        rows_file.read_text(encoding="utf-8").replace('", "', '",  "'), encoding="utf-8"
+    )
+
+    with pytest.raises(SnapshotInvariantError, match="rows_sha256"):
+        load_snapshot(directory)
 
 
 def test_write_snapshot_refuses_to_overwrite_a_published_snapshot(tmp_path: Path) -> None:
