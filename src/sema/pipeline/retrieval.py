@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from sema.graph.queries import CypherQueries
@@ -32,6 +33,21 @@ _VECTOR_INDEX_NAMES: tuple[str, ...] = (
 )
 
 
+@dataclass(frozen=True)
+class RetrievalScope:
+    """Layer scope for physical-mapping resolution (M6).
+
+    Constrains ``resolve_physical_mapping`` so a shared entity name resolves to
+    one layer's binding. Empty (both None) preserves the unscoped default.
+    """
+
+    model_role: str | None = None
+    schema_name: str | None = None
+
+    def is_active(self) -> bool:
+        return self.model_role is not None or self.schema_name is not None
+
+
 class RetrievalEngine:
     """Hybrid retrieval: vector + lexical + graph traversal."""
 
@@ -41,9 +57,11 @@ class RetrievalEngine:
         embedder: Any = None,
         *,
         embedder_model_name: str = "<configured embedder>",
+        scope: RetrievalScope | None = None,
     ) -> None:
         self._driver = driver
         self._embedder = embedder
+        self._scope = scope or RetrievalScope()
         if embedder is not None:
             from sema.graph.vector_index_utils import (
                 assert_retrieval_dim_matches,
@@ -118,6 +136,24 @@ class RetrievalEngine:
             "ancestry": ancestry,
             "metrics": metrics,
         }
+
+    def resolve_concept_for_source_term(
+        self, code: str, source_vocabulary: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Cross the value bridge: a source term code → target concept rows.
+
+        Each row carries the target concept code/label and the governed
+        Column/Table (schema-qualified) to filter, reached by traversing
+        MAPS_TO_CONCEPT.
+        """
+        try:
+            return self._run_query(
+                CypherQueries.resolve_concept_for_source_term(),
+                code=code, source_vocabulary=source_vocabulary,
+            )
+        except Exception as e:
+            logger.debug("resolve_concept_for_source_term({}): {}", code, e)
+            return []
 
     def _index_to_node_type(self, index: str) -> str:
         """Map vector index name to node type."""

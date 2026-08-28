@@ -18,12 +18,16 @@ import duckdb
 import pytest
 
 from sema.eval.mapping_goldset import GoldSet
+from sema.eval.mapping_report import GradingContext
 from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow
 from sema.eval.staging_qa_utils import QAOutcome
 from sema.models.planner.mapping_plan import MappingAssertion, MappingPlan
 from sema.models.planner.patterns import MappingPattern
 from showcase.cbioportal_to_omop.slice0_fit import FitResult, run_fit
-from showcase.cbioportal_to_omop.slice0_fit_utils import build_slice0_fit_request
+from showcase.cbioportal_to_omop.slice0_fit_utils import (
+    DEFAULT_VOCAB_RELEASE,
+    build_slice0_fit_request,
+)
 from sema.resolve.engine import VocabularyResolver
 from sema.resolve.vocab_store_utils import ConceptRow
 
@@ -96,12 +100,15 @@ def _seed_source(conn: duckdb.DuckDBPyConnection) -> None:
     )
 
 
-def _gold() -> GoldSet:
-    return GoldSet(
-        rows=[
-            GoldRow("LUAD", int(_STANDARD_ID), GoldLabel.RESOLVED, 2),
-            GoldRow("ZZZZ", None, GoldLabel.NO_MAP, 1),
-        ]
+def _grading() -> GradingContext:
+    return GradingContext(
+        gold=GoldSet(
+            rows=[
+                GoldRow("LUAD", int(_STANDARD_ID), GoldLabel.RESOLVED, 2),
+                GoldRow("ZZZZ", None, GoldLabel.NO_MAP, 1),
+            ]
+        ),
+        vocab_release=DEFAULT_VOCAB_RELEASE,
     )
 
 
@@ -113,7 +120,7 @@ def _run(conn: duckdb.DuckDBPyConnection) -> FitResult:
         value_column="ONCOTREE_CODE",
         source_codes=["LUAD", "ZZZZ"],
         source_row_count=3,
-        gold=_gold(),
+        grading=_grading(),
     )
     resolver = VocabularyResolver(_FakeVocabStore(), policy)
     return run_fit(resolver, request, value_mapping_conn=conn, staging_conn=conn)
@@ -227,7 +234,7 @@ class TestRunFit:
 
 
 def _run_codes(
-    conn: duckdb.DuckDBPyConnection, codes: list[str], gold: GoldSet
+    conn: duckdb.DuckDBPyConnection, codes: list[str], grading: GradingContext
 ) -> FitResult:
     policy, request = build_slice0_fit_request(
         manifest_path=_MANIFEST,
@@ -236,7 +243,7 @@ def _run_codes(
         value_column="ONCOTREE_CODE",
         source_codes=codes,
         source_row_count=3,
-        gold=gold,
+        grading=grading,
     )
     resolver = VocabularyResolver(_FakeVocabStore(), policy)
     return run_fit(resolver, request, value_mapping_conn=conn, staging_conn=conn)
@@ -252,17 +259,20 @@ def test_strict_report_ignores_stale_store_rows_absent_from_this_run(
     # OTHER, so it must not fail on that stale disagreement.
     conn = duckdb.connect(str(tmp_path / "fit.duckdb"))
     _seed_source(conn)
-    gold = GoldSet(
-        rows=[
-            GoldRow("LUAD", int(_STANDARD_ID), GoldLabel.RESOLVED, 2),
-            GoldRow("ZZZZ", None, GoldLabel.NO_MAP, 1),
-            GoldRow("OTHER", 999999, GoldLabel.RESOLVED, 1),
-        ]
+    grading = GradingContext(
+        gold=GoldSet(
+            rows=[
+                GoldRow("LUAD", int(_STANDARD_ID), GoldLabel.RESOLVED, 2),
+                GoldRow("ZZZZ", None, GoldLabel.NO_MAP, 1),
+                GoldRow("OTHER", 999999, GoldLabel.RESOLVED, 1),
+            ]
+        ),
+        vocab_release=DEFAULT_VOCAB_RELEASE,
     )
     # Run 1 leaves a stale OTHER -> NO_MAP row in the shared store.
-    _run_codes(conn, ["LUAD", "ZZZZ", "OTHER"], gold)
+    _run_codes(conn, ["LUAD", "ZZZZ", "OTHER"], grading)
     # Run 2: OTHER has dropped out of the source; only LUAD, ZZZZ resolve now.
-    result = _run_codes(conn, ["LUAD", "ZZZZ"], gold)
+    result = _run_codes(conn, ["LUAD", "ZZZZ"], grading)
     assert result.report.has_labelled_contradiction() is False
 
 
@@ -333,7 +343,7 @@ def test_assertion_production_is_scoped_to_this_run_not_whole_store(
         'INSERT INTO "study"."sample" VALUES (?)', [("ZZZZ",)]
     )
     # Seed a stale, same-policy LUAD row via a prior full run sharing the store.
-    _run_codes(conn, ["LUAD", "ZZZZ"], _gold())
+    _run_codes(conn, ["LUAD", "ZZZZ"], _grading())
     with pytest.raises(NoResolvedDecisionError):
         _run_codes_only(conn, ["ZZZZ"])
 
@@ -351,7 +361,7 @@ def test_duplicate_source_codes_stage_exactly_source_rows(tmp_path: Path) -> Non
         value_column="ONCOTREE_CODE",
         source_codes=["LUAD", "LUAD", "ZZZZ"],  # NON-distinct input
         source_row_count=3,
-        gold=_gold(),
+        grading=_grading(),
     )
     resolver = VocabularyResolver(_FakeVocabStore(), policy)
     result = run_fit(resolver, request, value_mapping_conn=conn, staging_conn=conn)
@@ -371,7 +381,7 @@ def _run_codes_only(conn: duckdb.DuckDBPyConnection, codes: list[str]) -> FitRes
         value_column="ONCOTREE_CODE",
         source_codes=codes,
         source_row_count=1,
-        gold=_gold(),
+        grading=_grading(),
     )
     resolver = VocabularyResolver(_FakeVocabStore(), policy)
     return run_fit(resolver, request, value_mapping_conn=conn, staging_conn=conn)
@@ -385,7 +395,7 @@ def test_build_request_reads_binding_from_manifest() -> None:
         value_column="ONCOTREE_CODE",
         source_codes=["LUAD"],
         source_row_count=1,
-        gold=_gold(),
+        grading=_grading(),
     )
     # SOURCE vocabulary comes from the resolver policy (R9); the manifest
     # binding names the OMOP-Condition governance scope.

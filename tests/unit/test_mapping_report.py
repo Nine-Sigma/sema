@@ -8,6 +8,8 @@ human-labelled gold coverage it is ``provisional — not accepted``.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import json
 from pathlib import Path
 
@@ -20,7 +22,9 @@ from sema.eval.mapping_goldset_utils import (
     GoldLabel,
     GoldRow,
     ResolutionStatus,
+    TierState,
 )
+from sema.eval.mapping_run import EvaluationSubject
 from sema.eval.mapping_report import (
     build_mapping_report,
     decisions_from_store,
@@ -85,6 +89,14 @@ def _all_correct(codes: list[tuple[str, int]]) -> tuple[list[GoldRow], list[Deci
         for c, cid in codes
     ]
     return gold, decisions
+
+
+_SUBJECT = EvaluationSubject(
+    source_vocabulary="OncoTree",
+    target_property_ref="target.stage.condition_concept_id",
+    resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
+    vocab_release="vocab-2024",
+)
 
 
 def _value_mapping(
@@ -191,6 +203,52 @@ def test_gold_no_map_predicted_resolved_is_a_contradiction() -> None:
     assert report.has_labelled_contradiction() is True
 
 
+def test_contradiction_strata_names_the_head() -> None:
+    gold = [_gold("A", 10, GoldLabel.RESOLVED)]
+    decisions = [_decision("A", 99, Status.auto_accepted, ResolutionStatus.RESOLVED)]
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.contradiction_strata() == ("head",)
+
+
+def test_contradiction_strata_is_empty_when_every_label_agrees() -> None:
+    gold, decisions = _all_correct([("A", 10)])
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.contradiction_strata() == ()
+    assert report.has_labelled_contradiction() is False
+
+
+def test_a_labelled_tail_contradiction_is_not_invisible() -> None:
+    """The reproduction that started this: the head matrix alone said 'clean'."""
+    gold = [
+        _gold("A", 10, GoldLabel.RESOLVED),
+        replace(
+            _gold("T", 20, GoldLabel.RESOLVED),
+            tier_state=TierState.OUT_OF_TIER,
+        ),
+    ]
+    decisions = [
+        _decision("A", 10, Status.auto_accepted, ResolutionStatus.RESOLVED),
+        _decision("T", 999, Status.auto_accepted, ResolutionStatus.RESOLVED),
+    ]
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.score.distinct_code.wrong == 0
+    assert report.contradiction_strata() == ("tail",)
+    assert report.has_labelled_contradiction() is True
+
+
+def test_head_and_challenge_contradictions_are_both_named() -> None:
+    gold = [
+        _gold("A", 10, GoldLabel.RESOLVED),
+        replace(_gold("C", None, GoldLabel.NO_MAP), tier_state=TierState.CHALLENGE),
+    ]
+    decisions = [
+        _decision("A", 99, Status.auto_accepted, ResolutionStatus.RESOLVED),
+        _decision("C", 77, Status.auto_accepted, ResolutionStatus.RESOLVED),
+    ]
+    report = build_mapping_report(GoldSet(gold), decisions)
+    assert report.contradiction_strata() == ("head", "challenge")
+
+
 # --- acceptance thresholds + coverage gate ----------------------------------
 
 
@@ -261,6 +319,71 @@ def test_full_coverage_undefined_precision_is_running() -> None:
 def test_evaluate_acceptance_thresholds_are_the_documented_values() -> None:
     assert MIN_MAPPED_PRECISION == pytest.approx(0.95)
     assert MIN_AUTO_RESOLUTION_RATE == pytest.approx(0.70)
+
+
+# --- the decision set must cover the population it certifies -----------------
+
+
+def test_a_labelled_head_code_with_no_decision_blocks_acceptance() -> None:
+    """Fully labelled + perfect on what WAS graded is not the same as graded.
+
+    A partially-matching evaluation subject (a mistyped --resolver-policy-ref,
+    a store missing a release) yields exactly this: coverage 1.0, a flawless
+    matrix, and half the frozen head silently absent from it.
+    """
+    gold, decisions = _all_correct([("A", 10), ("B", 20)])
+
+    report = build_mapping_report(GoldSet(gold), decisions[:1])
+
+    assert report.coverage_fraction == pytest.approx(1.0)
+    assert report.score.distinct_code.mapped_precision == pytest.approx(1.0)
+    assert report.verdict is AcceptanceVerdict.RUNNING_NOT_ACCEPTED
+    assert report.ungraded_codes == ("B",)
+    assert "B" in report.verdict_reason
+
+
+def test_the_ungraded_gap_is_visible_in_the_human_summary() -> None:
+    """It was previously reachable only by digging through report.json."""
+    gold, decisions = _all_correct([("A", 10), ("B", 20)])
+
+    summary = build_mapping_report(GoldSet(gold), decisions[:1]).human_summary()
+
+    assert "graded" in summary
+    assert "B" in summary
+
+
+def test_a_complete_decision_set_still_reaches_accepted() -> None:
+    gold, decisions = _all_correct([("A", 10), ("B", 20)])
+
+    report = build_mapping_report(GoldSet(gold), decisions)
+
+    assert report.ungraded_codes == ()
+    assert report.verdict is AcceptanceVerdict.ACCEPTED
+
+
+def test_an_ungraded_challenge_code_does_not_block_acceptance() -> None:
+    """Only the acceptance population gates; the challenge stratum never does."""
+    gold, decisions = _all_correct([("A", 10), ("B", 20)])
+    gold.append(
+        replace(
+            _gold("UESL", None, GoldLabel.NO_MAP),
+            tier_state=TierState.CHALLENGE,
+        )
+    )
+
+    report = build_mapping_report(GoldSet(gold), decisions)
+
+    assert report.ungraded_codes == ()
+    assert report.score.labelled_without_decision == ["UESL"]
+    assert report.verdict is AcceptanceVerdict.ACCEPTED
+
+
+def test_evaluate_acceptance_reports_the_frozen_head_not_observed_codes() -> None:
+    """D1(x): the denominator is the frozen tier, so the reason must say so."""
+    _, reason = evaluate_acceptance(None, 0.5)
+
+    assert "frozen" in reason
+    assert "observed distinct codes" not in reason
 
 
 def test_evaluate_acceptance_boundary_exactly_at_thresholds_accepts() -> None:
@@ -336,13 +459,13 @@ def test_decisions_from_store_reads_value_mapping_store(tmp_path: Path) -> None:
             _value_mapping("ZZZ", None, StoreResolutionStatus.NO_MAP),
         ]
     )
-    decisions = decisions_from_store(store)
+    decisions = decisions_from_store(store, _SUBJECT)
     by_code = {d.source_code: d for d in decisions}
     assert by_code["LUAD"].concept_id == 45768916
     assert by_code["ZZZ"].resolution_status is ResolutionStatus.NO_MAP
 
     # Both gold codes RESOLVED + correctly auto-accepted -> precision 1.0, auto 1.0.
-    decisions = decisions_from_store(store)
+    decisions = decisions_from_store(store, _SUBJECT)
     luad = next(d for d in decisions if d.source_code == "LUAD")
     gold = GoldSet([_gold("LUAD", 45768916, GoldLabel.RESOLVED)])
     report = build_mapping_report(gold, [luad])
@@ -365,7 +488,7 @@ def test_decisions_from_store_scope_filter(tmp_path: Path) -> None:
         ]
     )
     scoped = decisions_from_store(
-        store, target_property_ref="target.other.some_concept_id"
+        store, replace(_SUBJECT, target_property_ref="target.other.some_concept_id")
     )
     assert [d.concept_id for d in scoped] == [2]
     store.close()
@@ -375,18 +498,12 @@ def test_decisions_from_store_all_scope_filters(tmp_path: Path) -> None:
     conn = duckdb.connect(str(tmp_path / "vm.duckdb"))
     store = ValueMappingStore(conn)
     store.upsert([_value_mapping("LUAD", 1, StoreResolutionStatus.RESOLVED)])
-    assert decisions_from_store(store, source_vocabulary="Other") == []
+    assert decisions_from_store(store, replace(_SUBJECT, source_vocabulary="Other")) == []
     assert (
-        decisions_from_store(store, resolver_policy_ref="other.policy") == []
+        decisions_from_store(store, replace(_SUBJECT, resolver_policy_ref="other.policy")) == []
     )
-    assert decisions_from_store(store, vocab_release="vocab-1999") == []
-    kept = decisions_from_store(
-        store,
-        source_vocabulary="OncoTree",
-        resolver_policy_ref=OMOP_ONCOTREE_CONDITION_REF,
-        vocab_release="vocab-2024",
-    )
-    assert [d.concept_id for d in kept] == [1]
+    assert decisions_from_store(store, replace(_SUBJECT, vocab_release="vocab-1999")) == []
+    assert [d.concept_id for d in decisions_from_store(store, _SUBJECT)] == [1]
     store.close()
 
 
@@ -410,7 +527,7 @@ def test_report_from_store_reads_gold_file(tmp_path: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
-    report = report_from_store(store, gold_path)
+    report = report_from_store(store, gold_path, subject=_SUBJECT)
     assert report.verdict is AcceptanceVerdict.ACCEPTED
     assert report.score.distinct_code.tp == 1
     store.close()
@@ -434,3 +551,39 @@ def test_mapping_report_is_frozen_dataclass() -> None:
     assert isinstance(report, MappingReport)
     with pytest.raises(Exception):
         report.verdict = AcceptanceVerdict.ACCEPTED  # type: ignore[misc]
+
+
+def test_the_tail_sample_accounts_for_every_code_it_drew() -> None:
+    """Drawn = labelled + unlabelled + without-a-gold-row.
+
+    Reporting only "labelled" and "carry no gold row" let a drawn code that HAS a
+    row and is simply unlabelled fall out of the summary entirely — on the live
+    snapshot, 20 drawn reported as 0 labelled and 18 rowless, with 2 unaccounted.
+    """
+    def _labelled(code: str, concept: int, state: TierState) -> GoldRow:
+        return GoldRow(
+            code, concept, GoldLabel.RESOLVED, 1, tier_state=state,
+            target_concept_code=str(concept), curator="dean",
+            review_date="2026-08-12", evidence="browser",
+        )
+
+    gold = [
+        _labelled("LUAD", 45768916, TierState.IN_TIER),
+        _labelled("SEEN", 4180790, TierState.OUT_OF_TIER),
+        GoldRow("BLANK", None, GoldLabel.UNLABELLED, 1, tier_state=TierState.OUT_OF_TIER),
+    ]
+    report = build_mapping_report(
+        GoldSet(gold), [], snapshot_version="v1", tail_universe=["SEEN", "BLANK", "GONE"]
+    )
+
+    assert set(report.tail_sample_codes) == {"SEEN", "BLANK", "GONE"}
+    assert report.tail_sample_labelled == 1
+    assert report.tail_sample_unlabelled == 1
+    assert report.tail_sample_unlabellable == 1
+    total = (
+        report.tail_sample_labelled
+        + report.tail_sample_unlabelled
+        + report.tail_sample_unlabellable
+    )
+    assert total == len(report.tail_sample_codes)
+    assert "1 labelled, 1 unlabelled, 1 carry no gold row" in report.human_summary()

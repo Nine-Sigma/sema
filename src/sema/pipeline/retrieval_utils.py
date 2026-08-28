@@ -40,17 +40,29 @@ __all__ = [
 def _expand_physical(
     engine: RetrievalEngine, entity_names: list[str]
 ) -> list[dict[str, Any]]:
+    scope = getattr(engine, "_scope", None)
     physical: list[dict[str, Any]] = []
     for name in entity_names:
         try:
-            results = engine._run_query(
-                CypherQueries.resolve_physical_mapping(),
-                entity_name=name,
-            )
-            physical.extend(results)
+            physical.extend(_resolve_physical_for(engine, name, scope))
         except Exception:
             pass
     return physical
+
+
+def _resolve_physical_for(
+    engine: RetrievalEngine, name: str, scope: Any,
+) -> list[dict[str, Any]]:
+    if scope is not None and scope.is_active():
+        return engine._run_query(
+            CypherQueries.resolve_physical_mapping_scoped(),
+            entity_name=name,
+            model_role=scope.model_role,
+            schema_name=scope.schema_name,
+        )
+    return engine._run_query(
+        CypherQueries.resolve_physical_mapping(), entity_name=name,
+    )
 
 
 def _expand_joins(

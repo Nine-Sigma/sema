@@ -20,11 +20,13 @@ from sema.targets.neo4j_writer import Neo4jGraphWriter
 
 pytestmark = pytest.mark.integration
 
+# The OMOP manifest is a showcase artifact (per the showcase-separation
+# decision); the supported location is showcase/, not src/sema/targets/manifests
+# (which holds only the generic dim_customer.yaml example).
 _MANIFEST = (
-    Path(__file__).resolve().parents[2].parent
-    / "src"
-    / "sema"
-    / "targets"
+    Path(__file__).resolve().parents[3]
+    / "showcase"
+    / "cbioportal_to_omop"
     / "manifests"
     / "omop_condition_slice0.yaml"
 )

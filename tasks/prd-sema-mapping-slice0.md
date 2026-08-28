@@ -301,7 +301,10 @@ Metrics (all reported at **distinct-code**, **row-weighted**, and
   a Zone-2/Zone-3 prediction for a gold-`RESOLVED` code is a recall miss.
 - **`auto_resolution_rate` = (TP + WRONG + FP_map) / all labelled distinct codes** — the
   Zone-1 share. **Gate ≥ 70%.** Assertable as "accepted" **only when labelled coverage =
-  100% of observed distinct codes** (else: provisional).
+  100% of the snapshot's frozen tier** (D1(x) amendment, US-002) **and every labelled
+  tier code carries exactly one decision in the graded subject** (else: provisional /
+  running). Labelling a code is not grading it: a subject matching only part of the store
+  would otherwise report full coverage over a matrix built from whatever it found.
 - **`no_map_accuracy` = TN / (TN + FP_map)** — reported **separately**; NO_MAP is never
   folded into `mapped_precision`, `mapped_recall`, or `auto_resolution_rate`.
 
@@ -365,7 +368,8 @@ Acceptance criteria (+ all Global Standards):
 ---
 
 ### US-002 — Slice-0 OncoTree→SNOMED gold set + mapping eval harness (the test) · priority 3
-**As** the team, **I want** every distinct `ONCOTREE_CODE` in the loaded studies
+**As** the team, **I want** every `ONCOTREE_CODE` in the snapshot's **frozen tier** (D1(x);
+the whole declared scope is frozen in the universe manifest but not hand-labelled)
 hand-labelled to its correct standard SNOMED `concept_id` (or `NO_MAP`), with an eval
 harness that scores the **§1.5 confusion matrix**, **so that** "done" is defined before
 the resolver exists (architecture §3 step 0; R20).
@@ -376,14 +380,40 @@ Acceptance criteria (+ all Global Standards):
   `auto_resolution_rate`, and `no_map_accuracy` compute to the **§1.5 values**; a
   predicted `NO_MAP` is **TN** when gold is `NO_MAP` and **FN** (recall miss) when gold is
   a real concept (never silently dropped); `no_map_accuracy` is reported **separately**.
-- Gold set artifact `tests/data/gold/oncotree_condition_slice0.jsonl` (or `.csv`): one
-  row per **distinct** observed `ONCOTREE_CODE`, columns
-  `oncotree_code, gold_concept_id, gold_label (RESOLVED|NO_MAP), row_count, notes`.
-  Distinct codes enumerated from `~/.sema/poc.duckdb` `cbioportal_*` (document the query).
-  Hand-labelling **may** start with a documented subset (≥ the top codes by `row_count`
-  covering ≥80% of rows) — but per §1.5(f), subset metrics are **provisional only**;
-  acceptance thresholds (US-012) require 100% distinct-code coverage. Record the subset
-  and its coverage.
+- Gold set artifact: a **frozen snapshot** under
+  `tests/data/gold/snapshots/<snapshot_version>/`, with `current.json` naming the active
+  version. Each snapshot carries `oncotree_condition_slice0.jsonl` (one row per code in
+  its declared scope), `meta.json` (the declaration), and `universe.jsonl` (a
+  `{code, frozen_row_count}` manifest of **every** code in scope). The JSONL carries one
+  row per code in a **tracked** state — the frozen tier, the challenge stratum, anything
+  previously scaffolded, and anything retired — not one row per code in scope; the
+  universe manifest is what covers the scope exhaustively.
+  Row columns: `oncotree_code, gold_concept_id, target_concept_code, gold_label
+  (RESOLVED|NO_MAP|UNLABELLED), tier_state, row_count, curator, review_date, evidence,
+  second_reviewer, notes`.
+  Distinct codes are enumerated from an **executable source specification** in the
+  header (`source_of_truth`: `raw_samples` over `<schema>.sample`, or `staging` over
+  `sema_staging.condition_staging` keyed by the `source_schema` column) — never by
+  auto-discovering whatever `cbioportal_*` schemas happen to be loaded, which made the
+  scope a function of the last ingest.
+- **AMENDMENT (2026-08-11, D1(x) of `tasks/plan-goldset-drift.md`): acceptance coverage
+  is 100% of the frozen tier, not 100% of observed distinct codes.** The original rule
+  is retained in spirit — nothing is accepted on a partially-labelled population — but
+  its denominator is now the snapshot's frozen frequency head, an explicit code list in
+  the header that is **never recomputed at test time** (a frequency-defined tier is
+  itself ingest-sensitive, so recomputing it re-introduces the drift the declaration
+  removes). Out-of-tier and retired codes are *accounted for*, not coverage misses.
+  Rationale: labelling all 509 in-scope codes is not affordable at Slice-0, and under
+  the unamended rule `evaluate_acceptance` gates on `coverage_fraction >= 1.0` over
+  every artifact row — so retaining out-of-tier rows as `UNLABELLED` (which "retired,
+  never deleted" requires) capped coverage at 137/181 permanently and made `ACCEPTED`
+  unreachable however well the head was labelled.
+  The ≥80%-of-rows documented-subset floor **still binds** and now binds the *starting*
+  tier: the current head is 137 codes / 95.0% of staged rows, and G-05's tier 1 is the
+  top 50 (84.1% of rows) plus the 12 declared-uncertain codes.
+  Consequently the verdict is emitted as `accepted_for_frozen_frequency_head` with the
+  snapshot version — never a bare `accepted` — since a head chosen by row frequency is
+  no evidence about the distinct-code tail.
 - **Human-label checkpoint (acceptance-blocking; not Ralph-automatable).**
   `gold_concept_id` / `gold_label` are an **external oracle** — they must be
   hand-labelled by a human or imported from a trusted crosswalk, **never** generated
@@ -391,16 +421,26 @@ Acceptance criteria (+ all Global Standards):
   grading its own homework). Ralph **may** scaffold the file, enumerate distinct codes
   from `~/.sema/poc.duckdb`, and fill `row_count`/`notes`, and may mark this story
   `passes:true` on the **harness + scaffold + documented subset**. Completing labels to
-  100% distinct-code coverage is a **human gate** that US-012 acceptance (not just
+  100% of the frozen tier (D1(x)) is a **human gate** that US-012 acceptance (not just
   "running") depends on; Ralph must surface the unlabelled remainder, not invent labels.
+  The same gate covers the second-review floor: every code in the header's
+  `challenge.codes` labelled **and** second-reviewed, plus `min(10, |tier|)` reviewed head
+  labels — otherwise the verdict carries `unadjudicated`. Note a challenge code may also
+  rank inside the head (live case `IMMC`); the review obligation follows the header's
+  declared list, never the derived `tier_state`.
 - Eval harness `src/sema/eval/mapping_goldset.py` (+ `*_utils.py` for the math)
   implements the **§1.5(f) confusion matrix** exactly; unit of evaluation is the
   **distinct source code**; reports **distinct-code**, **row-weighted**, and
   **per-frequency-bucket** numbers. This module is the frozen home of the metric
   definitions referenced by US-012.
-- `integration` live test: enumerate distinct `ONCOTREE_CODE` from `~/.sema/poc.duckdb`
-  and assert the gold set covers every code observed (or records it as a known-unlabelled
-  gap), so the gold set cannot silently drift from the data.
+- `integration` live tests, **two contracts kept separate** because they cannot both hold
+  unconditionally (a large enough ingest must trip the second):
+  **snapshot integrity** — the artifact is internally consistent and matches its *declared*
+  scope, so it never reds on an ingest; and **benchmark freshness** — the frozen tier still
+  covers the header's declared floor of *current* rows and the unseen-code share is below
+  its ceiling, which **may** red, saying "benchmark stale — re-snapshot", never "the gold
+  set drifted". Both are fixture-backed as well as live, so the contract holds off one
+  developer's machine.
 - This story ships **no resolver** — only the gold set + harness.
 
 ---
@@ -713,16 +753,27 @@ Acceptance criteria (+ all Global Standards):
   reuses the US-002 metric module (no re-derived math).
 - **Thresholds asserted** in the `integration` live run (against real resolved decisions):
   **≥95% `mapped_precision`** and **≥70% `auto_resolution_rate`** — **only when labelled
-  gold coverage = 100% of observed distinct codes** (§1.5(f)); on a subset the report says
-  **"provisional — not accepted."** Below either threshold (at full coverage): **"running,
-  not accepted."**
+  gold coverage = 100% of the frozen tier** (§1.5(f), as amended by D1(x)); on a subset the
+  report says **"provisional — not accepted."** Below either threshold, or with any labelled
+  tier code missing a decision in the graded subject (at full coverage): **"running, not
+  accepted."**
+- **The report names its subject.** All five grain fields of the value-mapping store
+  (`source_vocabulary`, `normalized_source_value`, `target_property_ref`,
+  `resolver_policy_ref`, `vocab_release`) are fixed by an explicit evaluation-subject key
+  with no defaults, the subject's `vocab_release` **must equal** the gold-set header's
+  (a `gold_concept_id` is meaningless without the release that minted it, so grading across
+  releases reports vocabulary churn as resolver error), and more than one decision per
+  scored code is a hard error rather than a last-wins blend.
+- **Each run is an immutable artifact** under `eval-runs/<run_id>/`: the subject key, the
+  gold-set `snapshot_version` + row/universe digests + target pins, the store's own
+  `run_id`s for the graded rows, and the decision set actually graded with its digest.
 - The report **explicitly states** that Slice 0's ~100% precision is *structural* (a
   deterministic exact-code walk) and does **not** validate the product precision approach
   on the ambiguous tail (architecture §5 "read precision honestly"; R21).
 - **Depends on the US-002 human-label checkpoint:** "accepted" (vs "provisional")
-  requires a 100%-coverage gold set whose `gold_concept_id`s were set by a human/trusted
-  crosswalk, never by Sema's resolver. **Ralph cannot self-certify acceptance** — at less
-  than human-labelled 100% coverage the report emits "provisional — not accepted" and
+  requires a fully-labelled frozen tier whose `gold_concept_id`s were set by a
+  human/trusted crosswalk, never by Sema's resolver. **Ralph cannot self-certify acceptance** — below
+  a fully human-labelled frozen tier the report emits "provisional — not accepted" and
   surfaces the coverage gap; it must not flip US-013's acceptance on self-generated labels.
 
 ---
@@ -814,8 +865,10 @@ Architecture §5 acceptance, made executable here:
 - The SQLGlot compiler writes the §1.5(b) staging table in Databricks, idempotently, with
   **no `person_id`** and policy-owned column names (US-010).
 - Gate D-lite passes; the eval report meets **≥95% `mapped_precision`** and **≥70%
-  `auto_resolution_rate`** at **100% human-labelled gold coverage** (US-002 oracle, not
-  resolver-generated), with `no_map_accuracy` reported separately (US-011/US-012).
+  `auto_resolution_rate`** at **100% human-labelled coverage of the frozen tier** (D1(x);
+  US-002 oracle, not resolver-generated), with `no_map_accuracy` reported separately
+  (US-011/US-012). The verdict is `accepted_for_frozen_frequency_head`, never a bare
+  `accepted`.
 - The full spine runs locally end-to-end (US-012A), then **live on Databricks**
   (US-013), in the **single-model (no-council)** configuration.
 - A non-bio target proves the R29 boundary (US-014).
@@ -861,7 +914,7 @@ but not "accepted."**
 - `integration`/`e2e` live tests are skip-guarded; the unit suite must stay hermetic and
   green without Databricks/Neo4j.
 - **Two human gates the loop must not auto-satisfy:** (1) US-002 `gold_concept_id`
-  labelling (external oracle — Ralph scaffolds, a human labels to 100% coverage); (2)
+  labelling (external oracle — Ralph scaffolds, a human labels the frozen tier); (2)
   US-012/US-013 *acceptance* depends on that human-labelled coverage. Ralph may reach
   `passes:true` for the harness, resolver, spine, and a **provisional** eval autonomously,
   but "accepted" requires the human gold gate. Surface the gap; never invent gold labels.

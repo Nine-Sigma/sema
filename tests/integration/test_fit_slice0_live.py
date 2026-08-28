@@ -16,7 +16,8 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from sema.eval.mapping_goldset import GoldSet, load_gold_set
+from sema.eval.goldset_snapshot import current_snapshot_rows_path, load_current_snapshot
+from sema.eval.mapping_report import GradingContext
 from sema.eval.staging_qa_utils import QAOutcome
 from sema.models.planner.mapping_plan import MappingAssertion, MappingPlan
 from sema.models.planner.patterns import MappingPattern
@@ -30,12 +31,7 @@ from sema.resolve.vocab_store import open_duckdb_vocab_store, VocabStore
 pytestmark = pytest.mark.integration
 
 _DB = Path.home() / ".sema" / "poc.duckdb"
-_GOLD = (
-    Path(__file__).resolve().parents[1]
-    / "data"
-    / "gold"
-    / "oncotree_condition_slice0.jsonl"
-)
+_GOLD = current_snapshot_rows_path()
 _MANIFEST = (
     Path(__file__).resolve().parents[2]
     / "showcase" / "cbioportal_to_omop" / "manifests"
@@ -73,7 +69,11 @@ def test_fit_chain_end_to_end_on_duckdb(tmp_path: Path) -> None:
     codes, row_count = enumerate_source(
         work, schema=src_schema, table=src_table, value_column=_VALUE_COLUMN
     )
-    gold = GoldSet(rows=load_gold_set(_GOLD)) if _GOLD.exists() else GoldSet(rows=[])
+    grading = (
+        GradingContext.from_snapshot(load_current_snapshot())
+        if _GOLD.exists()
+        else GradingContext.empty()
+    )
 
     policy, request = build_slice0_fit_request(
         manifest_path=_MANIFEST,
@@ -82,7 +82,7 @@ def test_fit_chain_end_to_end_on_duckdb(tmp_path: Path) -> None:
         value_column=_VALUE_COLUMN,
         source_codes=codes,
         source_row_count=row_count,
-        gold=gold,
+        grading=grading,
     )
     # Vocabulary stays in poc.duckdb (read-only); store + staging in the work db.
     vstore = open_duckdb_vocab_store(str(_DB), schema=OMOP_VOCAB_SCHEMA)

@@ -286,3 +286,21 @@ class TestValueMappingValidation:
     def test_confidence_out_of_range_rejected(self) -> None:
         with pytest.raises(ValueError, match="confidence"):
             _resolved("LUAD", 1, confidence=1.5)
+
+
+def test_a_read_only_store_refuses_to_write(tmp_path: Path) -> None:
+    """US-006 is the sole writer; a reader that can write is a reader that did."""
+    import duckdb as _duckdb
+
+    from sema.resolve.value_mapping_store import ValueMappingStore
+
+    path = tmp_path / "store.duckdb"
+    ValueMappingStore(_duckdb.connect(str(path))).close()
+
+    reader = ValueMappingStore(_duckdb.connect(str(path), read_only=True), read_only=True)
+    try:
+        assert reader.read_all() == []
+        with pytest.raises(PermissionError, match="sole writer"):
+            reader.upsert([])
+    finally:
+        reader.close()

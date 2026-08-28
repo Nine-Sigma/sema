@@ -17,7 +17,14 @@ from sema.eval.runner import (
 
 @click.group()
 def eval_group() -> None:
-    """Evaluation harness commands (dev slice runner, diff, report)."""
+    """Evaluation harness commands (dev slice runner, diff, report, gold set)."""
+
+
+def _register_goldset_commands() -> None:
+    from sema.cli_goldset import goldset_group, mapping_report_cmd
+
+    eval_group.add_command(goldset_group)
+    eval_group.add_command(mapping_report_cmd)
 
 
 @eval_group.command("run")
@@ -158,3 +165,6 @@ def _emit_json(payload: dict[str, Any], output_path: str | None) -> None:
         Path(output_path).write_text(text)
     else:
         click.echo(text)
+
+
+_register_goldset_commands()

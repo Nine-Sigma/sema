@@ -16,6 +16,10 @@ import pytest
 from click.testing import CliRunner
 
 from sema.cli import cli
+from sema.eval.goldset_snapshot import write_snapshot
+from sema.eval.goldset_snapshot_utils import GoldSetHeader, UniverseEntry
+from sema.eval.goldset_source import SourceKind, SourceSpec
+from sema.eval.mapping_goldset_utils import GoldLabel, GoldRow, TierState
 
 pytestmark = pytest.mark.unit
 
@@ -29,6 +33,65 @@ _MANIFEST = (
 @pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
+
+
+def _write_gold_snapshot(
+    directory: Path, *, vocab_release: str = "omop-vocab-2024"
+) -> Path:
+    """A snapshot whose CHALLENGE code the resolver contradicts.
+
+    ``ZZZZ`` is the frozen head and is labelled NO_MAP, which the resolver
+    agrees with; ``LUAD`` is the declared challenge stratum, labelled NO_MAP,
+    and the resolver maps it. Reading the head matrix alone reports this run as
+    clean — the reproduction this snapshot exists to fail.
+    """
+    header = GoldSetHeader(
+        snapshot_version="fit-fixture-v1",
+        snapshot_date="2026-08-12",
+        source_of_truth=SourceSpec(
+            kind=SourceKind.RAW_SAMPLES,
+            table="sample",
+            code_column="ONCOTREE_CODE",
+            scope_column=None,
+            scope_values=("study",),
+        ),
+        target_vocabulary="SNOMED",
+        target_domain="Condition",
+        vocab_release=vocab_release,
+        oracle_source="test fixture",
+        oracle_version="1",
+        tier_codes=("ZZZZ",),
+        challenge_codes=("LUAD",),
+        tier_target_row_share=0.3,
+        tier_achieved_row_share=1 / 3,
+        min_frozen_tier_row_share=0.1,
+        max_unseen_code_share=0.5,
+    )
+    rows = [
+        GoldRow(
+            oncotree_code="ZZZZ",
+            gold_concept_id=None,
+            gold_label=GoldLabel.NO_MAP,
+            row_count=1,
+            tier_state=TierState.IN_TIER,
+            curator="alice",
+            review_date="2026-08-12",
+            evidence="no OncoTree concept exists",
+        ),
+        GoldRow(
+            oncotree_code="LUAD",
+            gold_concept_id=None,
+            gold_label=GoldLabel.NO_MAP,
+            row_count=2,
+            tier_state=TierState.CHALLENGE,
+            curator="bob",
+            review_date="2026-08-12",
+            evidence="deliberately contradicted",
+        ),
+    ]
+    universe = (UniverseEntry("LUAD", 2), UniverseEntry("ZZZZ", 1))
+    write_snapshot(directory, header, rows, universe)
+    return directory
 
 
 def _seed_fixture_db(path: Path) -> None:
@@ -119,44 +182,47 @@ def test_fit_strict_passes_on_conformance_without_gold(
     summary = json.loads(result.output)
     assert summary["conformance"]["passed"] is True
     assert summary["conformance"]["violations"] == []
+    # The gold check passed because there was no oracle — say so, or a vacuous
+    # pass is indistinguishable from a graded one.
+    assert summary["gold_gate"]["ran"] is False
+    assert "--gold-snapshot" in summary["gold_gate"]["reason"]
 
 
-def test_fit_strict_fails_on_labelled_gold_contradiction(
+def _fit_argv(db: Path, snapshot: Path) -> list[str]:
+    return [
+        "fit",
+        "--manifest",
+        str(_MANIFEST),
+        "--duckdb",
+        str(db),
+        "--study-schema",
+        "study",
+        "--gold-snapshot",
+        str(snapshot),
+        "--strict",
+    ]
+
+
+def test_fit_strict_fails_on_a_challenge_contradiction_and_names_it(
     runner: CliRunner, tmp_path
 ) -> None:
     db = tmp_path / "fixture.duckdb"
     _seed_fixture_db(db)
-    gold = tmp_path / "gold.jsonl"
-    # LUAD resolves to 45768916, but the human label says 999 -> `wrong` cell.
-    gold.write_text(
-        json.dumps(
-            {
-                "oncotree_code": "LUAD",
-                "gold_concept_id": 999,
-                "gold_label": "RESOLVED",
-                "row_count": 1,
-                "notes": "deliberately wrong",
-            }
-        )
-        + "\n"
-    )
-    result = runner.invoke(
-        cli,
-        [
-            "fit",
-            "--manifest",
-            str(_MANIFEST),
-            "--duckdb",
-            str(db),
-            "--study-schema",
-            "study",
-            "--gold",
-            str(gold),
-            "--strict",
-        ],
-    )
+    snapshot = _write_gold_snapshot(tmp_path / "snap")
+    result = runner.invoke(cli, _fit_argv(db, snapshot))
     assert result.exit_code == 3, result.output
-    assert "labelled gold contradiction" in result.output
+    assert "labelled gold contradiction (challenge)" in result.output
+
+
+def test_fit_strict_refuses_to_grade_a_foreign_vocabulary_release(
+    runner: CliRunner, tmp_path
+) -> None:
+    db = tmp_path / "fixture.duckdb"
+    _seed_fixture_db(db)
+    snapshot = _write_gold_snapshot(tmp_path / "snap", vocab_release="omop-vocab-2099")
+    result = runner.invoke(cli, _fit_argv(db, snapshot))
+    assert result.exit_code == 1, result.output
+    assert "omop-vocab-2099" in result.output
 
 
 def test_fit_is_registered(runner: CliRunner) -> None:

@@ -19,7 +19,7 @@ from pathlib import Path
 import duckdb
 
 from sema.compile.compiler_utils import CompileContext, SourceTableSpec
-from sema.eval.mapping_goldset import GoldSet
+from sema.eval.mapping_report import GradingContext
 from sema.models.planner._enums import (
     MaterializationMode,
     TargetArtifactKind,
@@ -131,7 +131,7 @@ def build_slice0_fit_request(
     value_column: str,
     source_codes: list[str],
     source_row_count: int,
-    gold: GoldSet,
+    grading: GradingContext,
     vocab_release: str = DEFAULT_VOCAB_RELEASE,
     run_id: str = DEFAULT_RUN_ID,
     staging_schema: str = DEFAULT_STAGING_SCHEMA,
@@ -166,7 +166,7 @@ def build_slice0_fit_request(
         ),
         staging_schema=staging_schema,
         staging_table=staging_table,
-        gold=gold,
+        grading=grading,
         nodes=MappingNodes(
             source_property_id=context.source_field_ref,
             target_property_id=context.target_property_ref,

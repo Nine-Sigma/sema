@@ -36,6 +36,24 @@ class GoldLabel(str, Enum):
     UNLABELLED = "UNLABELLED"
 
 
+class TierState(str, Enum):
+    """Which frozen population a code belongs to — a row attribute, never a label.
+
+    Deliberately NOT a fourth :class:`GoldLabel` member: ``classify_cell`` treats
+    every non-``RESOLVED`` label as gold-NO_MAP, so an out-of-tier code predicted
+    Zone-1 would score ``fp_map`` and collapse ``mapped_precision``.
+
+    ``IN_TIER`` gates the verdict; ``CHALLENGE`` is scored in its own matrix;
+    ``OUT_OF_TIER`` is accounted for but never scored; ``RETIRED`` is a code that
+    left the declared scope — kept, because deleting it discards human labour.
+    """
+
+    IN_TIER = "IN_TIER"
+    CHALLENGE = "CHALLENGE"
+    OUT_OF_TIER = "OUT_OF_TIER"
+    RETIRED = "RETIRED"
+
+
 class ResolutionStatus(str, Enum):
     """Per-decision resolution outcome (mirrors the value-mapping store)."""
 
@@ -59,13 +77,26 @@ _ZONE2_STATUSES = frozenset(
 
 @dataclass(frozen=True)
 class GoldRow:
-    """One hand-labelled distinct source code (the gold-set artifact row)."""
+    """One hand-labelled distinct source code (the gold-set artifact row).
+
+    ``target_concept_code`` is the durable vocabulary code (e.g. the SNOMED
+    code) behind ``gold_concept_id``, so a label survives a concept_id change
+    across vocabulary releases. ``curator`` / ``review_date`` / ``evidence`` are
+    the per-label annotation floor — for a ``NO_MAP``, ``evidence`` justifies the
+    *absence* of a target, because a NO_MAP is a positive claim, not a shrug.
+    """
 
     oncotree_code: str
     gold_concept_id: int | None
     gold_label: GoldLabel
     row_count: int
     notes: str = ""
+    tier_state: TierState = TierState.IN_TIER
+    target_concept_code: str | None = None
+    curator: str | None = None
+    review_date: str | None = None
+    evidence: str | None = None
+    second_reviewer: str | None = None
 
 
 @dataclass(frozen=True)

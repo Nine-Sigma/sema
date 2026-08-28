@@ -16,6 +16,8 @@ reported but is deliberately NOT a gating threshold.
 
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -24,7 +26,9 @@ from sema.eval.mapping_goldset import GoldSetReport
 from sema.eval.mapping_goldset_utils import (
     ConfusionMatrix,
     Decision,
+    GoldRow,
     ResolutionStatus,
+    TierState,
 )
 from sema.resolve.value_mapping_store_utils import ValueMapping
 
@@ -43,11 +47,42 @@ STRUCTURAL_PRECISION_CAVEAT = (
 
 
 class AcceptanceVerdict(str, Enum):
-    """Whether the run may be called 'accepted' — never self-certified."""
+    """Whether the run may be called 'accepted' — never self-certified.
 
-    ACCEPTED = "accepted"
+    Acceptance is scope-qualified by name. A bare ``accepted`` over a head chosen
+    *by row frequency* would overclaim: it says nothing about the distinct-code
+    tail, and ``per_bucket`` only buckets rows that were labelled and scored, so
+    it is not evidence about an unlabelled one either.
+    """
+
+    ACCEPTED = "accepted_for_frozen_frequency_head"
     PROVISIONAL_NOT_ACCEPTED = "provisional — not accepted"
     RUNNING_NOT_ACCEPTED = "running, not accepted"
+
+
+def tail_sample(
+    rows: Sequence[GoldRow],
+    snapshot_version: str,
+    size: int = 20,
+    tail_universe: Sequence[str] | None = None,
+) -> tuple[str, ...]:
+    """A deterministic, NEVER-gating sample of codes outside the frozen populations.
+
+    The only stratum that speaks to "confidently wrong in the tail" — so it must be
+    drawn from the universe manifest's tail when one is available. Drawing from the
+    gold rows alone samples the codes that happened to be in a PRIOR scope, which is
+    a biased slice of the tail rather than a sample of it.
+
+    Derived from the frozen snapshot (version + manifest) so it is reproducible
+    without becoming a second benchmark.
+    """
+    codes = list(tail_universe) if tail_universe is not None else [
+        r.oncotree_code for r in rows if r.tier_state is TierState.OUT_OF_TIER
+    ]
+    ranked = sorted(
+        codes, key=lambda c: hashlib.sha256(f"{snapshot_version}:{c}".encode()).hexdigest()
+    )
+    return tuple(sorted(ranked[:size]))
 
 
 def decision_from_value_mapping(mapping: ValueMapping) -> Decision:
@@ -66,17 +101,33 @@ def decision_from_value_mapping(mapping: ValueMapping) -> Decision:
 
 
 def evaluate_acceptance(
-    matrix: ConfusionMatrix | None,
+    matrix: ConfusionMatrix,
     coverage_fraction: float,
+    *,
+    ungraded_codes: Sequence[str] = (),
 ) -> tuple[AcceptanceVerdict, str]:
-    """Apply the §1.5(f) acceptance gate to one confusion matrix + coverage."""
+    """Apply the §1.5(f) acceptance gate to one confusion matrix + coverage.
+
+    ``ungraded_codes`` are acceptance-eligible codes that carry a human label but
+    no decision in the graded subject. Labelling them is not the same as grading
+    them: without this check a subject matching only part of the store (a
+    mistyped ``resolver_policy_ref``, a release the store never held) reports
+    100% coverage and a flawless matrix over whatever it happened to find.
+    """
     if coverage_fraction < 1.0:
         return (
             AcceptanceVerdict.PROVISIONAL_NOT_ACCEPTED,
-            f"labelled gold coverage {coverage_fraction:.1%} < 100% of observed "
-            "distinct codes; the US-002 human-label gate is incomplete",
+            f"labelled gold coverage {coverage_fraction:.1%} < 100% of the frozen "
+            "tier (D1(x)); the US-002 human-label gate is incomplete",
         )
-    assert matrix is not None  # full coverage implies a scored matrix
+    if ungraded_codes:
+        listed = ", ".join(sorted(ungraded_codes)[:10])
+        return (
+            AcceptanceVerdict.RUNNING_NOT_ACCEPTED,
+            f"{len(ungraded_codes)} labelled code(s) in the frozen tier have no "
+            f"decision in the graded subject ({listed}); the decision set does "
+            "not cover the population the verdict would certify",
+        )
     precision = matrix.mapped_precision
     auto = matrix.auto_resolution_rate
     if precision is None or auto is None:
@@ -114,51 +165,173 @@ class MappingReport:
     verdict: AcceptanceVerdict
     verdict_reason: str
     unlabelled_codes: tuple[str, ...] = ()
+    snapshot_version: str = ""
+    qualifiers: tuple[str, ...] = ()
+    tail_sample_codes: tuple[str, ...] = ()
+    tail_sample_labelled: int = 0
+    tail_sample_unlabelled: int = 0
+    tail_sample_unlabellable: int = 0
+    ungraded_codes: tuple[str, ...] = ()
+    declared_challenge_codes: tuple[str, ...] = ()
+    challenge_codes_in_head: tuple[str, ...] = ()
+    retired_challenge_codes: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "verdict": self.verdict.value,
             "verdict_reason": self.verdict_reason,
+            "qualifiers": list(self.qualifiers),
+            "snapshot_version": self.snapshot_version,
             "coverage": {
                 "labelled": self.labelled_count,
                 "total": self.total_codes,
                 "fraction": self.coverage_fraction,
                 "unlabelled_codes": list(self.unlabelled_codes),
             },
+            "graded": {
+                "scored": self.score.scored_codes,
+                "of": self.total_codes,
+                "ungraded_codes": list(self.ungraded_codes),
+            },
             "thresholds": {
                 "mapped_precision": MIN_MAPPED_PRECISION,
                 "auto_resolution_rate": MIN_AUTO_RESOLUTION_RATE,
             },
             "metrics": self.score.as_dict(),
+            "strata": {
+                "frozen_head": {"gating": True, "scored_codes": self.score.scored_codes},
+                "challenge": {
+                    "gating": False,
+                    "declared": list(self.declared_challenge_codes),
+                    "also_in_head": list(self.challenge_codes_in_head),
+                    "retired": list(self.retired_challenge_codes),
+                    "scored_codes": self.score.challenge_scored_codes,
+                },
+                "random_tail_sample": {
+                    "gating": False,
+                    "codes": list(self.tail_sample_codes),
+                    "labelled": self.tail_sample_labelled,
+                    "unlabelled": self.tail_sample_unlabelled,
+                    "without_a_gold_row": self.tail_sample_unlabellable,
+                    "note": (
+                        "the universe-manifest draw — informational only. The frozen "
+                        "head is selected by row frequency and says nothing about the "
+                        "distinct-code tail. The three counts partition `codes`: "
+                        "`without_a_gold_row` cannot be labelled until the snapshot "
+                        "carries a row, `unlabelled` has one and no human answer yet, "
+                        "so a zero labelled count is not evidence that the tail is clean"
+                    ),
+                },
+                "labelled_tail_census": {
+                    "gating": False,
+                    "scored_codes": self.score.tail_scored_codes,
+                    "distinct_code": self.score.tail_distinct_code.as_dict(),
+                    "note": (
+                        "every labelled out-of-tier row, self-selected by whoever "
+                        "labelled it — NOT the random draw above. Reporting both under "
+                        "one key let the matrix named for the random sample be "
+                        "populated from a curator's own choice of codes"
+                    ),
+                },
+            },
             "structural_precision_caveat": STRUCTURAL_PRECISION_CAVEAT,
         }
 
-    def has_labelled_contradiction(self) -> bool:
-        """True if any LABELLED gold code contradicts the resolver output.
+    def contradiction_strata(self) -> tuple[str, ...]:
+        """Every scored stratum in which a human label contradicts the resolver.
 
         Contradiction = scored cells where a human label disagrees with the
         prediction: ``wrong`` (mapped to the wrong concept), ``fn`` (gold
         RESOLVED but we said NO_MAP), ``fp_map`` (gold NO_MAP but we mapped).
-        ``recall_miss`` (Zone-2 review-pending) is EXCLUDED by design. Fires at
-        any ``labelled_count > 0``; full coverage is required only to GRANT the
-        ACCEPTED verdict, never to start honoring labels. This — not the
-        ACCEPTED verdict — is what gates ``sema fit --strict`` on gold.
+        ``recall_miss`` (Zone-2 review-pending) is EXCLUDED by design.
+
+        All three matrices are read, not just the head: the challenge stratum is
+        the only one that can grade a gold ``NO_MAP`` at all, and a labelled tail
+        code is a real human answer. Reading the head alone let a resolver that
+        contradicted every challenge label still report clean.
         """
-        m = self.score.distinct_code
-        return (m.wrong + m.fn + m.fp_map) > 0
+        return tuple(
+            name
+            for name, matrix in (
+                ("head", self.score.distinct_code),
+                ("challenge", self.score.challenge_distinct_code),
+                ("tail", self.score.tail_distinct_code),
+            )
+            if (matrix.wrong + matrix.fn + matrix.fp_map) > 0
+        )
+
+    def has_labelled_contradiction(self) -> bool:
+        """True if any LABELLED gold code contradicts the resolver output.
+
+        Fires at any ``labelled_count > 0``; full coverage is required only to
+        GRANT the ACCEPTED verdict, never to start honoring labels. This — not
+        the ACCEPTED verdict — is what gates ``sema fit --strict`` on gold.
+        """
+        return bool(self.contradiction_strata())
+
+    def _ungraded_note(self) -> str:
+        """Name the labelled-but-ungraded codes inline — a gap buried in JSON was
+        indistinguishable from a complete run."""
+        if not self.ungraded_codes:
+            return ""
+        listed = ", ".join(self.ungraded_codes[:10])
+        more = "" if len(self.ungraded_codes) <= 10 else ", …"
+        return f" — {len(self.ungraded_codes)} labelled but ungraded: {listed}{more}"
+
+    def _challenge_lines(self) -> list[str]:
+        """The challenge stratum, stated as DECLARED rather than as scored.
+
+        Its metrics are the only ones that can grade a ``NO_MAP`` at all — every
+        live resolver NO_MAP ranks outside the head, so the head's
+        ``no_map_accuracy`` is permanently ``n/a``. And the declared population
+        is not the gradable one: a code that also ranks inside the head (live
+        case ``IMMC``) is graded there, and a retired one is graded nowhere.
+        """
+        c = self.score.challenge_distinct_code
+        declared = len(self.declared_challenge_codes)
+        elsewhere = (
+            f", {len(self.challenge_codes_in_head)} also in the head and graded "
+            f"there ({', '.join(self.challenge_codes_in_head)})"
+            if self.challenge_codes_in_head
+            else ""
+        )
+        retired = (
+            f", {len(self.retired_challenge_codes)} retired "
+            f"({', '.join(self.retired_challenge_codes)})"
+            if self.retired_challenge_codes
+            else ""
+        )
+        return [
+            f"  challenge stratum: {declared} declared{elsewhere}{retired} — "
+            f"{self.score.challenge_scored_codes} scored here (never gating)",
+            f"    challenge mapped_precision = {_pct(c.mapped_precision)}",
+            f"    challenge no_map_accuracy   = {_pct(c.no_map_accuracy)} "
+            "(the only stratum that can grade a NO_MAP)",
+        ]
 
     def human_summary(self) -> str:
         m = self.score.distinct_code
+        qualified = " ".join(f"[{q}]" for q in self.qualifiers)
         lines = [
-            f"Mapping eval report — VERDICT: {self.verdict.value}",
+            f"Mapping eval report — VERDICT: {self.verdict.value} {qualified}".rstrip(),
+            f"  gold set: {self.snapshot_version or 'unversioned'}",
             f"  reason: {self.verdict_reason}",
             f"  coverage: labelled {self.labelled_count}/{self.total_codes} "
             f"({self.coverage_fraction:.1%})",
+            f"  graded: {self.score.scored_codes}/{self.total_codes} of the frozen "
+            f"tier scored{self._ungraded_note()}",
             "  distinct-code metrics:",
             f"    mapped_precision    = {_pct(m.mapped_precision)}",
             f"    mapped_recall       = {_pct(m.mapped_recall)}",
             f"    auto_resolution_rate= {_pct(m.auto_resolution_rate)}",
             f"    no_map_accuracy     = {_pct(m.no_map_accuracy)} (reported separately)",
+            f"  strata: head {self.score.scored_codes} scored (gating) / "
+            f"random tail sample {len(self.tail_sample_codes)} drawn, "
+            f"{self.tail_sample_labelled} labelled, {self.tail_sample_unlabelled} "
+            f"unlabelled, {self.tail_sample_unlabellable} "
+            f"carry no gold row yet / labelled tail census "
+            f"{self.score.tail_scored_codes} scored (never gating)",
+            *self._challenge_lines(),
             f"  NOTE: {STRUCTURAL_PRECISION_CAVEAT}",
         ]
         return "\n".join(lines)

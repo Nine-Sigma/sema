@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from sema.eval.goldset_snapshot import current_snapshot_rows_path
 from sema.eval.mapping_goldset import (
     GoldSet,
     GoldSetReport,
@@ -246,13 +247,7 @@ def test_report_has_per_bucket_matrices() -> None:
 
 # --- Gold set artifact loading + coverage -----------------------------------
 
-_GOLD_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "tests"
-    / "data"
-    / "gold"
-    / "oncotree_condition_slice0.jsonl"
-)
+_GOLD_PATH = current_snapshot_rows_path()
 
 
 def test_gold_set_artifact_exists_and_loads() -> None:
@@ -278,9 +273,14 @@ def test_gold_set_unlabelled_remainder_surfaced() -> None:
     gs = GoldSet(load_gold_set(_GOLD_PATH))
     # Ralph scaffolded the file; the human-label gate is unfinished, so the
     # unlabelled remainder must be discoverable, never silently treated labelled.
-    assert gs.labelled_count + len(gs.unlabelled_codes()) == len(gs.rows)
+    # Accounting is over the acceptance population — out-of-tier and retired rows
+    # are accounted for elsewhere, not counted as unfinished work.
+    assert gs.labelled_count + len(gs.unlabelled_codes()) == gs.total_eligible_codes
     assert gs.coverage_fraction() == pytest.approx(
-        gs.labelled_count / len(gs.rows)
+        gs.labelled_count / gs.total_eligible_codes
+    )
+    assert len(gs.rows) == gs.total_eligible_codes + len(
+        gs.challenge_codes() + gs.out_of_tier_codes() + gs.retired_codes()
     )
 
 
@@ -306,49 +306,6 @@ def test_report_as_dict_is_json_serializable() -> None:
     text = json.dumps(payload)
     assert '"distinct_code"' in text
     assert payload["distinct_code"]["mapped_precision"] == 1.0
-
-
-def test_distinct_oncotree_sql_builder() -> None:
-    from sema.eval.mapping_goldset import distinct_oncotree_sql
-
-    sql = distinct_oncotree_sql(["cbioportal_a", "cbioportal_b"])
-    assert "cbioportal_a.sample" in sql
-    assert "UNION ALL" in sql
-    with pytest.raises(ValueError):
-        distinct_oncotree_sql([])
-
-
-def test_enumerate_distinct_codes_with_fake_cursor() -> None:
-    from sema.eval.mapping_goldset import enumerate_distinct_codes
-
-    class _Fake:
-        def __init__(self) -> None:
-            self._next: list[Any] = []
-
-        def execute(self, sql: str) -> None:
-            if "information_schema" in sql:
-                self._next = [("cbioportal_x",)]
-            else:
-                assert "cbioportal_x.sample" in sql
-                self._next = [("LUAD", 5957), ("COAD", 10)]
-
-        def fetchall(self) -> list[Any]:
-            return self._next
-
-    assert enumerate_distinct_codes(_Fake()) == [("LUAD", 5957), ("COAD", 10)]
-
-
-def test_enumerate_distinct_codes_no_schemas_returns_empty() -> None:
-    from sema.eval.mapping_goldset import enumerate_distinct_codes
-
-    class _Empty:
-        def execute(self, sql: str) -> None:
-            return None
-
-        def fetchall(self) -> list[Any]:
-            return []
-
-    assert enumerate_distinct_codes(_Empty()) == []
 
 
 def test_confusion_matrix_add_rejects_unknown_cell() -> None:

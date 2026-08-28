@@ -43,17 +43,32 @@ class ValueMappingStore:
         *,
         schema: str = DEFAULT_SCHEMA,
         table: str = DEFAULT_TABLE,
+        read_only: bool = False,
     ) -> None:
+        """``read_only`` opens an EXISTING store without issuing any DDL.
+
+        A reader (US-012 grading) that constructs the store the writer's way
+        creates the table it came to read and takes a write lock on an artifact
+        it never modifies — which a genuinely read-only DuckDB connection then
+        refuses outright.
+        """
         self._conn = connection
         self._schema = schema
         self._table = table
-        self._ensure_table()
+        self._read_only = read_only
+        if not read_only:
+            self._ensure_table()
 
     def _ensure_table(self) -> None:
         self._conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{self._schema}"')
         self._conn.execute(create_table_sql(self._schema, self._table))
 
     def upsert(self, decisions: Iterable[ValueMapping]) -> int:
+        if self._read_only:
+            raise PermissionError(
+                f'{self._schema}."{self._table}" was opened read-only; US-006 is '
+                "the store's sole writer"
+            )
         sql = upsert_sql(self._schema, self._table)
         count = 0
         for decision in decisions:

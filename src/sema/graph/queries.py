@@ -49,6 +49,24 @@ class CypherQueries:
         )
 
     @staticmethod
+    def resolve_physical_mapping_scoped() -> str:
+        # M6: with source + target layers coexisting, a shared entity name
+        # returns mixed bindings. Scope by model_role / schema_name so a
+        # scoped query resolves to its own layer's physical binding. Both
+        # filters are OR-null so a caller may constrain either or neither.
+        return (
+            "MATCH (e:Entity {name: $entity_name})-[:ENTITY_ON_TABLE]->(t:Table) "
+            "WHERE (e.model_role = $model_role OR $model_role IS NULL) "
+            "AND (e.schema_name = $schema_name OR $schema_name IS NULL) "
+            "OPTIONAL MATCH (e)-[:HAS_PROPERTY]->(p:Property)"
+            "-[:PROPERTY_ON_COLUMN]->(c:Column) "
+            "RETURN t.name AS table_name, t.schema_name AS schema_name, "
+            "t.catalog AS catalog, "
+            "collect({property: p.name, column: c.name, "
+            "data_type: c.data_type, semantic_type: p.semantic_type}) AS columns"
+        )
+
+    @staticmethod
     def find_join_paths() -> str:
         return (
             "MATCH (jp:JoinPath)-[:USES]->(t:Table) "
@@ -229,6 +247,26 @@ class CypherQueries:
             "MATCH (t:Term)-[:MEMBER_OF]->(vs) "
             "RETURN t.code AS code, t.label AS label, "
             "t.vocabulary_name AS vocabulary_name"
+        )
+
+    @staticmethod
+    def resolve_concept_for_source_term() -> str:
+        # Cross-layer bridge (Finding 1): a query seeded on a SOURCE term
+        # surfaces the target concept it maps to plus the governed target
+        # Column/Table to filter. Matches on MAPS_TO_CONCEPT, not any domain
+        # literal. schema_name distinguishes same-named columns across schemas.
+        return (
+            "MATCH (src:Term {code: $code})-[:MAPS_TO_CONCEPT]->(concept:Term) "
+            "WHERE ($source_vocabulary IS NULL "
+            "OR src.vocabulary_name = $source_vocabulary) "
+            "MATCH (concept)-[:MEMBER_OF]->(vs:ValueSet)"
+            "<-[:HAS_VALUE_SET]-(c:Column) "
+            "OPTIONAL MATCH (c)-[:IN_TABLE]->(t:Table) "
+            "RETURN concept.code AS concept_code, "
+            "concept.label AS concept_label, "
+            "concept.vocabulary_name AS concept_vocabulary, "
+            "c.name AS column_name, c.table_name AS table_name, "
+            "c.schema_name AS schema_name, c.catalog AS catalog"
         )
 
     @staticmethod

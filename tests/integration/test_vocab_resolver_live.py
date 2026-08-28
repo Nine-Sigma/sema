@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from sema.eval.goldset_snapshot import current_snapshot_rows_path
 from sema.eval.mapping_goldset import load_gold_set
 from sema.resolve.engine import VocabularyResolver
 from showcase.cbioportal_to_omop.omop_policy import (
@@ -29,13 +30,7 @@ from tests.integration._omop_binding import build_condition_binding
 pytestmark = pytest.mark.integration
 
 _DB = Path.home() / ".sema" / "poc.duckdb"
-_GOLD = (
-    Path(__file__).resolve().parents[2]
-    / "tests"
-    / "data"
-    / "gold"
-    / "oncotree_condition_slice0.jsonl"
-)
+_GOLD = current_snapshot_rows_path()
 
 
 @pytest.fixture()
