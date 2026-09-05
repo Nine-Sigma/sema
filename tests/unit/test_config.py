@@ -120,6 +120,15 @@ class TestEmbeddingConfig:
         config = EmbeddingConfig(provider="sentence-transformers", model="all-MiniLM-L6-v2")
         assert config.provider == "sentence-transformers"
 
+    def test_cache_dir_field_defaults_to_none(self, monkeypatch):
+        monkeypatch.delenv("EMBEDDING_CACHE_DIR", raising=False)
+        assert EmbeddingConfig().cache_dir is None
+        assert EmbeddingConfig(cache_dir="/models/hf").cache_dir == "/models/hf"
+
+    def test_cache_dir_from_env_var(self, monkeypatch):
+        monkeypatch.setenv("EMBEDDING_CACHE_DIR", "/models/hf")
+        assert EmbeddingConfig().cache_dir == "/models/hf"
+
     def test_embeddable_labels_default(self):
         config = EmbeddingConfig()
         assert config.embeddable_labels == [

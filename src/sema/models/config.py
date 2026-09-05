@@ -85,7 +85,9 @@ class EmbeddingConfig(BaseSettings):
     Supported providers:
         openrouter          - OpenRouter API (default)
         openai              - Direct OpenAI API
-        sentence-transformers - Local sentence-transformers model
+        sentence-transformers - Local sentence-transformers model. `cache_dir`
+                              (EMBEDDING_CACHE_DIR) names the warm Hugging Face
+                              cache; when set, loading is local-only.
         databricks          - Mosaic AI / Databricks Model Serving. `model` is
                               a serving-endpoint name (e.g.,
                               databricks-bge-large-en). `api_key` and
@@ -100,6 +102,7 @@ class EmbeddingConfig(BaseSettings):
     model: str = "databricks-bge-large-en"
     api_key: SecretStr = SecretStr("")
     base_url: str | None = None
+    cache_dir: str | None = None
     embeddable_labels: list[str] = [
         "Entity", "Property", "Alias", "Term", "Metric",
     ]

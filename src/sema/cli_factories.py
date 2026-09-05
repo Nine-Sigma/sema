@@ -1,7 +1,17 @@
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
+from sema.cli_factories_utils import (
+    OPENROUTER_BASE_URL,
+    EmbeddingCacheMissError,
+    TruncatingEmbedder,
+    describe_unknown_embedding_model,
+    embedding_context_tokens,
+    expand_cache_dir,
+    sentence_transformers_prefetch_hint,
+)
 from sema.models.config import (
     EmbeddingConfig,
     LLMConfig,
@@ -118,22 +128,61 @@ def _get_llm(llm_config: LLMConfig) -> Any:
     raise ValueError(f"Unknown LLM provider: {provider}")
 
 
+def _build_sentence_transformer(embedding_config: EmbeddingConfig) -> Any:
+    """Offline provider: no Databricks import; explicit cache dir means no download."""
+    from sentence_transformers import SentenceTransformer
+    cache_dir = expand_cache_dir(embedding_config.cache_dir)
+    try:
+        if cache_dir is None:
+            return SentenceTransformer(embedding_config.model)
+        return SentenceTransformer(
+            embedding_config.model, cache_folder=cache_dir, local_files_only=True,
+        )
+    except OSError as exc:
+        raise EmbeddingCacheMissError(
+            sentence_transformers_prefetch_hint(embedding_config.model, cache_dir, exc)
+        ) from exc
+
+
+def _build_gateway_embedder(embedding_config: EmbeddingConfig, provider: str) -> Any:
+    """OpenRouter / custom gateways: raw strings in, floats out, sema-side truncation."""
+    from langchain_openai import OpenAIEmbeddings
+    api_key = embedding_config.api_key.get_secret_value()
+    base_url = embedding_config.base_url
+    if provider == "openrouter":
+        base_url = OPENROUTER_BASE_URL
+    inner = OpenAIEmbeddings(
+        model=embedding_config.model,
+        api_key=api_key,  # type: ignore[arg-type]
+        base_url=base_url,
+        check_embedding_ctx_length=False,
+        model_kwargs={"encoding_format": "float"},
+    )
+    describe = None
+    if provider == "openrouter":
+        describe = partial(describe_unknown_embedding_model, api_key=api_key)
+    return TruncatingEmbedder(
+        inner,
+        model=embedding_config.model,
+        context_tokens=embedding_context_tokens(embedding_config.model),
+        describe_rejected_model=describe,
+    )
+
+
 def _get_embedder(embedding_config: EmbeddingConfig) -> Any:
     provider = embedding_config.provider.lower()
 
     if provider == "databricks":
         return _build_databricks_embedder(embedding_config)
     if provider == "sentence-transformers":
-        from sentence_transformers import SentenceTransformer
-        return SentenceTransformer(embedding_config.model)
-    if provider in ("openrouter", "openai", "custom"):
+        return _build_sentence_transformer(embedding_config)
+    if provider in ("openrouter", "custom"):
+        return _build_gateway_embedder(embedding_config, provider)
+    if provider == "openai":
         from langchain_openai import OpenAIEmbeddings
-        base_url = embedding_config.base_url
-        if provider == "openrouter":
-            base_url = "https://openrouter.ai/api/v1"
         return OpenAIEmbeddings(
             model=embedding_config.model,
             api_key=embedding_config.api_key.get_secret_value(),  # type: ignore[arg-type]
-            base_url=base_url,
+            base_url=embedding_config.base_url,
         )
     raise ValueError(f"Unknown embedding provider: {provider}")
