@@ -1,0 +1,155 @@
+/* Motion. One authored moment (the hero constellation forms a fit, then the copy arrives in place),
+   two small responses (record trace draws on first view, form state line arrives), one loop (hero pulse).
+   Everything is gated on html[data-motion]; the attribute is never set under prefers-reduced-motion,
+   so those readers get the end state. "pending" holds the hero at its first frame until JS releases it. */
+
+@keyframes sema-blink {
+  to {
+    visibility: hidden;
+  }
+}
+@keyframes sema-state-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes sema-pulse {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sema-node-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sema-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes sema-ring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@keyframes sema-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(4px);
+  }
+  to {
+    filter: blur(0);
+  }
+}
+
+/* Form state line */
+html[data-motion] .sema-state:not([data-state=""]) {
+  animation: sema-state-in 260ms var(--ease-signal) both;
+}
+.sema-state[data-state="loading"]::before {
+  animation: sema-blink 1s steps(2, start) infinite;
+}
+
+/* Hero pulse: the only loop; paused when the hero leaves the screen. */
+.sema-pulse {
+  animation: sema-pulse 6s var(--ease-signal) infinite alternate;
+  animation-delay: var(--pd, 0s);
+}
+.sema-art[data-paused] .sema-pulse {
+  animation-play-state: paused;
+}
+
+/* The constellation forms: nodes by distance rank, blue edges draw, amber lines, rings, ticks, core. */
+html[data-motion] .sema-node {
+  animation: sema-node-in 400ms var(--ease-signal) both;
+  animation-delay: calc(var(--i) * 8ms);
+}
+html[data-motion] .sema-node.sema-pulse {
+  animation:
+    sema-node-in 400ms var(--ease-signal) both,
+    sema-pulse 6s var(--ease-signal) infinite alternate;
+  animation-delay: calc(var(--i) * 8ms), calc(900ms + var(--pd, 0s));
+}
+html[data-motion] .sema-edge {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: sema-draw 500ms var(--ease-signal) both;
+  animation-delay: calc(200ms + var(--i) * 6ms);
+}
+html[data-motion] .sema-amber-edge {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: sema-draw 300ms var(--ease-signal) both;
+  animation-delay: calc(500ms + var(--i) * 40ms);
+}
+html[data-motion] .sema-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sema-ring-in 320ms var(--ease-signal) both;
+  animation-delay: calc(640ms + var(--i) * 40ms);
+}
+html[data-motion] .sema-ticks {
+  animation: sema-node-in 300ms var(--ease-signal) both;
+  animation-delay: 760ms;
+}
+html[data-motion] .sema-core {
+  animation: sema-node-in 200ms var(--ease-signal) both;
+  animation-delay: 820ms;
+}
+html[data-motion] .sema-core.sema-pulse {
+  animation:
+    sema-node-in 200ms var(--ease-signal) both,
+    sema-pulse 6s var(--ease-signal) infinite alternate;
+  animation-delay: 820ms, 900ms;
+}
+
+/* Hero copy arrives in place, staggered after the constellation starts. */
+html[data-motion] .sema-arrive {
+  animation: sema-arrive 700ms var(--ease-signal) both;
+  animation-delay: var(--arrive, 300ms);
+}
+
+/* Held at the first frame until the page is painted in front of the reader; JS releases it. */
+html[data-motion="pending"] .sema-hero * {
+  animation-play-state: paused !important;
+}
+
+/* Record trace: accepted draws through; blocked stops at 60% and its status turns amber. */
+.sema-record .sema-trace::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  height: 1px;
+  width: 100%;
+  background: var(--blue);
+  transform-origin: left;
+}
+.sema-record[data-status="blocked"] .sema-trace::after {
+  width: 60%;
+  background: var(--accent);
+}
+html[data-motion] .sema-record .sema-trace::after {
+  transform: scaleX(0);
+  transition: transform 500ms var(--ease-signal);
+}
+html[data-motion] .sema-record[data-seen] .sema-trace::after {
+  transform: scaleX(1);
+}
+html[data-motion] .sema-record[data-status="blocked"][data-seen] .sema-trace::after {
+  transition-delay: 250ms;
+}
+html[data-motion] .sema-record[data-status="blocked"] .sema-status-word {
+  color: var(--ink);
+  transition: color 200ms var(--ease-signal) 700ms;
+}
+html[data-motion] .sema-record[data-status="blocked"][data-seen] .sema-status-word {
+  color: var(--accent);
+}

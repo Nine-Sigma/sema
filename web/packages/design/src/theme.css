@@ -1,0 +1,229 @@
+/* Sema design tokens. "Signal Cartography": near-black ground, amber signal, silver-blue structure.
+   Dark-first: bare :root is the dark set. Light is opt-in by data-theme or system preference.
+   Every color a component uses comes through these variables; nothing hard-codes a hex. */
+@import "tailwindcss";
+
+:root {
+  --ground: #0a0d19;
+  --ink: #e8e6df;
+  --muted: #8a8f9c;
+  --rule: #2a3040;
+  --rule-strong: #5c6478;
+  --accent: #e5a23a;
+  --accent-fill: #e5a23a;
+  --on-accent: #0a0d19;
+  --blue: #8fb0d6;
+  --gutter: clamp(16px, 3vw, 40px);
+  --section: clamp(64px, 8vw, 112px);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --ground: #f2f1ec;
+    --ink: #0a0d19;
+    --muted: #5c6270;
+    --rule: #c9cbd2;
+    --rule-strong: #7f8490;
+    --accent: #8f5e12;
+    --accent-fill: #b87a1e;
+    --on-accent: #0a0d19;
+    --blue: #3e6a99;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --ground: #f2f1ec;
+  --ink: #0a0d19;
+  --muted: #5c6270;
+  --rule: #c9cbd2;
+  --rule-strong: #7f8490;
+  --accent: #8f5e12;
+  --accent-fill: #b87a1e;
+  --on-accent: #0a0d19;
+  --blue: #3e6a99;
+  color-scheme: light;
+}
+
+@theme {
+  /* Sharp corners and flat surfaces are rules, not defaults: the radius and shadow scales are removed. */
+  --radius-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+
+  --font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+
+  --ease-signal: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* The design splits at 900px (desktop above) and 560px (stacked forms below). */
+  --breakpoint-*: initial;
+  --breakpoint-sm: 561px;
+  --breakpoint-lg: 901px;
+
+  --container-page: 1280px;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-accent: var(--accent);
+  --color-accent-fill: var(--accent-fill);
+  --color-on-accent: var(--on-accent);
+  --color-blue: var(--blue);
+
+  /* shadcn vocabulary mapped onto the same variables, so generated components pick up the theme. */
+  --color-background: var(--ground);
+  --color-foreground: var(--ink);
+  --color-muted-foreground: var(--muted);
+  --color-border: var(--rule-strong);
+  --color-input: var(--rule-strong);
+  --color-ring: var(--accent);
+  --color-primary: var(--accent-fill);
+  --color-primary-foreground: var(--on-accent);
+
+  --spacing-gutter: var(--gutter);
+  --spacing-section: var(--section);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--rule);
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  p {
+    margin: 0;
+    text-wrap: pretty;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin: 0;
+    font-weight: 700;
+    text-wrap: balance;
+  }
+  strong {
+    font-weight: 700;
+  }
+  ::selection {
+    background: var(--accent-fill);
+    color: var(--on-accent);
+  }
+}
+
+/* Type scale. One utility per role so the page never restates sizes. */
+@utility type-h1 {
+  font-size: clamp(2.5rem, 5.2vw, 4.75rem);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+}
+@utility type-h2 {
+  font-size: clamp(1.9rem, 3.2vw, 3rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+@utility type-h3 {
+  font-size: 1.35rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+@utility type-claim {
+  font-size: 1.25rem;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  font-weight: 700;
+}
+@utility type-lede {
+  font-size: 1.15rem;
+  line-height: 1.5;
+}
+@utility type-pull {
+  font-size: clamp(1.6rem, 3vw, 2.6rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+@utility type-turn {
+  font-size: clamp(1.25rem, 2vw, 1.6rem);
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+@utility type-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+@utility type-num {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(3.5rem, 7vw, 6.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+@utility type-wordmark {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+/* Layout: the page grid and the compartment pattern (1px rules made of gap + background). */
+@utility page-wrap {
+  max-width: var(--container-page);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+@utility page-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 24px;
+  @media (width < 901px) {
+    column-gap: 16px;
+  }
+}
+@utility compartments {
+  display: grid;
+  gap: 1px;
+  background: var(--rule);
+  border-block: 1px solid var(--rule);
+  & > * {
+    background: var(--ground);
+  }
+}

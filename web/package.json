@@ -1,0 +1,11 @@
+{
+  "name": "sema-web",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "gallery": "npm run dev -w @sema/gallery"
+  },
+  "engines": { "node": ">=22" }
+}
