@@ -10,9 +10,20 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "gallery": "npm run dev -w @sema/gallery",
     "landing": "npm run dev -w @sema/landing",
-    "pages:dev": "npx --yes wrangler@4 pages dev apps/landing/dist --port 8788 --d1 DB --service MAIL=waitlist-mail"
+    "test": "vitest run",
+    "typecheck:worker": "tsc -p worker/tsconfig.json",
+    "dev:worker": "wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260918.1",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.135.0"
+  },
+  "dependencies": {
+    "worker-mailer": "^1.2.1"
   }
 }
