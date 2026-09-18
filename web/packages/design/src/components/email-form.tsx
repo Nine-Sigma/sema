@@ -35,6 +35,8 @@ type EmailFormProps = Omit<React.ComponentProps<"form">, "onSubmit"> & {
   /** lg: the pilot form, a full-width bar with a rule above. */
   size?: "default" | "lg";
   messages?: Partial<typeof MESSAGES>;
+  /** Button text per state; falls back to buttonText. */
+  buttons?: Partial<typeof BUTTON>;
 };
 
 /* Waitlist form. Six designed states after idle: loading, success, duplicate, invalid, error, timeout.
@@ -48,12 +50,14 @@ function EmailForm({
   help,
   size = "default",
   messages,
+  buttons,
   className,
   ...props
 }: EmailFormProps) {
   const [state, setState] = React.useState<FormState>("");
   const inputRef = React.useRef<HTMLInputElement>(null);
   const text = { ...MESSAGES, ...messages };
+  const button = { ...BUTTON, ...buttons };
   const done = state === "success" || state === "duplicate";
   const busy = state === "loading";
   const retryable = state === "invalid" || state === "error" || state === "timeout";
@@ -126,7 +130,7 @@ function EmailForm({
           disabled={busy || done}
           aria-busy={busy}
         >
-          {BUTTON[state] ?? buttonText}
+          {button[state] ?? buttonText}
         </Button>
       </div>
       {help ? (
