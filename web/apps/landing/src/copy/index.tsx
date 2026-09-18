@@ -1,13 +1,19 @@
 import * as React from "react";
+import { figures, type FigureId, type FigureSource } from "@sema/design";
 
 export type Link = { text: string; href: string };
 export type Lead = { lead: string; text: string };
 export type ClaimRow = { claim: string; text: string };
 
 /* Every string on the page, keyed by section in page order. Slot names follow COPY.md, so a
-   sign-off row id `S5__card_blocked_why` reads as `copy.proof.cards.blocked.why`. Plain text only:
-   components own the markup. */
+   sign-off row id `S5__card_blocked_why` reads as `copy.proof.cards.blocked.why`. Text slots are plain text; components own the markup.
+   Optional figure overrides reuse repository-authored SVG plates with revised labels. */
+export type Plates = Record<FigureId, FigureSource>;
+export type FigureOverrides = (plates: Plates) => Partial<Plates>;
+
 export type Copy = {
+  /** Optional copy-only plate overrides (a function of the design package's plates); absent for the control. */
+  figures?: FigureOverrides;
   meta: { title: string; description: string; ogImageAlt: string };
   nav: {
     wordmark: string;
@@ -96,4 +102,14 @@ export function useCopy(): Copy {
   const copy = React.useContext(CopyContext);
   if (!copy) throw new Error("useCopy() called outside <CopyProvider>");
   return copy;
+}
+
+/* Existing plates are the default; a variant can relabel some without a redesign. */
+export function resolveFigures(copy: Copy): Plates {
+  return { ...figures, ...copy.figures?.(figures) };
+}
+
+export function useCopyFigures(): Plates {
+  const copy = useCopy();
+  return React.useMemo(() => resolveFigures(copy), [copy]);
 }
