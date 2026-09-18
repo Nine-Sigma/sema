@@ -15,39 +15,46 @@ npm run build
 npm run gallery
 ```
 
-Deploy: Cloudflare Pages Git integration, root directory `web`, build `npm ci && npm run build --workspaces`,
-output `apps/landing/dist`. See `tasks/plan-website-deploy.md`.
+Deploy: one Cloudflare Worker, `sema`, serves `apps/landing/dist` as static assets and handles
+`/` and `/api/waitlist` in `worker/` (`wrangler.toml` at this directory). `npm run deploy` builds
+every workspace and runs `wrangler deploy`. See `tasks/plan-website-deploy.md`.
 
-## Pages Functions (`functions/`) and the mail Worker (`workers/waitlist-mail`)
+## The Worker (`worker/`, `wrangler.toml`)
 
-Pages reads `functions/` from this directory (the Pages root). `apps/landing/public/_routes.json`
-limits them to `/` and `/api/*`.
+`assets.run_worker_first = ["/", "/api/*"]` sends only those paths through the code; everything
+else is served by the asset layer, where `apps/landing/public/_headers` applies.
 
-- `functions/_middleware.ts` — A/B assignment for `/` (`WEIGHTS`, cookie `sema-ab`, `?ab=<arm>`)
-  and the pages.dev → custom-domain redirect (env var `CANONICAL_HOST`).
-- `functions/api/waitlist.ts` — `POST /api/waitlist` from both landing forms. Stores the signup in
-  D1 (`DB`, table `waitlist`, created on first use) with the A/B arm, then notifies through the
-  `MAIL` service binding. 200 / 409 duplicate / 400 invalid / 500 when `DB` is missing.
-- `workers/waitlist-mail` — the only place an email binding can live (Pages Functions have none).
-  Sends to `waitlist@withsema.ai` from `waitlist@withsema.ai`; no route, no `workers.dev` URL.
+- `worker/index.ts` — `www.withsema.ai` → `withsema.ai` 301 (`CANONICAL_HOST`), A/B assignment for
+  `/`, and the `/api/waitlist` route. Preview URLs (`*.workers.dev`) are served as-is.
+- `worker/ab.ts` — arm weights (`WEIGHTS`), cookie `sema-ab`, `?ab=<arm>` override.
+- `worker/waitlist.ts` — `POST /api/waitlist` from both landing forms. Stores the signup in D1
+  (`DB`, table `waitlist`, created on first use) with the A/B arm, then emails
+  `waitlist@withsema.ai` with Reply-To set to the signup. 200 / 409 duplicate / 400 invalid /
+  405 / 500 when `DB` is missing. A mail failure is logged, never surfaced.
+- `worker/mail.ts` — SMTP through Titan (`smtp.titan.email:465`, the mailbox behind the
+  Squarespace email plan) using `worker-mailer` over `cloudflare:sockets`. Needs the
+  `SMTP_PASSWORD` secret; without it every send fails and is logged.
+- Tests: `npm test` (vitest, `worker/*.test.ts`, mocked bindings). Types: `npm run typecheck:worker`.
 
-One-time setup (`npx wrangler login` once; the Cloudflare MCP server from the `cloudflare` plugin
-covers the Pages steps that wrangler has no command for):
+Bindings are declared in `wrangler.toml`: D1 `sema-waitlist`, vars `CANONICAL_HOST`, `SMTP_*`,
+`FROM_ADDRESS`, `TO_ADDRESS`, the secret `SMTP_PASSWORD`, and the custom
+domains `withsema.ai` and `www.withsema.ai` (`wrangler deploy` creates their DNS records). Workers
+cannot vary bindings between production and preview, so previews share the production D1.
 
-1. `npx wrangler email sending enable withsema.ai` (or Dashboard → Email → Email Service). Until
-   the domain is onboarded, sends fail with `E_SENDER_NOT_VERIFIED`. Check: `npx wrangler email sending list`.
-2. `cd workers/waitlist-mail && npx wrangler deploy`. Redeploy on change; the Pages Git build does
-   not deploy Workers.
-3. `npx wrangler d1 create sema-waitlist`. Schema is created by the first request.
-4. Pages project `sema` → Bindings (Production and Preview): D1 `DB` → `sema-waitlist`; Service
-   binding `MAIL` → `waitlist-mail`; optional Analytics Engine `AB` for A/B assignments.
-   (Dashboard, or the Cloudflare API MCP server.)
-5. Pages project `sema` → Custom domains → `withsema.ai` (and `www.withsema.ai` if wanted). Then
-   env var `CANONICAL_HOST=withsema.ai` (Production only) so `sema-10w.pages.dev` 301s to the
-   domain. Leave it unset on Preview.
+One-time setup (done 2026-09-18; here for rebuilding the account):
 
-Local check: `npm run pages:dev` serves `apps/landing/dist` with the Functions, a local D1, and the
-`MAIL` binding; run `npx wrangler dev --port 8789 --inspector-port 9230` in `workers/waitlist-mail`
-first (the local email binding writes the message under
-`workers/waitlist-mail/.wrangler/tmp/email/`). Read signups with
+1. `npx wrangler login`. Two accounts are visible; `account_id` in `wrangler.toml` picks Dean's.
+2. `npx wrangler secret put SMTP_PASSWORD` with the Titan password of `SMTP_USER`. `SMTP_USER`
+   must be a mailbox login, not an alias; `FROM_ADDRESS` may be one of its aliases.
+3. `npx wrangler d1 create sema-waitlist`; put the id in `wrangler.toml`.
+4. Delete any DNS record on `withsema.ai` and `www` (a custom domain refuses a hostname that has
+   one), then `npm run deploy`.
+5. Optional: Workers Builds (dashboard → Worker `sema` → Settings → Build) connected to
+   `Nine-Sigma/sema`, root `web`, build `npm ci && npm run build --workspaces`, deploy
+   `npx wrangler deploy`, non-production branch builds on for preview URLs.
+
+Local check: `npm run build && npm run dev:worker` serves the built site with a local D1
+(`http://localhost:8787`). Mail is skipped locally unless `SMTP_PASSWORD` is in `.dev.vars`, in
+which case it really sends.
+`?ab=a` forces an arm. Read signups with
 `npx wrangler d1 execute sema-waitlist --remote --command "select email, variant, created_at from waitlist order by id"`.
