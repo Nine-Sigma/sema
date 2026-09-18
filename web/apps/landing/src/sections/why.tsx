@@ -1,10 +1,11 @@
-import { Figure, figures } from "@sema/design";
+import { Figure } from "@sema/design";
 import { Claim, Section } from "./section";
-import { useCopy } from "../copy";
+import { useCopy, useCopyFigures } from "../copy";
 
 /* S7. Essay left, figure rail right. */
 export function Why() {
   const c = useCopy().why;
+  const figures = useCopyFigures();
   return (
     <Section id="why" heading="h2-why">
       <h2 id="h2-why" className="type-h2 col-span-12 mb-10">

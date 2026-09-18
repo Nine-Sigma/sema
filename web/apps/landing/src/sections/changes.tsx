@@ -1,10 +1,11 @@
-import { Figure, figures } from "@sema/design";
+import { Figure } from "@sema/design";
 import { Claim, Section } from "./section";
-import { useCopy } from "../copy";
+import { useCopy, useCopyFigures } from "../copy";
 
 /* S4. Ledger rows: claim left, sentence right, rules between. */
 export function Changes() {
   const c = useCopy().changes;
+  const figures = useCopyFigures();
   return (
     <Section id="changes" heading="h2-changes">
       <h2 id="h2-changes" className="type-h2 col-span-12 mb-10 max-lg:mb-6">

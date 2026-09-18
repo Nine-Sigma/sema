@@ -1,10 +1,11 @@
-import { Button, Eyebrow, Figure, Record, figures } from "@sema/design";
+import { Button, Eyebrow, Figure, Record } from "@sema/design";
 import { Section } from "./section";
-import { useCopy } from "../copy";
+import { useCopy, useCopyFigures } from "../copy";
 
 /* S5. The showcase. The two records are the only bordered boxes on the page. */
 export function Proof() {
   const c = useCopy().proof;
+  const figures = useCopyFigures();
   return (
     <Section id="proof" heading="h2-proof">
       <Eyebrow className="col-span-12">{c.eyebrow}</Eyebrow>

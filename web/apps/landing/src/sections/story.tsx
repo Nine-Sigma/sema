@@ -1,10 +1,11 @@
-import { Figure, figures } from "@sema/design";
+import { Figure } from "@sema/design";
 import { Section } from "./section";
-import { useCopy } from "../copy";
+import { useCopy, useCopyFigures } from "../copy";
 
 /* S2. Four compartments with month numerals, then the turn. */
 export function Story() {
   const c = useCopy().story;
+  const figures = useCopyFigures();
   return (
     <Section id="story" heading="h2-story">
       <h2 id="h2-story" className="type-h2 col-span-12 mb-10 max-lg:mb-8">

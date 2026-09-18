@@ -1,10 +1,11 @@
-import { Figure, PullQuote, Tag, figures } from "@sema/design";
+import { Figure, PullQuote, Tag, type FigureSource } from "@sema/design";
 import { Section } from "./section";
-import { useCopy } from "../copy";
+import { useCopy, useCopyFigures } from "../copy";
 
 /* S3. Prose left, G3 right, the pull quote, then the two ways in. */
 export function Idea() {
   const c = useCopy().idea;
+  const figures = useCopyFigures();
   return (
     <Section id="idea" heading="h2-idea">
       <h2 id="h2-idea" className="type-h2 col-span-12">
@@ -37,7 +38,7 @@ function Way({
   title: string;
   tag: string;
   body: string;
-  figure: (typeof figures)[keyof typeof figures];
+  figure: FigureSource;
 }) {
   return (
     <div className="grid content-start gap-[18px] px-7 pt-8 pb-9">
