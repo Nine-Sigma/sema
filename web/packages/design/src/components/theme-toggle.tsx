@@ -2,15 +2,22 @@ import * as React from "react";
 import { Toggle } from "./ui/toggle";
 import { useTheme } from "../hooks/use-theme";
 
+const LABELS = { toDark: "Switch to dark theme", toLight: "Switch to light theme" };
+
 /* Half-disc icon; pressed = light, and the disc rotates 180°. */
-function ThemeToggle(props: Omit<React.ComponentProps<typeof Toggle>, "pressed" | "onPressedChange">) {
+type ThemeToggleProps = Omit<React.ComponentProps<typeof Toggle>, "pressed" | "onPressedChange"> & {
+  /** aria-label per direction of the switch. */
+  labels?: { toDark: string; toLight: string };
+};
+
+function ThemeToggle({ labels = LABELS, ...props }: ThemeToggleProps) {
   const { theme, setTheme } = useTheme();
   const light = theme === "light";
   return (
     <Toggle
       pressed={light}
       onPressedChange={(on) => setTheme(on ? "light" : "dark")}
-      aria-label={light ? "Switch to dark theme" : "Switch to light theme"}
+      aria-label={light ? labels.toDark : labels.toLight}
       {...props}
     >
       <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
