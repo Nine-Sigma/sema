@@ -1,0 +1,4 @@
+@import "@sema/design/theme.css";
+@import "@sema/design/motion.css";
+/* Workspace packages live under node_modules, which Tailwind skips; point it at the library source. */
+@source "../../../packages/design/src";

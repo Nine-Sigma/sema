@@ -1,0 +1,31 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="640" height="360" fill="#0A0D19"/>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="24" y="31.625">G12 &#xb7; OWNERSHIP CHAIN</tspan></text>
+<path d="M79 150H214" stroke="#8FB0D6" stroke-opacity="0.8" stroke-linecap="round"/>
+<path d="M220 150L214 146.4V153.6L220 150Z" fill="#8FB0D6"/>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="135.819" y="135.625">deed</tspan></text>
+<path d="M239 150H384" stroke="#8FB0D6" stroke-opacity="0.8" stroke-linecap="round"/>
+<path d="M390 150L384 146.4V153.6L390 150Z" fill="#8FB0D6"/>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="242.773" y="135.625">housing registration</tspan></text>
+<path d="M409 150H544" stroke="#8FB0D6" stroke-opacity="0.8" stroke-linecap="round"/>
+<path d="M550 150L544 146.4V153.6L550 150Z" fill="#8FB0D6"/>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="422.284" y="135.625">corporate filing</tspan></text>
+<circle cx="70" cy="150" r="7.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="51.249" y="183.875">Parcel</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="19.5401" y="201.625">123 Example St</tspan></text>
+<circle cx="230" cy="150" r="7.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="164.664" y="183.875">Example Property LLC</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="175.912" y="201.625">owner of record</tspan></text>
+<circle cx="400" cy="150" r="7.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="334.27" y="183.875">Example Holdings LLC</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="360.424" y="201.625">sole member</tspan></text>
+<circle cx="560" cy="150" r="7.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="526.434" y="183.875">A. Manager</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="502.284" y="201.625">signs the filing</tspan></text>
+<path d="M560 212V254" stroke="#E5A23A" stroke-linecap="round" stroke-dasharray="4 4"/>
+<path d="M560 258L563.6 252H556.4L560 258Z" fill="#E5A23A"/>
+<circle cx="560" cy="268" r="7.375" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.25"/>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="443.243" y="263.875">beneficial owner</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="368.523" y="281.625">not in the public record</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" letter-spacing="0em"><tspan x="24" y="337">Example entities. Not real companies.</tspan></text>
+</svg>

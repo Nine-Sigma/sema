@@ -1,0 +1,47 @@
+<svg width="800" height="600" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="800" height="600" fill="#0A0D19"/>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="24" y="31.625">G3 &#xb7; THE IDEA</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="65.9122" y="107.625">SOURCE MEANINGS</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="367.679" y="107.625">ONE GRAPH</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="625.912" y="107.625">TARGET MEANINGS</tspan></text>
+<path d="M400 300L340 240" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M400 300L468 248" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M400 300L352 372" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M400 300L458 360" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M340 240L468 248" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M352 372L458 360" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M128 190C209.333 190 277.333 206.667 332 240" stroke="#8FB0D6" stroke-opacity="0.7" stroke-linecap="round"/>
+<circle cx="120" cy="190" r="6.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="71.7412" y="183.875">Sales</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="53.8701" y="201.625">cust_no</tspan></text>
+<path d="M128 300C209.333 300 297.333 300 392 300" stroke="#8FB0D6" stroke-opacity="0.7" stroke-linecap="round"/>
+<circle cx="120" cy="300" r="6.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="66.6758" y="293.875">Billing</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="24.8473" y="311.625">customer_id</tspan></text>
+<path d="M128 410C209.333 410 281.333 397.333 344 372" stroke="#8FB0D6" stroke-opacity="0.7" stroke-linecap="round"/>
+<circle cx="120" cy="410" r="6.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="56.2148" y="403.875">Support</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="32.103" y="421.625">client_ref</tspan></text>
+<path d="M672 245C597.333 245 532 246 476 248" stroke="#E5A23A" stroke-opacity="0.7" stroke-linecap="round"/>
+<path d="M672 365C597.333 365 528.667 363.333 466 360" stroke="#E5A23A" stroke-opacity="0.7" stroke-linecap="round"/>
+<circle cx="400" cy="300" r="11.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<circle cx="340" cy="240" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<circle cx="468" cy="248" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<circle cx="352" cy="372" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<circle cx="458" cy="360" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="371.118" y="335.875">Customer</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" letter-spacing="0em"><tspan x="322.089" y="483.875">The graph is what persists.</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" letter-spacing="0em"><tspan x="150.104" y="505">Sources change. Targets change. The resolved meaning stays, with its source and confidence.</tspan></text>
+<path d="M612 245C567.333 245 522 246 476 248" stroke="#E5A23A" stroke-opacity="0.7" stroke-linecap="round"/>
+<circle cx="620" cy="245" r="6.375" fill="#0A0D19" stroke="#E5A23A" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="636" y="238.875">Customer</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="636" y="256.625">id &#xb7; name &#xb7; region</tspan></text>
+<path d="M612 365C567.333 365 518.667 363.333 466 360" stroke="#E5A23A" stroke-opacity="0.7" stroke-linecap="round"/>
+<circle cx="620" cy="365" r="6.375" fill="#0A0D19" stroke="#E5A23A" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="636" y="358.875">Order</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="636" y="376.625">customer &#xb7; placed_on</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="315.408" y="234.75">id</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="480" y="242.75">name</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="307.62" y="386.75">order</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="470" y="374.75">region</tspan></text>
+</svg>

@@ -1,0 +1,60 @@
+<svg width="1200" height="375" viewBox="0 0 1200 375" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="375" fill="#0A0D19"/>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="24" y="27.625">G5 &#xb7; WHAT THE AGENT GETS</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="60" y="141.625">A QUESTION</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="15" font-weight="500" letter-spacing="0em"><tspan x="60" y="168.625">Which customers churned after </tspan><tspan x="60" y="190.625">the price change?</tspan></text>
+<path d="M300 190H370" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M376 190L370 186.4V193.6L376 190Z" fill="#4A5163"/>
+<g stroke="#2A3040" stroke-linecap="round">
+<path d="M596.166 205.805L577.284 191.66"/><path d="M596.166 205.805L635.768 166.814"/><path d="M596.166 205.805L624.16 186.687"/><path d="M596.166 205.805L567.695 203.081"/><path d="M596.166 205.805L618.82 145.901"/><path d="M596.166 205.805L641.187 164.451"/><path d="M596.166 205.805L575.305 188.902"/><path d="M596.166 205.805L580.292 174.221"/>
+<path d="M446.19 123.434L470.48 73.0189"/><path d="M446.19 123.434L448.306 175.499"/><path d="M446.19 123.434L454.403 118.207"/><path d="M446.19 123.434L419.06 167.189"/>
+<path d="M577.284 191.66L635.768 166.814"/><path d="M577.284 191.66L624.16 186.687"/><path d="M577.284 191.66L567.695 203.081"/><path d="M577.284 191.66L618.82 145.901"/><path d="M577.284 191.66L540.679 151.015"/><path d="M577.284 191.66L641.187 164.451"/><path d="M577.284 191.66L575.305 188.902"/><path d="M577.284 191.66L580.291 174.221"/>
+<path d="M431.423 288.506L468.155 316.261"/><path d="M431.423 288.506L461.437 260.937"/><path d="M431.423 288.506L431.855 300.824"/><path d="M431.423 288.506L495.46 289.873"/>
+<path d="M635.768 166.814L599.42 121.12"/><path d="M635.768 166.814L624.16 186.686"/><path d="M635.768 166.814L668.748 133.015"/><path d="M635.768 166.814L618.82 145.901"/><path d="M635.768 166.814L588.282 121.37"/><path d="M635.768 166.814L641.187 164.451"/><path d="M635.768 166.814L575.305 188.902"/><path d="M635.768 166.814L580.292 174.221"/>
+<path d="M513.776 263.126L461.437 260.937"/><path d="M513.776 263.126L495.46 289.873"/><path d="M513.776 263.126L575.535 277.992"/>
+<path d="M662.977 79.9113L668.786 101.074"/><path d="M662.977 79.9113L668.748 133.015"/>
+<path d="M599.42 121.12L578.261 120.474"/><path d="M599.42 121.12L618.82 145.901"/><path d="M599.42 121.12L540.679 151.014"/><path d="M599.42 121.12L588.282 121.37"/><path d="M599.42 121.12L641.187 164.451"/><path d="M599.42 121.12L580.147 83.4489"/><path d="M599.42 121.12L580.292 174.221"/>
+<path d="M668.786 101.074L668.748 133.015"/><path d="M668.786 101.074L618.82 145.901"/><path d="M668.786 101.074L641.187 164.451"/>
+<path d="M624.16 186.687L567.695 203.081"/><path d="M624.16 186.686L668.748 133.015"/><path d="M624.16 186.686L618.82 145.901"/><path d="M624.16 186.686L641.187 164.451"/><path d="M624.16 186.687L672.377 228.192"/><path d="M624.16 186.687L575.305 188.902"/><path d="M624.16 186.686L580.292 174.221"/>
+<path d="M470.48 73.0189L454.403 118.207"/><path d="M448.306 175.499L454.403 118.207"/><path d="M448.306 175.499L419.06 167.189"/><path d="M782.281 109.177L782.071 144.483"/>
+<path d="M567.695 203.081L540.679 151.015"/><path d="M567.695 203.081L575.305 188.902"/><path d="M567.695 203.081L580.292 174.221"/>
+<path d="M668.748 133.015L618.82 145.901"/><path d="M668.748 133.015L641.187 164.451"/>
+<path d="M468.155 316.261L461.437 260.937"/><path d="M468.155 316.261L431.855 300.824"/><path d="M468.155 316.261L495.46 289.873"/>
+<path d="M578.261 120.474L618.82 145.901"/><path d="M578.261 120.474L540.679 151.015"/><path d="M578.261 120.474L588.282 121.37"/><path d="M578.261 120.474L580.147 83.4489"/><path d="M578.261 120.474L575.305 188.902"/><path d="M578.261 120.474L580.291 174.221"/>
+<path d="M618.82 145.901L588.282 121.37"/><path d="M618.82 145.901L641.187 164.451"/><path d="M618.82 145.901L575.305 188.902"/><path d="M618.82 145.901L580.292 174.221"/>
+<path d="M461.437 260.937L431.855 300.824"/><path d="M461.437 260.937L495.46 289.873"/>
+<path d="M540.679 151.015L588.282 121.37"/><path d="M540.679 151.015L575.305 188.902"/><path d="M540.679 151.015L580.292 174.221"/>
+<path d="M431.855 300.824L495.46 289.873"/>
+<path d="M588.282 121.37L641.187 164.451"/><path d="M588.282 121.37L580.147 83.4489"/><path d="M588.282 121.37L575.305 188.902"/><path d="M588.282 121.37L580.292 174.222"/>
+<path d="M641.187 164.451L580.292 174.221"/><path d="M703.556 229.734L672.377 228.192"/><path d="M454.403 118.207L419.06 167.189"/><path d="M575.305 188.902L580.292 174.221"/>
+</g>
+<g fill="#4A5163">
+<circle cx="596.166" cy="205.805" r="3"/><circle cx="446.19" cy="123.434" r="3"/><circle cx="577.284" cy="191.66" r="3"/><circle cx="431.423" cy="288.506" r="3"/><circle cx="635.768" cy="166.814" r="3"/><circle cx="513.776" cy="263.126" r="3"/><circle cx="662.977" cy="79.9113" r="3"/><circle cx="599.42" cy="121.12" r="3"/><circle cx="668.786" cy="101.074" r="3"/><circle cx="624.16" cy="186.687" r="3"/><circle cx="470.48" cy="73.0189" r="3"/><circle cx="775.648" cy="312.17" r="3"/><circle cx="448.306" cy="175.499" r="3"/><circle cx="782.281" cy="109.177" r="3"/><circle cx="567.695" cy="203.081" r="3"/><circle cx="668.748" cy="133.015" r="3"/><circle cx="468.155" cy="316.261" r="3"/><circle cx="578.261" cy="120.474" r="3"/><circle cx="618.82" cy="145.901" r="3"/><circle cx="461.437" cy="260.937" r="3"/><circle cx="540.679" cy="151.015" r="3"/><circle cx="431.855" cy="300.824" r="3"/><circle cx="495.46" cy="289.873" r="3"/><circle cx="588.282" cy="121.37" r="3"/><circle cx="641.187" cy="164.451" r="3"/><circle cx="703.556" cy="229.734" r="3"/><circle cx="454.403" cy="118.207" r="3"/><circle cx="580.147" cy="83.4489" r="3"/><circle cx="419.06" cy="167.189" r="3"/><circle cx="672.377" cy="228.192" r="3"/><circle cx="782.071" cy="144.483" r="3"/><circle cx="575.305" cy="188.902" r="3"/><circle cx="575.535" cy="277.992" r="3"/><circle cx="580.292" cy="174.221" r="3"/>
+</g>
+<g stroke="#E5A23A" stroke-width="1.25" stroke-linecap="round">
+<path d="M590 190L640 140"/><path d="M590 190L660 230"/><path d="M660 230L710 170"/><path d="M710 170L720 250"/><path d="M640 140L710 170"/>
+</g>
+<circle cx="590" cy="190" r="6.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<circle cx="640" cy="140" r="4.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<circle cx="660" cy="230" r="4.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<circle cx="710" cy="170" r="4.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<circle cx="720" cy="250" r="4.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="563.916" y="210.75">customer</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="623.81" y="132.75">churn</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="670.723" y="162.75">price change</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="567.679" y="341.625">THE MODEL</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="506.006" y="359.625">lit: the part that matters</tspan></text>
+<path d="M830 190H890" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M896 190L890 186.4V193.6L896 190Z" fill="#4A5163"/>
+<rect x="910.5" y="115.5" width="229" height="149" stroke="#4A5163"/>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="926" y="137.625">CONTEXT</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="926" y="161.625">customer &#xb7; 3 tables</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="926" y="183.625">joins &#xb7; 2, verified</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="926" y="205.625">churn &#xb7; closed &#60; 90 days</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="926" y="227.625">price &#xb7; changed 2026-03</tspan></text>
+<path d="M1140 190H1160" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M1166 190L1160 186.4V193.6L1166 190Z" fill="#4A5163"/>
+<circle cx="1176" cy="190" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="1159.81" y="214.75">agent</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" letter-spacing="0em"><tspan x="926" y="303">The agent never guesses what a column </tspan><tspan x="926" y="320">means.</tspan></text>
+</svg>

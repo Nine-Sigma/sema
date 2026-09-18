@@ -1,0 +1,31 @@
+<svg width="358" height="450" viewBox="0 0 358 450" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="358" height="450" fill="#0A0D19"/>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="16" y="23.625">G6m &#xb7; THREE STUDIES, ONE MODEL</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="103.145" y="51.625">PUBLIC CANCER STUDIES</tspan></text>
+<circle cx="70" cy="84" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" letter-spacing="0em"><tspan x="43.0469" y="109">Study one</tspan></text>
+<path d="M70 91C70 122.333 106.333 148.333 179 169" stroke="#8FB0D6" stroke-opacity="0.8" stroke-linecap="round"/>
+<circle cx="179" cy="84" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" letter-spacing="0em"><tspan x="152.07" y="109">Study two</tspan></text>
+<path d="M179 91C179 122.333 179 148.333 179 169" stroke="#8FB0D6" stroke-opacity="0.8" stroke-linecap="round"/>
+<circle cx="288" cy="84" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" letter-spacing="0em"><tspan x="256.834" y="109">Study three</tspan></text>
+<path d="M288 91C288 122.333 251.667 148.333 179 169" stroke="#8FB0D6" stroke-opacity="0.8" stroke-linecap="round"/>
+<circle cx="179" cy="178" r="7.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="197" y="181.625">OMOP</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="197" y="197.625">the standard model </tspan><tspan x="197" y="212.625">for health research</tspan></text>
+<path d="M179 187V236" stroke="#E5A23A" stroke-opacity="0.7" stroke-linecap="round"/>
+<path d="M179 236C106.333 256 70 280 70 308" stroke="#E5A23A" stroke-opacity="0.7" stroke-linecap="round"/>
+<circle cx="70" cy="314" r="4.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" font-weight="500" letter-spacing="0em"><tspan x="51.0684" y="339">People</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="26.7958" y="356.625">[N] patients</tspan></text>
+<path d="M179 236C179 256 179 280 179 308" stroke="#E5A23A" stroke-opacity="0.7" stroke-linecap="round"/>
+<circle cx="179" cy="314" r="4.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" font-weight="500" letter-spacing="0em"><tspan x="150.693" y="339">Diagnoses</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="132.168" y="356.625">[N] diagnoses</tspan></text>
+<path d="M179 236C251.667 256 288 280 288 308" stroke="#E5A23A" stroke-opacity="0.7" stroke-linecap="round"/>
+<circle cx="288" cy="314" r="4.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" font-weight="500" letter-spacing="0em"><tspan x="248.232" y="339">Merged across </tspan><tspan x="267.973" y="356">studies</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="244.466" y="373.625">[N] patients </tspan><tspan x="230.284" y="388.625">recognized twice</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="15.7467" y="429.625">run dated [date] &#xb7; nothing cancer-specific in </tspan><tspan x="150.307" y="444.625">the code</tspan></text>
+</svg>
