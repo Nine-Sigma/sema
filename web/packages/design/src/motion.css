@@ -121,6 +121,16 @@ html[data-motion="pending"] .sema-hero * {
   animation-play-state: paused !important;
 }
 
+/* Reduced motion: the loops stop too (the gate only withholds the authored moment). */
+@media (prefers-reduced-motion: reduce) {
+  .sema-pulse,
+  html[data-motion] .sema-node.sema-pulse,
+  html[data-motion] .sema-core.sema-pulse,
+  .sema-state[data-state="loading"]::before {
+    animation: none;
+  }
+}
+
 /* Record trace: accepted draws through; blocked stops at 60% and its status turns amber. */
 .sema-record .sema-trace::after {
   content: "";

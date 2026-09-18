@@ -31,7 +31,20 @@
     color-scheme: light;
   }
 }
-:root[data-theme="light"] {
+/* Scoped, not :root-only, so a container can render the other theme (the gallery ledger does). */
+[data-theme="dark"] {
+  --ground: #0a0d19;
+  --ink: #e8e6df;
+  --muted: #8a8f9c;
+  --rule: #2a3040;
+  --rule-strong: #5c6478;
+  --accent: #e5a23a;
+  --accent-fill: #e5a23a;
+  --on-accent: #0a0d19;
+  --blue: #8fb0d6;
+  color-scheme: dark;
+}
+[data-theme="light"] {
   --ground: #f2f1ec;
   --ink: #0a0d19;
   --muted: #5c6270;
@@ -97,6 +110,10 @@
   }
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: var(--scroll-pad, 0px);
+    @media (prefers-reduced-motion: reduce) {
+      scroll-behavior: auto;
+    }
   }
   body {
     margin: 0;

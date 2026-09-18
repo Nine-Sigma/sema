@@ -19,7 +19,7 @@ export { Wordmark } from "./components/wordmark";
 
 export { useMotionGate } from "./hooks/use-motion-gate";
 export { useSeen } from "./hooks/use-seen";
-export { useTheme, type Theme } from "./hooks/use-theme";
+export { useTheme, type Theme, type ThemeSource } from "./hooks/use-theme";
 
 export { figures, type FigureId } from "./figures";
 export { cn } from "./lib/utils";

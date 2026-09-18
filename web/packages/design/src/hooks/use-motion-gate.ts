@@ -29,10 +29,22 @@ function useMotionGate(): { replay: () => void } {
     };
     if (document.readyState === "complete") go();
     else window.addEventListener("load", go, { once: true });
-    const fallback = window.setTimeout(play, 4000);
+    /* Fallback without rAF: a headless or throttled renderer delivers no frames, so after 4s a visible
+       document releases directly. A hidden tab keeps the moment until it is shown. */
+    const release = (): void => {
+      if (root.getAttribute("data-motion") === "pending") root.setAttribute("data-motion", "");
+    };
+    const onVisible = (): void => {
+      if (document.visibilityState === "visible") play();
+    };
+    const fallback = window.setTimeout(() => {
+      if (document.visibilityState === "hidden") document.addEventListener("visibilitychange", onVisible);
+      else release();
+    }, 4000);
     return () => {
       reduce.removeEventListener("change", onChange);
       window.removeEventListener("load", go);
+      document.removeEventListener("visibilitychange", onVisible);
       window.clearTimeout(fallback);
     };
   }, [play]);
