@@ -45,3 +45,6 @@ backups/
 # Eval run artifacts — local by default (previously-tracked runs stay tracked)
 eval-runs/
 .runs/
+
+# Working plans and prompts; local only
+tasks/
