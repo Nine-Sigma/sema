@@ -10,8 +10,8 @@ function demo(email: string): Promise<FormOutcome> {
   return new Promise((resolve) => setTimeout(() => resolve(outcome), outcome === "timeout" ? 2400 : 800));
 }
 
-/* Posts to the Pages Function at /api/waitlist (D6: not built yet; until it exists every
-   production submit resolves to "error", which the form reports honestly). */
+/* Posts to the Pages Function at /api/waitlist (web/functions/api/waitlist.ts). The sema-ab cookie
+   travels with the same-origin request, which is how a signup is attributed to an A/B arm. */
 export async function submitWaitlist(email: string): Promise<FormOutcome> {
   if (import.meta.env.DEV) return demo(email);
   const ctl = new AbortController();

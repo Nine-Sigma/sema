@@ -10,7 +10,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "gallery": "npm run dev -w @sema/gallery",
     "landing": "npm run dev -w @sema/landing",
-    "pages:dev": "npx --yes wrangler@4 pages dev apps/landing/dist --port 8788"
+    "pages:dev": "npx --yes wrangler@4 pages dev apps/landing/dist --port 8788 --d1 DB --service MAIL=waitlist-mail"
   },
   "engines": {
     "node": ">=22"
