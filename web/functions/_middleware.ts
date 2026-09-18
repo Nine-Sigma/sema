@@ -19,11 +19,20 @@ const COOKIE = "sema-ab";
 const MAX_AGE = 60 * 60 * 24 * 30;
 
 type AnalyticsEngine = { writeDataPoint(point: { blobs?: string[]; doubles?: number[]; indexes?: string[] }): void };
-type Env = { ASSETS: { fetch(request: Request): Promise<Response> }; AB?: AnalyticsEngine };
+/* CANONICAL_HOST (Pages env var, e.g. `withsema.ai`): once set, the production pages.dev host
+   redirects there. Unset until the custom domain is attached; previews never match. */
+type Env = { ASSETS: { fetch(request: Request): Promise<Response> }; AB?: AnalyticsEngine; CANONICAL_HOST?: string };
 type Context = { request: Request; env: Env; next(): Promise<Response> };
+
+const PAGES_HOST = "sema-10w.pages.dev";
 
 export const onRequest = async ({ request, env, next }: Context): Promise<Response> => {
   const url = new URL(request.url);
+  if (env.CANONICAL_HOST && url.hostname === PAGES_HOST) {
+    url.hostname = env.CANONICAL_HOST;
+    url.protocol = "https:";
+    return Response.redirect(url.toString(), 301);
+  }
   if (url.pathname !== "/" || (request.method !== "GET" && request.method !== "HEAD")) return next();
 
   const forced = parseArm(url.searchParams.get("ab"));
