@@ -3,11 +3,11 @@ import { submitWaitlist } from "../waitlist";
 import { Section } from "./section";
 import { formProps, useCopy } from "../copy";
 
-/* S9. The last beat: the deal, then the full-width form bar. */
+/* S9. The last beat: the deal, then the full-width form bar. The plane re-forms behind it (reverse M1). */
 export function Pilot() {
   const { pilot: c, form } = useCopy();
   return (
-    <Section id="pilot" heading="h2-pilot">
+    <Section id="pilot" heading="h2-pilot" weight="heavy" chapter="pilot">
       <h2 id="h2-pilot" className="type-h2 col-span-10 max-lg:col-span-12">
         {c.h2}
       </h2>

@@ -25,11 +25,13 @@ export type Copy = {
     theme: { toDark: string; toLight: string };
   };
   hero: { h1: string; subhead: string; help: { text: string; link: Link }; secondary: Link };
+  /* S3a: lands from the hero stage (M1). Page order is hero → idea → story → quote (site plan v7, P2). */
+  idea: { h2: string; paras: string[] };
   story: { h2: string; beats: { num: string; label: string; text: string }[]; turn: string };
-  idea: {
-    h2: string;
-    paras: string[];
+  /* S3b: the quote wall and the two ways in. `pullQuoteAccent` is the amber last sentence; "" = all ink. */
+  quote: {
     pullQuote: string;
+    pullQuoteAccent: string;
     h3: string;
     ways: { have: Way; dont: Way };
   };

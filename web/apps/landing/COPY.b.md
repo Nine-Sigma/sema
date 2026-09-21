@@ -48,6 +48,14 @@ in Figma. `public/404.html` is still hand-edited; its strings are mirrored under
 | help · link | Data handling → #runs |
 | secondary | For investors → → #investors |
 
+## S3a · The idea (rendered before S2)
+
+| Slot | Copy |
+|---|---|
+| h2 | Give interpretations a decision record. |
+| paras · 1 | Sema separates inferred meaning from the decision to use it. Source assertions carry confidence and provenance. In the cBioPortal-to-OMOP workflow, vocabulary rules filter candidate targets; mapping plans check required fields and flag pending review. |
+| paras · 2 | Accepted, rejected, and unresolved are different states. Human pins and rejections become recorded events, with replay support for matching assertions. A correction can become system state instead of another instruction lost in a prompt. |
+
 ## S2 · You've run this project
 
 | Slot | Copy |
@@ -67,14 +75,12 @@ in Figma. `public/404.html` is still hand-edited; its strings are mirrored under
 | beats · 4 · text | An agent uses the old join. A plausible interpretation has become an answer nobody can adequately justify. |
 | turn | Plausible is a starting point. A decision needs evidence, a status, and a record of what a person changed. Otherwise uncertainty travels downstream as fact. |
 
-## S3 · The idea
+## S3b · Quote wall and two ways in
 
 | Slot | Copy |
 |---|---|
-| h2 | Give interpretations a decision record. |
-| paras · 1 | Sema separates inferred meaning from the decision to use it. Source assertions carry confidence and provenance. In the cBioPortal-to-OMOP workflow, vocabulary rules filter candidate targets; mapping plans check required fields and flag pending review. |
-| paras · 2 | Accepted, rejected, and unresolved are different states. Human pins and rejections become recorded events, with replay support for matching assertions. A correction can become system state instead of another instruction lost in a prompt. |
-| pullQuote | Confidence describes an inference. The decision record tells you what happened to it. |
+| pullQuote | Confidence describes an inference. |
+| pullQuoteAccent | The decision record tells you what happened to it. |
 | h3 | Two ways in. |
 | ways · have · title | You have a model. |
 | ways · have · tag | OMOP first |
@@ -229,10 +235,15 @@ in Figma. `public/404.html` is still hand-edited; its strings are mirrored under
 Title and description per figure; in-figure labels are Figma text nodes.
 
 - g11: "A proposed expansion path". OMOP first, then fitting organization-defined models, then exploratory model proposal. Broader fitting remains to be proved.
+- g11m: "Wedge to expansion". Concentric rings: supplied standard models at the core, emergent models around them, any model you define outside.
 - g12: "Ownership chain". Parcel to property company to holding company to manager, each link labelled with its record. The last link is not in the public record.
+- g12m: "Ownership chain". Parcel to property company to holding company to manager on one vertical line, each link labelled with its record. The last link is not in the public record.
 - g3: "Source-to-target decisions". Illustrative source fields and target properties connected through persisted semantic records.
+- g3m: "The idea". Source meanings across the top, target meanings at the bottom, both resolved into one graph in the middle.
 - g4: "Many to one". BIRTH_YR, yob and birth_year converge on one target property, year_of_birth.
+- g4m: "Many to one". BIRTH_YR, yob and birth_year converge downward on one target property, year_of_birth.
 - g5: "Filtered semantic context". Illustrative context for an agent: entities and joins filtered by status and confidence. Not a guarantee of correct answers.
+- g5m: "What the agent gets". A question enters at the top, the relevant part of the model is lit, and a compact context block goes to the agent.
 - g6: "Illustrative fitting workflow". Code lookup, target rules, and plan checks produce accepted, unresolved, or review-pending decisions. This is not a measured study run.
 - g6m: "Illustrative fitting workflow". Code lookup, target rules, and plan checks produce accepted, unresolved, or review-pending decisions. This is not a measured study run.
 - g7: "An illustrative integration project". An illustrative timeline: source reconciliation, a mapping sheet, a new source, and a downstream join error. Not customer results.

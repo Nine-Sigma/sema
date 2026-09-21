@@ -47,7 +47,10 @@ export const variantA: Copy = {
       "Sema inspects source schemas, metadata, and samples to infer entities, codes, and joins. Its cBioPortal-to-OMOP fitting workflow resolves codes against a target vocabulary and checks mapping plans for required fields and review status.",
       "Mapping records carry source references, confidence, status, and run provenance. Human corrections are recorded separately from machine assertions, with replay support for matching assertions. Missing fits and unresolved choices remain visible.",
     ],
+  },
+  quote: {
     pullQuote: "A mapping is more useful when the next engineer can see why it exists.",
+    pullQuoteAccent: "",
     h3: "Two ways in.",
     ways: {
       have: {
