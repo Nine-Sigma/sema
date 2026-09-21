@@ -4,10 +4,9 @@
 export type Env = {
   ASSETS: Fetcher;
   DB?: D1Database;
-  AB?: AnalyticsEngineDataset;
   /* Production hostname, e.g. `withsema.ai`. `www.<host>` 301s to it; preview URLs are served as-is. */
   CANONICAL_HOST?: string;
-  /* Titan SMTP. SMTP_USER is a mailbox login (an alias cannot authenticate). */
+  /* Titan SMTP. SMTP_USER is the mailbox login (dean@) and FROM_ADDRESS must equal it (aliases get 553). */
   SMTP_HOST: string;
   SMTP_PORT: string;
   SMTP_USER: string;

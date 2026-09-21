@@ -40,5 +40,8 @@ SMTP_USER = "waitlist@withsema.ai"
 FROM_ADDRESS = "waitlist@withsema.ai"
 TO_ADDRESS = "waitlist@withsema.ai"
 
+# A/B assignments and conversions both live in D1 (worker/db.ts): `npm run ab:report`.
+# Analytics Engine is not used; the account has it disabled (deploy error 10089, 2026-09-21).
+
 [observability]
 enabled = true

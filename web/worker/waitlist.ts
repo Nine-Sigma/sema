@@ -1,12 +1,13 @@
 /* POST /api/waitlist — the two landing forms post { email } here (apps/landing/src/waitlist.ts).
 
-   Stores the signup in D1 (binding `DB`, table `waitlist`; the A/B arm from the `sema-ab` cookie
+   Stores the signup in D1 (worker/db.ts, table `waitlist`; the A/B arm from the `sema-ab` cookie
    sits beside it, which is how conversions per arm are counted), then emails TO_ADDRESS over
    Titan SMTP (worker/mail.ts) with Reply-To set to the signup. Responses the client maps: 200 success,
    409 duplicate, anything else → the form's error state. A missing DB binding is a 500, never a
    silent success. A mail failure is logged, not surfaced: the signup is stored either way. */
 
 import { AB_COOKIE, readCookie } from "./ab";
+import { ensureSchema } from "./db";
 import type { Env } from "./env";
 import { sendMail } from "./mail";
 
@@ -14,18 +15,6 @@ type Signup = { email: string; variant: string | null; created_at: string; user_
 
 const MAX_EMAIL = 254;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const SCHEMA = [
-  `CREATE TABLE IF NOT EXISTS waitlist (
-     id INTEGER PRIMARY KEY,
-     email TEXT NOT NULL,
-     variant TEXT,
-     created_at TEXT NOT NULL,
-     user_agent TEXT,
-     referer TEXT
-   )`,
-  "CREATE UNIQUE INDEX IF NOT EXISTS waitlist_email ON waitlist (lower(email))",
-];
 
 export async function handleWaitlist(request: Request, env: Env): Promise<Response> {
   if (request.method !== "POST") return new Response(null, { status: 405, headers: { allow: "POST" } });
@@ -53,17 +42,6 @@ export async function handleWaitlist(request: Request, env: Env): Promise<Respon
 
   await notify(env, signup);
   return json(200, { ok: true });
-}
-
-/* One schema run per database per isolate. */
-const schemaReady = new WeakMap<D1Database, Promise<unknown>>();
-function ensureSchema(db: D1Database): Promise<unknown> {
-  let ready = schemaReady.get(db);
-  if (!ready) {
-    ready = db.batch(SCHEMA.map((sql) => db.prepare(sql)));
-    schemaReady.set(db, ready);
-  }
-  return ready;
 }
 
 async function readEmail(request: Request): Promise<string | undefined> {
