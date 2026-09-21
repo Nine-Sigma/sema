@@ -35,6 +35,8 @@ async function serveLanding(request: Request, url: URL, env: Env, ctx: Execution
 
   const upstream = await env.ASSETS.fetch(new Request(url.origin + ARM_PATHS[arm], request));
   const response = new Response(upstream.body, upstream);
+  /* `_headers` marks /ab/* noindex for direct hits; at / the arm is the page. */
+  response.headers.delete("x-robots-tag");
   response.headers.append("set-cookie", `${AB_COOKIE}=${arm}; Path=/; Max-Age=${AB_MAX_AGE}; SameSite=Lax; Secure`);
   response.headers.append("vary", "cookie");
   response.headers.set("cache-control", "no-store");

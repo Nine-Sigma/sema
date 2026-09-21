@@ -1,14 +1,12 @@
 import type { Copy } from "./index";
+import { base } from "./base";
 import { experimentFigures } from "./variant-figures";
 
 /* Hypothesis A: recurring integration work → durable mappings. See AB_COPY_NOTES.md. */
 export const variantA: Copy = {
-  meta: {
-    title: "Sema — Make the mapping work last",
-    description: "Source systems change. Keep the mapping decisions. Sema records source-to-target fits, confidence, and corrections, starting with cBioPortal to OMOP.",
-    // The shared OG asset still carries the control headline; describe the actual asset.
-    ogImageAlt: "Sema. Unify your data by meaning, not by spreadsheet.",
-  },
+  /* Title, description and preview text stay the control's: the test is the page copy, and search
+     results, link previews and structured data must not vary by arm. */
+  meta: base.meta,
   nav: {
     wordmark: "Sema",
     wordmarkLabel: "Sema, home",

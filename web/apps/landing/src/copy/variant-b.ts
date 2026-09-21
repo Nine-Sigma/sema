@@ -1,14 +1,12 @@
 import type { Copy } from "./index";
+import { base } from "./base";
 import { experimentFigures } from "./variant-figures";
 
 /* Hypothesis B: cheap semantic inference → trustworthy durable decisions. */
 export const variantB: Copy = {
-  meta: {
-    title: "Sema — Keep the evidence behind the fit",
-    description: "Plausible mappings need evidence. Sema records source-to-target decisions, confidence, and human corrections, starting with cBioPortal to OMOP.",
-    // Describe the existing shared asset until variant social cards are supplied.
-    ogImageAlt: "Sema. Unify your data by meaning, not by spreadsheet.",
-  },
+  /* Title, description and preview text stay the control's: the test is the page copy, and search
+     results, link previews and structured data must not vary by arm. */
+  meta: base.meta,
   nav: {
     wordmark: "Sema",
     wordmarkLabel: "Sema, home",

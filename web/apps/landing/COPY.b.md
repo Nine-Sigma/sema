@@ -17,8 +17,8 @@ in Figma. `public/404.html` is still hand-edited; its strings are mirrored under
 
 | Slot | Copy |
 |---|---|
-| title | Sema — Keep the evidence behind the fit |
-| description | Plausible mappings need evidence. Sema records source-to-target decisions, confidence, and human corrections, starting with cBioPortal to OMOP. |
+| title | Sema — Unify your data by meaning |
+| description | Sema fits your sources into one data model, keeps them there as new sources arrive, and gives AI agents the meaning behind every table. |
 | ogImageAlt | Sema. Unify your data by meaning, not by spreadsheet. |
 
 ## S0 · Navigation
