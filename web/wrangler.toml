@@ -1,0 +1,48 @@
+# The landing site: one Worker serving apps/landing/dist as static assets, with `/` (A/B arm
+# selection) and `/api/waitlist` handled in worker/. Deploy: `npm run deploy` (builds first).
+#
+# Notification mail goes out over Titan SMTP (worker/mail.ts). Secret, set once:
+# `npx wrangler secret put SMTP_PASSWORD` (the SMTP_USER mailbox password).
+name = "sema"
+main = "worker/index.ts"
+account_id = "c71b9a9123afd9a392a3166ba1792a72"
+compatibility_date = "2026-09-18"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = true
+
+[assets]
+directory = "apps/landing/dist"
+binding = "ASSETS"
+not_found_handling = "404-page"
+run_worker_first = ["/", "/api/*"]
+
+[[routes]]
+pattern = "withsema.ai"
+custom_domain = true
+
+[[routes]]
+pattern = "www.withsema.ai"
+custom_domain = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sema-waitlist"
+database_id = "de4712e6-01ee-4195-8e19-4511f55f2f56"
+
+# SMTP_USER is the Titan mailbox login and must also be the envelope sender: Titan answers 553 to
+# MAIL FROM an alias (waitlist@ is an alias of dean@, bug-709). SMTP_PASSWORD is dean@'s mailbox
+# password. TO_ADDRESS stays the alias; it delivers to dean@'s inbox.
+[vars]
+CANONICAL_HOST = "withsema.ai"
+SMTP_HOST = "smtp.titan.email"
+SMTP_PORT = "465"
+SMTP_USER = "dean@withsema.ai"
+FROM_ADDRESS = "dean@withsema.ai"
+TO_ADDRESS = "waitlist@withsema.ai"
+
+# A/B assignments and conversions both live in D1 (worker/db.ts): `npm run ab:report`.
+# Analytics Engine is not used; the account has it disabled (deploy error 10089, 2026-09-21).
+
+[observability]
+enabled = true

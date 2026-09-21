@@ -3,30 +3,43 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sema — Unify your data by meaning</title>
-    <meta name="description" content="Sema fits your sources into one data model, keeps them there as new sources arrive, and gives AI agents the meaning behind every table." />
+    <title>%copy.meta.title%</title>
+    <meta name="description" content="%copy.meta.description%" />
     <meta name="theme-color" content="#0a0d19" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f2f1ec" media="(prefers-color-scheme: light)" />
+    <link rel="canonical" href="%site.url%/" />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="%site.url%/" />
     <meta property="og:site_name" content="Sema" />
-    <meta property="og:title" content="Sema — Unify your data by meaning" />
-    <meta property="og:description" content="Sema fits your sources into one data model, keeps them there as new sources arrive, and gives AI agents the meaning behind every table." />
-    <meta property="og:image" content="/og.png" />
+    <meta property="og:title" content="%copy.meta.title%" />
+    <meta property="og:description" content="%copy.meta.description%" />
+    <meta property="og:image" content="%site.url%/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Sema. Unify your data by meaning, not by spreadsheet." />
+    <meta property="og:image:alt" content="%copy.meta.ogImageAlt%" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Sema — Unify your data by meaning" />
-    <meta name="twitter:description" content="Sema fits your sources into one data model, keeps them there as new sources arrive, and gives AI agents the meaning behind every table." />
-    <meta name="twitter:image" content="/og.png" />
+    <meta name="twitter:title" content="%copy.meta.title%" />
+    <meta name="twitter:description" content="%copy.meta.description%" />
+    <meta name="twitter:image" content="%site.url%/og.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
     <script src="/theme-boot.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;700&family=Cormorant+Garamond:wght@500&display=swap" />
   </head>
   <body>
+    <!--
+      THESIS: One graph the reader scrolls through; every section is a chapter in which the same graph does one thing. Refused: the stacked-blocks page (hero, feature grid, cards, CTA).
+      OWN-WORLD: Signal Cartography. Near-black ground, IBM Plex Sans display, Plex Mono annotation, Cormorant wordmark, silver-blue for structure, amber only for signal (core, CTA, Blocked, the break, the quote's second sentence, lit sub-graph). Hairline rules, one grid plane, no elevation except the two trace records.
+      STORY: The product lead recognises the project they ran, sees meaning carried across it as a graph, watches one decision resolve and one block, forwards "what stays where", joins the waitlist. The investor jumps to "Why now", checks "Proof", reads the raise line, mails.
+      FIRST VIEWPORT: 1440x800: H1 76px in columns 1-7, lede, form, secondary link; constellation owns columns 6-12, amber core at (1160,450). 390x844: H1 40px over a portrait constellation, core top-right at (300,250).
+      FORM: pinned by Dean 2026-09-20 ("the graph is the protagonist", Motion v6); no concept roll.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+    -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Cloudflare Web Analytics: cookieless page views, site 2944345a5bd744b6b8baf36507e35f00 on the withsema.ai zone. -->
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "f2433c2f2ae34d2eb6df02256b639bb7"}'></script>
   </body>
 </html>

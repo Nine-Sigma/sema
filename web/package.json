@@ -9,9 +9,23 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "gallery": "npm run dev -w @sema/gallery",
-    "landing": "npm run dev -w @sema/landing"
+    "landing": "npm run dev -w @sema/landing",
+    "test": "vitest run",
+    "typecheck:worker": "tsc -p worker/tsconfig.json",
+    "dev:worker": "wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "ab:report": "wrangler d1 execute sema-waitlist --remote --command \"SELECT a.arm, a.assigned, COALESCE(w.converted, 0) AS converted, ROUND(100.0 * COALESCE(w.converted, 0) / a.assigned, 2) AS pct FROM (SELECT arm, COUNT(*) AS assigned FROM ab_assignment GROUP BY arm) a LEFT JOIN (SELECT variant AS arm, COUNT(*) AS converted FROM waitlist WHERE variant IS NOT NULL GROUP BY variant) w ON w.arm = a.arm ORDER BY a.arm\"",
+    "waitlist:list": "wrangler d1 execute sema-waitlist --remote --command \"SELECT id, email, variant, created_at, referer FROM waitlist ORDER BY id DESC LIMIT 50\""
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260918.1",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.135.0"
+  },
+  "dependencies": {
+    "worker-mailer": "^1.2.1"
   }
 }

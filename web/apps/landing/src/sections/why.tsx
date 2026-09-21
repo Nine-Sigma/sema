@@ -1,35 +1,36 @@
-import { Figure, figures } from "@sema/design";
+import { Figure, useSeen } from "@sema/design";
 import { Claim, Section } from "./section";
+import { useCopy, useCopyFigures } from "../copy";
 
-const THESES = [
-  ["Agents need legible data.", "Every company is putting agents on its data. Agents fail on data with no shared meaning and no trusted joins. The bottleneck moved from the model to the data."],
-  ["A services business waiting to become software.", "Consultants do the fit once and it decays. Software that keeps it fitted changes who can afford a unified model."],
-  ["Understanding got cheap. Trust didn't.", "The durable asset is the checked, corrected record of what your data means. That compounds. A prompt doesn't."],
-] as const;
-
-const STEPS = [
-  ["The wedge.", "Domains with a standard model, where every conversion into it is still a project. Healthcare first. The same shape exists in finance, retail, and manufacturing."],
-  ["The expansion.", "Domains with no standard model, where Sema proposes one. Property records are the first exploration. Then the model your organization defines."],
-] as const;
-
-/* S7. Essay left, figure rail right. */
+/* S7. Three theses as a numbered column (mono numerals, not oversized), G11 to the right. The rings
+   draw outside in on first view, core last; the plane's amber point settles behind G11's core. */
 export function Why() {
+  const c = useCopy().why;
+  const figures = useCopyFigures();
+  const g11 = useSeen<HTMLDivElement>(0.5);
   return (
-    <Section id="why" heading="h2-why">
-      <h2 id="h2-why" className="type-h2 col-span-12 mb-10">
-        Why now, and why this.
+    <Section id="why" heading="h2-why" weight="light" chapter="why">
+      <h2 id="h2-why" className="type-h2 col-span-12 mb-14 max-lg:mb-8">
+        {c.h2}
       </h2>
-      <div className="col-span-7 grid content-start gap-9 max-lg:col-span-12">
-        {THESES.map(([claim, text]) => (
-          <div key={claim}>
-            <Claim className="mb-2">{claim}</Claim>
-            <p className="max-w-[52ch]">{text}</p>
-          </div>
+      <ol className="col-span-6 m-0 grid list-none content-start gap-10 p-0 max-lg:col-span-12">
+        {c.theses.map(({ claim, text }, k) => (
+          <li key={claim} className="grid grid-cols-[3rem_1fr] gap-x-4">
+            <span aria-hidden="true" className="type-label text-muted pt-1.5">
+              {String(k + 1).padStart(2, "0")}
+            </span>
+            <div>
+              <Claim className="mb-2">{claim}</Claim>
+              <p className="max-w-[46ch]">{text}</p>
+            </div>
+          </li>
         ))}
-      </div>
-      <div className="col-span-4 col-start-9 grid content-start gap-7 max-lg:col-span-12 max-lg:col-start-1 max-lg:mt-8">
-        <Figure source={figures.g11} />
-        {STEPS.map(([claim, text]) => (
+      </ol>
+      <div className="col-span-5 col-start-8 grid content-start gap-7 max-lg:col-span-12 max-lg:col-start-1 max-lg:mt-10">
+        <div ref={g11} data-plane-anchor="g11" className="sema-reveal-rings">
+          <Figure source={figures.g11} mobile={figures.g11m} />
+        </div>
+        {c.steps.map(({ claim, text }) => (
           <div key={claim} className="grid gap-1.5">
             <p className="font-bold">{claim}</p>
             <p className="text-[15px]">{text}</p>

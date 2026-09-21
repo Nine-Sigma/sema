@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-21T05:05:00Z",
+  "title": "Design System: Sema",
+  "extensions": {
+    "colorMeta": {
+      "ground": { "role": "neutral", "displayName": "Ground", "canonical": "#0a0d19", "light": "#f2f1ec" },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#e8e6df", "light": "#0a0d19" },
+      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "#8a8f9c", "light": "#5c6270" },
+      "rule": { "role": "neutral", "displayName": "Rule", "canonical": "#2a3040", "light": "#c9cbd2" },
+      "rule-strong": { "role": "neutral", "displayName": "Rule Strong", "canonical": "#5c6478", "light": "#7f8490" },
+      "accent": { "role": "primary", "displayName": "Amber Signal", "canonical": "#e5a23a", "light": "#8f5e12" },
+      "accent-fill": { "role": "primary", "displayName": "Amber Fill", "canonical": "#e5a23a", "light": "#b87a1e" },
+      "on-accent": { "role": "primary", "displayName": "Ink on Amber", "canonical": "#0a0d19", "light": "#0a0d19" },
+      "blue": { "role": "secondary", "displayName": "Silver-Blue Structure", "canonical": "#8fb0d6", "light": "#3e6a99" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero H1, three lines at 15ch." },
+      "wall": { "displayName": "Wall", "purpose": "Full-bleed quote wall; second sentence in amber." },
+      "chapter": { "displayName": "Chapter numeral", "purpose": "Mono 01 04 09 10 outlines behind the story beats." },
+      "headline": { "displayName": "Headline", "purpose": "One H2 per chapter." },
+      "label": { "displayName": "Label", "purpose": "Mono uppercase labels, statuses, table heads, tags." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "ease-signal", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The only easing: transitions, chapter states, arrivals." },
+      { "name": "press", "value": "120ms", "purpose": "Button press." },
+      { "name": "hover", "value": "180ms", "purpose": "Hover treatments." },
+      { "name": "state", "value": "260ms", "purpose": "Form state line arrival." },
+      { "name": "arrive", "value": "700ms", "purpose": "Text arriving in place (opacity, 6px, blur 4px)." },
+      { "name": "hero", "value": "~900ms", "purpose": "Load moment: nodes by distance rank, edges draw, amber, rings, ticks, core; pulse loops from 900ms." },
+      { "name": "chapter", "value": "one transition spec", "purpose": "Plane end states per html[data-chapter]; hero scrub writes frames directly with transitions off." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "561px" },
+      { "name": "lg", "value": "901px" },
+      { "name": "container", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled control per viewport: Join the waitlist.",
+      "html": "<button class=\"ds-btn-primary\">Join the waitlist</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0 22px; background: var(--accent-fill, #e5a23a); color: var(--on-accent, #0a0d19); font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.01em; border: 0; border-radius: 0; cursor: pointer; transition: filter 150ms cubic-bezier(0.16, 1, 0.3, 1), transform 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { filter: brightness(1.08); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #e5a23a); outline-offset: 3px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary and done states: an inset hairline ring, no fill.",
+      "html": "<button class=\"ds-btn-outline\">On the list</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0 22px; background: transparent; color: var(--ink, #e8e6df); box-shadow: inset 0 0 0 1px var(--rule-strong, #5c6478); font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.01em; border: 0; border-radius: 0; cursor: pointer; transition: box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-outline:hover { box-shadow: inset 0 0 0 1px var(--ink, #e8e6df); } .ds-btn-outline:focus-visible { outline: 2px solid var(--accent, #e5a23a); outline-offset: 3px; }"
+    },
+    {
+      "name": "Email Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Work email with a mono label above; joins the primary button into one bar.",
+      "html": "<label class=\"ds-label\" for=\"ds-email\">Work email</label><div class=\"ds-field\"><input class=\"ds-input\" id=\"ds-email\" type=\"email\" placeholder=\"you@company.com\" /><button class=\"ds-btn-primary\">Join the waitlist</button></div>",
+      "css": ".ds-label { display: block; margin-bottom: 8px; font-family: 'IBM Plex Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted, #8a8f9c); } .ds-field { display: flex; } .ds-input { flex: 1; height: 48px; padding: 0 14px; background: transparent; color: var(--ink, #e8e6df); border: 1px solid var(--rule-strong, #5c6478); border-right: 0; border-radius: 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 17px; } .ds-input::placeholder { color: var(--muted, #8a8f9c); } .ds-input:focus-visible { outline: 2px solid var(--accent, #e5a23a); outline-offset: 3px; } .ds-btn-primary { display: inline-flex; align-items: center; height: 48px; padding: 0 22px; background: var(--accent-fill, #e5a23a); color: var(--on-accent, #0a0d19); font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 15px; font-weight: 500; border: 0; border-radius: 0; cursor: pointer; }"
+    },
+    {
+      "name": "Tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "Positive status words in a hairline box: Showcase, Exploration.",
+      "html": "<span class=\"ds-tag\">Showcase below ↓</span>",
+      "css": ".ds-tag { display: inline-block; padding: 4px 8px; border: 1px solid var(--rule-strong, #5c6478); border-radius: 0; color: var(--muted, #8a8f9c); font-family: 'IBM Plex Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }"
+    },
+    {
+      "name": "Decision Record",
+      "kind": "card",
+      "refersTo": "record",
+      "description": "The only bordered container: one accepted fit or one blocked fit, with its trace line.",
+      "html": "<article class=\"ds-record ds-record-blocked\"><p class=\"ds-record-status\"><span class=\"ds-status-word\">Blocked · sent to a person</span><span class=\"ds-record-meta\">Decision [n] of [N]</span></p><p class=\"ds-record-trace\">[study].[table].[column] → [target table].[column]</p><p class=\"ds-record-why\">Many rows per patient where the model allows one. That's a decision, not a rename.</p></article>",
+      "css": ".ds-record { display: grid; gap: 16px; padding: 24px 24px 28px; background: var(--ground, #0a0d19); color: var(--ink, #e8e6df); border: 1px solid var(--rule-strong, #5c6478); border-radius: 0; font-family: 'IBM Plex Sans', Arial, sans-serif; } .ds-record-blocked { border-color: var(--accent, #e5a23a); } .ds-record-status { display: flex; justify-content: space-between; gap: 12px; margin: 0; font-family: 'IBM Plex Mono', Menlo, monospace; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; } .ds-record-blocked .ds-status-word { color: var(--accent, #e5a23a); } .ds-record-meta { color: var(--muted, #8a8f9c); } .ds-record-trace { margin: 0; padding: 14px 0; border-top: 1px solid var(--rule, #2a3040); border-bottom: 1px solid var(--rule, #2a3040); font-family: 'IBM Plex Mono', Menlo, monospace; font-size: 14px; overflow-wrap: anywhere; } .ds-record-why { margin: 0; font-size: 16px; line-height: 1.55; }"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "56px sticky bar: serif wordmark, text anchors, theme toggle, the filled CTA.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-wordmark\">Sema</span><a class=\"ds-nav-link\" href=\"#\">The idea</a><a class=\"ds-nav-link\" href=\"#\">Proof</a><a class=\"ds-nav-link\" href=\"#\">What stays where</a><a class=\"ds-nav-link\" href=\"#\">Why now</a><a class=\"ds-nav-link\" href=\"#\">Pilot</a><span class=\"ds-nav-spacer\"></span><button class=\"ds-btn-primary\">Join the waitlist</button></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 24px; background: var(--ground, #0a0d19); color: var(--ink, #e8e6df); border-bottom: 1px solid var(--rule, #2a3040); font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 15px; } .ds-wordmark { margin-right: 24px; font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 500; font-size: 28px; letter-spacing: 0.01em; line-height: 1; } .ds-nav-link { padding: 11px 10px; color: inherit; text-decoration: none; } .ds-nav-link:hover { text-decoration: underline; text-underline-offset: 3px; } .ds-nav-spacer { flex: 1; } .ds-btn-primary { display: inline-flex; align-items: center; height: 48px; padding: 0 22px; background: var(--accent-fill, #e5a23a); color: var(--on-accent, #0a0d19); font-weight: 500; border: 0; border-radius: 0; cursor: pointer; }"
+    },
+    {
+      "name": "Ledger Row",
+      "kind": "custom",
+      "refersTo": "compartments",
+      "description": "Sections are rows of claim and consequence separated by 1px rules, never cards.",
+      "html": "<div class=\"ds-ledger\"><div class=\"ds-ledger-row\"><p class=\"ds-claim\">Corrections stick.</p><p class=\"ds-consequence\">Fix something once. The fix is kept, attributed, and survives every rebuild.</p></div><div class=\"ds-ledger-row\"><p class=\"ds-claim\">You can see why.</p><p class=\"ds-consequence\">Every decision shows where it came from and how sure Sema was.</p></div></div>",
+      "css": ".ds-ledger { display: grid; gap: 1px; background: var(--rule, #2a3040); border-top: 1px solid var(--rule, #2a3040); border-bottom: 1px solid var(--rule, #2a3040); font-family: 'IBM Plex Sans', Arial, sans-serif; color: var(--ink, #e8e6df); } .ds-ledger-row { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; padding: 32px 0; background: var(--ground, #0a0d19); } .ds-claim { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.25; letter-spacing: -0.015em; } .ds-consequence { margin: 0; font-size: 17px; line-height: 1.55; max-width: 58ch; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Signal Cartography",
+    "overview": "The page is a chart of one graph. A near-black ground carries a faint grid plane and a field of small nodes; silver-blue draws structure and amber marks signal only. Type is IBM Plex Sans for reading and Plex Mono for annotation, with the Cormorant wordmark as the single serif. Nothing is rounded and nothing floats. The landing site is one graph the reader scrolls through; every section is a chapter in which the same fixed graph plane does one thing, and the page refuses the stacked-blocks arrangement.",
+    "keyCharacteristics": [
+      "Dark-first; light is a full second mode with the same geometry and a darker amber.",
+      "Amber rationed to the CTA fill, the graph core, Blocked, the break, the quote's second sentence.",
+      "Hairline rules do the work borders and shadows do elsewhere.",
+      "Figures are authored SVG plates with live text, themed through tokens.",
+      "One scroll clock, one easing, end state under reduced motion."
+    ],
+    "rules": [
+      { "name": "The Signal Rule", "body": "Amber marks a decision or a call, never ornament. More than one amber fill per screen is wrong.", "section": "colors" },
+      { "name": "The One Ground Rule", "body": "Every surface is --ground. A container is a border, not a tint.", "section": "colors" },
+      { "name": "The Lead-In Rule", "body": "Structure inside running text is a bold lead-in on the paragraph, not a label above it.", "section": "typography" },
+      { "name": "The Flat Rule", "body": "No box-shadow, no drop shadow, no gradient fills; the radius and shadow scales are removed at the theme level.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do put every colour through the tokens.",
+      "Do keep one filled amber control per viewport.",
+      "Do build sections as ledger rows, tables, one-line rows or numbered theses.",
+      "Do draw figures in Figma with live text and export as SVG.",
+      "Do render the end state when motion is off."
+    ],
+    "donts": [
+      "Don't add radius, shadows, gradients or tinted surfaces.",
+      "Don't add mono labels above paragraphs.",
+      "Don't write \"not shipped\" anywhere but the roadmap's eyebrow.",
+      "Don't name mechanisms on the page; sell by result.",
+      "Don't add a second scroll clock or easing."
+    ],
+    "notCanonized": "The two eyebrows (S5 Proof, S8 Roadmap) are a user-waived exception to the craft floor (max one per three sections), not a system rule; they are not recorded as a component."
+  }
+}
