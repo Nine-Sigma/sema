@@ -114,6 +114,12 @@ describe("worker fetch", () => {
     expect(db.calls.filter((c) => c.sql.startsWith("INSERT INTO ab_assignment"))).toHaveLength(0);
   });
 
+  it("strips the /ab/* noindex header when an arm is served at /", async () => {
+    const { env } = fakeEnv();
+    const res = await worker.fetch(get("https://withsema.ai/?ab=a"), env, fakeCtx());
+    expect(res.headers.get("x-robots-tag")).toBeNull();
+  });
+
   it("routes /api/waitlist to the handler", async () => {
     const { env } = fakeEnv();
     const res = await worker.fetch(get("https://withsema.ai/api/waitlist"), env, fakeCtx());
