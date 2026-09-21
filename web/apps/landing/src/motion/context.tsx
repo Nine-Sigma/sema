@@ -10,7 +10,13 @@ const MotionContext = React.createContext<Motion | null>(null);
 
 export function MotionProvider({ children }: { children: React.ReactNode }) {
   const [motion] = React.useState<Motion>(() => ({ bus: createBus(), plane: { current: null } }));
-  React.useEffect(() => () => motion.bus.destroy(), [motion]);
+  React.useEffect(() => {
+    const detach = motion.bus.attach();
+    return () => {
+      detach();
+      motion.bus.destroy();
+    };
+  }, [motion]);
   return <MotionContext.Provider value={motion}>{children}</MotionContext.Provider>;
 }
 

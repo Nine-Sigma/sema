@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && npm run copy:check && vite build",
+    "build": "tsc --noEmit && npm run copy:check && vite build && npm run prerender",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "copy:md": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/render-copy.ts",
-    "copy:check": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/render-copy.ts --check"
+    "copy:check": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/render-copy.ts --check",
+    "prerender": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/prerender.ts"
   },
   "dependencies": {
     "@sema/design": "*",
