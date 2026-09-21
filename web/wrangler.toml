@@ -30,14 +30,15 @@ binding = "DB"
 database_name = "sema-waitlist"
 database_id = "de4712e6-01ee-4195-8e19-4511f55f2f56"
 
-# SMTP_USER must be a Titan mailbox login; if waitlist@ is an alias, put the owning mailbox here
-# and keep FROM_ADDRESS as the alias (Titan allows send-as for a mailbox's aliases).
+# SMTP_USER is the Titan mailbox login and must also be the envelope sender: Titan answers 553 to
+# MAIL FROM an alias (waitlist@ is an alias of dean@, bug-709). SMTP_PASSWORD is dean@'s mailbox
+# password. TO_ADDRESS stays the alias; it delivers to dean@'s inbox.
 [vars]
 CANONICAL_HOST = "withsema.ai"
 SMTP_HOST = "smtp.titan.email"
 SMTP_PORT = "465"
-SMTP_USER = "waitlist@withsema.ai"
-FROM_ADDRESS = "waitlist@withsema.ai"
+SMTP_USER = "dean@withsema.ai"
+FROM_ADDRESS = "dean@withsema.ai"
 TO_ADDRESS = "waitlist@withsema.ai"
 
 # A/B assignments and conversions both live in D1 (worker/db.ts): `npm run ab:report`.
