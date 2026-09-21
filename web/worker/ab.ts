@@ -8,8 +8,8 @@ export type ArmId = "control" | "a" | "b";
 export type Weights = Record<ArmId, number>;
 
 /* Relative weights. `control: 1, a: 0, b: 0` = test off: `/` is served untouched and no cookie is
-   set. Change and redeploy to start the test; fold the winner into base.ts and reset to off. */
-export const WEIGHTS: Weights = { control: 1, a: 0, b: 0 };
+   set. Test ON since 2026-09-21 (equal split); fold the winner into base.ts and reset to off. */
+export const WEIGHTS: Weights = { control: 1, a: 1, b: 1 };
 
 export const ARM_PATHS: Record<ArmId, string> = { control: "/", a: "/ab/a", b: "/ab/b" };
 export const AB_COOKIE = "sema-ab";
