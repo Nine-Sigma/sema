@@ -10,11 +10,11 @@ type NavProps = React.ComponentProps<"nav"> & {
   actions?: React.ReactNode;
 };
 
-/* 64px bar under a 1px rule. Anchor targets are padded to ~44px. */
+/* 56px bar under a 1px rule. Anchor targets are padded to ~44px. */
 function Nav({ brand, anchors = [], actions, className, ...props }: NavProps) {
   return (
     <nav aria-label="Primary" data-slot="nav" className={cn("border-b border-rule", className)} {...props}>
-      <div className="page-wrap flex h-16 items-center gap-8">
+      <div className="page-wrap flex h-14 items-center gap-8">
         {brand}
         {anchors.length ? (
           <div className="ml-4 flex gap-2 text-[15px] max-lg:hidden">

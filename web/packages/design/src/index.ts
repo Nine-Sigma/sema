@@ -4,6 +4,7 @@ export { Label } from "./components/ui/label";
 export { Toggle } from "./components/ui/toggle";
 
 export { Constellation, constellation, type ConstellationProps } from "./components/constellation";
+export { constellationGeometry, type ConstellationGeometry, type Pt } from "./lib/constellation-geometry";
 export { EmailForm, type EmailFormProps, type FormOutcome, type FormState } from "./components/email-form";
 export { Eyebrow } from "./components/eyebrow";
 export { Figure, type FigureProps, type FigureSource } from "./components/figure";

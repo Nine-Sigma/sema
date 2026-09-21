@@ -188,6 +188,22 @@
   font-size: 1.15rem;
   line-height: 1.5;
 }
+/* v7 additions: the quote wall (S3b) and the chapter numerals (S2). Desktop 96 / 220, mobile 40 / 120. */
+@utility type-wall {
+  font-size: clamp(2.5rem, 6.67vw, 6rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-weight: 500;
+  text-wrap: balance;
+}
+@utility type-chapter {
+  font-family: var(--font-mono);
+  font-size: clamp(7.5rem, 15.3vw, 13.75rem);
+  line-height: 0.85;
+  letter-spacing: -0.04em;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
 @utility type-pull {
   font-size: clamp(1.6rem, 3vw, 2.6rem);
   line-height: 1.1;
@@ -233,6 +249,32 @@
   column-gap: 24px;
   @media (width < 901px) {
     column-gap: 16px;
+  }
+}
+/* Chapter rhythm (site plan v7 §3.4): top padding by weight, less below than above a heading.
+   Heavy 240 / light 160 / connective 200; mobile 120 / 96 / 112. Bottom is half the top. */
+@utility chapter-heavy {
+  padding-top: 240px;
+  padding-bottom: 120px;
+  @media (width < 901px) {
+    padding-top: 120px;
+    padding-bottom: 60px;
+  }
+}
+@utility chapter-light {
+  padding-top: 160px;
+  padding-bottom: 80px;
+  @media (width < 901px) {
+    padding-top: 96px;
+    padding-bottom: 48px;
+  }
+}
+@utility chapter-connective {
+  padding-top: 200px;
+  padding-bottom: 100px;
+  @media (width < 901px) {
+    padding-top: 112px;
+    padding-bottom: 56px;
   }
 }
 @utility compartments {

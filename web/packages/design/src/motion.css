@@ -117,8 +117,13 @@ html[data-motion] .sema-arrive {
 }
 
 /* Held at the first frame until the page is painted in front of the reader; JS releases it. */
-html[data-motion="pending"] .sema-hero * {
+html[data-motion="pending"] .sema-hero *,
+html[data-motion="pending"] .sema-plane * {
   animation-play-state: paused !important;
+}
+/* Once the scroll owns the plane (the reader scrolled), the load moment must not fight it. */
+html[data-scrub] .sema-plane * {
+  animation: none !important;
 }
 
 /* Reduced motion: the loops stop too (the gate only withholds the authored moment). */
