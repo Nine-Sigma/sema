@@ -36,6 +36,15 @@ export const base: Copy = {
     secondary: { text: "Investor? Deck on request →", href: "#investors" },
   },
 
+  /* S3a · The idea */
+  idea: {
+    h2: "Integrate by meaning.",
+    paras: [
+      "Sema reads your sources and works out what they mean: which columns are the same thing, which codes mean what, which tables join. Then it fits them to one model and checks its own work. When a fit can't hold, Sema blocks it and says why.",
+      "Every decision keeps its source, how sure Sema was, and who changed it. Corrections stay. Add a source, and only the new part gets fitted.",
+    ],
+  },
+
   /* S2 · You've run this project */
   story: {
     h2: "You've run this project.",
@@ -56,14 +65,10 @@ export const base: Copy = {
     turn: "The work was right. Where it lived was wrong. Meaning sat in a spreadsheet and in people's heads. It needs to live somewhere a machine can read, keep, and build on.",
   },
 
-  /* S3 · The idea */
-  idea: {
-    h2: "Integrate by meaning.",
-    paras: [
-      "Sema reads your sources and works out what they mean: which columns are the same thing, which codes mean what, which tables join. Then it fits them to one model and checks its own work. When a fit can't hold, Sema blocks it and says why.",
-      "Every decision keeps its source, how sure Sema was, and who changed it. Corrections stay. Add a source, and only the new part gets fitted.",
-    ],
-    pullQuote: "ETL moves data between schemas. Sema moves it between meanings.",
+  /* S3b · Quote wall + two ways in */
+  quote: {
+    pullQuote: "ETL moves data between schemas.",
+    pullQuoteAccent: "Sema moves it between meanings.",
     h3: "Two ways in.",
     ways: {
       have: {

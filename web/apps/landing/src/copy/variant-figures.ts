@@ -23,6 +23,28 @@ function relabel(
   return { ...source, title, desc, svg };
 }
 
+/* Figma exports position text by its left edge, so a longer replacement drifts against its node.
+   Source labels are re-anchored: G6 right-aligned 8px off the node (x 160, r 5.4); G6m centred
+   under each node (x 70, 179, 288). */
+type Anchor = { x: number; anchor: "end" | "middle" };
+const G6_ANCHORS: Record<string, Anchor> = {
+  "Code lookup": { x: 146, anchor: "end" },
+  "Target rules": { x: 146, anchor: "end" },
+  "Plan checks": { x: 146, anchor: "end" },
+};
+const G6M_ANCHORS: Record<string, Anchor> = {
+  "Code lookup": { x: 70, anchor: "middle" },
+  "Target rules": { x: 179, anchor: "middle" },
+  "Plan checks": { x: 288, anchor: "middle" },
+};
+function reanchor(plate: FigureSource, anchors: Record<string, Anchor>): FigureSource {
+  let svg = plate.svg;
+  for (const [label, { x, anchor }] of Object.entries(anchors)) {
+    svg = svg.replace(new RegExp(`<tspan x="[0-9.]+" y="([0-9.]+)">${label}</tspan>`), `<tspan x="${x}" y="$1" text-anchor="${anchor}">${label}</tspan>`);
+  }
+  return { ...plate, svg };
+}
+
 const flowTitle = "Illustrative fitting workflow";
 const flowDesc = "Code lookup, target rules, and plan checks produce accepted, unresolved, or review-pending decisions. This is not a measured study run.";
 const flowLabels = {
@@ -51,13 +73,13 @@ export const experimentFigures: FigureOverrides = (figures: Plates) => ({
     "The agent never guesses what a column ": "Context is filtered by status",
     "means.": "and confidence.",
   }),
-  g6: relabel(figures.g6, flowTitle, flowDesc, {
+  g6: reanchor(relabel(figures.g6, flowTitle, flowDesc, {
     ...flowLabels,
     "Merged across studies": "Review pending",
     "[N] patients recognized twice": "operator decision",
     "run dated [date] &#xb7; nothing cancer-specific in the code": "Illustrative workflow. See the test fixtures below.",
-  }),
-  g6m: relabel(figures.g6m, flowTitle, flowDesc, {
+  }), G6_ANCHORS),
+  g6m: reanchor(relabel(figures.g6m, flowTitle, flowDesc, {
     ...flowLabels,
     "Merged across ": "Review",
     "studies": "pending",
@@ -65,7 +87,7 @@ export const experimentFigures: FigureOverrides = (figures: Plates) => ({
     "recognized twice": "decision",
     "run dated [date] &#xb7; nothing cancer-specific in ": "Illustrative workflow. See the test",
     "the code": "fixtures below.",
-  }),
+  }), G6M_ANCHORS),
   g7: relabel(figures.g7, "An illustrative integration project", "An illustrative timeline: source reconciliation, a mapping sheet, a new source, and a downstream join error. Not customer results.", {
     "a 1,400-row mapping sheet": "a growing mapping sheet",
     "new source, half the sheet redone": "new source, mappings reopened",

@@ -46,6 +46,14 @@ in Figma. `public/404.html` is still hand-edited; its strings are mirrored under
 | help · link | Privacy → #privacy |
 | secondary | Investor? Deck on request → → #investors |
 
+## S3a · The idea (rendered before S2)
+
+| Slot | Copy |
+|---|---|
+| h2 | Integrate by meaning. |
+| paras · 1 | Sema reads your sources and works out what they mean: which columns are the same thing, which codes mean what, which tables join. Then it fits them to one model and checks its own work. When a fit can't hold, Sema blocks it and says why. |
+| paras · 2 | Every decision keeps its source, how sure Sema was, and who changed it. Corrections stay. Add a source, and only the new part gets fitted. |
+
 ## S2 · You've run this project
 
 | Slot | Copy |
@@ -65,14 +73,12 @@ in Figma. `public/404.html` is still hand-edited; its strings are mirrored under
 | beats · 4 · text | The agent pilot joins on the wrong key and answers with total confidence. |
 | turn | The work was right. Where it lived was wrong. Meaning sat in a spreadsheet and in people's heads. It needs to live somewhere a machine can read, keep, and build on. |
 
-## S3 · The idea
+## S3b · Quote wall and two ways in
 
 | Slot | Copy |
 |---|---|
-| h2 | Integrate by meaning. |
-| paras · 1 | Sema reads your sources and works out what they mean: which columns are the same thing, which codes mean what, which tables join. Then it fits them to one model and checks its own work. When a fit can't hold, Sema blocks it and says why. |
-| paras · 2 | Every decision keeps its source, how sure Sema was, and who changed it. Corrections stay. Add a source, and only the new part gets fitted. |
-| pullQuote | ETL moves data between schemas. Sema moves it between meanings. |
+| pullQuote | ETL moves data between schemas. |
+| pullQuoteAccent | Sema moves it between meanings. |
 | h3 | Two ways in. |
 | ways · have · title | You have a model. |
 | ways · have · tag | Showcase below ↓ |
@@ -227,10 +233,15 @@ in Figma. `public/404.html` is still hand-edited; its strings are mirrored under
 Title and description per figure; in-figure labels are Figma text nodes.
 
 - g11: "Wedge to expansion". Concentric rings: supplied standard models at the core, emergent models around them, any model you define outside.
+- g11m: "Wedge to expansion". Concentric rings: supplied standard models at the core, emergent models around them, any model you define outside.
 - g12: "Ownership chain". Parcel to property company to holding company to manager, each link labelled with its record. The last link is not in the public record.
+- g12m: "Ownership chain". Parcel to property company to holding company to manager on one vertical line, each link labelled with its record. The last link is not in the public record.
 - g3: "The idea". Source meanings on the left, target meanings on the right, both resolved into one graph in the centre.
+- g3m: "The idea". Source meanings across the top, target meanings at the bottom, both resolved into one graph in the middle.
 - g4: "Many to one". BIRTH_YR, yob and birth_year converge on one target property, year_of_birth.
+- g4m: "Many to one". BIRTH_YR, yob and birth_year converge downward on one target property, year_of_birth.
 - g5: "What the agent gets". A question enters, the relevant part of the model is lit, and a compact context block goes to the agent.
+- g5m: "What the agent gets". A question enters at the top, the relevant part of the model is lit, and a compact context block goes to the agent.
 - g6: "Three studies, one model". Three public cancer studies converge on OMOP; people, diagnoses and merged patients come out, with dated counts.
 - g6m: "Three studies, one model". Three public cancer studies converge on OMOP; people, diagnoses and merged patients come out, with dated counts.
 - g7: "The project you have run". Four months on one line. The mapping sheet grows, then breaks at month nine when a new source arrives.

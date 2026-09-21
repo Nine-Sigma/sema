@@ -47,7 +47,10 @@ export const variantB: Copy = {
       "Sema separates inferred meaning from the decision to use it. Source assertions carry confidence and provenance. In the cBioPortal-to-OMOP workflow, vocabulary rules filter candidate targets; mapping plans check required fields and flag pending review.",
       "Accepted, rejected, and unresolved are different states. Human pins and rejections become recorded events, with replay support for matching assertions. A correction can become system state instead of another instruction lost in a prompt.",
     ],
-    pullQuote: "Confidence describes an inference. The decision record tells you what happened to it.",
+  },
+  quote: {
+    pullQuote: "Confidence describes an inference.",
+    pullQuoteAccent: "The decision record tells you what happened to it.",
     h3: "Two ways in.",
     ways: {
       have: {
