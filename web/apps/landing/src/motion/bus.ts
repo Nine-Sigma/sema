@@ -14,6 +14,8 @@ export type Bus = {
   /** Recompute cached document offsets on the next frame. */
   relayout: () => void;
   onRelayout: (fn: () => void) => () => void;
+  /** Wire scroll/resize/fonts to the clock. Client only; returns the detach. */
+  attach: () => () => void;
   destroy: () => void;
 };
 
@@ -49,12 +51,20 @@ export function createBus(): Bus {
     needsLayout = true;
     request();
   };
-  window.addEventListener("scroll", request, { passive: true });
-  window.addEventListener("resize", relayout);
-  const ro = "ResizeObserver" in window ? new ResizeObserver(relayout) : null;
-  ro?.observe(document.body);
-  const fonts = document.fonts?.ready;
-  void fonts?.then(relayout, () => undefined);
+  /* Creation touches no browser global: the page is prerendered at build time (entry-server.tsx). */
+  const attach = (): (() => void) => {
+    window.addEventListener("scroll", request, { passive: true });
+    window.addEventListener("resize", relayout);
+    const ro = "ResizeObserver" in window ? new ResizeObserver(relayout) : null;
+    ro?.observe(document.body);
+    void document.fonts?.ready.then(relayout, () => undefined);
+    relayout();
+    return () => {
+      window.removeEventListener("scroll", request);
+      window.removeEventListener("resize", relayout);
+      ro?.disconnect();
+    };
+  };
 
   return {
     subscribe: (fn, post = false) => {
@@ -69,10 +79,8 @@ export function createBus(): Bus {
       layoutSubs.add(fn);
       return () => layoutSubs.delete(fn);
     },
+    attach,
     destroy: () => {
-      window.removeEventListener("scroll", request);
-      window.removeEventListener("resize", relayout);
-      ro?.disconnect();
       subs.clear();
       postSubs.clear();
       layoutSubs.clear();
