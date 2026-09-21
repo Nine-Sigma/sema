@@ -10,6 +10,7 @@
     ".": "./src/index.ts",
     "./theme.css": "./src/theme.css",
     "./motion.css": "./src/motion.css",
+    "./chapters.css": "./src/chapters.css",
     "./tokens": "./src/tokens.ts",
     "./figures": "./src/figures/index.ts"
   },

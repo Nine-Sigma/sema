@@ -32,7 +32,7 @@ type EmailFormProps = Omit<React.ComponentProps<"form">, "onSubmit"> & {
   placeholder?: string;
   buttonText?: string;
   help?: React.ReactNode;
-  /** lg: the pilot form, a full-width bar with a rule above. */
+  /** lg: the pilot form, a full-width bar. */
   size?: "default" | "lg";
   messages?: Partial<typeof MESSAGES>;
   /** Button text per state; falls back to buttonText. */
@@ -94,7 +94,7 @@ function EmailForm({
       <div
         className={cn(
           "flex max-sm:flex-col",
-          size === "lg" && "border-t border-rule-strong pt-6 max-lg:flex-col",
+          size === "lg" && "max-lg:flex-col",
         )}
       >
         <Input
