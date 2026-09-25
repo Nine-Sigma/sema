@@ -1,0 +1,46 @@
+manifest_version: 1
+descriptor:
+  target_model_id: concept-fixture
+  target_model_version: "2026-09"
+  display_name: Concept Fixture Library
+vocabularies:
+  - name: VS_PRT4013886
+    source: INLINE
+terms:
+  - vocabulary: VS_PRT4013886
+    code: PRT1000001
+    display: White
+    definition: A person having origins in any of the original peoples of Europe.
+    synonyms: [Caucasian]
+    external_refs:
+      - {system: omop, id: "8527"}
+  - vocabulary: VS_PRT4013886
+    code: PRT1000002
+    display: Unknown
+entities:
+  - qualified_name: prt_standard_library.demographics
+    kind: CONCEPT_SCHEME
+    properties:
+      - name: race
+        type: string
+        nullable: true
+        synonyms: [Race]
+        concept_ref: {identity_system: partner, id: PRT4013886, version: "2026-09"}
+        definition: A self-identified social construct of ancestral grouping.
+        external_refs:
+          - {system: omop, id: "4013886"}
+          - {system: SNOMED, id: "103579009"}
+        vocabulary_binding:
+          vocabulary: VS_PRT4013886
+      - name: record_note
+        type: string
+        nullable: true
+    context_card:
+      card_version: "1.0.0"
+      description: partner Standard Library data elements for the demographics domain.
+relationships:
+  - from: {system: partner, id: PRT4013886}
+    to: {system: omop, id: "4013886"}
+    type: Maps to
+    hierarchical: false
+    far_end_loaded: false

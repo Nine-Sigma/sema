@@ -22,7 +22,7 @@ from sema.models.target.context_card import TargetContextCard
 from sema.models.target.endpoints import EdgeEndpointDecl, EdgeEndpointsDecl
 from sema.models.target.entity import TargetEntityDecl
 from sema.models.target.obligation import TargetObligationDecl
-from sema.models.target.properties import TargetPropertyDecl
+from sema.models.target.properties import PropertyKind, TargetPropertyDecl
 from sema.models.target.refs import TargetEntityRef, VocabularyRef, VocabularySource
 from sema.models.target.term import TargetTermDecl
 from sema.models.target.vocab_binding import VocabularyBindingDecl
@@ -120,6 +120,12 @@ def to_target_property(prop: ManifestProperty) -> TargetPropertyDecl:
             if prop.vocabulary_binding is not None
             else None
         ),
+        property_kind=(
+            PropertyKind.CONCEPT if prop.concept_ref is not None else PropertyKind.COLUMN
+        ),
+        concept_ref=prop.concept_ref,
+        definition=prop.definition,
+        external_refs=list(prop.external_refs),
     )
 
 
@@ -296,6 +302,9 @@ def to_inline_terms(
             code=t.code,
             display=t.display,
             domain=t.domain,
+            definition=t.definition,
+            synonyms=list(t.synonyms),
+            external_refs=list(t.external_refs),
         )
         for t in parsed.terms
         if t.vocabulary == vocabulary_name

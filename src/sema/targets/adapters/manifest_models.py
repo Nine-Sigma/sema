@@ -11,7 +11,7 @@ from sema.models.planner._enums import (
     TargetArtifactKind,
 )
 from sema.models.target.completeness import SemanticCompletenessAnnotations
-from sema.models.target.refs import VocabularySource
+from sema.models.target.refs import ConceptRef, ExternalRef, VocabularySource
 
 
 class ManifestVocabulary(BaseModel):
@@ -28,6 +28,9 @@ class ManifestTerm(BaseModel):
     code: str = Field(min_length=1)
     display: str = Field(min_length=1)
     domain: str | None = None
+    definition: str | None = None
+    synonyms: list[str] = Field(default_factory=list)
+    external_refs: list[ExternalRef] = Field(default_factory=list)
 
 
 class ManifestVocabularyBinding(BaseModel):
@@ -51,6 +54,9 @@ class ManifestProperty(BaseModel):
     synonyms: list[str] = Field(default_factory=list)
     decoded_values: dict[str, str] = Field(default_factory=dict)
     vocabulary_binding: ManifestVocabularyBinding | None = None
+    concept_ref: ConceptRef | None = None
+    definition: str | None = None
+    external_refs: list[ExternalRef] = Field(default_factory=list)
 
 
 class ManifestEndpoint(BaseModel):
@@ -152,6 +158,16 @@ class ManifestDescriptor(BaseModel):
     completeness: SemanticCompletenessAnnotations | None = None
 
 
+class ManifestRelationship(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    from_: ExternalRef = Field(alias="from")
+    to: ExternalRef
+    type: str = Field(min_length=1)
+    hierarchical: bool | None = None
+    far_end_loaded: bool
+
+
 class ParsedManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -160,3 +176,4 @@ class ParsedManifest(BaseModel):
     vocabularies: list[ManifestVocabulary] = Field(default_factory=list)
     terms: list[ManifestTerm] = Field(default_factory=list)
     entities: list[ManifestEntity] = Field(default_factory=list)
+    relationships: list[ManifestRelationship] = Field(default_factory=list)

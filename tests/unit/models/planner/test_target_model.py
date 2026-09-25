@@ -21,6 +21,7 @@ def test_target_artifact_kind_values() -> None:
         "TABLE_ROW",
         "GRAPH_NODE",
         "GRAPH_EDGE",
+        "CONCEPT_SCHEME",
     }
 
 
