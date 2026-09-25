@@ -22,7 +22,7 @@ from typing import Final, Iterable
 EMBEDDING_MATCH_KEYS: Final[dict[str, tuple[str, ...]]] = {
     "Entity": ("name",),
     "Property": ("name", "entity_name"),
-    "Term": ("vocabulary_name", "code"),
+    "Term": ("vocabulary_name", "code", "model_role"),
     "Alias": ("text",),
     "Metric": ("name",),
     # Synonym kept for backward compat with existing Neo4j nodes.

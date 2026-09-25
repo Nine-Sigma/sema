@@ -110,8 +110,9 @@ def _build_profiling_assertions(
     schema = work_item.schema
     table_name = work_item.table_name
     fqn = work_item.fqn
+    distinct_scanned = columns if connector._profiling.enable_distinct_counts else []
 
-    for col in columns:
+    for col in distinct_scanned:
         col_ref = f"{fqn}/{col['name']}"
 
         if connector._should_skip_profiling(col["data_type"]):

@@ -264,13 +264,12 @@ def _compute_embeddings(
             click.echo(f"  Vector indexes created (dimensions={dimensions})")
 
         for label in embeddable_labels:
-            nodes = loader.query_nodes_by_label(label)
+            nodes = [n for n in loader.query_nodes_by_label(label)
+                     if n.get("model_role") != "TARGET"]
             if not nodes:
                 continue
             key_spec = EMBEDDING_KEY_MAP.get(label, ("name",))
-            _embed_label_nodes(
-                emb_engine, loader, label, key_spec, nodes,
-            )
+            _embed_label_nodes(emb_engine, loader, label, key_spec, nodes)
             if config.verbose:
                 click.echo(f"  {label}: embedded {len(nodes)} nodes")
     except EmbeddingDimensionMismatchError:

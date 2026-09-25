@@ -30,7 +30,8 @@ class TestEmbeddingComputation:
             "Entity": [{"name": "Order", "description": "A purchase order"}],
             "Property": [{"name": "order_id", "entity_name": "Order"}],
             "Term": [
-                {"vocabulary_name": "Status", "code": "ACTIVE", "label": "Active"}
+                {"vocabulary_name": "Status", "code": "ACTIVE", "label": "Active",
+                 "model_role": "SOURCE"}
             ],
             "Alias": [{"text": "purchase"}],
             "Metric": [{"name": "total_revenue", "description": "Sum of sales"}],
@@ -92,12 +93,12 @@ class TestEmbeddingComputation:
         engine.embed_and_store(
             label="Term", match_prop="code",
             items=[{"vocabulary_name": "Status", "code": "T001",
-                    "label": "Active"}],
+                    "label": "Active", "model_role": "SOURCE"}],
             text_fn=lambda item: build_embedding_text("term", **item),
         )
         term_call = mock_loader.set_node_embedding.call_args
         assert term_call.kwargs["match"] == {
-            "vocabulary_name": "Status", "code": "T001",
+            "vocabulary_name": "Status", "code": "T001", "model_role": "SOURCE",
         }
 
         mock_loader.reset_mock()
@@ -132,9 +133,10 @@ class TestEmbeddingComputation:
         engine.embed_and_store(
             label="Term", match_prop="code",
             items=[
-                {"vocabulary_name": "Gender", "code": "M", "label": "Male"},
+                {"vocabulary_name": "Gender", "code": "M", "label": "Male",
+                 "model_role": "SOURCE"},
                 {"vocabulary_name": "State", "code": "M",
-                 "label": "Mississippi"},
+                 "label": "Mississippi", "model_role": "SOURCE"},
             ],
             text_fn=lambda item: build_embedding_text("term", **item),
         )
@@ -143,8 +145,8 @@ class TestEmbeddingComputation:
             for c in mock_loader.set_node_embedding.call_args_list
         ]
         assert matches == [
-            {"vocabulary_name": "Gender", "code": "M"},
-            {"vocabulary_name": "State", "code": "M"},
+            {"vocabulary_name": "Gender", "code": "M", "model_role": "SOURCE"},
+            {"vocabulary_name": "State", "code": "M", "model_role": "SOURCE"},
         ]
 
     def test_embedding_batch_size_64(self):

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 import yaml
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -82,6 +82,7 @@ class ProfilingConfig(BaseSettings):
     max_sample_values: int = 5
     skip_temporal_profiling: bool = True
     skip_numeric_profiling: bool = False
+    enable_distinct_counts: bool = True
 
 
 class BuildConfig(BaseSettings):
@@ -103,6 +104,11 @@ class BuildConfig(BaseSettings):
 
     enable_fk_detection: bool = True
     materialize_structural_fk: bool = False
+
+    evidence_policy: Literal["metadata_only", "bounded_values", "full"] = "full"
+    max_distinct_values_read: int = 200
+    max_unmatched_reported: int = 20
+    judge_workers: int = 4
 
     eval_dump_dir: str | None = None
     eval_config_label: str = "run"
@@ -129,6 +135,16 @@ class BuildConfig(BaseSettings):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     profiling: ProfilingConfig = Field(default_factory=ProfilingConfig)
+
+    @model_validator(mode="after")
+    def _apply_evidence_policy(self) -> BuildConfig:
+        if self.evidence_policy != "metadata_only":
+            return self
+        self.profiling = self.profiling.model_copy(update={
+            "sample_rows": 0, "top_k_values": 0, "enable_distinct_counts": False,
+        })
+        self.enable_fk_detection = False
+        return self
 
     @property
     def fk_materialization_threshold(self) -> float:

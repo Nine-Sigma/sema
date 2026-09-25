@@ -63,7 +63,7 @@ def loader_with_session():
 
 class TestEmbeddingMatchAllowlist:
     def test_term_key_is_composite(self):
-        assert EMBEDDING_MATCH_KEYS["Term"] == ("vocabulary_name", "code")
+        assert EMBEDDING_MATCH_KEYS["Term"] == ("vocabulary_name", "code", "model_role")
 
     def test_validate_label_rejects_unknown(self):
         with pytest.raises(ValueError):
@@ -86,7 +86,8 @@ class TestEmbeddingMatchAllowlist:
     ):
         loader, session = loader_with_session
         loader.set_node_embedding(
-            "Term", {"vocabulary_name": "Gender", "code": "M"}, [0.1],
+            "Term", {"vocabulary_name": "Gender", "code": "M", "model_role": "SOURCE"},
+            [0.1],
         )
         cypher = session.run.call_args[0][0]
         params = session.run.call_args[1]
