@@ -15,6 +15,7 @@ from sema.models.assertions import (
     AssertionPredicate,
 )
 from sema.models.config import DatabricksConfig, ProfilingConfig
+from sema.models.schema_metadata import SchemaMetadata, Unreadable
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,8 @@ sql_connect = databricks_sql.connect
 
 
 class DatabricksConnector(Connector):
+    sql_dialect = "databricks"
+
     def __init__(self, config: DatabricksConfig, profiling: ProfilingConfig | None = None) -> None:
         self._config = config
         self._profiling = profiling or ProfilingConfig()
@@ -68,6 +71,13 @@ class DatabricksConnector(Connector):
     def list_catalogs(self) -> list[str]:
         rows = self._execute("SHOW CATALOGS")
         return [row[0] for row in rows]
+
+    def read_schema_metadata(
+        self, catalog: str, schema: str,
+    ) -> SchemaMetadata | Unreadable:
+        from sema.connectors.databricks_utils import read_schema_metadata
+
+        return read_schema_metadata(self._execute, catalog, schema)
 
     def _discover_schemas(self, catalog: str) -> list[str]:
         rows = self._execute(f"SHOW SCHEMAS IN `{catalog}`")

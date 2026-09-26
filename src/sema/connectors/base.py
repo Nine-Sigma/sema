@@ -12,6 +12,7 @@ from sema.models.extraction import (
     ExtractedTag,
     ExtractedTopValues,
 )
+from sema.models.schema_metadata import SchemaMetadata, Unreadable
 
 if TYPE_CHECKING:
     from sema.connectors.databricks import TableWorkItem
@@ -29,6 +30,8 @@ class Connector(ABC):
     method is kept for backward compatibility with the Databricks
     connector.
     """
+
+    sql_dialect: str | None = None
 
     @abstractmethod
     def extract(
@@ -120,4 +123,10 @@ class Connector(ABC):
         self, catalog: str, schema: str, table: str,
     ) -> list[ExtractedTag]:
         """Extract tags/labels. Override in new connectors."""
+        raise NotImplementedError
+
+    def read_schema_metadata(
+        self, catalog: str, schema: str,
+    ) -> SchemaMetadata | Unreadable:
+        """Read one schema's objects, columns, and view text. Override."""
         raise NotImplementedError

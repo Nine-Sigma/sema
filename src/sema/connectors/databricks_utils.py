@@ -5,11 +5,21 @@ DatabricksConnector class and its public interface.
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
+from databricks.sql import exc as databricks_exc
+
+from sema.log import logger
 from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
+)
+from sema.models.schema_metadata import (
+    ColumnMetadata,
+    ObjectMetadata,
+    SchemaMetadata,
+    Unreadable,
 )
 
 if TYPE_CHECKING:
@@ -153,3 +163,77 @@ def _build_profiling_assertions(
         pass
 
     return assertions
+
+
+METADATA_SOURCE = "`system`.`information_schema`"
+
+Row = tuple[Any, ...]
+
+
+def sql_string_literal(value: str) -> str:
+    """Quote a value as a Databricks string literal.
+
+    Databricks reads '' as two adjacent literals, not an escaped quote, so the
+    quote is backslash-escaped, after backslashes themselves.
+    """
+    escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+    return f"'{escaped}'"
+
+
+def schema_metadata_queries(catalog: str, schema: str) -> tuple[str, str, str]:
+    """Return the objects, columns, and view-text statements for one schema."""
+    where = (
+        f"WHERE table_catalog = {sql_string_literal(catalog)} "
+        f"AND table_schema = {sql_string_literal(schema)}"
+    )
+    objects = f"SELECT table_name, table_type FROM {METADATA_SOURCE}.`tables` {where}"
+    columns = (
+        f"SELECT table_name, column_name, full_data_type, comment "
+        f"FROM {METADATA_SOURCE}.`columns` {where} "
+        f"ORDER BY table_name, ordinal_position"
+    )
+    views = f"SELECT table_name, view_definition FROM {METADATA_SOURCE}.`views` {where}"
+    return objects, columns, views
+
+
+def build_schema_metadata(
+    catalog: str,
+    schema: str,
+    object_rows: Sequence[Row],
+    column_rows: Sequence[Row],
+    view_rows: Sequence[Row],
+) -> SchemaMetadata:
+    columns_by_table: dict[str, list[ColumnMetadata]] = {}
+    for table_name, column_name, data_type, comment in column_rows:
+        columns_by_table.setdefault(table_name, []).append(
+            ColumnMetadata(name=column_name, data_type=data_type, comment=comment or None)
+        )
+    view_text = {table_name: definition for table_name, definition in view_rows}
+    objects = tuple(
+        ObjectMetadata(
+            catalog=catalog,
+            schema_name=schema,
+            name=table_name,
+            object_type=table_type,
+            columns=tuple(columns_by_table.get(table_name, ())),
+            view_definition=view_text.get(table_name),
+        )
+        for table_name, table_type in object_rows
+    )
+    return SchemaMetadata(catalog=catalog, schema_name=schema, objects=objects)
+
+
+def read_schema_metadata(
+    execute: Callable[[str], list[Row]], catalog: str, schema: str,
+) -> SchemaMetadata | Unreadable:
+    """Run the three metadata statements; a warehouse error yields Unreadable."""
+    try:
+        object_rows, column_rows, view_rows = [
+            execute(query) for query in schema_metadata_queries(catalog, schema)
+        ]
+    except databricks_exc.Error as exc:
+        first_line = next(iter(str(exc).splitlines()), "")
+        reason = f"{type(exc).__name__}: {first_line}"
+        logger.warning("Schema metadata unreadable for {}.{}: {}", catalog, schema, reason)
+        return Unreadable(catalog=catalog, schema_name=schema, reason=reason)
+    return build_schema_metadata(catalog, schema, object_rows, column_rows, view_rows)
