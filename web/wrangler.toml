@@ -15,7 +15,9 @@ preview_urls = true
 directory = "apps/landing/dist"
 binding = "ASSETS"
 not_found_handling = "404-page"
-run_worker_first = ["/", "/api/*"]
+# Every request runs the Worker first so the www → apex 301 (worker/index.ts canonicalRedirect)
+# covers static paths too; assets still come from env.ASSETS with `_headers` applied.
+run_worker_first = true
 
 [[routes]]
 pattern = "withsema.ai"
