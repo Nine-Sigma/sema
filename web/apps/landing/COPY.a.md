@@ -230,6 +230,15 @@ in Figma. `public/404.html` is still hand-edited; its strings are mirrored under
 | body | Check the address or return to the Sema homepage. |
 | link | Back to Sema → / |
 
+## Cookie notice
+
+| Slot | Copy |
+|---|---|
+| label | Cookie notice |
+| body | This site sets one cookie. It remembers which version of this page you saw, for 30 days. Nothing else is stored, and nothing follows you elsewhere. |
+| allow | Allow the cookie |
+| decline | No thanks |
+
 ## Figures
 
 Title and description per figure; in-figure labels are Figma text nodes.

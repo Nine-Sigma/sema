@@ -1,12 +1,13 @@
 /* POST /api/waitlist — the two landing forms post { email } here (apps/landing/src/waitlist.ts).
 
-   Stores the signup in D1 (worker/db.ts, table `waitlist`; the A/B arm from the `sema-ab` cookie
-   sits beside it, which is how conversions per arm are counted), then emails TO_ADDRESS over
+   Stores the signup in D1 (worker/db.ts, table `waitlist`; the A/B arm sits beside it, which is
+   how conversions per arm are counted: the `sema-ab` cookie when the visitor allowed it, else the
+   `variant` the page sends from <html data-arm>), then emails TO_ADDRESS over
    Titan SMTP (worker/mail.ts) with Reply-To set to the signup. Responses the client maps: 200 success,
    409 duplicate, anything else → the form's error state. A missing DB binding is a 500, never a
    silent success. A mail failure is logged, not surfaced: the signup is stored either way. */
 
-import { AB_COOKIE, readCookie } from "./ab";
+import { AB_COOKIE, parseArm, readCookie } from "./ab";
 import { ensureSchema } from "./db";
 import type { Env } from "./env";
 import { sendMail } from "./mail";
@@ -19,12 +20,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export async function handleWaitlist(request: Request, env: Env): Promise<Response> {
   if (request.method !== "POST") return new Response(null, { status: 405, headers: { allow: "POST" } });
   if (!env.DB) return json(500, { error: "waitlist store not configured" });
-  const email = await readEmail(request);
-  if (!email) return json(400, { error: "invalid email" });
+  const body = await readBody(request);
+  if (!body) return json(400, { error: "invalid email" });
 
   const signup: Signup = {
-    email,
-    variant: readCookie(request.headers.get("cookie"), AB_COOKIE) ?? null,
+    email: body.email,
+    variant: parseArm(readCookie(request.headers.get("cookie"), AB_COOKIE)) ?? parseArm(body.variant) ?? null,
     created_at: new Date().toISOString(),
     user_agent: request.headers.get("user-agent"),
     referer: request.headers.get("referer"),
@@ -44,17 +45,21 @@ export async function handleWaitlist(request: Request, env: Env): Promise<Respon
   return json(200, { ok: true });
 }
 
-async function readEmail(request: Request): Promise<string | undefined> {
-  let body: unknown;
+type Body = { email: string; variant: string | undefined };
+
+async function readBody(request: Request): Promise<Body | undefined> {
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return undefined;
   }
-  const email = typeof body === "object" && body !== null ? (body as { email?: unknown }).email : undefined;
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const { email, variant } = raw as { email?: unknown; variant?: unknown };
   if (typeof email !== "string") return undefined;
   const trimmed = email.trim();
-  return trimmed.length <= MAX_EMAIL && EMAIL_RE.test(trimmed) ? trimmed : undefined;
+  if (trimmed.length > MAX_EMAIL || !EMAIL_RE.test(trimmed)) return undefined;
+  return { email: trimmed, variant: typeof variant === "string" ? variant : undefined };
 }
 
 async function notify(env: Env, signup: Signup): Promise<void> {

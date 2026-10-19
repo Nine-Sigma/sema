@@ -248,4 +248,12 @@ export const base: Copy = {
     body: "The page moved or never existed. The record stops here.",
     link: { text: "Back to Sema", href: "/" },
   },
+
+  /* Cookie notice */
+  consent: {
+    label: "Cookie notice",
+    body: "This site sets one cookie. It remembers which version of this page you saw, for 30 days. Nothing else is stored, and nothing follows you elsewhere.",
+    allow: "Allow the cookie",
+    decline: "No thanks",
+  },
 };

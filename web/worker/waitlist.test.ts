@@ -77,6 +77,22 @@ describe("handleWaitlist", () => {
     expect(mail.text).toContain("Arm:      b");
   });
 
+  it("attributes the arm from the body when there is no cookie, and ignores unknown arms", async () => {
+    const { env, calls } = fakeEnv();
+    await handleWaitlist(post({ email: "a@b.co", variant: "a" }), env);
+    expect(calls.find((c) => c.sql.startsWith("INSERT"))?.values[1]).toBe("a");
+    calls.length = 0;
+    await handleWaitlist(post({ email: "c@d.co", variant: "zzz" }), env);
+    expect(calls.find((c) => c.sql.startsWith("INSERT"))?.values[1]).toBeNull();
+    expect(sendMailMock.mock.calls.at(-1)?.[1].subject).toBe("Waitlist: c@d.co");
+  });
+
+  it("prefers the cookie over the body arm", async () => {
+    const { env, calls } = fakeEnv();
+    await handleWaitlist(post({ email: "a@b.co", variant: "a" }, { cookie: "sema-ab=b" }), env);
+    expect(calls.find((c) => c.sql.startsWith("INSERT"))?.values[1]).toBe("b");
+  });
+
   it("creates the schema before the first insert", async () => {
     const { env, calls } = fakeEnv();
     await handleWaitlist(post({ email: "a@b.co" }), env);

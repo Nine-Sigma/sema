@@ -63,13 +63,21 @@ describe("worker fetch", () => {
     expect(fetched).toHaveLength(1);
   });
 
-  it("assigns an arm on / with no cookie while the test is on (equal split since 2026-09-21)", async () => {
+  it("draws an arm on / with no cookie while the test is on, and sets no cookie (consent is the page's)", async () => {
     const { env } = fakeEnv();
     const res = await worker.fetch(get("https://withsema.ai/"), env, fakeCtx());
     const body = await res.text();
     expect(["asset:/", "asset:/ab/a", "asset:/ab/b"]).toContain(body);
-    expect(res.headers.get("set-cookie")).toMatch(/^sema-ab=(control|a|b);/);
+    expect(res.headers.get("set-cookie")).toBeNull();
     expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("vary")).toContain("cookie");
+  });
+
+  it("serves the arm a consenting visitor holds in the sema-ab cookie", async () => {
+    const { env } = fakeEnv();
+    const res = await worker.fetch(get("https://withsema.ai/", { cookie: "sema-consent=1; sema-ab=b" }), env, fakeCtx());
+    expect(await res.text()).toBe("asset:/ab/b");
+    expect(res.headers.get("set-cookie")).toBeNull();
   });
 
   it("serves / untouched with no cookie when the test is off", async () => {
@@ -85,13 +93,12 @@ describe("worker fetch", () => {
     }
   });
 
-  it("serves a forced arm via ?ab= and pins it in the cookie", async () => {
+  it("serves a forced arm via ?ab= over the cookie, without setting one", async () => {
     const { env } = fakeEnv();
-    const res = await worker.fetch(get("https://withsema.ai/?ab=a"), env, fakeCtx());
+    const res = await worker.fetch(get("https://withsema.ai/?ab=a", { cookie: "sema-ab=b" }), env, fakeCtx());
     expect(await res.text()).toBe("asset:/ab/a");
-    expect(res.headers.get("set-cookie")).toContain("sema-ab=a;");
+    expect(res.headers.get("set-cookie")).toBeNull();
     expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(res.headers.get("vary")).toContain("cookie");
   });
 
   it("records a fresh browser assignment in D1, in the background", async () => {

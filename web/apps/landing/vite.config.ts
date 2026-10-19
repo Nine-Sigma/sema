@@ -14,7 +14,7 @@ const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
 
 /* One HTML template (index.html) for every arm. A variant entry (ab/a.html) is a stub: its markup is
    index.html with the entry script swapped. %copy.meta.<slot>% tokens read from the arm's copy, so
-   metadata switches too; %site.url% is SITE_URL. */
+   metadata switches too; %site.url% is SITE_URL; %arm.id% stamps <html data-arm> for src/consent.ts. */
 const copyHtml = () => ({
   name: "sema-copy-html",
   transformIndexHtml: {
@@ -23,7 +23,7 @@ const copyHtml = () => ({
       const arm = armByPath(ctx.path);
       if (!arm) throw new Error(`${ctx.path}: not an A/B arm; add it to src/copy/variants.ts`);
       const template = arm.id === "control" ? html : variantHtml(arm.id);
-      return template.replaceAll("%site.url%", SITE_URL).replace(/%copy\.meta\.(\w+)%/g, (token, slot: string) => {
+      return template.replaceAll("%site.url%", SITE_URL).replaceAll("%arm.id%", arm.id).replace(/%copy\.meta\.(\w+)%/g, (token, slot: string) => {
         const value = (arm.copy.meta as Record<string, string | undefined>)[slot];
         if (value === undefined) throw new Error(`${ctx.path}: unknown copy slot ${token}`);
         return escapeHtml(value);

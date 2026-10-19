@@ -1,8 +1,9 @@
 /* The landing site Worker: static assets from apps/landing/dist plus two dynamic paths.
-   `run_worker_first` in wrangler.toml sends only `/` and `/api/*` here; every other request is
-   served by the asset layer directly (`_headers` applies there). */
+   `run_worker_first = true` in wrangler.toml sends every request here, so the canonical-host
+   redirect applies to static paths as well; everything but `/` and `/api/*` is handed to the asset
+   layer unchanged (`_headers` applies there). */
 
-import { AB_COOKIE, AB_MAX_AGE, ARM_PATHS, activeArms, draw, parseArm, readCookie } from "./ab";
+import { AB_COOKIE, ARM_PATHS, activeArms, draw, parseArm, readCookie } from "./ab";
 import { countable, recordAssignment } from "./db";
 import type { Env } from "./env";
 import { handleWaitlist } from "./waitlist";
@@ -37,7 +38,7 @@ async function serveLanding(request: Request, url: URL, env: Env, ctx: Execution
   const response = new Response(upstream.body, upstream);
   /* `_headers` marks /ab/* noindex for direct hits; at / the arm is the page. */
   response.headers.delete("x-robots-tag");
-  response.headers.append("set-cookie", `${AB_COOKIE}=${arm}; Path=/; Max-Age=${AB_MAX_AGE}; SameSite=Lax; Secure`);
+  /* No Set-Cookie here: the page writes `sema-ab` only after the visitor allows it (apps/landing/src/consent.ts). */
   response.headers.append("vary", "cookie");
   response.headers.set("cache-control", "no-store");
   return response;

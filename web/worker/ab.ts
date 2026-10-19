@@ -1,8 +1,11 @@
 /* A/B arm selection for `/` (tasks/plan-landing-copy.md, phase 4, D10/D11).
 
-   Every visitor requests `/`. The Worker picks an arm once, stores it in the `sema-ab` cookie, and
-   for a variant arm returns that arm's document from the static build in place of `/`. The address
-   bar never changes. Arm paths must match `apps/landing/src/copy/variants.ts`. */
+   Every visitor requests `/`. The Worker serves the arm named in the `sema-ab` cookie when there is
+   one, else draws an arm for this response; for a variant arm it returns that arm's document from
+   the static build in place of `/`. The address bar never changes. The cookie is written by the page
+   after consent (apps/landing/src/consent.ts, 30 days), never by the Worker, so a visitor who has not
+   allowed it is redrawn on every visit and counted in `ab_assignment` each time. Arm paths must
+   match `apps/landing/src/copy/variants.ts`. */
 
 export type ArmId = "control" | "a" | "b";
 export type Weights = Record<ArmId, number>;
@@ -13,7 +16,6 @@ export const WEIGHTS: Weights = { control: 1, a: 1, b: 1 };
 
 export const ARM_PATHS: Record<ArmId, string> = { control: "/", a: "/ab/a", b: "/ab/b" };
 export const AB_COOKIE = "sema-ab";
-export const AB_MAX_AGE = 60 * 60 * 24 * 30;
 
 export function activeArms(weights: Weights = WEIGHTS): ArmId[] {
   return (Object.keys(weights) as ArmId[]).filter((id) => weights[id] > 0);

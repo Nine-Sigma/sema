@@ -21,14 +21,18 @@ every workspace and runs `wrangler deploy`. See `tasks/plan-website-deploy.md`.
 
 ## The Worker (`worker/`, `wrangler.toml`)
 
-`assets.run_worker_first = ["/", "/api/*"]` sends only those paths through the code; everything
-else is served by the asset layer, where `apps/landing/public/_headers` applies.
+`assets.run_worker_first = true` sends every request through the code, so the `www` → apex 301
+covers static paths too. Everything except `/` and `/api/*` is handed to the asset layer
+unchanged, where `apps/landing/public/_headers` applies.
 
 - `worker/index.ts` — `www.withsema.ai` → `withsema.ai` 301 (`CANONICAL_HOST`), A/B assignment for
   `/`, and the `/api/waitlist` route. Preview URLs (`*.workers.dev`) are served as-is.
-- `worker/ab.ts` — arm weights (`WEIGHTS`), cookie `sema-ab`, `?ab=<arm>` override.
+- `worker/ab.ts` — arm weights (`WEIGHTS`), cookie `sema-ab`, `?ab=<arm>` override. The Worker
+  reads `sema-ab` but never sets it; the page writes it after cookie consent
+  (`apps/landing/src/consent.ts`). Without it, every visit draws a fresh arm.
 - `worker/waitlist.ts` — `POST /api/waitlist` from both landing forms. Stores the signup in D1
-  (`DB`, table `waitlist`, created on first use) with the A/B arm, then emails
+  (`DB`, table `waitlist`, created on first use) with the A/B arm (the `sema-ab` cookie, else
+  the `variant` the page sends from `<html data-arm>`), then emails
   `waitlist@withsema.ai` with Reply-To set to the signup. 200 / 409 duplicate / 400 invalid /
   405 / 500 when `DB` is missing. A mail failure is logged, never surfaced.
 - `worker/mail.ts` — SMTP through Titan (`smtp.titan.email:465`, the mailbox behind the

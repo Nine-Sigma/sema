@@ -57,6 +57,11 @@ html[data-motion] .sema-state:not([data-state=""]) {
   animation: sema-blink 1s steps(2, start) infinite;
 }
 
+/* Cookie notice: arrives like the state line, after the load moment has had the screen to itself. */
+html[data-motion] .sema-consent {
+  animation: sema-state-in 260ms var(--ease-signal) both;
+}
+
 /* Hero pulse: the only loop; paused when the hero leaves the screen. */
 .sema-pulse {
   animation: sema-pulse 6s var(--ease-signal) infinite alternate;

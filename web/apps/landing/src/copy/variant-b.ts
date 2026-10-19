@@ -187,4 +187,5 @@ export const variantB: Copy = {
     link: { text: "Back to Sema", href: "/" },
   },
   figures: experimentFigures,
+  consent: base.consent,
 };

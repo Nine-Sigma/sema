@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, Footer, Nav, SkipLink, ThemeToggle, Wordmark, useMotionGate } from "@sema/design";
+import { Button, ConsentNotice, Footer, Nav, SkipLink, ThemeToggle, Wordmark, useMotionGate } from "@sema/design";
 import { Hero } from "./sections/hero";
 import { Story } from "./sections/story";
 import { Quote } from "./sections/quote";
@@ -14,6 +14,7 @@ import { useCopy } from "./copy";
 import { MotionProvider, useMotion } from "./motion/context";
 import { GraphPlane } from "./motion/plane";
 import { routeStageAnchors, trackChapters } from "./motion/chapters";
+import { deny, grant, readConsent, syncArmCookie } from "./consent";
 
 /* Nav button: focus the hero form while it is on screen and still open; otherwise go to the pilot form. */
 function focusHeroForm(ev: React.MouseEvent<HTMLAnchorElement>): void {
@@ -30,6 +31,31 @@ export function Landing() {
     <MotionProvider>
       <Page />
     </MotionProvider>
+  );
+}
+
+/* Shown once per browser until a choice is stored; never part of the prerender (localStorage decides). */
+function Consent() {
+  const { consent } = useCopy();
+  const [open, setOpen] = React.useState(false);
+  React.useEffect(() => {
+    syncArmCookie();
+    setOpen(readConsent() === undefined);
+  }, []);
+  if (!open) return null;
+  const choose = (decide: () => void) => () => {
+    decide();
+    setOpen(false);
+  };
+  return (
+    <ConsentNotice
+      label={consent.label}
+      body={consent.body}
+      allowText={consent.allow}
+      declineText={consent.decline}
+      onAllow={choose(grant)}
+      onDecline={choose(deny)}
+    />
   );
 }
 
@@ -112,6 +138,7 @@ function Page() {
           <span className="text-muted">{footer.copyright}</span>,
         ]}
       />
+      <Consent />
     </>
   );
 }

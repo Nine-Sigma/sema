@@ -61,6 +61,8 @@ export type Copy = {
     buttons: Record<FormButtonKey, string>;
   };
   notFound: { title: string; numeral: string; h1: string; body: string; link: Link };
+  /* The cookie notice (src/consent.ts). One slot set; the arms share it. */
+  consent: { label: string; body: string; allow: string; decline: string };
 };
 
 type Way = { title: string; tag: string; body: string };

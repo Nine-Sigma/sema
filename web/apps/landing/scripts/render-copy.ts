@@ -46,6 +46,7 @@ const HEADINGS: Record<Exclude<keyof Copy, "figures">, string> = {
   footer: "S11 · Footer",
   form: "Form states (both forms)",
   notFound: "404",
+  consent: "Cookie notice",
 };
 
 const SOURCE: Record<Arm["id"], string> = {
