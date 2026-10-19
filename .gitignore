@@ -52,3 +52,8 @@ tasks/
 
 # graphify knowledge graph output and AST cache
 graphify-out/
+
+# Agent skills and design-tool state; local only
+.agents/
+.impeccable/
+skills-lock.json
