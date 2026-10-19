@@ -1,67 +1,35 @@
 import * as React from "react";
 import { cn } from "../lib/utils";
+import { constellationGeometry } from "../lib/constellation-geometry";
 
 /* The hero ground: a deterministic Signal Cartography constellation. No text. Left third empty.
    Motion hooks: --i is the stagger index (rank by distance to the core), --pd the pulse phase.
    The SVG is generated once per seed at module scope; the markup is program output, not input. */
 function constellation(seed = 11): string {
-  let s = seed >>> 0;
-  const rnd = (): number => {
-    s += 0x6d2b79f5;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  type Pt = { x: number; y: number };
-  const core: Pt = { x: 1640, y: 400 };
-  const pts: Pt[] = [];
-  let guard = 0;
-  while (pts.length < 46 && guard++ < 20000) {
-    const p = { x: 780 + rnd() * 1560, y: 50 + rnd() * 700 };
-    const far =
-      pts.every((q) => Math.hypot(p.x - q.x, p.y - q.y) > 105) &&
-      Math.hypot(p.x - core.x, p.y - core.y) > 150;
-    if (far) pts.push(p);
-  }
-  const edges = new Set<string>();
-  pts.forEach((p, i) => {
-    pts
-      .map((q, j) => ({ j, d: Math.hypot(p.x - q.x, p.y - q.y) }))
-      .filter((o) => o.j !== i)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, 2)
-      .forEach((o) => edges.add(i < o.j ? `${i}-${o.j}` : `${o.j}-${i}`));
-  });
-  const byDist = pts
-    .map((p, i) => ({ i, d: Math.hypot(p.x - core.x, p.y - core.y) }))
-    .sort((a, b) => a.d - b.d);
-  const rank = new Map(byDist.map((o, k) => [o.i, k]));
-  const rk = (i: number): number => rank.get(i) ?? 0;
-  const at = (i: number): Pt => pts[i] ?? core;
-  const amber = new Set(byDist.slice(0, 5).map((o) => o.i));
-  const pulse = new Set(byDist.filter((_, k) => k % 4 === 1).slice(0, 10).map((o) => o.i));
+  const G = constellationGeometry(seed);
+  const { core, pts } = G;
+  const at = (i: number) => pts[i] ?? core;
   const f = (n: number): string => n.toFixed(1);
   let grid = "";
   for (let x = 120; x < 2400; x += 120) grid += `<path d="M${x} 0V800"/>`;
   for (let y = 80; y < 800; y += 120) grid += `<path d="M0 ${y}H2400"/>`;
   let lines = "";
-  [...edges]
-    .map((e) => e.split("-").map(Number) as [number, number])
-    .sort((u, v) => Math.min(rk(u[0]), rk(u[1])) - Math.min(rk(v[0]), rk(v[1])))
+  [...G.edges]
+    .sort((u, v) => Math.min(G.rank[u[0]] ?? 0, G.rank[u[1]] ?? 0) - Math.min(G.rank[v[0]] ?? 0, G.rank[v[1]] ?? 0))
     .forEach(([a, b], k) => {
       lines += `<path class="sema-edge" pathLength="1" style="--i:${k}" d="M${f(at(a).x)} ${f(at(a).y)}L${f(at(b).x)} ${f(at(b).y)}"/>`;
     });
   let amberLines = "";
-  [...amber].forEach((i, k) => {
+  [...G.amber].forEach((i, k) => {
     amberLines += `<path class="sema-amber-edge" pathLength="1" style="--i:${k}" d="M${f(at(i).x)} ${f(at(i).y)}L${core.x} ${core.y}"/>`;
   });
   let nodes = "";
-  byDist.forEach(({ i }) => {
+  G.byDist.forEach((i) => {
     const p = at(i);
-    const r = amber.has(i) ? 6 : 3.2 + rnd() * 2.4;
-    const cls = pulse.has(i) ? "sema-node sema-pulse" : "sema-node";
-    const style = `--i:${rk(i)}` + (pulse.has(i) ? `;--pd:${f(rnd() * 6)}s` : "");
-    nodes += amber.has(i)
+    const r = G.radii[i] ?? 4;
+    const cls = G.pulse.has(i) ? "sema-node sema-pulse" : "sema-node";
+    const style = `--i:${G.rank[i]}` + (G.pulse.has(i) ? `;--pd:${f(G.phase[i] ?? 0)}s` : "");
+    nodes += G.amber.has(i)
       ? `<circle class="${cls}" style="${style}" cx="${f(p.x)}" cy="${f(p.y)}" r="${r}" fill="var(--accent)" fill-opacity="0.18" stroke="var(--accent)" stroke-width="1.5"/>`
       : `<circle class="${cls}" style="${style}" cx="${f(p.x)}" cy="${f(p.y)}" r="${f(r)}" fill="var(--ground)" stroke="var(--blue)" stroke-width="1.25"/>`;
   });

@@ -1,4 +1,5 @@
 import type { FormOutcome } from "@sema/design";
+import { currentArm } from "./consent";
 
 const TIMEOUT_MS = 8000;
 /* Demo only, and only in dev builds (gate G2): error@, timeout@, duplicate@ show those states. */
@@ -10,8 +11,8 @@ function demo(email: string): Promise<FormOutcome> {
   return new Promise((resolve) => setTimeout(() => resolve(outcome), outcome === "timeout" ? 2400 : 800));
 }
 
-/* Posts to the Pages Function at /api/waitlist (D6: not built yet; until it exists every
-   production submit resolves to "error", which the form reports honestly). */
+/* Posts to the Worker at /api/waitlist (web/worker/waitlist.ts). The arm travels in the body
+   (from <html data-arm>), so a signup is attributed whether or not the sema-ab cookie was allowed. */
 export async function submitWaitlist(email: string): Promise<FormOutcome> {
   if (import.meta.env.DEV) return demo(email);
   const ctl = new AbortController();
@@ -20,7 +21,7 @@ export async function submitWaitlist(email: string): Promise<FormOutcome> {
     const res = await fetch("/api/waitlist", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, variant: currentArm() ?? null }),
       signal: ctl.signal,
     });
     if (res.status === 409) return "duplicate";

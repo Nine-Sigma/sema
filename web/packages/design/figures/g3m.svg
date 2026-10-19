@@ -1,0 +1,47 @@
+<svg width="358" height="600" viewBox="0 0 358 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="358" height="600" fill="#0A0D19"/>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="16" y="23.625">G3m &#xb7; THE IDEA</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="124.912" y="45.625">SOURCE MEANINGS</tspan></text>
+<path d="M60 110C60 170 80 215 120 245" stroke="#8FB0D6" stroke-opacity="0.55" stroke-linecap="round"/>
+<path d="M179 110V290" stroke="#8FB0D6" stroke-opacity="0.55" stroke-linecap="round"/>
+<path d="M298 110C298 170 278 215 238 245" stroke="#8FB0D6" stroke-opacity="0.55" stroke-linecap="round"/>
+<path d="M179 290L120 245" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M179 290L238 245" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M179 290L120 335" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M179 290L238 335" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M120 245H238" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M120 335H238" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M120 335C106.667 391.667 100 436.667 100 470" stroke="#E5A23A" stroke-linecap="round"/>
+<path d="M238 335C251.333 391.667 258 436.667 258 470" stroke="#E5A23A" stroke-linecap="round"/>
+<circle cx="60" cy="110" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="43.8706" y="69.875">Sales</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0em"><tspan x="36.915" y="89.625">cust_no</tspan></text>
+<circle cx="179" cy="110" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="160.338" y="69.875">Billing</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0em"><tspan x="142.724" y="89.625">customer_id</tspan></text>
+<circle cx="298" cy="110" r="5.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="274.107" y="69.875">Support</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0em"><tspan x="265.021" y="89.625">client_ref</tspan></text>
+<circle cx="120" cy="245" r="4.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<circle cx="238" cy="245" r="4.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<circle cx="120" cy="335" r="4.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<circle cx="238" cy="335" r="4.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0em"><tspan x="96.0078" y="248.75">id</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0em"><tspan x="250" y="248.75">order</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0em"><tspan x="84.0156" y="338.75">name</tspan></text>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0em"><tspan x="250" y="338.75">region</tspan></text>
+<circle cx="179" cy="290" r="11.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<path d="M174 285L184 295" stroke="#E5A23A" stroke-linecap="round"/>
+<path d="M184 285L174 295" stroke="#E5A23A" stroke-linecap="round"/>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="198" y="295.875">Customer</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="16" y="295.625">ONE GRAPH</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="124.912" y="443.625">TARGET MEANINGS</tspan></text>
+<circle cx="100" cy="470" r="5.375" fill="#0A0D19" stroke="#E5A23A" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="71.1182" y="497.875">Customer</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0em"><tspan x="40.6387" y="513.625">id &#xb7; name &#xb7; region</tspan></text>
+<circle cx="258" cy="470" r="5.375" fill="#0A0D19" stroke="#E5A23A" stroke-width="1.25"/>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" font-weight="500" letter-spacing="0em"><tspan x="240.982" y="497.875">Order</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0em"><tspan x="192.043" y="513.625">customer &#xb7; placed_on</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="13" letter-spacing="0em"><tspan x="101.089" y="549.875">The graph is what persists.</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" letter-spacing="0em"><tspan x="30.7871" y="569">Sources change. Targets change. The resolved meaning </tspan><tspan x="78.7344" y="586">stays, with its source and confidence.</tspan></text>
+</svg>

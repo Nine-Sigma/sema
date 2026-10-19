@@ -1,0 +1,40 @@
+<svg width="358" height="675" viewBox="0 0 358 675" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="358" height="675" fill="#0A0D19"/>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="16" y="23.625">G5m &#xb7; WHAT THE AGENT GETS</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="16" y="55.625">A QUESTION</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="15" font-weight="500" letter-spacing="0em"><tspan x="16" y="80.125">Which customers churned after the price </tspan><tspan x="16" y="101.125">change?</tspan></text>
+<path d="M179 120V148" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M179 154L182.6 148H175.4L179 154Z" fill="#4A5163"/>
+<g stroke="#2A3040" stroke-linecap="round">
+<path d="M101.272 304.789L123.125 318.299"/><path d="M101.272 304.789L124.052 285.922"/><path d="M236.742 279.462L240.409 258.162"/><path d="M236.742 279.462L234.479 305.752"/><path d="M83.7622 270.637L102.77 254.112"/><path d="M83.7622 270.637L101.272 304.789"/><path d="M123.125 318.299L147.737 319.891"/><path d="M124.052 285.922L123.125 318.299"/><path d="M215.629 229.242L226.81 202.851"/><path d="M215.629 229.242L248.433 222.352"/><path d="M188.171 312L158.004 299.66"/><path d="M188.171 312L219.45 325.275"/><path d="M275.412 201.611L286.709 175.344"/><path d="M275.412 201.611L248.433 222.352"/><path d="M62.4087 308.705L101.272 304.789"/><path d="M62.4087 308.705L83.7625 270.637"/><path d="M265.23 281.781L283.452 295.946"/><path d="M265.231 281.781L236.742 279.462"/><path d="M100.774 182.66L142.672 225.927"/><path d="M100.774 182.66L168.926 186.19"/><path d="M176.11 220.313L142.672 225.927"/><path d="M176.11 220.313L168.926 186.19"/><path d="M198.883 267.736L236.742 279.462"/><path d="M198.883 267.736L215.629 229.242"/><path d="M289.859 265.118L301.508 286.585"/><path d="M289.859 265.118L265.23 281.781"/><path d="M219.45 325.275L234.478 305.752"/><path d="M286.709 175.344L238.792 186.827"/><path d="M238.792 186.827L226.81 202.851"/><path d="M238.792 186.827L215.765 172.414"/><path d="M301.508 286.585L283.452 295.945"/><path d="M248.433 222.352L226.81 202.851"/><path d="M168.926 186.19L142.672 225.927"/><path d="M147.736 319.891L158.004 299.66"/><path d="M263.653 247.273L240.409 258.162"/>
+</g>
+<g fill="#4A5163">
+<circle cx="101.272" cy="304.789" r="3"/><circle cx="236.742" cy="279.462" r="3"/><circle cx="83.7622" cy="270.637" r="3"/><circle cx="123.125" cy="318.299" r="3"/><circle cx="124.052" cy="285.922" r="3"/><circle cx="215.629" cy="229.242" r="3"/><circle cx="188.171" cy="312" r="3"/><circle cx="275.412" cy="201.611" r="3"/><circle cx="62.4087" cy="308.705" r="3"/><circle cx="102.771" cy="254.112" r="3"/><circle cx="265.23" cy="281.781" r="3"/><circle cx="100.774" cy="182.66" r="3"/><circle cx="176.11" cy="220.313" r="3"/><circle cx="198.883" cy="267.736" r="3"/><circle cx="289.859" cy="265.118" r="3"/><circle cx="219.45" cy="325.275" r="3"/><circle cx="286.708" cy="175.344" r="3"/><circle cx="238.792" cy="186.827" r="3"/><circle cx="301.508" cy="286.585" r="3"/><circle cx="283.452" cy="295.945" r="3"/><circle cx="248.433" cy="222.352" r="3"/><circle cx="234.479" cy="305.752" r="3"/><circle cx="226.81" cy="202.851" r="3"/><circle cx="215.765" cy="172.414" r="3"/><circle cx="168.926" cy="186.19" r="3"/><circle cx="147.736" cy="319.891" r="3"/><circle cx="263.653" cy="247.273" r="3"/><circle cx="142.672" cy="225.927" r="3"/><circle cx="158.004" cy="299.66" r="3"/><circle cx="240.409" cy="258.162" r="3"/>
+</g>
+<g stroke="#E5A23A" stroke-width="1.25" stroke-linecap="round">
+<path d="M150 250L200 205"/><path d="M150 250L210 290"/><path d="M210 290L255 235"/><path d="M255 235L268 305"/><path d="M200 205L255 235"/>
+</g>
+<circle cx="150" cy="250" r="5.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<circle cx="200" cy="205" r="3.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<circle cx="210" cy="290" r="3.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<circle cx="255" cy="235" r="3.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<circle cx="268" cy="305" r="3.25" fill="#E5A23A" fill-opacity="0.18" stroke="#E5A23A" stroke-width="1.5"/>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="123.916" y="272.75">customer</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="183.81" y="196.75">churn</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="266" y="238.75">price change</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="146.679" y="355.625">THE MODEL</tspan></text>
+<text fill="#E5A23A" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="85.0059" y="373.625">lit: the part that matters</tspan></text>
+<path d="M179 388V412" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M179 418L182.6 412H175.4L179 418Z" fill="#4A5163"/>
+<rect x="16.5" y="424.5" width="325" height="127" stroke="#4A5163"/>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="32" y="449.625">CONTEXT</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="32" y="471.625">customer &#xb7; 3 tables</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="32" y="491.625">joins &#xb7; 2, verified</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="32" y="511.625">churn &#xb7; closed &#60; 90 days</tspan></text>
+<text fill="#E8E6DF" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="11" letter-spacing="0.06em"><tspan x="32" y="531.625">price &#xb7; changed 2026-03</tspan></text>
+<path d="M179 562V586" stroke="#4A5163" stroke-linecap="round"/>
+<path d="M179 592L182.6 586H175.4L179 592Z" fill="#4A5163"/>
+<circle cx="179" cy="606" r="4.375" fill="#0A0D19" stroke="#8FB0D6" stroke-width="1.25"/>
+<text fill="#8FB0D6" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Mono" font-size="10" letter-spacing="0.06em"><tspan x="162.81" y="626.75">agent</tspan></text>
+<text fill="#8A8F9C" style="white-space: pre" xml:space="preserve" font-family="IBM Plex Sans" font-size="12" letter-spacing="0em"><tspan x="16" y="655">The agent never guesses what a column means.</tspan></text>
+</svg>

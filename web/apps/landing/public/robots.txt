@@ -1,2 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /ab/
+
+Sitemap: https://withsema.ai/sitemap.xml

@@ -3,6 +3,7 @@ __pycache__/
 *.py[oc]
 build/
 dist/
+.wrangler/
 wheels/
 *.egg-info
 
@@ -48,3 +49,6 @@ eval-runs/
 
 # Working plans and prompts; local only
 tasks/
+
+# graphify knowledge graph output and AST cache
+graphify-out/

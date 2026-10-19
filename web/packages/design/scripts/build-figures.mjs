@@ -21,6 +21,11 @@ const META = {
   g11: ["Wedge to expansion", "Concentric rings: supplied standard models at the core, emergent models around them, any model you define outside.", "20 40 440 400"],
   g7m: ["The project you have run", "Four months on one vertical line. The mapping sheet grows, then breaks at month nine when a new source arrives.", "0 34 358 346"],
   g6m: ["Three studies, one model", "Three public cancer studies converge on OMOP; people, diagnoses and merged patients come out, with dated counts.", "0 36 358 414"],
+  g3m: ["The idea", "Source meanings across the top, target meanings at the bottom, both resolved into one graph in the middle.", "0 36 358 564"],
+  g4m: ["Many to one", "BIRTH_YR, yob and birth_year converge downward on one target property, year_of_birth.", "0 36 358 340"],
+  g5m: ["What the agent gets", "A question enters at the top, the relevant part of the model is lit, and a compact context block goes to the agent.", "0 36 358 639"],
+  g11m: ["Wedge to expansion", "Concentric rings: supplied standard models at the core, emergent models around them, any model you define outside.", "0 36 358 356"],
+  g12m: ["Ownership chain", "Parcel to property company to holding company to manager on one vertical line, each link labelled with its record. The last link is not in the public record.", "0 64 358 495"],
   g12: ["Ownership chain", "Parcel to property company to holding company to manager, each link labelled with its record. The last link is not in the public record.", "0 115 640 235"],
 };
 

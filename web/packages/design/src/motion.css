@@ -57,6 +57,11 @@ html[data-motion] .sema-state:not([data-state=""]) {
   animation: sema-blink 1s steps(2, start) infinite;
 }
 
+/* Cookie notice: arrives like the state line, after the load moment has had the screen to itself. */
+html[data-motion] .sema-consent {
+  animation: sema-state-in 260ms var(--ease-signal) both;
+}
+
 /* Hero pulse: the only loop; paused when the hero leaves the screen. */
 .sema-pulse {
   animation: sema-pulse 6s var(--ease-signal) infinite alternate;
@@ -117,8 +122,13 @@ html[data-motion] .sema-arrive {
 }
 
 /* Held at the first frame until the page is painted in front of the reader; JS releases it. */
-html[data-motion="pending"] .sema-hero * {
+html[data-motion="pending"] .sema-hero *,
+html[data-motion="pending"] .sema-plane * {
   animation-play-state: paused !important;
+}
+/* Once the scroll owns the plane (the reader scrolled), the load moment must not fight it. */
+html[data-scrub] .sema-plane * {
+  animation: none !important;
 }
 
 /* Reduced motion: the loops stop too (the gate only withholds the authored moment). */
