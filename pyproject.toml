@@ -80,4 +80,5 @@ dev = [
     "pytest-mock>=3.14.0",
     "mypy>=1.10",
     "types-pyyaml>=6.0.12.20250915",
+    "pytest-xdist>=3.6",
 ]
