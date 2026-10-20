@@ -106,6 +106,11 @@ def query_fn(con: duckdb.DuckDBPyConnection) -> QueryFn:
     return run
 
 
+def provider_for(con: duckdb.DuckDBPyConnection) -> Any:
+    """What the importer takes as its relation source for this fixture."""
+    return query_fn(con)
+
+
 def with_array_codes(con: duckdb.DuckDBPyConnection) -> None:
     """Mapping codes become ARRAY<string>, plus one row carrying two codes."""
     con.execute(

@@ -77,3 +77,9 @@ def test_engine_core_and_spine_are_r29_clean() -> None:
     """The live tree must be green: no OMOP/OncoTree literal in any core path."""
     violations = find_violations()
     assert violations == [], f"R29 coupling leaks: {violations}"
+
+
+def test_intake_package_is_guarded_with_athena_allowlisted() -> None:
+    """Landing loaders are core; only the Athena loader may name its file set."""
+    assert "src/sema/intake" in R29_POLICY.core_paths
+    assert "src/sema/intake/loaders/athena.py" in R29_POLICY.allowlist

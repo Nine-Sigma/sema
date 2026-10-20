@@ -63,12 +63,14 @@ R29_POLICY = EngineCouplingPolicy(
         "src/sema/resolve/identity_collapse_utils.py",
         "src/sema/compile",
         "src/sema/targets",
+        "src/sema/intake",
     ),
     allowlist=(
         "src/sema/resolve/policy.py",
         "src/sema/resolve/policies",
         "src/sema/targets/adapters",
         "src/sema/eval",
+        "src/sema/intake/loaders/athena.py",
         "tests",
     ),
 )
