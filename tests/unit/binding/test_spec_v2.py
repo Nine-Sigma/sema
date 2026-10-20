@@ -301,3 +301,15 @@ def test_value_mappings_on_another_provider_are_rejected_from_yaml(
 
     with pytest.raises(ValidationError, match="value_mappings.*concepts"):
         load_concept_source_spec(path)
+
+
+def test_hierarchy_without_concepts_is_rejected() -> None:
+    roles = {"entity": "t", "property": "c", "type": "dt"}
+    raw = _minimal(
+        entity_model={"relation": "land.dict", "roles": roles},
+        hierarchy={"parent_column": "parent_id"},
+    )
+    del raw["concepts"]
+
+    with pytest.raises(ValidationError, match="hierarchy need a `concepts`"):
+        _load(raw)

@@ -198,6 +198,7 @@ def _check_single_hierarchy(spec: ConceptSourceSpec) -> None:
 def _check_scope_providers(spec: ConceptSourceSpec) -> None:
     present = [name for name in SCOPED_SECTIONS if getattr(spec, name) is not None]
     if spec.concepts is None:
+        present += ["hierarchy"] if spec.hierarchy is not None else []
         if present:
             raise ValueError(f"{', '.join(present)} need a `concepts` section")
         return

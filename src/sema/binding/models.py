@@ -7,7 +7,11 @@ mistaken for a ``HumanPin``.
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from sema.binding.mappings_utils import SssomMapping
 
 
 class AuthoredColumnBinding(BaseModel):
@@ -28,6 +32,19 @@ class AuthoredValueMapping(BaseModel):
     approved: bool
 
 
+class Retirement(BaseModel):
+    """A retired concept or inline term, kept out of the manifest but not lost."""
+
+    kind: Literal["term", "concept"]
+    vocabulary: str | None
+    code: str
+    replaced_by: str | None
+    valid_from: str | None
+    valid_to: str | None
+
+
 class AuthoredEvidence(BaseModel):
     column_bindings: list[AuthoredColumnBinding]
     value_mappings: list[AuthoredValueMapping]
+    mappings: list[SssomMapping] = Field(default_factory=list)
+    retirements: list[Retirement] = Field(default_factory=list)

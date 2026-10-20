@@ -52,5 +52,7 @@
       "status": "Reviewed",
       "approved": true
     }
-  ]
+  ],
+  "mappings": [],
+  "retirements": []
 }
