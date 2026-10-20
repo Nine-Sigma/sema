@@ -6,9 +6,11 @@ import hashlib
 from datetime import datetime
 from pathlib import Path
 
+import openpyxl
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
+from openpyxl.styles import Font
 
 from sema.ingest.duckdb_staging import Staging
 
@@ -186,14 +188,101 @@ def test_glob_lands_matching_files(tmp_path: Path, staging: Staging) -> None:
     assert [r.name for r in result.relations] == ["a_codes", "b_codes"]
 
 
-def test_sheet_without_a_header_fails_naming_the_sheet(
+def _write_workbook(path: Path, sheets: dict[str, list[list[object]]]) -> Path:
+    workbook = openpyxl.Workbook()
+    workbook.remove(workbook.active)
+    for title, rows in sheets.items():
+        worksheet = workbook.create_sheet(title)
+        for row in rows:
+            worksheet.append(row)
+    workbook.save(path)
+    return path
+
+
+def test_csv_without_a_header_lands_with_positional_columns(
     tmp_path: Path, staging: Staging
 ) -> None:
     path = tmp_path / "numbers.csv"
     path.write_text("1,2\n3,4\n")
 
-    with pytest.raises(ValueError, match=r"numbers.*non-empty strings.*unique.*recurs"):
-        _land(path, staging)
+    result = _land(path, staging)
+
+    relation = result.relation("numbers")
+    assert [name for name, _ in relation.columns] == ["_col_1", "_col_2", "_sema_locator"]
+    assert relation.header_row is None
+    assert relation.row_count == 2
+    assert result.headerless == ("numbers",)
+    assert _rows(staging, "numbers", "_col_1, _col_2, _sema_locator") == [
+        (1, 2, "numbers!1"),
+        (3, 4, "numbers!2"),
+    ]
+
+
+def test_headerless_sheet_lands_beside_the_other_sheets(
+    tmp_path: Path, staging: Staging
+) -> None:
+    path = _write_workbook(
+        tmp_path / "book.xlsx",
+        {
+            "Codes": [["code", "label"], ["A", "Alpha"], ["B", "Beta"]],
+            "Figures": [[1, 2, 3], [4, 5, 6], [None, None, None], [7, 8, 9]],
+        },
+    )
+
+    result = _land(path, staging)
+
+    assert [r.name for r in result.relations] == ["book__Codes", "book__Figures"]
+    assert result.headerless == ("book__Figures",)
+    codes, figures = result.relation("book__Codes"), result.relation("book__Figures")
+    assert (codes.header_row, codes.row_count) == (1, 2)
+    assert figures.header_row is None
+    assert [n for n, _ in figures.columns] == ["_col_1", "_col_2", "_col_3", "_sema_locator"]
+    assert _rows(staging, "book__Figures", "_col_1, _sema_locator") == [
+        (1, "Figures!1"),
+        (4, "Figures!2"),
+        (7, "Figures!4"),
+    ]
+
+
+def test_trailing_empty_columns_are_not_landed(tmp_path: Path, staging: Staging) -> None:
+    path = tmp_path / "log.xlsx"
+    _write_workbook(
+        path, {"Log": [["Revision history"], ["Version", "Date", "Change", "Comments"]]}
+    )
+    workbook = openpyxl.load_workbook(path)
+    for row in range(1, 6):
+        workbook["Log"].cell(row=row, column=18).font = Font(bold=True)
+    workbook.save(path)
+
+    result = _land(path, staging)
+
+    relation = result.relation("log__Log")
+    assert relation.header_row == 2
+    names = [name for name, _ in relation.columns]
+    assert names == ["Version", "Date", "Change", "Comments", "_sema_locator"]
+    assert relation.row_count == 0
+    assert relation.empty_columns == ()
+    assert result.headerless == ()
+
+
+def test_header_line_break_is_collapsed_in_the_column_name(
+    tmp_path: Path, staging: Staging
+) -> None:
+    path = _write_workbook(
+        tmp_path / "notes.xlsx",
+        {"Info": [["Column Name", "Additional Notes \n(where applicable)"], ["a", "b"]]},
+    )
+
+    result = _land(path, staging)
+
+    names = [name for name, _ in result.relation("notes__Info").columns]
+    assert names == ["Column Name", "Additional Notes (where applicable)", "_sema_locator"]
+
+
+def test_a_workbook_whose_sheets_all_have_headers_lists_none_as_headerless(
+    staging: Staging,
+) -> None:
+    assert _land(WORKBOOK, staging).headerless == ()
 
 
 def test_two_landings_produce_equal_snapshots(tmp_path: Path) -> None:
@@ -283,14 +372,20 @@ def test_text_that_would_change_as_a_number_lands_as_text(
     ]
 
 
-def test_headers_differing_only_in_case_fail_naming_the_sheet(
+def test_headers_differing_only_in_case_land_the_sheet_headerless(
     tmp_path: Path, staging: Staging
 ) -> None:
     path = tmp_path / "cased.csv"
     path.write_text("Code,code,label\nA,a,Alpha\n")
 
-    with pytest.raises(ValueError, match="sheet cased"):
-        _land(path, staging)
+    result = _land(path, staging)
+
+    assert result.headerless == ("cased",)
+    assert result.relation("cased").header_row is None
+    assert _rows(staging, "cased", "_col_1, _col_2, _col_3") == [
+        ("Code", "code", "label"),
+        ("A", "a", "Alpha"),
+    ]
 
 
 def test_header_named_like_the_locator_column_fails(

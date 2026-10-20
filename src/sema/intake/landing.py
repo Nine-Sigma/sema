@@ -50,6 +50,7 @@ class LandResult:
     source_identity: tuple[tuple[str, str], ...]
     relations: tuple[LandedRelation, ...]
     policy_class: str
+    headerless: tuple[str, ...] = ()
 
     @property
     def schema_snapshot(self) -> tuple[tuple[str, Columns], ...]:

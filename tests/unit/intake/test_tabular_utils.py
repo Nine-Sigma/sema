@@ -87,6 +87,50 @@ def test_header_strings_must_be_unique_ignoring_case() -> None:
     assert _detect(rows) is None
 
 
+def test_trailing_empty_columns_do_not_count_toward_the_width() -> None:
+    padding: list[object] = [None] * 14
+    rows: list[list[object]] = [
+        ["Revision history", None, None, None, *padding],
+        ["Version", "Date", "Change", "Comments", *padding],
+    ]
+    rows += [[None] * 18 for _ in range(12)]
+
+    assert _detect(rows) == 2
+
+
+def test_a_column_filled_only_below_the_header_still_counts() -> None:
+    rows: list[list[object]] = [
+        ["code", "label", None, None, None],
+        ["A", "Alpha", None, None, "x"],
+    ]
+
+    assert _detect(rows) is None
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Additional Notes \n(where applicable)", "Additional Notes (where applicable)"),
+        ("  code\t name  ", "code name"),
+        ("include the  range", "include the range"),
+        ("line\r\nbreak", "line break"),
+        ("plain", "plain"),
+    ],
+)
+def test_collapse_whitespace(text: str, expected: str) -> None:
+    from sema.intake.loaders.tabular_utils import collapse_whitespace
+
+    assert collapse_whitespace(text) == expected
+
+
+def test_column_names_collapse_whitespace_in_header_text() -> None:
+    from sema.intake.loaders.tabular_utils import column_names
+
+    names = column_names(["Additional Notes \n(where applicable)", None, " a \t b "], 3)
+
+    assert names == ["Additional Notes (where applicable)", "_empty_2", "a b"]
+
+
 @pytest.mark.parametrize(
     ("values", "expected"),
     [

@@ -5,6 +5,8 @@ Parquet file (``<file stem>``), with non-word characters replaced by ``_``. Ever
 ``<sheet>!<physical row>``; CSV and Parquet use the file stem as the sheet, and a
 CSV record that spans lines is located by its first line.
 Merged cells are not expanded: ``openpyxl`` reports only the top-left cell.
+Trailing columns with no value in any row are not landed; a sheet with no header
+row lands with positional ``_col_<n>`` columns and is listed under ``headerless``.
 """
 
 from __future__ import annotations
@@ -38,7 +40,10 @@ from sema.intake.loaders.tabular_utils import (
     column_type,
     convert,
     detect_header,
+    occupied_width,
+    positional_names,
 )
+from sema.log import logger
 
 LOADER = "tabular"
 LOADER_VERSION = "1"
@@ -66,6 +71,7 @@ class _SheetData:
     types: dict[str, str]
     header_row: int | None
     empty_columns: tuple[str, ...]
+    headerless: bool = False
 
 
 def land_tabular(
@@ -90,6 +96,7 @@ def land_tabular(
         source_identity=tuple((path.name, file_digest(path)) for path in files),
         relations=tuple(sorted(relations, key=lambda r: r.name)),
         policy_class=policy_class,
+        headerless=tuple(sorted(sheet.name for sheet, data in read if data.headerless)),
     )
 
 
@@ -180,21 +187,17 @@ def _csv_dialect(path: Path) -> tuple[str, str]:
 
 def _rows_data(rows: list[list[Any]], label: str) -> _SheetData:
     header_row = detect_header(rows)
-    if header_row is None:
-        raise ValueError(
-            f"sheet {label}: no row passes the header tests ({'; '.join(HEADER_TESTS)})"
-        )
-    width = max(len(row) for row in rows)
-    names = column_names(rows[header_row - 1], width)
-    _check_locator(names, label)
-    body = list(_data_rows(rows, header_row, width))
+    width = occupied_width(rows)
+    names = _names(rows, header_row, width, label)
+    body = list(_data_rows(rows, header_row or 0, width))
     columns = {name: [row[i] for _, row in body] for i, name in enumerate(names)}
     types = {name: column_type(values) for name, values in columns.items()}
     arrays = {
         name: pa.array([convert(v, types[name]) for v in values], ARROW_TYPES[types[name]])
         for name, values in columns.items()
     }
-    arrays[LOCATOR_COLUMN] = pa.array([f"{label}!{number}" for number, _ in body])
+    locators = [f"{label}!{number}" for number, _ in body]
+    arrays[LOCATOR_COLUMN] = pa.array(locators, pa.string())
     empty = tuple(
         name for name, values in columns.items() if all(cell_text(v) is None for v in values)
     )
@@ -202,8 +205,24 @@ def _rows_data(rows: list[list[Any]], label: str) -> _SheetData:
         table=pa.table(arrays),
         types={**types, LOCATOR_COLUMN: "VARCHAR"},
         header_row=header_row,
-        empty_columns=empty,
+        empty_columns=empty if body else (),
+        headerless=header_row is None,
     )
+
+
+def _names(
+    rows: list[list[Any]], header_row: int | None, width: int, label: str
+) -> list[str]:
+    if header_row is None:
+        logger.info(
+            "sheet {} lands with positional columns: no row passes the header tests ({})",
+            label,
+            "; ".join(HEADER_TESTS),
+        )
+        return positional_names(width)
+    names = column_names(rows[header_row - 1], width)
+    _check_locator(names, label)
+    return names
 
 
 def _check_locator(names: list[str], label: str) -> None:
@@ -219,7 +238,7 @@ def _data_rows(
 ) -> Iterator[tuple[int, list[Any]]]:
     for number, row in enumerate(rows[header_row:], start=header_row + 1):
         if any(cell_text(cell) is not None for cell in row):
-            yield number, list(row) + [None] * (width - len(row))
+            yield number, list(row[:width]) + [None] * (width - len(row))
 
 
 def _parquet_data(sheet: _Sheet) -> _SheetData:

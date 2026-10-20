@@ -1,7 +1,8 @@
 """Pure helpers for the tabular loader: header detection and column typing.
 
 A header is the first row, within the first ``HEADER_SCAN_ROWS``, where at least
-``HEADER_MIN_STRING_RATIO`` of the cells are non-empty strings, those strings are
+``HEADER_MIN_STRING_RATIO`` of the cells are non-empty strings (trailing columns
+empty throughout the window do not count), those strings are
 unique within the row ignoring case, and none of them recurs in its own column in
 the window. Text that parses as a number is not a header string: CSV cells arrive
 as text.
@@ -26,6 +27,7 @@ HEADER_TESTS = (
     f"none recurs in its column within the first {HEADER_SCAN_ROWS} rows",
 )
 EMPTY_COLUMN_PREFIX = "_empty_"
+POSITIONAL_COLUMN_PREFIX = "_col_"
 
 _INTEGER_TEXT = re.compile(r"^-?(0|[1-9]\d*)$")
 _BIGINT_RANGE = range(-(2**63), 2**63)
@@ -35,12 +37,12 @@ _BOOL_TEXT = {"true": True, "false": False}
 def detect_header(rows: list[list[Any]]) -> int | None:
     """1-based row number of the header, or ``None`` when no row passes."""
     window = rows[:HEADER_SCAN_ROWS]
-    width = max((len(row) for row in window), default=0)
+    width = occupied_width(window)
     if width == 0:
         return None
     counts = [Counter[str]() for _ in range(width)]
     for row in window:
-        for index, cell in enumerate(row):
+        for index, cell in enumerate(row[:width]):
             if (text := cell_text(cell)) is not None:
                 counts[index][text] += 1
     for number, row in enumerate(window, start=1):
@@ -49,10 +51,23 @@ def detect_header(rows: list[list[Any]]) -> int | None:
     return None
 
 
+def occupied_width(rows: list[list[Any]]) -> int:
+    """One past the highest column index holding a non-empty cell in any row."""
+    return max(
+        (
+            index + 1
+            for row in rows
+            for index, cell in enumerate(row)
+            if cell_text(cell) is not None
+        ),
+        default=0,
+    )
+
+
 def _is_header(row: list[Any], width: int, counts: list[Counter[str]]) -> bool:
     strings = {
         index: text
-        for index, cell in enumerate(row)
+        for index, cell in enumerate(row[:width])
         if isinstance(cell, str)
         and (text := cell_text(cell)) is not None
         and not _parses_float(text)
@@ -71,12 +86,22 @@ def cell_text(cell: Any) -> str | None:
     return text or None
 
 
+def collapse_whitespace(text: str) -> str:
+    return " ".join(text.split())
+
+
 def column_names(header: list[Any], width: int) -> list[str]:
-    padded = list(header) + [None] * (width - len(header))
+    padded = list(header[:width]) + [None] * (width - len(header))
     return [
-        cell_text(cell) or f"{EMPTY_COLUMN_PREFIX}{index}"
+        collapse_whitespace(text)
+        if (text := cell_text(cell))
+        else f"{EMPTY_COLUMN_PREFIX}{index}"
         for index, cell in enumerate(padded, start=1)
     ]
+
+
+def positional_names(width: int) -> list[str]:
+    return [f"{POSITIONAL_COLUMN_PREFIX}{index}" for index in range(1, width + 1)]
 
 
 def column_type(values: list[Any]) -> str:
