@@ -39,7 +39,11 @@ def select_sql(relation: str, columns: Iterable[str], where: str | None = None) 
 
 def concept_scope_sql(spec: ConceptSourceSpec) -> str:
     concepts = spec.concepts
-    return select_sql(concepts.relation, [concepts.roles.concept_id], concepts.filter)
+    if concepts is None:
+        raise ValueError(f"spec {spec.id} has no concepts section to scope by")
+    return select_sql(
+        concepts.relation.name, [concepts.roles.concept_id], concepts.filter
+    )
 
 
 def in_concept_scope(column: str, spec: ConceptSourceSpec) -> str:
@@ -154,7 +158,7 @@ def read_details(
     key_column = details.on[1]
     rows = fetch(
         query,
-        details.relation,
+        details.relation.name,
         [
             key_column,
             details.roles.definition,
@@ -215,7 +219,9 @@ def synonyms_of(
 
 
 def matched_details(
-    rows: list[Record], column: str, index: dict[str, Details]
+    rows: list[Record], column: str | None, index: dict[str, Details]
 ) -> list[Details]:
+    if column is None:
+        return []
     keys = sorted({key for row in rows if (key := as_text(row[column])) is not None})
     return [index[key] for key in keys if key in index]

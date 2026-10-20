@@ -25,13 +25,13 @@ def test_spec_yaml_loads_into_concept_source_spec(
     assert spec.identity_system == "syn"
     assert spec.release == "2026-09"
     assert spec.scheme.qualified_name == "syn_library.demographics"
-    assert spec.concepts.relation == "lib.data_element"
+    assert spec.concepts.relation.name == "lib.data_element"
     assert spec.concepts.group_by == "data_element_id"
     assert spec.concepts.roles.definition == "data_element_definition"
     assert spec.value_sets.roles.code == "value_id"
     assert spec.concept_details.on == ["data_element_id", "concept_id"]
     assert spec.term_details.roles.definition == "definition"
-    assert spec.relationships.relation == "lib.concept_relationship"
+    assert spec.relationships.relation.name == "lib.concept_relationship"
     assert spec.authored_bindings.roles.columns == "source_columns"
     assert (
         Path(spec.authored_bindings.dataset_map).resolve() == DATASET_MAP_PATH.resolve()

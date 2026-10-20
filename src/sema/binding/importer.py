@@ -38,7 +38,16 @@ from sema.binding.models import (
     AuthoredEvidence,
     AuthoredValueMapping,
 )
-from sema.binding.spec import ConceptSourceSpec, ExternalRefRole
+from sema.binding.spec import (
+    AuthoredBindingsSpec,
+    ConceptSourceSpec,
+    ConceptsSpec,
+    ExternalRefRole,
+    RelationshipsSpec,
+    ValueMappingsSpec,
+    ValueSetRoles,
+    ValueSetsSpec,
+)
 from sema.log import logger
 
 MANIFEST_VERSION = 1
@@ -54,8 +63,12 @@ class ConceptImport:
 def import_concept_source(
     spec: ConceptSourceSpec, query: QueryFn, *, dataset_map: dict[str, str]
 ) -> ConceptImport:
-    properties = _concept_properties(spec, query)
-    vocabularies, terms = _value_sets(spec, query, properties)
+    properties = _concept_properties(spec, spec.concepts, query) if spec.concepts else {}
+    vocabularies, terms = (
+        _value_sets(spec, spec.value_sets, query, properties)
+        if spec.value_sets
+        else ([], [])
+    )
     loaded = {(spec.identity_system, concept_id) for concept_id in properties}
     manifest: dict[str, Any] = {
         "manifest_version": MANIFEST_VERSION,
@@ -66,12 +79,18 @@ def import_concept_source(
         },
         "vocabularies": vocabularies,
         "terms": terms,
-        "entities": [_scheme_entity(spec, list(properties.values()))],
-        "relationships": _relationships(spec, query, loaded),
+        "entities": _scheme_entities(spec, list(properties.values())),
+        "relationships": _relationships(spec, spec.relationships, query, loaded)
+        if spec.relationships
+        else [],
     }
     authored = AuthoredEvidence(
-        column_bindings=_column_bindings(spec, query, dataset_map),
-        value_mappings=_value_mappings(spec, query),
+        column_bindings=_column_bindings(spec, spec.authored_bindings, query, dataset_map)
+        if spec.authored_bindings
+        else [],
+        value_mappings=_value_mappings(spec, spec.value_mappings, query)
+        if spec.value_mappings
+        else [],
     )
     logger.info(
         "Imported concept source {}: {} concepts, {} terms, {} relationships",
@@ -90,24 +109,30 @@ def write_import(
     evidence_path.write_text(result.authored.model_dump_json(indent=2))
 
 
-def _scheme_entity(spec: ConceptSourceSpec, properties: list[Record]) -> Record:
-    return {
-        "qualified_name": spec.scheme.qualified_name,
-        "kind": CONCEPT_SCHEME_KIND,
-        "properties": properties,
-        "context_card": {
-            "card_version": spec.release,
-            "description": spec.scheme.description,
-        },
-    }
+def _scheme_entities(spec: ConceptSourceSpec, properties: list[Record]) -> list[Record]:
+    if spec.concepts is None or spec.scheme is None:
+        return []
+    return [
+        {
+            "qualified_name": spec.scheme.qualified_name,
+            "kind": CONCEPT_SCHEME_KIND,
+            "properties": properties,
+            "context_card": {
+                "card_version": spec.release,
+                "description": spec.scheme.description,
+            },
+        }
+    ]
 
 
-def _concept_properties(spec: ConceptSourceSpec, query: QueryFn) -> dict[str, Record]:
-    concepts, roles = spec.concepts, spec.concepts.roles
-    join_column = spec.concept_details.on[0]
+def _concept_properties(
+    spec: ConceptSourceSpec, concepts: ConceptsSpec, query: QueryFn
+) -> dict[str, Record]:
+    roles = concepts.roles
+    join_column = spec.concept_details.on[0] if spec.concept_details else None
     rows = fetch(
         query,
-        concepts.relation,
+        concepts.relation.name,
         [
             concepts.group_by,
             roles.concept_id,
@@ -120,22 +145,30 @@ def _concept_properties(spec: ConceptSourceSpec, query: QueryFn) -> dict[str, Re
         ],
         concepts.filter,
     )
-    source_sql = select_sql(concepts.relation, [join_column], concepts.filter)
-    details = read_details(query, spec.concept_details, source_sql)
+    details: dict[str, Details] = {}
+    if spec.concept_details and join_column:
+        source_sql = select_sql(concepts.relation.name, [join_column], concepts.filter)
+        details = read_details(query, spec.concept_details, source_sql)
     properties: dict[str, Record] = {}
     # One row per (concept, value): grouping stops one property per value.
     for group in group_by_key(rows, concepts.group_by).values():
         concept_id = first_text(group, roles.concept_id)
         if concept_id is not None:
             found = matched_details(group, join_column, details)
-            properties[concept_id] = _concept_property(spec, concept_id, group, found)
+            properties[concept_id] = _concept_property(
+                spec, concepts, concept_id, group, found
+            )
     return dict(sorted(properties.items()))
 
 
 def _concept_property(
-    spec: ConceptSourceSpec, concept_id: str, group: list[Record], found: list[Details]
+    spec: ConceptSourceSpec,
+    concepts: ConceptsSpec,
+    concept_id: str,
+    group: list[Record],
+    found: list[Details],
 ) -> Record:
-    roles = spec.concepts.roles
+    roles = concepts.roles
     name = first_text(group, roles.name) or concept_id
     definition = first_text(group, roles.definition) or next(
         (d.definition for d in found if d.definition), None
@@ -159,13 +192,17 @@ def _concept_property(
 
 
 def _value_sets(
-    spec: ConceptSourceSpec, query: QueryFn, properties: dict[str, Record]
+    spec: ConceptSourceSpec,
+    value_sets: ValueSetsSpec,
+    query: QueryFn,
+    properties: dict[str, Record],
 ) -> tuple[list[Record], list[Record]]:
-    roles, join_column = spec.value_sets.roles, spec.term_details.on[0]
+    roles = value_sets.roles
+    join_column = spec.term_details.on[0] if spec.term_details else None
     scope = in_concept_scope(roles.concept_id, spec)
     rows = fetch(
         query,
-        spec.value_sets.relation,
+        value_sets.relation.name,
         [
             roles.concept_id,
             roles.code,
@@ -178,8 +215,10 @@ def _value_sets(
         ],
         scope,
     )
-    source_sql = select_sql(spec.value_sets.relation, [join_column], scope)
-    details = read_details(query, spec.term_details, source_sql)
+    details: dict[str, Details] = {}
+    if spec.term_details and join_column:
+        source_sql = select_sql(value_sets.relation.name, [join_column], scope)
+        details = read_details(query, spec.term_details, source_sql)
     vocabularies: list[Record] = []
     terms: list[Record] = []
     for concept_id, group in sorted(group_by_key(rows, roles.concept_id).items()):
@@ -188,21 +227,22 @@ def _value_sets(
         vocabulary = f"VS_{concept_id}"
         properties[concept_id]["vocabulary_binding"] = {"vocabulary": vocabulary}
         vocabularies.append({"name": vocabulary, "source": "INLINE"})
-        terms.extend(_terms(spec, vocabulary, group, details))
+        terms.extend(_terms(spec, value_sets.roles, vocabulary, group, details))
     return vocabularies, terms
 
 
 def _terms(
     spec: ConceptSourceSpec,
+    roles: ValueSetRoles,
     vocabulary: str,
     group: list[Record],
     details: dict[str, Details],
 ) -> list[Record]:
-    roles = spec.value_sets.roles
-    own_refs = _value_row_ref_roles(spec)
+    own_refs = _value_row_ref_roles(roles)
+    join_column = spec.term_details.on[0] if spec.term_details else None
     terms: list[Record] = []
     for code, rows in sorted(group_by_key(group, roles.code).items()):
-        found = matched_details(rows, spec.term_details.on[0], details)
+        found = matched_details(rows, join_column, details)
         display = first_text(rows, roles.display) or first_text(
             rows, roles.display_fallback
         )
@@ -222,8 +262,7 @@ def _terms(
     return terms
 
 
-def _value_row_ref_roles(spec: ConceptSourceSpec) -> list[ExternalRefRole]:
-    roles = spec.value_sets.roles
+def _value_row_ref_roles(roles: ValueSetRoles) -> list[ExternalRefRole]:
     if roles.vocabulary_id is None or roles.concept_code is None:
         return []
     return [
@@ -232,19 +271,22 @@ def _value_row_ref_roles(spec: ConceptSourceSpec) -> list[ExternalRefRole]:
 
 
 def _relationships(
-    spec: ConceptSourceSpec, query: QueryFn, loaded: set[RefKey]
+    spec: ConceptSourceSpec,
+    relation: RelationshipsSpec,
+    query: QueryFn,
+    loaded: set[RefKey],
 ) -> list[Record]:
-    relation, roles = spec.relationships, spec.relationships.roles
+    roles = relation.roles
     rows = fetch(
         query,
-        relation.relation,
+        relation.relation.name,
         [
             *endpoint_columns(roles.from_),
             *endpoint_columns(roles.to),
             roles.type,
             roles.hierarchical,
         ],
-        _relationship_scope(spec),
+        _relationship_scope(spec, relation),
     )
     kept: dict[tuple[RefKey, RefKey, str], Record] = {}
     for row in rows:
@@ -266,23 +308,26 @@ def _relationships(
     return [kept[key] for key in sorted(kept)]
 
 
-def _relationship_scope(spec: ConceptSourceSpec) -> str:
-    roles = spec.relationships.roles
+def _relationship_scope(spec: ConceptSourceSpec, relation: RelationshipsSpec) -> str:
+    roles = relation.roles
     scope = (
         f"({in_concept_scope(roles.from_.id, spec)}"
         f" OR {in_concept_scope(roles.to.id, spec)})"
     )
-    extra = spec.relationships.filter
+    extra = relation.filter
     return f"({extra}) AND {scope}" if extra else scope
 
 
 def _column_bindings(
-    spec: ConceptSourceSpec, query: QueryFn, dataset_map: dict[str, str]
+    spec: ConceptSourceSpec,
+    bindings_spec: AuthoredBindingsSpec,
+    query: QueryFn,
+    dataset_map: dict[str, str],
 ) -> list[AuthoredColumnBinding]:
-    bindings_spec, roles = spec.authored_bindings, spec.authored_bindings.roles
+    roles = bindings_spec.roles
     rows = fetch(
         query,
-        bindings_spec.relation,
+        bindings_spec.relation.name,
         [
             roles.concept_id,
             roles.dataset_label,
@@ -326,12 +371,12 @@ def _resolve_dataset(
 
 
 def _value_mappings(
-    spec: ConceptSourceSpec, query: QueryFn
+    spec: ConceptSourceSpec, mappings_spec: ValueMappingsSpec, query: QueryFn
 ) -> list[AuthoredValueMapping]:
-    mappings_spec, roles = spec.value_mappings, spec.value_mappings.roles
+    roles = mappings_spec.roles
     rows = fetch(
         query,
-        mappings_spec.relation,
+        mappings_spec.relation.name,
         [roles.concept_id, roles.source_value, roles.code, roles.status],
         in_concept_scope(roles.concept_id, spec),
     )

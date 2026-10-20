@@ -1,165 +1,206 @@
 """Concept source spec: which relations hold a concept library and their column roles.
 
-Role values are column names in the named relation. ``filter`` strings are SQL
-``WHERE`` fragments written by the operator and appended verbatim.
+Version 1 is the original all-sections spec. Version 2 adds per-relation
+providers, optional sections, hierarchy forms, lifecycle and language roles,
+SSSOM mappings, term storage, an entity model, and a recorded shape. A version 1
+spec cannot use a version 2 field, so the version marker can be trusted.
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    ValidationInfo,
-    field_validator,
-    model_validator,
+from pydantic import Field, field_validator, model_validator
+
+from sema.binding.spec_sections import (
+    AuthoredBindingRoles,
+    AuthoredBindingsSpec,
+    ConceptRoles,
+    ConceptsSpec,
+    DetailRoles,
+    DetailsSpec,
+    EndpointFallback,
+    EndpointRole,
+    EntityModelRoles,
+    EntityModelSpec,
+    ExternalRefRole,
+    HierarchySpec,
+    LevelColumnsHierarchy,
+    LifecycleRoles,
+    MappingRoles,
+    MappingsSpec,
+    ParentColumnHierarchy,
+    PathCodesHierarchy,
+    Provider,
+    RelationRef,
+    RelationshipRoles,
+    RelationshipsSpec,
+    SchemeSpec,
+    ShapeEntry,
+    StatusRole,
+    TermStorageSpec,
+    ValueMappingRoles,
+    ValueMappingsSpec,
+    ValueSetRoles,
+    ValueSetsSpec,
+    _SpecModel,
+)
+
+SUPPORTED_SPEC_VERSIONS = (1, 2)
+_LIFECYCLE_FIELDS = ("status", "valid_from", "valid_to", "replaced_by", "lang")
+VERSION_2_FIELDS: tuple[tuple[str, str], ...] = (
+    ("", "default_provider"),
+    ("", "shape"),
+    ("", "hierarchy"),
+    ("", "mappings"),
+    ("", "term_storage"),
+    ("", "entity_model"),
+    *(("concepts.roles", name) for name in _LIFECYCLE_FIELDS),
+    *(("value_sets.roles", name) for name in _LIFECYCLE_FIELDS),
+)
+SCOPED_SECTIONS = (
+    "value_sets",
+    "concept_details",
+    "term_details",
+    "relationships",
+    "authored_bindings",
+    "value_mappings",
+)
+VERSION_1_SECTIONS = ("scheme", "concepts", *SCOPED_SECTIONS)
+RELATION_SECTIONS = (
+    "concepts",
+    *SCOPED_SECTIONS,
+    "hierarchy",
+    "mappings",
+    "entity_model",
 )
 
 
-class _SpecModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-
-class SchemeSpec(_SpecModel):
-    qualified_name: str = Field(min_length=1)
-    description: str = Field(min_length=1)
-
-
-class ConceptRoles(_SpecModel):
-    concept_id: str
-    name: str
-    title: str | None = None
-    definition: str | None = None
-    data_type: str | None = None
-    sensitive: str | None = None
-    synonyms: str | None = None
-
-
-class ConceptsSpec(_SpecModel):
-    relation: str
-    group_by: str
-    roles: ConceptRoles
-    filter: str | None = None
-
-
-class ValueSetRoles(_SpecModel):
-    concept_id: str
-    code: str
-    display: str
-    display_fallback: str | None = None
-    vocabulary_id: str | None = None
-    concept_code: str | None = None
-    synonyms: str | None = None
-
-
-class ValueSetsSpec(_SpecModel):
-    relation: str
-    roles: ValueSetRoles
-
-
-class ExternalRefRole(_SpecModel):
-    """``system`` is a literal, or ``{column}`` to read the system per row."""
-
-    system: str
-    column: str
-
-
-class DetailRoles(_SpecModel):
-    definition: str | None = None
-    external_refs: list[ExternalRefRole] = Field(default_factory=list)
-
-
-class DetailsSpec(_SpecModel):
-    """``on`` is [column in the source relation, column in this relation]."""
-
-    relation: str
-    on: list[str] = Field(min_length=2, max_length=2)
-    roles: DetailRoles
-
-    @model_validator(mode="before")
-    @classmethod
-    def _yaml_on_key(cls, data: Any) -> Any:
-        # YAML 1.1 reads the bare key `on` as boolean True.
-        if isinstance(data, dict) and True in data:
-            data = {
-                ("on" if key is True else key): value for key, value in data.items()
-            }
-        return data
-
-
-class EndpointFallback(_SpecModel):
-    system: str
-    id: str
-
-
-class EndpointRole(_SpecModel):
-    system: str
-    id: str
-    fallback: EndpointFallback | None = None
-
-
-class RelationshipRoles(_SpecModel):
-    from_: EndpointRole = Field(alias="from")
-    to: EndpointRole
-    type: str
-    hierarchical: str | None = None
-
-
-class RelationshipsSpec(_SpecModel):
-    relation: str
-    roles: RelationshipRoles
-    filter: str | None = None
-
-
-class AuthoredBindingRoles(_SpecModel):
-    concept_id: str
-    dataset_label: str
-    dataset_id: str
-    columns: str
-    project: str | None = None
-
-
-class AuthoredBindingsSpec(_SpecModel):
-    relation: str
-    roles: AuthoredBindingRoles
-    dataset_map: Path
-
-    @field_validator("dataset_map")
-    @classmethod
-    def _relative_to_spec(cls, value: Path, info: ValidationInfo) -> Path:
-        base_dir = (info.context or {}).get("base_dir")
-        return value if base_dir is None else Path(base_dir) / value
-
-
-class ValueMappingRoles(_SpecModel):
-    concept_id: str
-    source_value: str
-    code: str
-    status: str
-
-
-class ValueMappingsSpec(_SpecModel):
-    relation: str
-    roles: ValueMappingRoles
-    approved_statuses: list[str] = Field(default_factory=list)
-
-
 class ConceptSourceSpec(_SpecModel):
+    spec_version: int = 1
     id: str = Field(min_length=1)
     identity_system: str = Field(min_length=1)
     release: str = Field(min_length=1)
-    scheme: SchemeSpec
-    concepts: ConceptsSpec
-    value_sets: ValueSetsSpec
-    concept_details: DetailsSpec
-    term_details: DetailsSpec
-    relationships: RelationshipsSpec
-    authored_bindings: AuthoredBindingsSpec
-    value_mappings: ValueMappingsSpec
+    default_provider: Provider = "warehouse"
+    shape: list[ShapeEntry] | None = None
+    scheme: SchemeSpec | None = None
+    concepts: ConceptsSpec | None = None
+    value_sets: ValueSetsSpec | None = None
+    concept_details: DetailsSpec | None = None
+    term_details: DetailsSpec | None = None
+    relationships: RelationshipsSpec | None = None
+    hierarchy: HierarchySpec | None = None
+    authored_bindings: AuthoredBindingsSpec | None = None
+    value_mappings: ValueMappingsSpec | None = None
+    mappings: MappingsSpec | None = None
+    term_storage: TermStorageSpec = Field(default_factory=TermStorageSpec)
+    entity_model: EntityModelSpec | None = None
+
+    @property
+    def external_namespace(self) -> str:
+        explicit = self.term_storage.external_namespace
+        return explicit or "vocabulary_" + re.sub(r"\W", "_", self.id)
+
+    @field_validator("spec_version")
+    @classmethod
+    def _supported_version(cls, value: int) -> int:
+        if value not in SUPPORTED_SPEC_VERSIONS:
+            supported = ", ".join(str(v) for v in SUPPORTED_SPEC_VERSIONS)
+            raise ValueError(
+                f"spec_version {value} is not supported; supported versions are "
+                f"{{{supported}}}"
+            )
+        return value
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_relations(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        version = data.get("spec_version", 1)
+        provider = data.get("default_provider", "warehouse")
+        resolved = dict(data)
+        for section in RELATION_SECTIONS:
+            body = resolved.get(section)
+            if isinstance(body, dict) and "relation" in body:
+                relation = _relation_ref(section, body["relation"], provider, version)
+                resolved[section] = {**body, "relation": relation}
+        return resolved
+
+    @model_validator(mode="after")
+    def _check_sections(self) -> ConceptSourceSpec:
+        if self.spec_version == 1:
+            _gate_version_1(self)
+        if self.concepts is None and self.entity_model is None:
+            raise ValueError("a spec needs `concepts` or `entity_model`; it has neither")
+        if self.concepts is not None and self.scheme is None:
+            raise ValueError("`scheme` is required when `concepts` is present")
+        _check_single_hierarchy(self)
+        _check_scope_providers(self)
+        return self
+
+
+def _relation_ref(section: str, value: Any, provider: str, version: Any) -> Any:
+    if isinstance(value, str):
+        return {"provider": provider, "name": value}
+    if version == 1:
+        raise ValueError(
+            f"{section}.relation as an object requires spec_version: 2"
+        )
+    return value
+
+
+def _gate_version_1(spec: ConceptSourceSpec) -> None:
+    for path, name in VERSION_2_FIELDS:
+        owner = _at_path(spec, path)
+        if owner is not None and name in owner.model_fields_set:
+            where = f"{path}.{name}" if path else name
+            raise ValueError(f"field `{where}` requires spec_version: 2")
+    missing = [name for name in VERSION_1_SECTIONS if getattr(spec, name) is None]
+    if missing:
+        raise ValueError(
+            f"spec_version 1 requires every section; missing {', '.join(missing)}"
+        )
+
+
+def _at_path(spec: ConceptSourceSpec, path: str) -> Any:
+    owner: Any = spec
+    for part in filter(None, path.split(".")):
+        owner = getattr(owner, part, None)
+        if owner is None:
+            return None
+    return owner
+
+
+def _check_single_hierarchy(spec: ConceptSourceSpec) -> None:
+    relationships = spec.relationships
+    if spec.hierarchy is None or relationships is None:
+        return
+    if relationships.roles.hierarchical is not None:
+        raise ValueError(
+            "hierarchy is declared twice: `hierarchy` and "
+            "`relationships.roles.hierarchical`; keep one"
+        )
+
+
+def _check_scope_providers(spec: ConceptSourceSpec) -> None:
+    present = [name for name in SCOPED_SECTIONS if getattr(spec, name) is not None]
+    if spec.concepts is None:
+        if present:
+            raise ValueError(f"{', '.join(present)} need a `concepts` section")
+        return
+    expected = spec.concepts.relation.provider
+    for name in present:
+        provider = getattr(spec, name).relation.provider
+        if provider != expected:
+            raise ValueError(
+                f"{name} resolves to provider {provider!r} but concepts resolves to "
+                f"{expected!r}; sections filtered to the concept scope must use the "
+                "concepts provider"
+            )
 
 
 def load_concept_source_spec(path: Path) -> ConceptSourceSpec:
@@ -176,3 +217,42 @@ def load_dataset_map(path: Path) -> dict[str, str]:
     if not isinstance(raw, dict):
         raise ValueError(f"{path}: expected a mapping of dataset label or id to table")
     return {str(key): str(value) for key, value in raw.items()}
+
+
+__all__ = [
+    "AuthoredBindingRoles",
+    "AuthoredBindingsSpec",
+    "ConceptRoles",
+    "ConceptSourceSpec",
+    "ConceptsSpec",
+    "DetailRoles",
+    "DetailsSpec",
+    "EndpointFallback",
+    "EndpointRole",
+    "EntityModelRoles",
+    "EntityModelSpec",
+    "ExternalRefRole",
+    "HierarchySpec",
+    "LevelColumnsHierarchy",
+    "LifecycleRoles",
+    "MappingRoles",
+    "MappingsSpec",
+    "ParentColumnHierarchy",
+    "PathCodesHierarchy",
+    "Provider",
+    "RelationRef",
+    "RelationshipRoles",
+    "RelationshipsSpec",
+    "SchemeSpec",
+    "ShapeEntry",
+    "StatusRole",
+    "TermStorageSpec",
+    "ValueMappingRoles",
+    "ValueMappingsSpec",
+    "ValueSetRoles",
+    "ValueSetsSpec",
+    "SUPPORTED_SPEC_VERSIONS",
+    "VERSION_2_FIELDS",
+    "load_concept_source_spec",
+    "load_dataset_map",
+]
