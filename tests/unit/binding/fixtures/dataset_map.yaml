@@ -1,0 +1,3 @@
+# Operator-supplied: dataset label or dataset id -> catalog.schema.table.
+# "Unmapped Visits" is deliberately absent so its binding stays unresolved.
+Synthetic Patients: syn_cat.syn_schema.patient

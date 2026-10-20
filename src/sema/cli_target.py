@@ -1,4 +1,4 @@
-"""CLI: `sema target load --manifest <path>`.
+"""CLI: `sema target load --manifest <path>` and `sema target import --spec <path>`.
 
 Connects any user-supplied ontology manifest to the target loader and
 prints a `LoadedTarget` summary as JSON. Defaults to the in-memory
@@ -16,6 +16,7 @@ from pathlib import Path
 import click
 
 from sema.cli_target_utils import build_summary
+from sema.connectors.base import Connector
 from sema.targets.adapters.manifest import (
     ManifestTargetAdapter,
     register_manifest_adapter,
@@ -51,9 +52,7 @@ def target_group() -> None:
     multiple=True,
     help="Repeatable. Operator opt-out per facet (e.g. semantic_aliases).",
 )
-def load_cmd(
-    manifest_path: Path, writer: str, skip_facets: tuple[str, ...]
-) -> None:
+def load_cmd(manifest_path: Path, writer: str, skip_facets: tuple[str, ...]) -> None:
     """Load a manifest and print a LoadedTarget summary as JSON."""
     try:
         adapter = ManifestTargetAdapter(manifest_path)
@@ -68,6 +67,55 @@ def load_cmd(
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
     click.echo(json.dumps(build_summary(loaded), indent=2, default=str))
+
+
+@target_group.command(name="import")
+@click.option(
+    "--spec",
+    "spec_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="Concept source spec (YAML) naming the library relations and column roles.",
+)
+@click.option(
+    "--out",
+    "out_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    required=True,
+    help="Where to write the target manifest.",
+)
+@click.option(
+    "--evidence-out",
+    "evidence_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    required=True,
+    help="Where to write the authored-evidence sidecar (JSON).",
+)
+def import_cmd(spec_path: Path, out_path: Path, evidence_path: Path) -> None:
+    """Import a concept library into a manifest plus an authored-evidence sidecar."""
+    from sema.binding.importer import import_concept_source, write_import
+    from sema.binding.spec import load_concept_source_spec, load_dataset_map
+
+    try:
+        spec = load_concept_source_spec(spec_path)
+        dataset_map = load_dataset_map(spec.authored_bindings.dataset_map)
+        connector = _import_connector()
+        result = import_concept_source(
+            spec, connector.execute_query, dataset_map=dataset_map
+        )
+        write_import(result, out_path, evidence_path)
+    except Exception as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+    click.echo(f"Wrote {out_path} and {evidence_path}")
+
+
+def _import_connector() -> Connector:
+    from sema.models.config import DatabricksConfig
+    from sema.pipeline.build import DatabricksConnectorFactory
+
+    # Same resolution as `sema build`: DATABRICKS_* environment settings.
+    return DatabricksConnectorFactory(DatabricksConfig()).create()
 
 
 def _build_writer(kind: str) -> GraphWriter:
@@ -89,4 +137,4 @@ def _neo4j_writer_from_env() -> GraphWriter:
     return Neo4jGraphWriter(driver)
 
 
-__all__ = ["target_group", "load_cmd"]
+__all__ = ["target_group", "load_cmd", "import_cmd"]

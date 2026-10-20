@@ -1,0 +1,68 @@
+concept_source:
+  id: syn-library
+  identity_system: syn
+  release: "2026-09"
+  scheme:
+    qualified_name: syn_library.demographics
+    description: "Synthetic library data elements for the demographics domain"
+  concepts:
+    relation: lib.data_element
+    group_by: data_element_id
+    roles:
+      concept_id: data_element_id
+      name: data_element_label
+      title: data_element_title
+      definition: data_element_definition
+      data_type: data_element_data_type
+      synonyms: data_element_synonyms
+  value_sets:
+    relation: lib.data_element
+    roles:
+      concept_id: data_element_id
+      code: value_id
+      display: value_label
+      display_fallback: value_title
+      vocabulary_id: value_vocabulary_id
+      concept_code: value_concept_code
+      synonyms: value_synonyms
+  concept_details:
+    relation: lib.concept
+    on: [data_element_id, concept_id]
+    roles:
+      external_refs:
+        - system: omop
+          column: athena_id
+        - system: "{vocabulary_id}"
+          column: concept_code
+  term_details:
+    relation: lib.concept
+    on: [value_id, concept_id]
+    roles:
+      definition: definition
+      external_refs:
+        - system: omop
+          column: athena_id
+  relationships:
+    relation: lib.concept_relationship
+    roles:
+      from: {system: syn, id: concept_id_1, fallback: {system: omop, id: athena_id_1}}
+      to:   {system: syn, id: concept_id_2, fallback: {system: omop, id: athena_id_2}}
+      type: relationship_id
+      hierarchical: is_hierarchical
+  authored_bindings:
+    relation: lib.column_bindings
+    roles:
+      concept_id: data_element_id
+      dataset_label: dataset_label
+      dataset_id: dataset_id
+      columns: source_columns
+      project: project_label
+    dataset_map: dataset_map.yaml
+  value_mappings:
+    relation: lib.value_mappings
+    roles:
+      concept_id: data_element_id
+      source_value: given_value
+      code: mapped_value_id
+      status: mapping_status
+    approved_statuses: ["Reviewed"]
