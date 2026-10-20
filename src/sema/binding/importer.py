@@ -35,6 +35,7 @@ from sema.binding.lifecycle_utils import lifecycle_columns, lifecycle_of, retire
 from sema.binding.mappings_utils import SssomMapping, add_refs, exact_refs, read_mappings
 from sema.binding.models import AuthoredEvidence, Retirement
 from sema.binding.spec import ConceptSourceSpec, ConceptsSpec, ValueSetsSpec
+from sema.binding.term_staging import staged_tables, write_term_staging
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.relations import RelationProvider
 from sema.log import logger
@@ -54,6 +55,7 @@ class _Collected:
     properties: dict[str, Record] = field(default_factory=dict)
     vocabularies: list[Record] = field(default_factory=list)
     terms: list[Record] = field(default_factory=list)
+    staged: list[TermRow] = field(default_factory=list)
     retirements: list[Retirement] = field(default_factory=list)
 
 
@@ -70,7 +72,7 @@ def import_concept_source(
     if spec.concepts:
         _concept_properties(spec, spec.concepts, provider, collected)
     if spec.value_sets:
-        _value_sets(spec, spec.value_sets, provider, collected)
+        _value_sets(spec, spec.value_sets, provider, collected, staging)
     loaded = _loaded_refs(spec, collected)
     mappings = _apply_mappings(spec, provider, collected, loaded)
     manifest: dict[str, Any] = {
@@ -91,6 +93,8 @@ def import_concept_source(
         "relationships": _relationship_rows(spec, provider, loaded),
     }
     authored = _authored(spec, provider, dataset_map, mappings, collected)
+    if staging is not None and collected.staged:
+        write_term_staging(staging, spec.external_namespace, *staged_tables(collected.staged))
     _log_summary(spec, collected, manifest)
     return ConceptImport(manifest=manifest, authored=authored)
 
@@ -156,6 +160,7 @@ def _loaded_refs(spec: ConceptSourceSpec, collected: _Collected) -> set[RefKey]:
     ids = set(collected.properties)
     if spec.spec_version >= 2:
         ids |= {term["code"] for term in collected.terms}
+        ids |= {term.code for term in collected.staged}
     return {(spec.identity_system, loaded_id) for loaded_id in ids}
 
 
@@ -286,6 +291,7 @@ def _value_sets(
     value_sets: ValueSetsSpec,
     provider: RelationProvider,
     collected: _Collected,
+    staging: Staging | None,
 ) -> None:
     roles = value_sets.roles
     join_column = spec.term_details.on[0] if spec.term_details else None
@@ -317,7 +323,25 @@ def _value_sets(
         vocabulary = f"VS_{concept_id}"
         terms = collect_terms(spec, roles, relation, vocabulary, group, details)
         collected.properties[concept_id]["vocabulary_binding"] = {"vocabulary": vocabulary}
-        _add_inline(collected, vocabulary, terms)
+        if _above_cap(spec, vocabulary, terms, staging):
+            collected.vocabularies.append({"name": vocabulary, "source": "EXTERNAL"})
+            collected.staged.extend(terms)
+        else:
+            _add_inline(collected, vocabulary, terms)
+
+
+def _above_cap(
+    spec: ConceptSourceSpec, vocabulary: str, terms: list[TermRow], staging: Staging | None
+) -> bool:
+    cap = spec.term_storage.inline_cap
+    if spec.spec_version < 2 or len(terms) <= cap:
+        return False
+    if staging is None:
+        raise ValueError(
+            f"vocabulary {vocabulary} has {len(terms)} terms, above inline_cap {cap}; "
+            "term staging needs a staging database (--staging)"
+        )
+    return True
 
 
 def _add_inline(collected: _Collected, vocabulary: str, terms: list[TermRow]) -> None:

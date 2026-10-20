@@ -13,6 +13,7 @@ from sema.binding.spec_sections import LifecycleRoles, StatusRole
 @dataclass(frozen=True)
 class Lifecycle:
     retired: bool
+    status: str | None
     replaced_by: str | None
     valid_from: str | None
     valid_to: str | None
@@ -23,6 +24,7 @@ def lifecycle_of(rows: list[Record], roles: LifecycleRoles, relation: str) -> Li
     valid_from, valid_to = valid_dates(rows, roles)
     return Lifecycle(
         retired=is_retired(status, roles.status),
+        status=status,
         replaced_by=first_text(rows, roles.replaced_by),
         valid_from=valid_from,
         valid_to=valid_to,
