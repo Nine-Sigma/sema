@@ -1,0 +1,184 @@
+# A3 fixture: a 50-class ontology in the restricted Turtle subset build_fixture.py reads:
+# @prefix lines, then one triple per line ending in ' .'.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix oio: <http://www.geneontology.org/formats/oboInOwl#> .
+@prefix IAO: <http://purl.obolibrary.org/obo/IAO_> .
+@prefix EX: <http://example.org/EX_> .
+@prefix NCIT: <http://purl.obolibrary.org/obo/NCIT_> .
+
+<http://example.org/ex.owl> rdf:type owl:Ontology .
+<http://example.org/ex.owl> owl:versionIRI <http://example.org/ex/2026-10-01/ex.owl> .
+EX:0001 rdf:type owl:Class .
+EX:0001 rdfs:label "Entity"@en .
+EX:0001 IAO:0000115 "Definition of Entity."@en .
+EX:0002 rdf:type owl:Class .
+EX:0002 rdfs:label "Category 1"@en .
+EX:0002 rdfs:subClassOf EX:0001 .
+EX:0002 IAO:0000115 "Definition of Category 1."@en .
+EX:0002 oio:hasExactSynonym "Category 1 synonym"@en .
+EX:0003 rdf:type owl:Class .
+EX:0003 rdfs:label "Category 2"@en .
+EX:0003 rdfs:subClassOf EX:0001 .
+EX:0003 IAO:0000115 "Definition of Category 2."@en .
+EX:0003 oio:hasExactSynonym "Category 2 synonym"@en .
+EX:0004 rdf:type owl:Class .
+EX:0004 rdfs:label "Category 3"@en .
+EX:0004 rdfs:subClassOf EX:0001 .
+EX:0004 IAO:0000115 "Definition of Category 3."@en .
+EX:0004 oio:hasExactSynonym "Category 3 synonym"@en .
+EX:0005 rdf:type owl:Class .
+EX:0005 rdfs:label "Category 4"@en .
+EX:0005 rdfs:subClassOf EX:0001 .
+EX:0005 IAO:0000115 "Definition of Category 4."@en .
+EX:0005 oio:hasExactSynonym "Category 4 synonym"@en .
+EX:0006 rdf:type owl:Class .
+EX:0006 rdfs:label "Category 5"@en .
+EX:0006 rdfs:subClassOf EX:0001 .
+EX:0006 IAO:0000115 "Definition of Category 5."@en .
+EX:0006 oio:hasExactSynonym "Category 5 synonym"@en .
+EX:0007 rdf:type owl:Class .
+EX:0007 rdfs:label "Category 6"@en .
+EX:0007 rdfs:subClassOf EX:0001 .
+EX:0007 IAO:0000115 "Definition of Category 6."@en .
+EX:0008 rdf:type owl:Class .
+EX:0008 rdfs:label "Category 7"@en .
+EX:0008 rdfs:subClassOf EX:0001 .
+EX:0008 IAO:0000115 "Definition of Category 7."@en .
+EX:0009 rdf:type owl:Class .
+EX:0009 rdfs:label "Category 8"@en .
+EX:0009 rdfs:subClassOf EX:0001 .
+EX:0009 IAO:0000115 "Definition of Category 8."@en .
+EX:0010 rdf:type owl:Class .
+EX:0010 rdfs:label "Category 9"@en .
+EX:0010 rdfs:subClassOf EX:0001 .
+EX:0010 IAO:0000115 "Definition of Category 9."@en .
+EX:0011 rdf:type owl:Class .
+EX:0011 rdfs:label "Item 1"@en .
+EX:0011 rdfs:subClassOf EX:0004 .
+EX:0012 rdf:type owl:Class .
+EX:0012 rdfs:label "Item 2"@en .
+EX:0012 rdfs:subClassOf EX:0005 .
+EX:0013 rdf:type owl:Class .
+EX:0013 rdfs:label "Item 3"@en .
+EX:0013 rdfs:subClassOf EX:0006 .
+EX:0014 rdf:type owl:Class .
+EX:0014 rdfs:label "Item 4"@en .
+EX:0014 rdfs:subClassOf EX:0007 .
+EX:0015 rdf:type owl:Class .
+EX:0015 rdfs:label "Item 5"@en .
+EX:0015 rdfs:subClassOf EX:0008 .
+EX:0016 rdf:type owl:Class .
+EX:0016 rdfs:label "Item 6"@en .
+EX:0016 rdfs:subClassOf EX:0009 .
+EX:0017 rdf:type owl:Class .
+EX:0017 rdfs:label "Item 7"@en .
+EX:0017 rdfs:subClassOf EX:0010 .
+EX:0018 rdf:type owl:Class .
+EX:0018 rdfs:label "Item 8"@en .
+EX:0018 rdfs:subClassOf EX:0002 .
+EX:0019 rdf:type owl:Class .
+EX:0019 rdfs:label "Item 9"@en .
+EX:0019 rdfs:subClassOf EX:0003 .
+EX:0020 rdf:type owl:Class .
+EX:0020 rdfs:label "Item 10"@en .
+EX:0020 rdfs:subClassOf EX:0004 .
+EX:0021 rdf:type owl:Class .
+EX:0021 rdfs:label "Item 11"@en .
+EX:0021 rdfs:subClassOf EX:0005 .
+EX:0022 rdf:type owl:Class .
+EX:0022 rdfs:label "Item 12"@en .
+EX:0022 rdfs:subClassOf EX:0006 .
+EX:0023 rdf:type owl:Class .
+EX:0023 rdfs:label "Item 13"@en .
+EX:0023 rdfs:subClassOf EX:0007 .
+EX:0024 rdf:type owl:Class .
+EX:0024 rdfs:label "Item 14"@en .
+EX:0024 rdfs:subClassOf EX:0008 .
+EX:0025 rdf:type owl:Class .
+EX:0025 rdfs:label "Item 15"@en .
+EX:0025 rdfs:subClassOf EX:0009 .
+EX:0026 rdf:type owl:Class .
+EX:0026 rdfs:label "Item 16"@en .
+EX:0026 rdfs:subClassOf EX:0010 .
+EX:0027 rdf:type owl:Class .
+EX:0027 rdfs:label "Item 17"@en .
+EX:0027 rdfs:subClassOf EX:0002 .
+EX:0028 rdf:type owl:Class .
+EX:0028 rdfs:label "Item 18"@en .
+EX:0028 rdfs:subClassOf EX:0003 .
+EX:0029 rdf:type owl:Class .
+EX:0029 rdfs:label "Item 19"@en .
+EX:0029 rdfs:subClassOf EX:0004 .
+EX:0030 rdf:type owl:Class .
+EX:0030 rdfs:label "Item 20"@en .
+EX:0030 rdfs:subClassOf EX:0005 .
+EX:0031 rdf:type owl:Class .
+EX:0031 rdfs:label "Item 21"@en .
+EX:0031 rdfs:subClassOf EX:0006 .
+EX:0032 rdf:type owl:Class .
+EX:0032 rdfs:label "Item 22"@en .
+EX:0032 rdfs:subClassOf EX:0007 .
+EX:0033 rdf:type owl:Class .
+EX:0033 rdfs:label "Item 23"@en .
+EX:0033 rdfs:subClassOf EX:0008 .
+EX:0034 rdf:type owl:Class .
+EX:0034 rdfs:label "Item 24"@en .
+EX:0034 rdfs:subClassOf EX:0009 .
+EX:0035 rdf:type owl:Class .
+EX:0035 rdfs:label "Item 25"@en .
+EX:0035 rdfs:subClassOf EX:0010 .
+EX:0036 rdf:type owl:Class .
+EX:0036 rdfs:label "Item 26"@en .
+EX:0036 rdfs:subClassOf EX:0002 .
+EX:0037 rdf:type owl:Class .
+EX:0037 rdfs:label "Item 27"@en .
+EX:0037 rdfs:subClassOf EX:0003 .
+EX:0038 rdf:type owl:Class .
+EX:0038 rdfs:label "Item 28"@en .
+EX:0038 rdfs:subClassOf EX:0004 .
+EX:0039 rdf:type owl:Class .
+EX:0039 rdfs:label "Item 29"@en .
+EX:0039 rdfs:subClassOf EX:0005 .
+EX:0040 rdf:type owl:Class .
+EX:0040 rdfs:label "Item 30"@en .
+EX:0040 rdfs:subClassOf EX:0006 .
+EX:0041 rdf:type owl:Class .
+EX:0041 rdfs:label "Item 31"@en .
+EX:0041 rdfs:subClassOf EX:0007 .
+EX:0042 rdf:type owl:Class .
+EX:0042 rdfs:label "Item 32"@en .
+EX:0042 rdfs:subClassOf EX:0008 .
+EX:0043 rdf:type owl:Class .
+EX:0043 rdfs:label "Item 33"@en .
+EX:0043 rdfs:subClassOf EX:0009 .
+EX:0044 rdf:type owl:Class .
+EX:0044 rdfs:label "Item 34"@en .
+EX:0044 rdfs:subClassOf EX:0010 .
+EX:0045 rdf:type owl:Class .
+EX:0045 rdfs:label "Item 35"@en .
+EX:0045 rdfs:subClassOf EX:0002 .
+EX:0046 rdf:type owl:Class .
+EX:0046 rdfs:label "Item 36"@en .
+EX:0046 rdfs:subClassOf EX:0003 .
+EX:0047 rdf:type owl:Class .
+EX:0047 rdfs:label "Item 37"@en .
+EX:0047 rdfs:subClassOf EX:0004 .
+EX:0048 rdf:type owl:Class .
+EX:0048 rdfs:label "Item 38"@en .
+EX:0048 rdfs:subClassOf EX:0005 .
+EX:0049 rdf:type owl:Class .
+EX:0049 rdfs:label "obsolete Item 39"@en .
+EX:0050 rdf:type owl:Class .
+EX:0050 rdfs:label "obsolete Item 40"@en .
+EX:0049 owl:deprecated "true"^^xsd:boolean .
+EX:0049 IAO:0100001 EX:0002 .
+EX:0050 owl:deprecated "true"^^xsd:boolean .
+EX:0050 IAO:0100001 EX:0003 .
+EX:0002 skos:exactMatch NCIT:C1000 .
+EX:0003 skos:exactMatch NCIT:C1001 .
+EX:0004 skos:closeMatch NCIT:C1002 .
+EX:0005 oio:hasDbXref "MESH:D000001" .

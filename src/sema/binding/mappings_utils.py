@@ -29,13 +29,17 @@ def split_curie(curie: str) -> RefKey | None:
     return (prefix, local) if sep and prefix and local else None
 
 
+def subject_index(identity_system: str, loaded_ids: set[str]) -> dict[str, str]:
+    """Subject CURIE to loaded id: ``<system>:<id>``, or the id when it is a CURIE."""
+    index = {f"{identity_system}:{loaded_id}": loaded_id for loaded_id in loaded_ids}
+    index.update({i: i for i in loaded_ids if split_curie(i) is not None})
+    return index
+
+
 def read_mappings(
-    mappings: MappingsSpec,
-    provider: RelationProvider,
-    identity_system: str,
-    loaded_ids: set[str],
+    mappings: MappingsSpec, provider: RelationProvider, subjects: dict[str, str]
 ) -> list[SssomMapping]:
-    """Rows whose subject is a loaded concept or term of the spec's identity system."""
+    """Rows whose subject is a loaded concept or term (see ``subject_index``)."""
     roles = mappings.roles
     columns = [
         roles.subject_id,
@@ -47,12 +51,11 @@ def read_mappings(
         roles.confidence,
     ]
     rows = fetch(provider, mappings.relation, columns, mappings.filter)
-    subjects = {(identity_system, loaded_id) for loaded_id in loaded_ids}
     kept = [
         mapping
         for row in rows
         if (mapping := _mapping(row, mappings)) is not None
-        and split_curie(mapping.subject_id) in subjects
+        and mapping.subject_id in subjects
     ]
     if len(kept) < len(rows):
         logger.info(
@@ -65,15 +68,14 @@ def read_mappings(
 
 
 def exact_refs(
-    mappings: list[SssomMapping], exact_predicates: list[str]
+    mappings: list[SssomMapping], exact_predicates: list[str], subjects: dict[str, str]
 ) -> dict[str, set[RefKey]]:
-    """Object refs per subject local id, for exact-match predicates only."""
+    """Object refs per loaded id, for exact-match predicates only."""
     refs: dict[str, set[RefKey]] = {}
     for mapping in mappings:
-        subject = split_curie(mapping.subject_id)
         target = split_curie(mapping.object_id)
-        if mapping.predicate_id in exact_predicates and subject and target:
-            refs.setdefault(subject[1], set()).add(target)
+        if mapping.predicate_id in exact_predicates and target:
+            refs.setdefault(subjects[mapping.subject_id], set()).add(target)
     return refs
 
 

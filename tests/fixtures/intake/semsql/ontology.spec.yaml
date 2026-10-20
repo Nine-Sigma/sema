@@ -1,0 +1,46 @@
+# A3: the 50-class fixture ontology landed by the semsql loader into schema land_a3.
+# Classes are the terms of one value set hung off a single concept, the ontology
+# itself; subclass edges arrive through the hierarchy form over semsql_edges.
+concept_source:
+  spec_version: 2
+  id: ex-ontology
+  identity_system: EX
+  release: "2026-10-01"
+  default_provider: staging
+  scheme:
+    qualified_name: ex.ontology
+    description: Example ontology landed through semantic-sql
+  concepts:
+    relation: land_a3.semsql_terms
+    group_by: ontology
+    roles:
+      concept_id: ontology
+      name: ontology
+  value_sets:
+    relation: land_a3.semsql_terms
+    roles:
+      concept_id: ontology
+      code: subject
+      display: label
+      synonyms: synonyms
+      status: {column: deprecated, active_values: ["false"], retired_values: ["true"]}
+      replaced_by: replaced_by
+  term_details:
+    relation: land_a3.semsql_terms
+    on: [subject, subject]
+    roles:
+      definition: definition
+  hierarchy:
+    relation: land_a3.semsql_edges
+    child_column: subject
+    parent_column: object
+    relationship_type: rdfs:subClassOf
+  mappings:
+    relation: land_a3.semsql_mappings
+    roles:
+      subject_id: subject_id
+      predicate_id: predicate_id
+      object_id: object_id
+      mapping_justification: mapping_justification
+  term_storage:
+    inline_cap: 100

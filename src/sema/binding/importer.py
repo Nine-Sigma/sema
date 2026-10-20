@@ -32,7 +32,13 @@ from sema.binding.importer_utils import (
     synonyms_of,
 )
 from sema.binding.lifecycle_utils import lifecycle_columns, lifecycle_of, retirement_row
-from sema.binding.mappings_utils import SssomMapping, add_refs, exact_refs, read_mappings
+from sema.binding.mappings_utils import (
+    SssomMapping,
+    add_refs,
+    exact_refs,
+    read_mappings,
+    subject_index,
+)
 from sema.binding.models import AuthoredEvidence, Retirement
 from sema.binding.spec import ConceptSourceSpec, ConceptsSpec, ValueSetsSpec
 from sema.binding.term_staging import staged_tables, write_term_staging
@@ -185,8 +191,9 @@ def _apply_mappings(
         return []
     loaded_ids = {loaded_id for _, loaded_id in loaded}
     loaded_ids |= {term["code"] for term in collected.terms}
-    mappings = read_mappings(spec.mappings, provider, spec.identity_system, loaded_ids)
-    refs = exact_refs(mappings, spec.mappings.exact_predicates)
+    subjects = subject_index(spec.identity_system, loaded_ids)
+    mappings = read_mappings(spec.mappings, provider, subjects)
+    refs = exact_refs(mappings, spec.mappings.exact_predicates, subjects)
     for term in collected.terms:
         add_refs(term, refs.get(term["code"], set()))
     for concept_id, prop in collected.properties.items():
