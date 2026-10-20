@@ -1,0 +1,21 @@
+# A7: the OMOP CDM v5.4 field-level CSV, landed by the tabular loader into
+# schema land_cdm, read as a data dictionary. The DDL is not an A7 input.
+concept_source:
+  spec_version: 2
+  id: omop-cdm
+  identity_system: omop
+  release: "5.4"
+  default_provider: staging
+  entity_model:
+    relation: land_cdm.OMOP_CDMv5_4_Field_Level
+    entity_case: lower
+    roles:
+      entity: cdmTableName
+      property: cdmFieldName
+      type: cdmDatatype
+      required: isRequired
+      primary_key: isPrimaryKey
+      fk_entity: fkTableName
+      fk_property: fkFieldName
+      domain: fkDomain
+      description: userGuidance

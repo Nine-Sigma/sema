@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 from typing import Protocol
 
@@ -18,6 +19,11 @@ _DIGEST_CHUNK = 1 << 20
 
 class Loader(Protocol):
     def __call__(self, source: Path, staging: Staging, *, schema: str) -> LandResult: ...
+
+
+def relation_name(text: str) -> str:
+    """A landed relation name the importer's unquoted SQL can name: word chars only."""
+    return re.sub(r"\W", "_", text)
 
 
 def ensure_schema(staging: Staging, schema: str) -> None:

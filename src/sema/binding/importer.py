@@ -13,6 +13,7 @@ from typing import Any
 
 import yaml
 
+from sema.binding.importer_entity_utils import entity_model_entities
 from sema.binding.importer_evidence_utils import column_bindings, value_mappings
 from sema.binding.importer_relationships_utils import hierarchy_rows, relationship_rows
 from sema.binding.importer_terms_utils import TermRow, collect_terms
@@ -81,7 +82,12 @@ def import_concept_source(
         },
         "vocabularies": collected.vocabularies,
         "terms": collected.terms,
-        "entities": _scheme_entities(spec, list(collected.properties.values())),
+        "entities": _scheme_entities(spec, list(collected.properties.values()))
+        + (
+            entity_model_entities(spec, spec.entity_model, provider)
+            if spec.entity_model
+            else []
+        ),
         "relationships": _relationship_rows(spec, provider, loaded),
     }
     authored = _authored(spec, provider, dataset_map, mappings, collected)

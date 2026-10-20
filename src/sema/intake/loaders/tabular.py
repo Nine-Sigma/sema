@@ -1,7 +1,7 @@
 """Land CSV, XLSX, and Parquet sources as staging relations.
 
 One relation per workbook sheet (``<file stem>__<sheet>``) or per CSV or
-Parquet file (``<file stem>``). Every row carries ``_sema_locator`` as
+Parquet file (``<file stem>``), with non-word characters replaced by ``_``. Every row carries ``_sema_locator`` as
 ``<sheet>!<physical row>``; CSV and Parquet use the file stem as the sheet.
 Merged cells are not expanded: ``openpyxl`` reports only the top-left cell.
 """
@@ -26,6 +26,7 @@ from sema.intake.loaders.base import (
     ensure_schema,
     file_digest,
     provenance,
+    relation_name,
     write_arrow,
 )
 from sema.intake.loaders.tabular_utils import (
@@ -109,11 +110,11 @@ def source_files(source: Path) -> list[Path]:
 
 def _plan(path: Path) -> list[_Sheet]:
     if path.suffix.lower() != ".xlsx":
-        return [_Sheet(path=path, label=path.stem, name=path.stem)]
+        return [_Sheet(path=path, label=path.stem, name=relation_name(path.stem))]
     workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
     try:
         return [
-            _Sheet(path=path, label=title, name=f"{path.stem}__{title}")
+            _Sheet(path=path, label=title, name=relation_name(f"{path.stem}__{title}"))
             for title in workbook.sheetnames
         ]
     finally:

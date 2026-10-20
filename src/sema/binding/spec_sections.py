@@ -237,8 +237,11 @@ class EntityModelRoles(_SpecModel):
 
 
 class EntityModelSpec(_SpecModel):
+    """``entity_case: lower`` lowercases entity, property, and foreign key names."""
+
     relation: RelationRef
     roles: EntityModelRoles
+    entity_case: Literal["preserve", "lower"] = "preserve"
     filter: str | None = None
 
 

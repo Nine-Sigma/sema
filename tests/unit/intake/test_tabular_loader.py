@@ -206,3 +206,16 @@ def test_two_landings_produce_equal_snapshots(tmp_path: Path) -> None:
     assert one.source_identity == two.source_identity
     first.close()
     second.close()
+
+
+def test_non_word_characters_in_names_become_underscores(
+    tmp_path: Path, staging: Staging
+) -> None:
+    path = tmp_path / "OMOP_CDMv5.4 fields.csv"
+    path.write_text("code,name\nA,Alpha\n")
+
+    result = _land(path, staging)
+
+    assert [r.name for r in result.relations] == ["OMOP_CDMv5_4_fields"]
+    rows = staging.execute(f"SELECT code FROM {SCHEMA}.OMOP_CDMv5_4_fields").fetchall()
+    assert rows == [("A",)]
