@@ -15,12 +15,12 @@ from sema.targets.adapters.manifest_parser import parse_manifest_raw
 pytestmark = pytest.mark.unit
 
 DICTIONARY = """\
-table_name,column_name,datatype,required,pk,fk_table,fk_column,domain,guidance
-VISIT,VISIT_ID,integer,Yes,Yes,,,,Visit key
-VISIT,PERSON_ID,integer,Yes,No,PERSON,PERSON_ID,,
-VISIT,VISIT_TYPE_ID,integer,No,No,TYPE,TYPE_ID,Visit Type,
-PERSON,PERSON_ID,integer,Yes,Yes,,,,
-PERSON,BIRTH_YEAR,integer,No,No,,,,
+table_name,column_name,datatype,required,pk,fk_table,fk_column,domain,guidance,table_note
+VISIT,VISIT_ID,integer,Yes,Yes,,,,Visit key,Visits to a care site
+VISIT,PERSON_ID,integer,Yes,No,PERSON,PERSON_ID,,,
+VISIT,VISIT_TYPE_ID,integer,No,No,TYPE,TYPE_ID,Visit Type,,
+PERSON,PERSON_ID,integer,Yes,Yes,,,,,
+PERSON,BIRTH_YEAR,integer,No,No,,,,,
 """
 
 ENTITY_MODEL = {
@@ -108,3 +108,12 @@ def test_spec_with_concepts_and_entity_model_produces_both(tmp_path: Path) -> No
         ("ex.person", "TABLE_ROW"),
         ("ex.visit", "TABLE_ROW"),
     ]
+
+
+def test_entity_description_role_reaches_the_context_card(tmp_path: Path) -> None:
+    roles = {**ENTITY_MODEL["roles"], "entity_description": "table_note"}  # type: ignore[dict-item]
+    result = _import(tmp_path, _spec(entity_model={**ENTITY_MODEL, "roles": roles}))
+
+    cards = {e["qualified_name"]: e.get("context_card") for e in result.manifest["entities"]}
+    assert cards["ex.visit"]["description"] == "Visits to a care site"
+    assert cards["ex.person"] is None

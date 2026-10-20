@@ -234,6 +234,7 @@ class EntityModelRoles(_SpecModel):
     fk_property: str | None = None
     domain: str | None = None
     description: str | None = None
+    entity_description: str | None = None
 
 
 class EntityModelSpec(_SpecModel):

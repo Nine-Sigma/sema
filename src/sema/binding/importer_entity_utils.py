@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sema.binding.importer_utils import Record, as_text, fetch, group_by_key
 from sema.binding.spec import ConceptSourceSpec, EntityModelSpec
+from sema.log import logger
 from sema.intake.relations import RelationProvider
 from sema.intake.table_schema import to_manifest_entity
 from sema.intake.table_schema_utils import (
@@ -30,6 +31,7 @@ def entity_model_entities(
             roles.fk_property,
             roles.domain,
             roles.description,
+            roles.entity_description,
         ],
         model.filter,
     )
@@ -37,7 +39,9 @@ def entity_model_entities(
     for entity, group in sorted(group_by_key(rows, roles.entity).items()):
         name = _cased(entity, model)
         dictionary = [row for record in group if (row := _row(record, model))]
-        schema = table_schema_from_rows(name, dictionary)
+        schema = table_schema_from_rows(
+            name, dictionary, description=_entity_description(name, group, model)
+        )
         entities.append(
             to_manifest_entity(
                 schema,
@@ -68,6 +72,23 @@ def _row(record: Record, model: EntityModelSpec) -> DictionaryRow | None:
         domain=_text(record, roles.domain),
         description=_text(record, roles.description),
     )
+
+
+def _entity_description(
+    entity: str, group: list[Record], model: EntityModelSpec
+) -> str | None:
+    column = model.roles.entity_description
+    if column is None:
+        return None
+    found = sorted({text for record in group if (text := as_text(record[column]))})
+    if len(found) > 1:
+        logger.info(
+            "Entity {} has {} distinct {} values; the first is its description",
+            entity,
+            len(found),
+            column,
+        )
+    return found[0] if found else None
 
 
 def _text(record: Record, column: str | None) -> str | None:
