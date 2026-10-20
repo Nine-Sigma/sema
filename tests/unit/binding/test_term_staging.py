@@ -255,3 +255,22 @@ def test_failed_synonym_write_leaves_the_previous_tables(
     assert names == [("Big 2",)]
     assert _fetch(staging, f"SELECT count(*) FROM {NAMESPACE}.concept") == [(6,)]
     assert _fetch(staging, f"SELECT count(*) FROM {NAMESPACE}.concept_synonym") == [(5,)]
+
+
+def test_shrinking_to_the_cap_clears_the_namespace(tmp_path: Path) -> None:
+    path = tmp_path / "staging.duckdb"
+    first = _staging(path, _value_rows(big=6))
+    _import(_spec(), first, first)
+    first.close()
+    second = _staging(path, _value_rows(big=5))
+
+    result = _import(_spec(), second, second)
+
+    vocabularies = {v["name"]: v["source"] for v in result.manifest["vocabularies"]}
+    assert vocabularies["VS_BIG"] == "INLINE"
+    tables = _fetch(
+        second,
+        f"SELECT count(*) FROM duckdb_tables() WHERE schema_name = '{NAMESPACE}'",
+    )
+    assert tables == [(0,)]
+    second.close()

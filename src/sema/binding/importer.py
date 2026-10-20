@@ -41,7 +41,11 @@ from sema.binding.mappings_utils import (
 )
 from sema.binding.models import AuthoredEvidence, Retirement
 from sema.binding.spec import ConceptSourceSpec, ConceptsSpec, ValueSetsSpec
-from sema.binding.term_staging import staged_tables, write_term_staging
+from sema.binding.term_staging import (
+    clear_term_staging,
+    staged_tables,
+    write_term_staging,
+)
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.relations import RelationProvider
 from sema.log import logger
@@ -101,6 +105,8 @@ def import_concept_source(
     authored = _authored(spec, provider, dataset_map, mappings, collected)
     if staging is not None and collected.staged:
         write_term_staging(staging, spec.external_namespace, *staged_tables(collected.staged))
+    elif staging is not None and spec.spec_version >= 2:
+        clear_term_staging(staging, spec.external_namespace)
     _log_summary(spec, collected, manifest)
     return ConceptImport(manifest=manifest, authored=authored)
 

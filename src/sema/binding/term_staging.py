@@ -113,6 +113,21 @@ def write_term_staging(
     staging.execute("COMMIT")
 
 
+def clear_term_staging(staging: Staging, namespace: str) -> None:
+    """Drop the namespace's three tables: a run that stages nothing leaves none."""
+    tables = (_S.concept_table, _S.relationship_table, _S.synonym_table)
+    staging.execute("BEGIN TRANSACTION")
+    try:
+        for table in tables:
+            staging.execute(
+                f"DROP TABLE IF EXISTS {quote_ident(namespace)}.{quote_ident(table)}"
+            )
+    except Exception:
+        staging.execute("ROLLBACK")
+        raise
+    staging.execute("COMMIT")
+
+
 def _append(columns: dict[str, list[object]], *values: object) -> None:
     for name, value in zip(list(columns)[: len(values)], values, strict=True):
         columns[name].append(value)
