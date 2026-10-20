@@ -29,7 +29,7 @@ def column_bindings(
             roles.columns,
             roles.project,
         ],
-        in_concept_scope(roles.concept_id, spec),
+        in_concept_scope(provider, bindings_spec.relation, roles.concept_id, spec),
     )
     bindings: list[AuthoredColumnBinding] = []
     for row in rows:
@@ -72,7 +72,7 @@ def value_mappings(
         provider,
         mappings_spec.relation,
         [roles.concept_id, roles.source_value, roles.code, roles.status],
-        in_concept_scope(roles.concept_id, spec),
+        in_concept_scope(provider, mappings_spec.relation, roles.concept_id, spec),
     )
     approved_statuses = set(mappings_spec.approved_statuses)
     mappings: list[AuthoredValueMapping] = []

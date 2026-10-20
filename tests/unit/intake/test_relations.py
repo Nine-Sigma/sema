@@ -123,3 +123,96 @@ def test_query_text_stays_fixed_select_forms_for_hostile_cells(tmp_path: Path) -
     names = {p["name"] for e in result.manifest["entities"] for p in e["properties"]}
     assert HOSTILE in names
     staging.close()
+
+
+STAGING_REF = RelationRef(provider="staging", name="land.codes")
+WAREHOUSE_REF = RelationRef(provider="warehouse", name="cat.schema.concept")
+PUNCTUATED = "Term, Acronym, or Code Definitions"
+
+
+def _provider() -> Any:
+    from sema.intake.relations import RelationProvider
+
+    return RelationProvider(warehouse=lambda sql: [], staging=None)
+
+
+@pytest.mark.parametrize(
+    ("ref", "identifier", "expected"),
+    [
+        (STAGING_REF, "code", '"code"'),
+        (STAGING_REF, "Column Name", '"Column Name"'),
+        (STAGING_REF, PUNCTUATED, f'"{PUNCTUATED}"'),
+        (STAGING_REF, "table", '"table"'),
+        (STAGING_REF, 'say "hi"', '"say ""hi"""'),
+        (WAREHOUSE_REF, "code", "`code`"),
+        (WAREHOUSE_REF, "Column Name", "`Column Name`"),
+        (WAREHOUSE_REF, 'say "hi"', '`say "hi"`'),
+    ],
+)
+def test_quote_uses_the_provider_identifier_quote(
+    ref: RelationRef, identifier: str, expected: str
+) -> None:
+    assert _provider().quote(ref, identifier) == expected
+
+
+def test_warehouse_rejects_an_identifier_holding_a_backtick() -> None:
+    with pytest.raises(ValueError, match=r"(?i)backtick.*odd`name|odd`name.*backtick"):
+        _provider().quote(WAREHOUSE_REF, "odd`name")
+
+
+@pytest.mark.parametrize(
+    ("ref", "expected"),
+    [
+        (STAGING_REF, '"land"."codes"'),
+        (
+            RelationRef(provider="staging", name="land_a2.codes_a2__Concepts"),
+            '"land_a2"."codes_a2__Concepts"',
+        ),
+        (RelationRef(provider="staging", name="codes"), '"codes"'),
+        (WAREHOUSE_REF, "`cat`.`schema`.`concept`"),
+    ],
+)
+def test_relation_sql_splits_the_dotted_name_and_quotes_each_part(
+    ref: RelationRef, expected: str
+) -> None:
+    assert _provider().relation_sql(ref) == expected
+
+
+def test_relation_sql_rejects_a_warehouse_part_holding_a_backtick() -> None:
+    ref = RelationRef(provider="warehouse", name="cat.sch`ema.concept")
+
+    with pytest.raises(ValueError, match=r"(?i)backtick"):
+        _provider().relation_sql(ref)
+
+
+def test_warehouse_statement_names_the_relation_with_backticks() -> None:
+    from sema.binding.importer import import_concept_source
+    from sema.intake.relations import RelationProvider
+
+    statements: list[str] = []
+
+    def warehouse(sql: str) -> list[tuple[Any, ...]]:
+        statements.append(sql)
+        return [("A", "Alpha")]
+
+    spec = ConceptSourceSpec.model_validate(
+        {
+            "spec_version": 2,
+            "id": "codes",
+            "identity_system": "ex",
+            "release": "1",
+            "default_provider": "warehouse",
+            "scheme": {"qualified_name": "ex.codes", "description": "Codes"},
+            "concepts": {
+                "relation": "cat.schema.concept",
+                "group_by": "code",
+                "roles": {"concept_id": "code", "name": "label"},
+            },
+        }
+    )
+
+    import_concept_source(
+        spec, RelationProvider(warehouse=warehouse, staging=None), dataset_map={}
+    )
+
+    assert statements == ["SELECT `code`, `label` FROM `cat`.`schema`.`concept`"]

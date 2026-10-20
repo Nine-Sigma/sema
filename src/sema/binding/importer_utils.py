@@ -32,22 +32,34 @@ class Details:
     external_refs: set[RefKey] = field(default_factory=set)
 
 
-def select_sql(relation: str, columns: Iterable[str], where: str | None = None) -> str:
-    sql = f"SELECT {', '.join(columns)} FROM {relation}"
+def select_sql(
+    provider: RelationProvider,
+    relation: RelationRef,
+    columns: Iterable[str],
+    where: str | None = None,
+) -> str:
+    names = ", ".join(provider.quote(relation, column) for column in columns)
+    sql = f"SELECT {names} FROM {provider.relation_sql(relation)}"
     return f"{sql} WHERE {where}" if where else sql
 
 
-def concept_scope_sql(spec: ConceptSourceSpec) -> str:
+def concept_scope_sql(spec: ConceptSourceSpec, provider: RelationProvider) -> str:
     concepts = spec.concepts
     if concepts is None:
         raise ValueError(f"spec {spec.id} has no concepts section to scope by")
     return select_sql(
-        concepts.relation.name, [concepts.roles.concept_id], concepts.filter
+        provider, concepts.relation, [concepts.roles.concept_id], concepts.filter
     )
 
 
-def in_concept_scope(column: str, spec: ConceptSourceSpec) -> str:
-    return f"{column} IN ({concept_scope_sql(spec)})"
+def in_concept_scope(
+    provider: RelationProvider,
+    relation: RelationRef,
+    column: str,
+    spec: ConceptSourceSpec,
+) -> str:
+    scope = concept_scope_sql(spec, provider)
+    return f"{provider.quote(relation, column)} IN ({scope})"
 
 
 def fetch(
@@ -60,7 +72,8 @@ def fetch(
     names = list(dict.fromkeys(c for c in columns if c))
     query = provider.query(relation)
     records = [
-        dict(zip(names, row)) for row in query(select_sql(relation.name, names, where))
+        dict(zip(names, row))
+        for row in query(select_sql(provider, relation, names, where))
     ]
     return sorted(records, key=lambda r: [str(r[name]) for name in names])
 
@@ -165,7 +178,7 @@ def read_details(
             details.roles.definition,
             *ref_columns(details.roles.external_refs),
         ],
-        f"{key_column} IN ({source_sql})",
+        f"{provider.quote(details.relation, key_column)} IN ({source_sql})",
     )
     index: dict[str, Details] = {}
     for row in rows:

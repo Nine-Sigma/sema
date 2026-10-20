@@ -7,9 +7,9 @@ License: U.S. Government work, public domain (17 U.S.C. 105).
 Copy date: 2026-10-20. File: `CollegeScorecardDataDictionary.xlsx` (770 KB),
 copied unchanged.
 
-Commit: added in the commit whose subject is: chore: add acris and held-out
-fixtures and the source-literal guard. It precedes every commit that sets a
-floor, lexicon token, ignore profile, or extractor pattern.
+Commit: 5d7afa8 (chore: add acris and held-out fixtures and the source-literal
+guard). It precedes every commit that sets a floor, lexicon token, ignore
+profile, or extractor pattern.
 
 Axes on which it differs, read from the publisher's documentation and the
 sheet list and first rows only:
@@ -27,10 +27,9 @@ sheet list and first rows only:
 - Domain: U.S. higher education institutions and fields of study. A2 is a
   synthetic code library, A7 the OMOP clinical CDM, A10 NYC property records.
 
-Landing on the S1 tabular loader, called once into a scratch DuckDB, fails:
-
-    ValueError: sheet ChangeLog: no row passes the header tests (at least 80% of
-    cells are non-empty strings; the strings are unique within the row, ignoring
-    case; none recurs in its column within the first 50 rows)
-
-This is the trailing-empty-column case the tabular landing fix addresses.
+Landing: after the group 2 and group 3 fixes, the tabular loader lands the
+workbook with 8 relations, one per sheet
+(`tests/unit/intake/test_heldout_landing.py`). Before those fixes it failed
+first at sheet ChangeLog (no row passed the header tests, the trailing empty
+column case), then with bug-738 (a column name holding a double quote broke
+the staging INSERT).

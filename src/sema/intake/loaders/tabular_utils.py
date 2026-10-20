@@ -2,9 +2,9 @@
 
 A header is the first row, within the first ``HEADER_SCAN_ROWS``, where at least
 ``HEADER_MIN_STRING_RATIO`` of the cells are non-empty strings (trailing columns
-empty throughout the window do not count), those strings are
-unique within the row ignoring case, and none of them recurs in its own column in
-the window. Text that parses as a number is not a header string: CSV cells arrive
+empty throughout the window do not count), those strings are unique within the
+row ignoring case and whitespace runs, and none of them recurs in its own column
+in the window. Text that parses as a number is not a header string: CSV cells arrive
 as text.
 
 A column is numeric only when every text cell survives the round trip: ``1.10``
@@ -23,7 +23,7 @@ HEADER_MIN_STRING_RATIO = 0.8
 HEADER_SCAN_ROWS = 50
 HEADER_TESTS = (
     f"at least {HEADER_MIN_STRING_RATIO:.0%} of cells are non-empty strings",
-    "the strings are unique within the row, ignoring case",
+    "the strings are unique within the row, ignoring case and whitespace runs",
     f"none recurs in its column within the first {HEADER_SCAN_ROWS} rows",
 )
 EMPTY_COLUMN_PREFIX = "_empty_"
@@ -74,7 +74,8 @@ def _is_header(row: list[Any], width: int, counts: list[Counter[str]]) -> bool:
     }
     if len(strings) < HEADER_MIN_STRING_RATIO * width - 1e-9:
         return False
-    if len({text.casefold() for text in strings.values()}) != len(strings):
+    folded = {collapse_whitespace(text).casefold() for text in strings.values()}
+    if len(folded) != len(strings):
         return False
     return all(counts[index][text] == 1 for index, text in strings.items())
 

@@ -249,7 +249,9 @@ def _concept_properties(
     )
     details: dict[str, Details] = {}
     if spec.concept_details and join_column:
-        source_sql = select_sql(concepts.relation.name, [join_column], concepts.filter)
+        source_sql = select_sql(
+            provider, concepts.relation, [join_column], concepts.filter
+        )
         details = read_details(provider, spec.concept_details, source_sql)
     properties: dict[str, Record] = {}
     # One row per (concept, value): grouping stops one property per value.
@@ -308,7 +310,7 @@ def _value_sets(
 ) -> None:
     roles = value_sets.roles
     join_column = spec.term_details.on[0] if spec.term_details else None
-    scope = in_concept_scope(roles.concept_id, spec)
+    scope = in_concept_scope(provider, value_sets.relation, roles.concept_id, spec)
     rows = fetch(
         provider,
         value_sets.relation,
@@ -327,7 +329,7 @@ def _value_sets(
     )
     details: dict[str, Details] = {}
     if spec.term_details and join_column:
-        source_sql = select_sql(value_sets.relation.name, [join_column], scope)
+        source_sql = select_sql(provider, value_sets.relation, [join_column], scope)
         details = read_details(provider, spec.term_details, source_sql)
     relation = value_sets.relation.name
     for concept_id, group in sorted(group_by_key(rows, roles.concept_id).items()):

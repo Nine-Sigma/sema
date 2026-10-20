@@ -2,7 +2,8 @@
 
 The importer never knows where a relation lives: it asks the provider for the
 query function of each ``RelationRef``. Statements are built by the caller from
-spec identifiers only; the provider runs them unchanged.
+spec identifiers only, each quoted with the provider's identifier quote; the
+provider runs them unchanged.
 """
 
 from __future__ import annotations
@@ -13,12 +14,17 @@ from typing import Any
 
 from sema.binding.spec_sections import RelationRef
 from sema.ingest.duckdb_staging import Staging
+from sema.ingest.duckdb_staging_utils import quote_ident
 
 QueryFn = Callable[[str], list[tuple[Any, ...]]]
 
 
 class MissingProviderError(ValueError):
     """A spec names a provider the caller did not supply."""
+
+
+class UnquotableIdentifierError(ValueError):
+    """A spec identifier holds the provider's quote character and cannot be quoted."""
 
 
 @dataclass(frozen=True)
@@ -32,6 +38,19 @@ class RelationProvider:
         if self.warehouse is None:
             raise _missing(ref)
         return self.warehouse
+
+    def quote(self, ref: RelationRef, identifier: str) -> str:
+        if ref.provider == "staging":
+            return quote_ident(identifier)
+        if "`" in identifier:
+            raise UnquotableIdentifierError(
+                f"warehouse identifier {identifier!r} holds a backtick; the "
+                f"warehouse quotes identifiers with backticks, so rename it"
+            )
+        return f"`{identifier}`"
+
+    def relation_sql(self, ref: RelationRef) -> str:
+        return ".".join(self.quote(ref, part) for part in ref.name.split("."))
 
     def require(self, refs: Iterable[RelationRef]) -> None:
         for ref in refs:

@@ -46,7 +46,7 @@ def relationship_rows(
             roles.type,
             roles.hierarchical,
         ],
-        relationship_scope(spec, relation),
+        relationship_scope(spec, relation, provider),
     )
     kept: dict[tuple[RefKey, RefKey, str], Record] = {}
     for row in rows:
@@ -68,11 +68,13 @@ def relationship_rows(
     return [kept[key] for key in sorted(kept)]
 
 
-def relationship_scope(spec: ConceptSourceSpec, relation: RelationshipsSpec) -> str:
-    roles = relation.roles
+def relationship_scope(
+    spec: ConceptSourceSpec, relation: RelationshipsSpec, provider: RelationProvider
+) -> str:
+    roles, ref = relation.roles, relation.relation
     scope = (
-        f"({in_concept_scope(roles.from_.id, spec)}"
-        f" OR {in_concept_scope(roles.to.id, spec)})"
+        f"({in_concept_scope(provider, ref, roles.from_.id, spec)}"
+        f" OR {in_concept_scope(provider, ref, roles.to.id, spec)})"
     )
     extra = relation.filter
     return f"({extra}) AND {scope}" if extra else scope

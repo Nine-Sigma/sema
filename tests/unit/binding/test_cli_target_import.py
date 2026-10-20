@@ -11,7 +11,11 @@ from click.testing import CliRunner
 
 from sema.cli_target import target_group
 from sema.targets.registry import _clear_for_tests
-from tests.unit.binding.fixtures.concept_library import SPEC_PATH, build_library
+from tests.unit.binding.fixtures.concept_library import (
+    SPEC_PATH,
+    build_library,
+    warehouse_sql,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -21,7 +25,7 @@ class _DuckDBConnector:
         self._con = build_library()
 
     def execute_query(self, query: str) -> list[tuple[Any, ...]]:
-        return self._con.execute(query).fetchall()
+        return self._con.execute(warehouse_sql(query)).fetchall()
 
 
 @pytest.fixture(autouse=True)

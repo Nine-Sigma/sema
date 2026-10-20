@@ -47,7 +47,11 @@ class _RecordingQuery:
         return rows
 
     def relationship_calls(self) -> list[tuple[str, list[tuple[Any, ...]]]]:
-        return [(sql, rows) for sql, rows in self.calls if RELATIONSHIP_FROM in sql]
+        return [
+            (sql, rows)
+            for sql, rows in self.calls
+            if RELATIONSHIP_FROM in sql.replace("`", "")
+        ]
 
 
 def _import_from(con: duckdb.DuckDBPyConnection, query: QueryFn | None = None) -> Any:
@@ -130,6 +134,7 @@ def test_scalar_code_imports_as_one_element_list() -> None:
 def test_relationship_query_carries_concept_scope_predicate() -> None:
     from sema.binding.importer_utils import in_concept_scope
     from sema.binding.spec import load_concept_source_spec
+    from sema.intake.relations import RelationProvider
 
     spec = load_concept_source_spec(SPEC_PATH)
     con = build_library()
@@ -139,9 +144,10 @@ def test_relationship_query_carries_concept_scope_predicate() -> None:
     calls = recorder.relationship_calls()
     assert len(calls) == 1
     sql = calls[0][0]
-    roles = spec.relationships.roles
-    assert in_concept_scope(roles.from_.id, spec) in sql
-    assert in_concept_scope(roles.to.id, spec) in sql
+    roles, ref = spec.relationships.roles, spec.relationships.relation
+    provider = RelationProvider(warehouse=recorder, staging=None)
+    assert in_concept_scope(provider, ref, roles.from_.id, spec) in sql
+    assert in_concept_scope(provider, ref, roles.to.id, spec) in sql
     # Scope comes from identifiers and the concepts subquery, never row values.
     assert not [concept_id for concept_id in CONCEPT_IDS if concept_id in sql]
 

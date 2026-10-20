@@ -8,6 +8,7 @@ would emit one property per value.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Callable
 
@@ -29,6 +30,7 @@ RESOLVED_PHYSICAL = "syn_cat.syn_schema.patient"
 MULTI_CODES = ["SYN_RACE_WHITE", "SYN_RACE_BLACK"]
 
 QueryFn = Callable[[str], list[tuple[Any, ...]]]
+BACKTICK_IDENTIFIER = re.compile(r"`((?:[^`]|``)*)`")
 
 _CONCEPTS = (
     ("SYN_RACE", "Race", "Patient race", "Self-identified ancestral grouping."),
@@ -100,10 +102,20 @@ def build_library() -> duckdb.DuckDBPyConnection:
     return con
 
 
+def warehouse_sql(sql: str) -> str:
+    """Warehouse (Databricks) backtick identifiers rewritten for the DuckDB stand-in."""
+
+    def to_duckdb(match: re.Match[str]) -> str:
+        name = match.group(1).replace("``", "`")
+        return '"' + name.replace('"', '""') + '"'
+
+    return BACKTICK_IDENTIFIER.sub(to_duckdb, sql)
+
+
 def query_fn(con: duckdb.DuckDBPyConnection) -> QueryFn:
     # Same shape as Connector.execute_query: positional tuples, no column names.
     def run(sql: str) -> list[tuple[Any, ...]]:
-        return con.execute(sql).fetchall()
+        return con.execute(warehouse_sql(sql)).fetchall()
 
     return run
 

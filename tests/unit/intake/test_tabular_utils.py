@@ -87,6 +87,24 @@ def test_header_strings_must_be_unique_ignoring_case() -> None:
     assert _detect(rows) is None
 
 
+@pytest.mark.parametrize(
+    "pair",
+    [("a b", "a  b"), ("a b", "a\nb"), ("Line Break", "line \t break")],
+)
+def test_header_strings_must_be_unique_after_collapsing_whitespace(
+    pair: tuple[str, str],
+) -> None:
+    rows: list[list[object]] = [[*pair, "label"], ["1", "2", "3"]]
+
+    assert _detect(rows) is None
+
+
+def test_header_strings_differing_in_more_than_whitespace_still_pass() -> None:
+    rows: list[list[object]] = [["a b", "a  bc", "label"], ["1", "2", "3"]]
+
+    assert _detect(rows) == 1
+
+
 def test_trailing_empty_columns_do_not_count_toward_the_width() -> None:
     padding: list[object] = [None] * 14
     rows: list[list[object]] = [

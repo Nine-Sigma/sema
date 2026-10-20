@@ -17,6 +17,7 @@ import duckdb
 from sema.binding.spec import ConceptSourceSpec
 from sema.intake.relations import RelationProvider
 from sema.log import logger
+from tests.unit.binding.fixtures.concept_library import warehouse_sql
 
 RETIRED_TERM = "RACE_X"
 RETIRED_CONCEPT = "OLD"
@@ -103,7 +104,7 @@ def build_library_v2() -> duckdb.DuckDBPyConnection:
 
 def provider_v2(con: duckdb.DuckDBPyConnection) -> RelationProvider:
     def run(sql: str) -> list[tuple[Any, ...]]:
-        return con.execute(sql).fetchall()
+        return con.execute(warehouse_sql(sql)).fetchall()
 
     return RelationProvider(warehouse=run, staging=None)
 

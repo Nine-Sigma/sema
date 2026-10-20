@@ -33,14 +33,6 @@ def _expected_relations() -> set[str]:
     return names
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Staging._insert_rows quotes column names as f'\"{c}\"' without doubling an "
-        "embedded quote: _duckdb.ParserException: Parser Error: syntax error at or "
-        'near "Most" on the column \'Cohort/Measure in "Most Recent" Datafile\''
-    ),
-)
 def test_heldout_fixture_lands_with_every_relation_accounted_for(tmp_path: Path) -> None:
     from sema.intake.loaders.tabular import land_tabular
 
