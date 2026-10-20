@@ -1,0 +1,8 @@
+# A10 run descriptor: the values of acris.spec.yaml that no predicate derives.
+id: acris
+identity_system: acris
+release: "2026-10-20"
+term_storage:
+  inline_cap: 5000
+  external_namespace: vocabulary_acris
+entity_case: preserve

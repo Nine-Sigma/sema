@@ -71,6 +71,8 @@ R29_POLICY = EngineCouplingPolicy(
         "src/sema/targets/adapters",
         "src/sema/eval",
         "src/sema/intake/loaders/athena.py",
+        # The lexicon is the single home of role literals the denylist names.
+        "src/sema/intake/lexicon.py",
         "tests",
     ),
 )
