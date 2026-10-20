@@ -11,3 +11,7 @@ Rules:
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update src` to keep the graph current (AST-only, no API cost).
 - graphify-out/ is local only and gitignored. Never commit graph.json or any other graphify output.
+
+## Test cost rule (always)
+
+The suite is large. While developing, run only the tests relevant to the change: the test file(s) for the modules touched, or `uv run pytest -k <name>`. Never run the full suite after each edit. Run the full unit suite exactly once at the end of the task, in parallel: `uv run pytest -n auto`. Run integration or e2e tests once at the end only when the task needs them. A Claude Code hook (`.claude/hooks/pytest-scope.py`) refuses a full serial `pytest` call; Codex and other agents must follow the rule themselves.
