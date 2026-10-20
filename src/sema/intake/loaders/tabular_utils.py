@@ -2,12 +2,17 @@
 
 A header is the first row, within the first ``HEADER_SCAN_ROWS``, where at least
 ``HEADER_MIN_STRING_RATIO`` of the cells are non-empty strings, those strings are
-unique within the row, and none of them recurs in its own column in the window.
-Text that parses as a number is not a header string: CSV cells arrive as text.
+unique within the row ignoring case, and none of them recurs in its own column in
+the window. Text that parses as a number is not a header string: CSV cells arrive
+as text.
+
+A column is numeric only when every text cell survives the round trip: ``1.10``
+and ``007`` stay text, because a code column must keep each code's identity.
 """
 
 from __future__ import annotations
 
+import math
 import re
 from collections import Counter
 from datetime import date, datetime
@@ -17,12 +22,13 @@ HEADER_MIN_STRING_RATIO = 0.8
 HEADER_SCAN_ROWS = 50
 HEADER_TESTS = (
     f"at least {HEADER_MIN_STRING_RATIO:.0%} of cells are non-empty strings",
-    "the strings are unique within the row",
+    "the strings are unique within the row, ignoring case",
     f"none recurs in its column within the first {HEADER_SCAN_ROWS} rows",
 )
 EMPTY_COLUMN_PREFIX = "_empty_"
 
-_INTEGER_TEXT = re.compile(r"^[+-]?(0|[1-9]\d*)$")
+_INTEGER_TEXT = re.compile(r"^-?(0|[1-9]\d*)$")
+_BIGINT_RANGE = range(-(2**63), 2**63)
 _BOOL_TEXT = {"true": True, "false": False}
 
 
@@ -53,7 +59,7 @@ def _is_header(row: list[Any], width: int, counts: list[Counter[str]]) -> bool:
     }
     if len(strings) < HEADER_MIN_STRING_RATIO * width - 1e-9:
         return False
-    if len(set(strings.values())) != len(strings):
+    if len({text.casefold() for text in strings.values()}) != len(strings):
         return False
     return all(counts[index][text] == 1 for index, text in strings.items())
 
@@ -94,16 +100,28 @@ def _is_int(value: Any) -> bool:
     if isinstance(value, bool):
         return False
     if isinstance(value, int):
-        return True
-    return isinstance(value, str) and bool(_INTEGER_TEXT.match(value.strip()))
+        return value in _BIGINT_RANGE
+    if not isinstance(value, str) or not _INTEGER_TEXT.match(value.strip()):
+        return False
+    return int(value) in _BIGINT_RANGE
 
 
 def _is_float(value: Any) -> bool:
     if isinstance(value, bool):
         return False
-    if isinstance(value, (int, float)):
+    if isinstance(value, int):
+        return value in _BIGINT_RANGE
+    if isinstance(value, float):
         return True
-    return isinstance(value, str) and _parses_float(value)
+    return isinstance(value, str) and _float_round_trips(value.strip())
+
+
+def _float_round_trips(text: str) -> bool:
+    try:
+        number = float(text)
+    except ValueError:
+        return False
+    return math.isfinite(number) and repr(number) == text
 
 
 def _parses_float(text: str) -> bool:

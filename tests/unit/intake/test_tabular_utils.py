@@ -79,3 +79,31 @@ def test_numeric_text_is_not_a_header_string() -> None:
     rows: list[list[object]] = [["1", "2"], ["3", "4"]]
 
     assert _detect(rows) is None
+
+
+def test_header_strings_must_be_unique_ignoring_case() -> None:
+    rows: list[list[object]] = [["Code", "code", "label"], ["1", "2", "3"]]
+
+    assert _detect(rows) is None
+
+
+@pytest.mark.parametrize(
+    ("values", "expected"),
+    [
+        (["1", "1.1", "1.2", "1.10"], "VARCHAR"),
+        (["007", "008"], "VARCHAR"),
+        (["+1", "2"], "VARCHAR"),
+        (["1e5"], "VARCHAR"),
+        (["12345678901234567890"], "VARCHAR"),
+        (["0.5", "1.25", "2.0"], "DOUBLE"),
+        (["1", "-2", " 3 "], "BIGINT"),
+        ([1, 2.5], "DOUBLE"),
+        ([2**63], "VARCHAR"),
+    ],
+)
+def test_column_is_numeric_only_when_its_text_survives_the_round_trip(
+    values: list[object], expected: str
+) -> None:
+    from sema.intake.loaders.tabular_utils import column_type
+
+    assert column_type(values) == expected

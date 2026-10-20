@@ -2,12 +2,14 @@
 
 One relation per workbook sheet (``<file stem>__<sheet>``) or per CSV or
 Parquet file (``<file stem>``), with non-word characters replaced by ``_``. Every row carries ``_sema_locator`` as
-``<sheet>!<physical row>``; CSV and Parquet use the file stem as the sheet.
+``<sheet>!<physical row>``; CSV and Parquet use the file stem as the sheet, and a
+CSV record that spans lines is located by its first line.
 Merged cells are not expanded: ``openpyxl`` reports only the top-left cell.
 """
 
 from __future__ import annotations
 
+import csv
 import glob
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -151,12 +153,29 @@ def _xlsx_rows(sheet: _Sheet) -> list[list[Any]]:
 
 
 def _csv_rows(path: Path) -> list[list[Any]]:
+    """Row ``n`` starts on physical line ``n``: continuation lines become empty rows."""
+    delimiter, quote = _csv_dialect(path)
+    rows: list[list[Any]] = []
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        reader = csv.reader(handle, delimiter=delimiter, quotechar=quote)
+        start = 1
+        for record in reader:
+            rows.append(list(record))
+            rows.extend([] for _ in range(reader.line_num - start))
+            start = reader.line_num + 1
+    return rows
+
+
+def _csv_dialect(path: Path) -> tuple[str, str]:
     with duckdb.connect(":memory:") as con:
-        rows = con.execute(
-            "SELECT * FROM read_csv_auto(?, header = false, all_varchar = true)",
-            [str(path)],
-        ).fetchall()
-    return [list(row) for row in rows]
+        sniffed = con.execute(
+            "SELECT Delimiter, Quote FROM sniff_csv(?)", [str(path)]
+        ).fetchone()
+    delimiter, quote = (str(sniffed[0]), str(sniffed[1])) if sniffed else (",", '"')
+    return (
+        delimiter if len(delimiter) == 1 else ",",
+        quote if len(quote) == 1 else '"',
+    )
 
 
 def _rows_data(rows: list[list[Any]], label: str) -> _SheetData:
@@ -167,6 +186,7 @@ def _rows_data(rows: list[list[Any]], label: str) -> _SheetData:
         )
     width = max(len(row) for row in rows)
     names = column_names(rows[header_row - 1], width)
+    _check_locator(names, label)
     body = list(_data_rows(rows, header_row, width))
     columns = {name: [row[i] for _, row in body] for i, name in enumerate(names)}
     types = {name: column_type(values) for name, values in columns.items()}
@@ -186,6 +206,14 @@ def _rows_data(rows: list[list[Any]], label: str) -> _SheetData:
     )
 
 
+def _check_locator(names: list[str], label: str) -> None:
+    for name in names:
+        if name.casefold() == LOCATOR_COLUMN:
+            raise ValueError(
+                f"sheet {label}: column {name} collides with the {LOCATOR_COLUMN} column"
+            )
+
+
 def _data_rows(
     rows: list[list[Any]], header_row: int, width: int
 ) -> Iterator[tuple[int, list[Any]]]:
@@ -200,6 +228,7 @@ def _parquet_data(sheet: _Sheet) -> _SheetData:
         con.register("landed", table)
         described = con.execute("DESCRIBE SELECT * FROM landed").fetchall()
     types = {str(row[0]): str(row[1]) for row in described}
+    _check_locator(list(types), sheet.label)
     locators = [f"{sheet.label}!{n}" for n in range(1, table.num_rows + 1)]
     table = table.append_column(LOCATOR_COLUMN, pa.array(locators, pa.string()))
     empty = tuple(

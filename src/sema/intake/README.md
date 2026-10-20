@@ -19,12 +19,12 @@ Landed relation names replace non-word characters with `_`, because the importer
 
 | Loader | Function | Relations | Locator |
 |---|---|---|---|
-| Tabular (CSV, XLSX, Parquet) | `loaders.tabular.land_tabular(source, staging, schema=...)` | one per sheet (`<file stem>__<sheet>`) or per file (`<file stem>`); `source` is a file, a directory, or a glob | `<sheet>!<row>`: the physical sheet row for XLSX, the record number for CSV and Parquet |
+| Tabular (CSV, XLSX, Parquet) | `loaders.tabular.land_tabular(source, staging, schema=...)` | one per sheet (`<file stem>__<sheet>`) or per file (`<file stem>`); `source` is a file, a directory, or a glob | `<sheet>!<row>`: the physical row for XLSX and CSV (a CSV record that spans lines is located by its first line), the record number for Parquet |
 | semsql (OWL, OBO, SKOS via a prebuilt semantic-sql SQLite file) | `loaders.semsql.land_semsql(path, staging, schema=...)` | `statements`, `entailed_edge`, `prefix`, the label, definition, synonym, mapping, deprecation, class, and edge views, plus `semsql_terms`, `semsql_edges`, `semsql_synonyms`, `semsql_mappings` | subject IRI (prefix for `prefix`) |
 | Dictionary (PostgreSQL DDL) | `loaders.dictionary.land_ddl(path, staging, schema=...)` | `<file stem>__columns`: `entity`, `property`, `raw_type`, `nullable`, `ordinal` | `<file name>!<entity>.<property>` |
 | Athena bundle | `loaders.athena.land_athena_bundle(bundle_dir, staging)` | `vocabulary_omop.concept`, `concept_relationship`, and the rest of the bundle | none; relation-level |
 
-The tabular loader picks the header as the first of the first 50 rows where at least 80 percent of cells are non-empty, non-numeric strings, those strings are unique, and none recurs in its column. Merged cells are not expanded.
+The tabular loader picks the header as the first of the first 50 rows where at least 80 percent of cells are non-empty, non-numeric strings, those strings are unique ignoring case, and none recurs in its column. Merged cells are not expanded. A column is typed as a number only when every text cell survives the round trip, so `1.10`, `007`, and integers beyond 64 bits stay text. A header named `_sema_locator` fails the landing.
 
 ## Naming a staging relation in a spec
 

@@ -219,3 +219,85 @@ def test_non_word_characters_in_names_become_underscores(
     assert [r.name for r in result.relations] == ["OMOP_CDMv5_4_fields"]
     rows = staging.execute(f"SELECT code FROM {SCHEMA}.OMOP_CDMv5_4_fields").fetchall()
     assert rows == [("A",)]
+
+
+def test_csv_title_block_keeps_the_physical_header_row_and_locators(
+    tmp_path: Path, staging: Staging
+) -> None:
+    path = tmp_path / "titled.csv"
+    path.write_text("My code list\n\ncode,name,parent\nA,Alpha,\nB,Beta,A\n")
+
+    result = _land(path, staging)
+
+    assert result.relation("titled").header_row == 3
+    assert _rows(staging, "titled", "code, _sema_locator") == [
+        ("A", "titled!4"),
+        ("B", "titled!5"),
+    ]
+
+
+def test_csv_blank_lines_and_multiline_cells_keep_physical_rows(
+    tmp_path: Path, staging: Staging
+) -> None:
+    path = tmp_path / "gaps.csv"
+    path.write_text('code,label\nA,One\n\nB,"Two\nlines"\nC,Three\n')
+
+    _land(path, staging)
+
+    assert _rows(staging, "gaps", "code, label, _sema_locator") == [
+        ("A", "One", "gaps!2"),
+        ("B", "Two\nlines", "gaps!4"),
+        ("C", "Three", "gaps!6"),
+    ]
+
+
+def test_csv_delimiter_is_sniffed(tmp_path: Path, staging: Staging) -> None:
+    path = tmp_path / "semi.csv"
+    path.write_text("code;label\nA;Alpha\nB;Beta\n")
+
+    _land(path, staging)
+
+    assert _rows(staging, "semi", "code, label") == [("A", "Alpha"), ("B", "Beta")]
+
+
+def test_text_that_would_change_as_a_number_lands_as_text(
+    tmp_path: Path, staging: Staging
+) -> None:
+    path = tmp_path / "codes.csv"
+    path.write_text(
+        "code,id,score\n1,12345678901234567890,0.5\n1.1,2,1.25\n1.10,3,2.0\n"
+    )
+
+    result = _land(path, staging)
+
+    assert dict(result.relation("codes").columns) == {
+        "code": "VARCHAR",
+        "id": "VARCHAR",
+        "score": "DOUBLE",
+        "_sema_locator": "VARCHAR",
+    }
+    assert _rows(staging, "codes", "code, id") == [
+        ("1", "12345678901234567890"),
+        ("1.1", "2"),
+        ("1.10", "3"),
+    ]
+
+
+def test_headers_differing_only_in_case_fail_naming_the_sheet(
+    tmp_path: Path, staging: Staging
+) -> None:
+    path = tmp_path / "cased.csv"
+    path.write_text("Code,code,label\nA,a,Alpha\n")
+
+    with pytest.raises(ValueError, match="sheet cased"):
+        _land(path, staging)
+
+
+def test_header_named_like_the_locator_column_fails(
+    tmp_path: Path, staging: Staging
+) -> None:
+    path = tmp_path / "loc.csv"
+    path.write_text("code,_SEMA_LOCATOR\nA,x\n")
+
+    with pytest.raises(ValueError, match="_sema_locator"):
+        _land(path, staging)
