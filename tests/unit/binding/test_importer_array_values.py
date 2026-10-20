@@ -22,6 +22,7 @@ from tests.unit.binding.fixtures.concept_library import (
     QueryFn,
     build_library,
     load_dataset_map,
+    provider_for,
     query_fn,
     with_array_codes,
 )
@@ -58,7 +59,9 @@ def _import(to_array: ToArray | None = None) -> Any:
     query = _as_arrays(run, to_array) if to_array else run
     try:
         return import_concept_source(
-            load_concept_source_spec(SPEC_PATH), query, dataset_map=load_dataset_map()
+            load_concept_source_spec(SPEC_PATH),
+            provider_for(con, query),
+            dataset_map=load_dataset_map(),
         )
     finally:
         con.close()

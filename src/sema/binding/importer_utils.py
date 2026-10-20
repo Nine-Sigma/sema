@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import ast
 import json
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -17,9 +17,9 @@ from sema.binding.spec import (
     DetailsSpec,
     EndpointRole,
     ExternalRefRole,
+    RelationRef,
 )
-
-QueryFn = Callable[[str], list[tuple[Any, ...]]]
+from sema.intake.relations import RelationProvider
 Record = dict[str, Any]
 RefKey = tuple[str, str]
 
@@ -51,15 +51,16 @@ def in_concept_scope(column: str, spec: ConceptSourceSpec) -> str:
 
 
 def fetch(
-    query: QueryFn,
-    relation: str,
+    provider: RelationProvider,
+    relation: RelationRef,
     columns: Iterable[str | None],
     where: str | None = None,
 ) -> list[Record]:
     """Rows as column-keyed dicts, sorted so the import is order-independent."""
     names = list(dict.fromkeys(c for c in columns if c))
+    query = provider.query(relation)
     records = [
-        dict(zip(names, row)) for row in query(select_sql(relation, names, where))
+        dict(zip(names, row)) for row in query(select_sql(relation.name, names, where))
     ]
     return sorted(records, key=lambda r: [str(r[name]) for name in names])
 
@@ -152,13 +153,13 @@ def _is_template(system: str) -> bool:
 
 
 def read_details(
-    query: QueryFn, details: DetailsSpec, source_sql: str
+    provider: RelationProvider, details: DetailsSpec, source_sql: str
 ) -> dict[str, Details]:
     """Details keyed by the join value, limited to keys the source relation holds."""
     key_column = details.on[1]
     rows = fetch(
-        query,
-        details.relation.name,
+        provider,
+        details.relation,
         [
             key_column,
             details.roles.definition,

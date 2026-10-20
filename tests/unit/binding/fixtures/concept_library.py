@@ -14,6 +14,8 @@ from typing import Any, Callable
 import duckdb
 import yaml
 
+from sema.intake.relations import RelationProvider
+
 FIXTURES_DIR = Path(__file__).parent
 SPEC_PATH = FIXTURES_DIR / "concept_source.yaml"
 DATASET_MAP_PATH = FIXTURES_DIR / "dataset_map.yaml"
@@ -106,9 +108,11 @@ def query_fn(con: duckdb.DuckDBPyConnection) -> QueryFn:
     return run
 
 
-def provider_for(con: duckdb.DuckDBPyConnection) -> Any:
-    """What the importer takes as its relation source for this fixture."""
-    return query_fn(con)
+def provider_for(
+    con: duckdb.DuckDBPyConnection, query: QueryFn | None = None
+) -> RelationProvider:
+    """Warehouse-only provider over the fixture, optionally through ``query``."""
+    return RelationProvider(warehouse=query or query_fn(con), staging=None)
 
 
 def with_array_codes(con: duckdb.DuckDBPyConnection) -> None:

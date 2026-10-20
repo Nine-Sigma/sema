@@ -104,6 +104,15 @@ class ConceptSourceSpec(_SpecModel):
         explicit = self.term_storage.external_namespace
         return explicit or "vocabulary_" + re.sub(r"\W", "_", self.id)
 
+    def relation_refs(self) -> list[RelationRef]:
+        """Every relation the spec reads, in section order."""
+        refs: list[RelationRef] = []
+        for section in RELATION_SECTIONS:
+            relation = getattr(getattr(self, section), "relation", None)
+            if isinstance(relation, RelationRef):
+                refs.append(relation)
+        return refs
+
     @field_validator("spec_version")
     @classmethod
     def _supported_version(cls, value: int) -> int:

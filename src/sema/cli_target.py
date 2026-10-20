@@ -12,6 +12,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -23,6 +24,9 @@ from sema.targets.adapters.manifest import (
 )
 from sema.targets.loader import load_target
 from sema.targets.materializer import GraphWriter, InMemoryGraphWriter
+
+if TYPE_CHECKING:
+    from sema.intake.relations import QueryFn
 
 
 @click.group(name="target")
@@ -91,23 +95,52 @@ def load_cmd(manifest_path: Path, writer: str, skip_facets: tuple[str, ...]) -> 
     required=True,
     help="Where to write the authored-evidence sidecar (JSON).",
 )
-def import_cmd(spec_path: Path, out_path: Path, evidence_path: Path) -> None:
+@click.option(
+    "--staging",
+    "staging_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="DuckDB staging database for staging relations and term staging.",
+)
+def import_cmd(
+    spec_path: Path, out_path: Path, evidence_path: Path, staging_path: Path | None
+) -> None:
     """Import a concept library into a manifest plus an authored-evidence sidecar."""
     from sema.binding.importer import import_concept_source, write_import
     from sema.binding.spec import load_concept_source_spec, load_dataset_map
+    from sema.ingest.duckdb_staging import Staging
+    from sema.intake.relations import RelationProvider
 
+    staging: Staging | None = None
     try:
         spec = load_concept_source_spec(spec_path)
-        dataset_map = load_dataset_map(spec.authored_bindings.dataset_map)
-        connector = _import_connector()
+        staging = Staging(str(staging_path), schemas=()) if staging_path else None
+        bindings = spec.authored_bindings
+        dataset_map = load_dataset_map(bindings.dataset_map) if bindings else {}
+        provider = RelationProvider(warehouse=_lazy_warehouse(), staging=staging)
         result = import_concept_source(
-            spec, connector.execute_query, dataset_map=dataset_map
+            spec, provider, dataset_map=dataset_map, staging=staging
         )
         write_import(result, out_path, evidence_path)
     except Exception as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
+    finally:
+        if staging is not None:
+            staging.close()
     click.echo(f"Wrote {out_path} and {evidence_path}")
+
+
+def _lazy_warehouse() -> QueryFn:
+    """Builds the connector on the first warehouse query, never for staging specs."""
+    connectors: list[Connector] = []
+
+    def run(sql: str) -> list[tuple[Any, ...]]:
+        if not connectors:
+            connectors.append(_import_connector())
+        return connectors[0].execute_query(sql)
+
+    return run
 
 
 def _import_connector() -> Connector:

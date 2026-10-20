@@ -12,42 +12,32 @@ from typing import Any
 
 import yaml
 
+from sema.binding.importer_evidence_utils import column_bindings, value_mappings
+from sema.binding.importer_relationships_utils import relationship_rows
 from sema.binding.importer_utils import (
     Details,
-    QueryFn,
     Record,
-    RefKey,
-    as_text,
-    endpoint,
-    endpoint_columns,
-    expand_list,
     fetch,
     first_text,
     group_by_key,
     in_concept_scope,
     matched_details,
-    normalize_bool,
     read_details,
     refs_payload,
     row_external_refs,
     select_sql,
     synonyms_of,
 )
-from sema.binding.models import (
-    AuthoredColumnBinding,
-    AuthoredEvidence,
-    AuthoredValueMapping,
-)
+from sema.binding.models import AuthoredEvidence
 from sema.binding.spec import (
-    AuthoredBindingsSpec,
     ConceptSourceSpec,
     ConceptsSpec,
     ExternalRefRole,
-    RelationshipsSpec,
-    ValueMappingsSpec,
     ValueSetRoles,
     ValueSetsSpec,
 )
+from sema.ingest.duckdb_staging import Staging
+from sema.intake.relations import RelationProvider
 from sema.log import logger
 
 MANIFEST_VERSION = 1
@@ -61,11 +51,17 @@ class ConceptImport:
 
 
 def import_concept_source(
-    spec: ConceptSourceSpec, query: QueryFn, *, dataset_map: dict[str, str]
+    spec: ConceptSourceSpec,
+    provider: RelationProvider,
+    *,
+    dataset_map: dict[str, str],
+    staging: Staging | None = None,
 ) -> ConceptImport:
-    properties = _concept_properties(spec, spec.concepts, query) if spec.concepts else {}
+    provider.require(spec.relation_refs())
+    concepts = spec.concepts
+    properties = _concept_properties(spec, concepts, provider) if concepts else {}
     vocabularies, terms = (
-        _value_sets(spec, spec.value_sets, query, properties)
+        _value_sets(spec, spec.value_sets, provider, properties)
         if spec.value_sets
         else ([], [])
     )
@@ -80,15 +76,17 @@ def import_concept_source(
         "vocabularies": vocabularies,
         "terms": terms,
         "entities": _scheme_entities(spec, list(properties.values())),
-        "relationships": _relationships(spec, spec.relationships, query, loaded)
+        "relationships": relationship_rows(spec, spec.relationships, provider, loaded)
         if spec.relationships
         else [],
     }
     authored = AuthoredEvidence(
-        column_bindings=_column_bindings(spec, spec.authored_bindings, query, dataset_map)
+        column_bindings=column_bindings(
+            spec, spec.authored_bindings, provider, dataset_map
+        )
         if spec.authored_bindings
         else [],
-        value_mappings=_value_mappings(spec, spec.value_mappings, query)
+        value_mappings=value_mappings(spec, spec.value_mappings, provider)
         if spec.value_mappings
         else [],
     )
@@ -126,13 +124,13 @@ def _scheme_entities(spec: ConceptSourceSpec, properties: list[Record]) -> list[
 
 
 def _concept_properties(
-    spec: ConceptSourceSpec, concepts: ConceptsSpec, query: QueryFn
+    spec: ConceptSourceSpec, concepts: ConceptsSpec, provider: RelationProvider
 ) -> dict[str, Record]:
     roles = concepts.roles
     join_column = spec.concept_details.on[0] if spec.concept_details else None
     rows = fetch(
-        query,
-        concepts.relation.name,
+        provider,
+        concepts.relation,
         [
             concepts.group_by,
             roles.concept_id,
@@ -148,7 +146,7 @@ def _concept_properties(
     details: dict[str, Details] = {}
     if spec.concept_details and join_column:
         source_sql = select_sql(concepts.relation.name, [join_column], concepts.filter)
-        details = read_details(query, spec.concept_details, source_sql)
+        details = read_details(provider, spec.concept_details, source_sql)
     properties: dict[str, Record] = {}
     # One row per (concept, value): grouping stops one property per value.
     for group in group_by_key(rows, concepts.group_by).values():
@@ -194,15 +192,15 @@ def _concept_property(
 def _value_sets(
     spec: ConceptSourceSpec,
     value_sets: ValueSetsSpec,
-    query: QueryFn,
+    provider: RelationProvider,
     properties: dict[str, Record],
 ) -> tuple[list[Record], list[Record]]:
     roles = value_sets.roles
     join_column = spec.term_details.on[0] if spec.term_details else None
     scope = in_concept_scope(roles.concept_id, spec)
     rows = fetch(
-        query,
-        value_sets.relation.name,
+        provider,
+        value_sets.relation,
         [
             roles.concept_id,
             roles.code,
@@ -218,7 +216,7 @@ def _value_sets(
     details: dict[str, Details] = {}
     if spec.term_details and join_column:
         source_sql = select_sql(value_sets.relation.name, [join_column], scope)
-        details = read_details(query, spec.term_details, source_sql)
+        details = read_details(provider, spec.term_details, source_sql)
     vocabularies: list[Record] = []
     terms: list[Record] = []
     for concept_id, group in sorted(group_by_key(rows, roles.concept_id).items()):
@@ -268,132 +266,3 @@ def _value_row_ref_roles(roles: ValueSetRoles) -> list[ExternalRefRole]:
     return [
         ExternalRefRole(system=f"{{{roles.vocabulary_id}}}", column=roles.concept_code)
     ]
-
-
-def _relationships(
-    spec: ConceptSourceSpec,
-    relation: RelationshipsSpec,
-    query: QueryFn,
-    loaded: set[RefKey],
-) -> list[Record]:
-    roles = relation.roles
-    rows = fetch(
-        query,
-        relation.relation.name,
-        [
-            *endpoint_columns(roles.from_),
-            *endpoint_columns(roles.to),
-            roles.type,
-            roles.hierarchical,
-        ],
-        _relationship_scope(spec, relation),
-    )
-    kept: dict[tuple[RefKey, RefKey, str], Record] = {}
-    for row in rows:
-        start, end = endpoint(row, roles.from_), endpoint(row, roles.to)
-        rel_type = as_text(row[roles.type])
-        if start is None or end is None or rel_type is None:
-            continue
-        if start not in loaded and end not in loaded:
-            continue
-        kept[(start, end, rel_type)] = {
-            "from": {"system": start[0], "id": start[1]},
-            "to": {"system": end[0], "id": end[1]},
-            "type": rel_type,
-            "hierarchical": normalize_bool(row[roles.hierarchical])
-            if roles.hierarchical
-            else None,
-            "far_end_loaded": start in loaded and end in loaded,
-        }
-    return [kept[key] for key in sorted(kept)]
-
-
-def _relationship_scope(spec: ConceptSourceSpec, relation: RelationshipsSpec) -> str:
-    roles = relation.roles
-    scope = (
-        f"({in_concept_scope(roles.from_.id, spec)}"
-        f" OR {in_concept_scope(roles.to.id, spec)})"
-    )
-    extra = relation.filter
-    return f"({extra}) AND {scope}" if extra else scope
-
-
-def _column_bindings(
-    spec: ConceptSourceSpec,
-    bindings_spec: AuthoredBindingsSpec,
-    query: QueryFn,
-    dataset_map: dict[str, str],
-) -> list[AuthoredColumnBinding]:
-    roles = bindings_spec.roles
-    rows = fetch(
-        query,
-        bindings_spec.relation.name,
-        [
-            roles.concept_id,
-            roles.dataset_label,
-            roles.dataset_id,
-            roles.columns,
-            roles.project,
-        ],
-        in_concept_scope(roles.concept_id, spec),
-    )
-    bindings: list[AuthoredColumnBinding] = []
-    for row in rows:
-        concept_id = as_text(row[roles.concept_id])
-        if concept_id is None:
-            continue
-        label, dataset_id = (
-            as_text(row[roles.dataset_label]),
-            as_text(row[roles.dataset_id]),
-        )
-        physical = _resolve_dataset(dataset_map, label, dataset_id)
-        bindings.append(
-            AuthoredColumnBinding(
-                concept_ref=f"{spec.identity_system}:{concept_id}",
-                dataset_label=label,
-                dataset_id=dataset_id,
-                physical=physical,
-                columns=expand_list(row[roles.columns]),
-                resolved=physical is not None,
-                project=as_text(row[roles.project]) if roles.project else None,
-            )
-        )
-    return bindings
-
-
-def _resolve_dataset(
-    dataset_map: dict[str, str], label: str | None, dataset_id: str | None
-) -> str | None:
-    for key in (label, dataset_id):
-        if key is not None and key in dataset_map:
-            return dataset_map[key]
-    return None
-
-
-def _value_mappings(
-    spec: ConceptSourceSpec, mappings_spec: ValueMappingsSpec, query: QueryFn
-) -> list[AuthoredValueMapping]:
-    roles = mappings_spec.roles
-    rows = fetch(
-        query,
-        mappings_spec.relation.name,
-        [roles.concept_id, roles.source_value, roles.code, roles.status],
-        in_concept_scope(roles.concept_id, spec),
-    )
-    approved_statuses = set(mappings_spec.approved_statuses)
-    mappings: list[AuthoredValueMapping] = []
-    for row in rows:
-        concept_id = as_text(row[roles.concept_id])
-        if concept_id is None:
-            continue
-        status = as_text(row[roles.status])
-        mappings.append(
-            AuthoredValueMapping(
-                concept_ref=f"{spec.identity_system}:{concept_id}",
-                source_value=as_text(row[roles.source_value]),
-                codes=expand_list(row[roles.code]),
-                status=status,
-                approved=status in approved_statuses,
-            )
-        )
-    return mappings

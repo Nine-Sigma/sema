@@ -23,6 +23,7 @@ from tests.unit.binding.fixtures.concept_library import (
     QueryFn,
     build_library,
     load_dataset_map,
+    provider_for,
     query_fn,
     with_array_codes,
 )
@@ -56,7 +57,7 @@ def _import_from(con: duckdb.DuckDBPyConnection, query: QueryFn | None = None) -
     spec = load_concept_source_spec(SPEC_PATH)
     try:
         return import_concept_source(
-            spec, query or query_fn(con), dataset_map=load_dataset_map()
+            spec, provider_for(con, query), dataset_map=load_dataset_map()
         )
     finally:
         con.close()

@@ -78,3 +78,86 @@ def test_target_load_skip_facets_threaded() -> None:
         for d in payload["enrichment_decisions"]
     ]
     assert any(s == "required_skipped" for s in statuses)
+
+
+_STAGING_SPEC = """\
+concept_source:
+  spec_version: 2
+  id: land-codes
+  identity_system: ex
+  release: "1"
+  default_provider: staging
+  scheme: {qualified_name: ex.codes, description: Codes}
+  concepts:
+    relation: land.codes
+    group_by: code
+    roles: {concept_id: code, name: label}
+"""
+
+
+def _staging_file(tmp_path: Path) -> Path:
+    import pyarrow as pa
+
+    from sema.ingest.duckdb_staging import Staging
+
+    path = tmp_path / "staging.duckdb"
+    with Staging(str(path), schemas=("land",)) as staging:
+        staging.write_table(
+            "land",
+            "codes",
+            pa.table({"code": ["A", "B"], "label": ["Alpha", "Beta"]}),
+            {"code": "VARCHAR", "label": "VARCHAR"},
+            {},
+            None,
+        )
+    return path
+
+
+def _no_connector() -> None:
+    raise AssertionError("a staging-only spec must not construct a connector")
+
+
+def _import_args(tmp_path: Path, *extra: str) -> list[str]:
+    spec = tmp_path / "spec.yaml"
+    spec.write_text(_STAGING_SPEC)
+    return [
+        "import",
+        "--spec",
+        str(spec),
+        "--out",
+        str(tmp_path / "manifest.yaml"),
+        "--evidence-out",
+        str(tmp_path / "evidence.json"),
+        *extra,
+    ]
+
+
+def test_target_import_staging_spec_never_constructs_a_connector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import yaml
+
+    monkeypatch.setattr("sema.cli_target._import_connector", _no_connector)
+    staging = _staging_file(tmp_path)
+
+    result = CliRunner().invoke(
+        target_group, _import_args(tmp_path, "--staging", str(staging))
+    )
+
+    assert result.exit_code == 0, result.output
+    manifest = yaml.safe_load((tmp_path / "manifest.yaml").read_text())
+    names = {p["name"] for e in manifest["entities"] for p in e["properties"]}
+    assert names == {"Alpha", "Beta"}
+
+
+def test_target_import_staging_spec_without_staging_names_provider_and_relation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("sema.cli_target._import_connector", _no_connector)
+
+    result = CliRunner().invoke(target_group, _import_args(tmp_path))
+
+    assert result.exit_code != 0
+    assert "staging" in result.output
+    assert "land.codes" in result.output
+    assert not (tmp_path / "manifest.yaml").exists()

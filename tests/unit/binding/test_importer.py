@@ -20,7 +20,7 @@ from tests.unit.binding.fixtures.concept_library import (
     SPEC_PATH,
     build_library,
     load_dataset_map,
-    query_fn,
+    provider_for,
 )
 
 pytestmark = pytest.mark.unit
@@ -40,7 +40,7 @@ def _import() -> Any:
     con = build_library()
     try:
         return import_concept_source(
-            spec, query_fn(con), dataset_map=load_dataset_map()
+            spec, provider_for(con), dataset_map=load_dataset_map()
         )
     finally:
         con.close()
