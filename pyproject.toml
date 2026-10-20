@@ -84,4 +84,5 @@ dev = [
     "types-pyyaml>=6.0.12.20250915",
     "pytest-xdist>=3.6",
     "jsonschema>=4.0",
+    "types-openpyxl>=3.1",
 ]

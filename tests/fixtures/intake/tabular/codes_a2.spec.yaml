@@ -1,0 +1,30 @@
+# A2: a three-sheet workbook landed by the tabular loader into schema land_a2.
+concept_source:
+  spec_version: 2
+  id: codes-a2
+  identity_system: a2
+  release: "2026-10"
+  default_provider: staging
+  scheme:
+    qualified_name: a2.codes
+    description: Synthetic code library landed from a workbook
+  concepts:
+    relation: land_a2.codes_a2__Concepts
+    group_by: concept_code
+    roles:
+      concept_id: concept_code
+      name: concept_name
+      definition: definition
+      data_type: data_type
+  value_sets:
+    relation: land_a2.codes_a2__Values
+    roles:
+      concept_id: concept_code
+      code: code
+      display: label
+      status: {column: status, active_values: [active], retired_values: [deprecated]}
+      replaced_by: successor
+  hierarchy:
+    relation: land_a2.codes_a2__Hierarchy
+    level_columns: [l1, l2, l3]
+    relationship_type: BROADER
