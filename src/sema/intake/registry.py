@@ -17,6 +17,7 @@ from typing import Any
 RUN_STATUSES = frozenset(
     {"running", "waiting_review", "approved", "rejected", "failed", "complete"}
 )
+RUN_REASONS = frozenset({"budget_exceeded", "escalate"})
 INITIAL_STATUS = "running"
 FILTER_COLUMNS = ("status", "stage", "source_identity")
 RECORD_COLUMNS = (
@@ -30,6 +31,7 @@ RECORD_COLUMNS = (
     "model_calls",
     "tokens",
     "cost",
+    "reason",
 )
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -42,9 +44,11 @@ CREATE TABLE IF NOT EXISTS runs (
     updated_at TEXT NOT NULL,
     model_calls INTEGER NOT NULL DEFAULT 0,
     tokens INTEGER NOT NULL DEFAULT 0,
-    cost REAL NOT NULL DEFAULT 0
+    cost REAL NOT NULL DEFAULT 0,
+    reason TEXT
 )
 """
+ADD_REASON_COLUMN = "ALTER TABLE runs ADD COLUMN reason TEXT"
 
 Clock = Callable[[], datetime]
 
@@ -65,10 +69,11 @@ class RunRecord:
     model_calls: int
     tokens: int
     cost: float
+    reason: str | None = None
 
 
 def _record(row: tuple[Any, ...]) -> RunRecord:
-    run_id, source, stage, status, approver, started, updated, calls, tokens, cost = row
+    run_id, source, stage, status, approver, started, updated, calls, tokens, cost, reason = row
     return RunRecord(
         run_id=run_id,
         source=source,
@@ -80,6 +85,7 @@ def _record(row: tuple[Any, ...]) -> RunRecord:
         model_calls=calls,
         tokens=tokens,
         cost=cost,
+        reason=reason,
     )
 
 
@@ -90,6 +96,9 @@ class Registry:
         path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.execute(CREATE_TABLE)
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(runs)")}
+            if "reason" not in columns:
+                conn.execute(ADD_REASON_COLUMN)
 
     def register(self, run_id: str, *, source: str, stage: str) -> None:
         now = self._now()
@@ -104,14 +113,20 @@ class Registry:
         except sqlite3.IntegrityError as err:
             raise ValueError(f"run id {run_id} is already registered") from err
 
-    def advance(self, run_id: str, stage: str, status: str) -> None:
+    def advance(
+        self, run_id: str, stage: str, status: str, reason: str | None = None
+    ) -> None:
+        """Move a run on; a call without a reason clears any reason stored before."""
         if status not in RUN_STATUSES:
             expected = ", ".join(sorted(RUN_STATUSES))
             raise ValueError(f"unknown run status {status!r}; expected one of {expected}")
+        if reason is not None and reason not in RUN_REASONS:
+            expected = ", ".join(sorted(RUN_REASONS))
+            raise ValueError(f"unknown run reason {reason!r}; expected one of {expected}")
         self._update(
             run_id,
-            "stage = ?, status = ?, updated_at = ?",
-            (stage, status, self._now()),
+            "stage = ?, status = ?, reason = ?, updated_at = ?",
+            (stage, status, reason, self._now()),
         )
 
     def count_call(self, run_id: str, tokens: int, cost: float) -> None:
@@ -121,6 +136,14 @@ class Registry:
             " updated_at = ?",
             (tokens, cost, self._now()),
         )
+
+    def get(self, run_id: str) -> RunRecord:
+        query = f"SELECT {', '.join(RECORD_COLUMNS)} FROM runs WHERE run_id = ?"
+        with self._connect() as conn:
+            row = conn.execute(query, (run_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"run id {run_id} is not registered")
+        return _record(row)
 
     def list(
         self, status: str | None = None, stage: str | None = None, source: str | None = None

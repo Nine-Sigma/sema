@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import Field, SecretStr, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Defaults differ by caller: build reads values (``full``), intake starts at ``metadata_only``.
@@ -46,6 +47,32 @@ class LLMConfig(BaseSettings):
 
     provider: str = "databricks"
     model: str = "databricks-llama-4-maverick"
+    api_key: SecretStr = SecretStr("")
+    base_url: str | None = None
+    use_structured_output: str = "auto"
+    request_timeout: int = 120
+
+
+class ModelPrice(BaseModel):
+    input_per_1k: float = Field(ge=0)
+    output_per_1k: float = Field(ge=0)
+
+
+class IntakeModelConfig(BaseSettings):
+    """Model calls for intake: its own provider (never the build default), caps, and prices.
+
+    `provider` stays None unless set for intake, so a run fails at start instead of
+    reading `LLM_PROVIDER`. Cost is an estimate from `prices`, keyed by model id.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="INTAKE_MODEL_")
+
+    provider: str | None = None
+    model: str
+    max_calls: int = Field(ge=0)
+    max_cost: float = Field(ge=0)
+    prices: dict[str, ModelPrice] = Field(default_factory=dict)
+    recordings_dir: Path | None = None
     api_key: SecretStr = SecretStr("")
     base_url: str | None = None
     use_structured_output: str = "auto"

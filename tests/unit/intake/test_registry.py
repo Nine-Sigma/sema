@@ -203,3 +203,99 @@ def test_registry_imports_no_orchestration_framework() -> None:
 
     assert not roots & set(FORBIDDEN_IMPORT_ROOTS)
     assert "sqlite3" in roots
+
+
+OLD_SCHEMA = """
+CREATE TABLE runs (
+    run_id TEXT PRIMARY KEY,
+    source_identity TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    status TEXT NOT NULL,
+    approver TEXT,
+    started_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    model_calls INTEGER NOT NULL DEFAULT 0,
+    tokens INTEGER NOT NULL DEFAULT 0,
+    cost REAL NOT NULL DEFAULT 0
+)
+"""
+
+
+def test_a_registered_run_has_an_empty_reason(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    run_id = _new_id()
+    registry.register(run_id, source="dict", stage="land")
+    registry.advance(run_id, "roles", "running")
+
+    assert _row(registry, run_id).reason is None
+
+
+@pytest.mark.parametrize("reason", ["budget_exceeded", "escalate"])
+def test_advance_stores_the_reason_and_the_status_listing_shows_it(
+    tmp_path: Path, reason: str
+) -> None:
+    registry = _registry(tmp_path)
+    run_id = _new_id()
+    registry.register(run_id, source="dict", stage="land")
+
+    registry.advance(run_id, "review", "waiting_review", reason=reason)
+    (row,) = registry.list(status="waiting_review")
+
+    assert (row.run_id, row.stage, row.status, row.reason) == (
+        run_id,
+        "review",
+        "waiting_review",
+        reason,
+    )
+
+
+def test_advance_rejects_an_unknown_reason(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    run_id = _new_id()
+    registry.register(run_id, source="dict", stage="land")
+
+    with pytest.raises(ValueError, match="tired"):
+        registry.advance(run_id, "review", "waiting_review", reason="tired")
+
+
+def test_an_old_registry_file_gains_the_reason_column_on_open(tmp_path: Path) -> None:
+    path = tmp_path / "registry.sqlite"
+    run_id = _new_id()
+    with sqlite3.connect(path) as conn:
+        conn.execute(OLD_SCHEMA)
+        conn.execute(
+            "INSERT INTO runs (run_id, source_identity, stage, status, started_at, updated_at)"
+            " VALUES (?, 'dict', 'land', 'running', ?, ?)",
+            (run_id, START.isoformat(), START.isoformat()),
+        )
+
+    registry = _registry(tmp_path)
+    with sqlite3.connect(path) as conn:
+        columns = [r[1] for r in conn.execute("PRAGMA table_info(runs)")]
+
+    assert "reason" in columns
+    assert _row(registry, run_id).reason is None
+    registry.advance(run_id, "review", "waiting_review", reason="budget_exceeded")
+    assert _row(_registry(tmp_path), run_id).reason == "budget_exceeded"
+
+
+def test_advance_without_a_reason_clears_the_stored_reason(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    run_id = _new_id()
+    registry.register(run_id, source="dict", stage="land")
+    registry.advance(run_id, "review", "waiting_review", reason="escalate")
+
+    registry.advance(run_id, "review", "approved")
+
+    assert _row(registry, run_id).reason is None
+
+
+def test_get_returns_one_run_and_names_an_unknown_id(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    run_id = _new_id()
+    registry.register(run_id, source="dict", stage="land")
+    registry.count_call(run_id, tokens=10, cost=0.5)
+
+    assert registry.get(run_id) == _row(registry, run_id)
+    with pytest.raises(KeyError, match="missing-run"):
+        registry.get("missing-run")
