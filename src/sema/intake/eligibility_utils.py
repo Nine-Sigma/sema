@@ -8,7 +8,7 @@ normalized token sequences. The embedding rank is optional and settles nothing u
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -27,13 +27,14 @@ __all__ = [
     "RoleEligibility",
     "RoleMemory",
     "RunDescriptor",
+    "StatedChoice",
     "lexicon_hits",
     "mentions",
     "normalize",
 ]
 
 EMBEDDING_MARGIN_FLOOR: float | None = None
-EligibilitySource = Literal["code", "memory", "lexicon", "embedding", "human"]
+EligibilitySource = Literal["code", "memory", "lexicon", "embedding", "human", "model"]
 HintSource = Literal["memory", "lexicon", "embedding"]
 # Ordinal, not calibrated: S3 calibrates confidence against the gold set.
 SOURCE_CONFIDENCE: dict[str, float] = {
@@ -77,12 +78,41 @@ class RoleEligibility(BaseModel):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     source: EligibilitySource | None = None
 
-    def settled(self, choice: str, source: EligibilitySource) -> RoleEligibility:
-        confidence = SOURCE_CONFIDENCE[source]
+    def settled(
+        self, choice: str, source: EligibilitySource, confidence: float | None = None
+    ) -> RoleEligibility:
+        """``confidence`` is the stated one; otherwise the source's ordinal value."""
+        if confidence is None:
+            confidence = SOURCE_CONFIDENCE[source]
         return self.model_copy(update=dict(choice=choice, source=source, confidence=confidence))
 
     def hinted(self, *hints: Hint) -> RoleEligibility:
         return self.model_copy(update={"hints": (*self.hints, *hints)})
+
+
+class StatedChoice(BaseModel):
+    """A choice made outside the predicates (a model answer or a human decision), keyed
+    by its ambiguity subject; it settles its role before any hint and is verified."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    choice: str
+    source: EligibilitySource
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+def subject_of(entry: RoleEligibility) -> str:
+    parts = (entry.relation, entry.role, entry.subject)
+    return ".".join(part for part in parts if part is not None)
+
+
+def with_stated(
+    entry: RoleEligibility, choices: Mapping[str, StatedChoice]
+) -> RoleEligibility:
+    stated = choices.get(subject_of(entry))
+    if stated is None or stated.choice not in entry.members:
+        return entry
+    return entry.settled(stated.choice, stated.source, stated.confidence)
 
 
 class DeclaredJoin(BaseModel):

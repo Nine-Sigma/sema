@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib import resources
 from string import Template
+from typing import TypeVar
 
 from sema.intake.output_models_utils import ABSTAIN, Choice
 from sema.intake.profile import ProfileTools
@@ -23,6 +24,8 @@ NOTHING = "none"
 HUMAN = "human"
 
 Bindings = dict[str, dict[str, SlotBinding]]
+SchemaText = dict[str, list[tuple[object, ...]]]
+Attempt = TypeVar("Attempt")
 
 
 @dataclass(frozen=True)
@@ -148,6 +151,29 @@ def failure_notes(
     return list(dict.fromkeys(notes))
 
 
+def retried(
+    ask: Callable[[Sequence[Sequence[str]]], Attempt],
+    notes: Callable[[Attempt], list[str]],
+    max_retries: int,
+) -> tuple[Attempt, bool]:
+    """Ask, then re-ask with every earlier attempt's notes until one has none; the last
+    attempt and whether it passed. An attempt passes when ``notes`` returns nothing."""
+    failed: list[list[str]] = []
+    for _ in range(max_retries):
+        attempt = ask(failed)
+        found = notes(attempt)
+        if not found:
+            return attempt, True
+        failed.append(found)
+    attempt = ask(failed)
+    return attempt, not notes(attempt)
+
+
+def render_template(prompt: str, sections: Mapping[str, str]) -> str:
+    template = resources.files(PROMPT_PACKAGE).joinpath(prompt).read_text("utf-8")
+    return Template(template).substitute(sections)
+
+
 def render_prompt(
     batch: Sequence[OpenEntry],
     in_force: Sequence[BoundEntry],
@@ -155,25 +181,40 @@ def render_prompt(
     schema_text: Mapping[str, Sequence[tuple[object, ...]]],
     failed: Sequence[Sequence[str]],
 ) -> str:
-    template = resources.files(PROMPT_PACKAGE).joinpath(STRUCTURE_PROMPT).read_text("utf-8")
     sections = {
-        "in_force": _bullets(f"`{member(e.binding)}` ({e.source})" for e in in_force),
-        "failures": _history(failed),
-        "relations": "\n\n".join(_relation(p, schema_text.get(p.ref.name)) for p in relations),
+        "in_force": bullets(f"`{member(e.binding)}` ({e.source})" for e in in_force),
+        "failures": history(failed),
+        "relations": render_relations(relations, schema_text),
         "entries": "\n\n".join(_entry(index, entry) for index, entry in enumerate(batch)),
     }
-    return Template(template).substitute(sections)
+    return render_template(STRUCTURE_PROMPT, sections)
 
 
-def _bullets(lines: Iterable[str]) -> str:
+def bullets(lines: Iterable[str]) -> str:
     rendered = [f"- {line}" for line in lines]
     return "\n".join(rendered) if rendered else NOTHING
 
 
-def _history(failed: Sequence[Sequence[str]]) -> str:
+def history(failed: Sequence[Sequence[str]]) -> str:
     """Every earlier answer's failed checks, oldest first."""
-    answers = [f"answer {n}:\n{_bullets(notes)}" for n, notes in enumerate(failed, start=1)]
+    answers = [f"answer {n}:\n{bullets(notes)}" for n, notes in enumerate(failed, start=1)]
     return "\n\n".join(answers) or NOTHING
+
+
+def render_relations(
+    relations: Sequence[RelationProfile], schema_text: Mapping[str, Sequence[tuple[object, ...]]]
+) -> str:
+    return "\n\n".join(_relation(p, schema_text.get(p.ref.name)) for p in relations)
+
+
+def schema_text(tools: ProfileTools, relations: Sequence[RelationProfile]) -> SchemaText:
+    """Text of the bound schema relations among ``relations``, only when the run may read it."""
+    readable = tools.structure.schema_relations if tools.structure is not None else ()
+    return {
+        profile.ref.name: tools.read_schema_text(profile.ref, text_columns(profile))
+        for profile in relations
+        if profile.ref.name in readable and text_columns(profile)
+    }
 
 
 def _entry(index: int, entry: OpenEntry) -> str:

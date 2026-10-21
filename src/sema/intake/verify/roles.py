@@ -7,7 +7,7 @@ a spec only the stage's own sections and ambiguity list are checked.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from itertools import combinations
 
 from sema.binding.spec import ConceptSourceSpec
@@ -24,6 +24,7 @@ from sema.intake.shapes.base_utils import JOIN_FLOOR, failure, section_of
 from sema.intake.structure import StructureResult
 from sema.intake.structure_hint_utils import section_at
 from sema.intake.verify.base import Ambiguity, Failure, FloorValue, Verdict
+from sema.intake.verify.roles_chosen_utils import chosen_sections, with_sources
 from sema.intake.verify.roles_utils import (
     GROUP_KEY_ROLES,
     VALUE_CHECKS,
@@ -55,27 +56,42 @@ FLOORS: dict[str, FloorValue] = {
     "DISPLAY_NULL_RATE_FLOOR": lexicon.DISPLAY_NULL_RATE_FLOOR,
     **JOIN_FLOOR,
 }
+ROLE_CHECKS = (COLUMN_EXISTS, IN_ELIGIBILITY_SET, ONE_ROLE_PER_COLUMN, *VALUE_CHECKS)
 UNVERIFIABLE = "unverifiable"
 MAPPINGS = section_of(MappingsSpec)
 
 
 def verify_roles(
-    roles: RolesResult, tools: ProfileTools, *, spec: ConceptSourceSpec | None
+    roles: RolesResult,
+    tools: ProfileTools,
+    *,
+    spec: ConceptSourceSpec | None,
+    relations: Collection[str] = (),
 ) -> Verdict:
+    """``relations`` also re-proves each named relation's chosen roles, with no spec."""
     failures = _section_failures(roles.structure)
     failures += _ambiguity_failures(roles)
     listed: list[Ambiguity] = list(roles.ambiguities)
+    sections = chosen_sections(roles, relations) if relations else []
     if spec is not None:
         failures += _required_failures(roles.structure, spec)
-        for section in bound_sections(spec):
-            profile = tools.describe_relation(section.relation)
-            present = {column.name for column in profile.columns}
-            failures += _binding_failures(section, present, roles.eligibilities, tools)
-            failures += value_failures(section, profile, tools)
+        sections += bound_sections(spec)
         found, unverifiable = _external_refs(spec, tools)
         failures += found
         listed += unverifiable
+    for section in sections:
+        failures += _section_role_failures(section, roles.eligibilities, tools)
+    failures = with_sources(failures, roles.eligibilities, ROLE_CHECKS)
     return Verdict.of(failures=failures, ambiguities=listed, floors=FLOORS)
+
+
+def _section_role_failures(
+    section: BoundSection, eligibilities: Sequence[RoleEligibility], tools: ProfileTools
+) -> list[Failure]:
+    profile = tools.describe_relation(section.relation)
+    present = {column.name for column in profile.columns}
+    failures = _binding_failures(section, present, eligibilities, tools)
+    return failures + value_failures(section, profile, tools)
 
 
 def _section_failures(structure: StructureResult) -> list[Failure]:

@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, create_model
 
 from sema.intake.output_models_utils import (
     ABSTAIN,
+    MAX_SCHEMA_KEYS,
     NONE,
     Choice,
     checked_field,
@@ -28,15 +29,20 @@ from sema.intake.shapes import TEMPLATES
 MAX_STRUCTURE_BATCH = 50
 STRUCTURE_BATCH = "StructureBatch_v1"
 ROLES_CHOICE = "RolesChoice_v1"
+REFERENCE_CHOICE = "ReferenceChoice_v1"
 LAYOUT_PROPOSAL = "LayoutProposal_v1"
 ENTRY_CHOICE = "EntryChoice_v1"
 ENTRY_PREFIX = "entry_"
 ROLE_PREFIX = "role_"
+REFERENCE_PREFIX = "reference_"
 SLOT_PREFIX = "slot_"
 LAYOUT_ANSWERS = ("propose", ABSTAIN, "needs_values")
 FORBID_EXTRA = ConfigDict(extra="forbid")
 
 Fields = dict[str, Any]
+
+# The two reasoning lists take the remaining keys under the cap.
+MAX_REFERENCE_BATCH = MAX_SCHEMA_KEYS - len(("confidences", "reasons"))
 
 
 def _build(name: str, fields: Fields) -> type[BaseModel]:
@@ -99,6 +105,23 @@ def roles_model(roles: Mapping[str, Sequence[str]]) -> type[BaseModel]:
     return _build(ROLES_CHOICE, fields | _reasoning_lists())
 
 
+def reference_field(index: int) -> str:
+    return f"{REFERENCE_PREFIX}{index}"
+
+
+def references_model(entries: Sequence[Sequence[str]]) -> type[BaseModel]:
+    """One field per open reference entry of a relation, each over that entry's members."""
+    if len(entries) > MAX_REFERENCE_BATCH:
+        raise ValueError(
+            f"{len(entries)} reference entries exceed the batch limit {MAX_REFERENCE_BATCH}"
+        )
+    fields: Fields = {
+        reference_field(index): (_abstainable(members, reference_field(index)), ...)
+        for index, members in enumerate(entries)
+    }
+    return _build(REFERENCE_CHOICE, fields | _reasoning_lists())
+
+
 def slot_field(slot: str) -> str:
     return checked_field(SLOT_PREFIX, slot)
 
@@ -137,6 +160,11 @@ def role_choices(answer: BaseModel, roles: Sequence[str]) -> list[Choice] | None
     return read_choices(answer, [role_field(role) for role in roles])
 
 
+def reference_choices(answer: BaseModel, count: int) -> list[Choice] | None:
+    """A references answer's choices in entry order, or None when it failed."""
+    return read_choices(answer, [reference_field(index) for index in range(count)])
+
+
 def _sample_members(prefix: str, count: int) -> list[str]:
     return [f"{prefix}_{index}" for index in range(count)]
 
@@ -155,6 +183,11 @@ def _sample_roles() -> type[BaseModel]:
     return roles_model({role: columns for role in _sample_members("role", 6)})
 
 
+def _sample_references() -> type[BaseModel]:
+    entries = [_sample_members(f"target_{i}", 3) for i in range(MAX_REFERENCE_BATCH)]
+    return references_model(entries)
+
+
 def _sample_layout() -> type[BaseModel]:
     return layout_model(
         templates=[template.ID for template in TEMPLATES],
@@ -169,5 +202,6 @@ OUTPUT_MODEL_FACTORIES: tuple[Callable[[], type[BaseModel]], ...] = (
     _sample_choice,
     _sample_structure_batch,
     _sample_roles,
+    _sample_references,
     _sample_layout,
 )

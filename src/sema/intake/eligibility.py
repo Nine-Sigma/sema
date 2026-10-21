@@ -47,10 +47,13 @@ from sema.intake.eligibility_utils import (
     RoleEligibility,
     RoleMemory,
     RunDescriptor,
+    StatedChoice,
     eligible,
     embedding_rank,
     lexicon_hits,
     status_classes,
+    subject_of,
+    with_stated,
 )
 from sema.intake.profile import SAMPLE_CAP, ProfileRefusedError, ProfileTools, ValueSample
 from sema.intake.shapes import (
@@ -83,6 +86,7 @@ class Hints:
     memory: RoleMemory | None
     embedder: Embedder | None
     margin_floor: float | None
+    choices: Mapping[str, StatedChoice]
 
 
 def compute(
@@ -95,7 +99,7 @@ def compute(
     stated: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[RoleEligibility]:
     by_name = {profile.ref.name: profile for profile in profiles}
-    return _compute(binding, by_name, Hints(memory, embedder, margin_floor), stated or {})
+    return _compute(binding, by_name, Hints(memory, embedder, margin_floor, {}), stated or {})
 
 
 def ambiguities(eligibilities: Iterable[RoleEligibility]) -> list[Ambiguity]:
@@ -110,7 +114,7 @@ def ambiguities(eligibilities: Iterable[RoleEligibility]) -> list[Ambiguity]:
             members = (*members, entry.choice)
         found.append(Ambiguity(
             stage=STAGE,
-            subject=_subject(entry),
+            subject=subject_of(entry),
             members=members,
             hints=_hint_texts(entry, unresolved),
             exclusions=dict(entry.exclusions),
@@ -129,15 +133,20 @@ def run_roles(
     hint: ConceptSourceSpec | None = None,
     embedder: Embedder | None = None,
     margin_floor: float | None = EMBEDDING_MARGIN_FLOOR,
+    choices: Mapping[str, StatedChoice] | None = None,
 ) -> RolesResult:
+    """``choices`` are stated choices by ambiguity subject (model answers, decisions)."""
     by_name = {profile.ref.name: profile for profile in profiles}
-    hints = Hints(RoleMemory(), embedder, margin_floor)
+    hints = Hints(RoleMemory(), embedder, margin_floor, choices or {})
     stated = stated_roles(hint, structure) if hint is not None else {}
     keys = hint.entity_model.header_keys if hint is not None and hint.entity_model else None
     models = [e.binding for e in structure.bound if e.binding.template == entity_model.ID]
     found = [role for b in models for role in _compute(b, by_name, hints, stated)]
     headers, dictionaries, notes = _read_dictionaries(models, by_name, found, tools, keys)
-    references = reference_roles(dictionaries, list(vocabularies(structure, by_name)))
+    references = [
+        with_stated(entry, hints.choices)
+        for entry in reference_roles(dictionaries, list(vocabularies(structure, by_name)))
+    ]
     joins, open_joins = declared_joins(dictionaries, headers)
     resolved, open_sections = resolve_sections(structure, references, by_name)
     others = [e.binding for e in resolved.bound if e.binding.template != entity_model.ID]
@@ -263,6 +272,9 @@ def _settle(
     human = stated.column if isinstance(stated, StatusRole) else stated
     if isinstance(human, str):
         return base.settled(human, "human")
+    stated_choice = with_stated(base, hints.choices)
+    if stated_choice.choice is not None:
+        return stated_choice
     if len(members) == 1 and not excluded:
         return base.settled(members[0], "code")
     recalled = (remembered or {}).get(entry.name)
@@ -356,11 +368,6 @@ def _statuses(
                 column=column, active_values=active, retired_values=retired
             )
     return statuses
-
-
-def _subject(entry: RoleEligibility) -> str:
-    parts = (entry.relation, entry.role, entry.subject)
-    return ".".join(part for part in parts if part is not None)
 
 
 def _hint_texts(entry: RoleEligibility, unresolved: Sequence[str]) -> tuple[str, ...]:
