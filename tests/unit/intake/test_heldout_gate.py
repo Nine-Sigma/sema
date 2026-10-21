@@ -81,6 +81,42 @@ HELDOUT2_POST_FIX_METRICS = RunMetrics(
 
 
 @dataclass(frozen=True)
+class GateThreshold:
+    min_bound_fraction: float
+    max_open_choices: int
+
+
+@dataclass(frozen=True)
+class GateMiss:
+    metric: str
+    value: float
+    threshold: float
+
+    def __str__(self) -> str:
+        return f"{self.metric} {self.value} misses threshold {self.threshold}"
+
+
+# Decided by Dean 2026-10-21 and committed before any model-backed run over either source
+# (task 14.1). Open choices are counted at Review, before any decisions file.
+GATE_THRESHOLDS = {
+    "heldout": GateThreshold(min_bound_fraction=0.75, max_open_choices=2),
+    "heldout2": GateThreshold(min_bound_fraction=1.0, max_open_choices=3),
+}
+
+
+def gate_misses(metrics: RunMetrics, threshold: GateThreshold) -> tuple[GateMiss, ...]:
+    misses: list[GateMiss] = []
+    if metrics.bound_fraction < threshold.min_bound_fraction:
+        misses.append(
+            GateMiss("bound_fraction", metrics.bound_fraction, threshold.min_bound_fraction)
+        )
+    open_choices = metrics.open_structure + metrics.open_roles
+    if open_choices > threshold.max_open_choices:
+        misses.append(GateMiss("open_choices", open_choices, threshold.max_open_choices))
+    return tuple(misses)
+
+
+@dataclass(frozen=True)
 class HeldOut:
     directory: Path
     schema: str
@@ -221,3 +257,57 @@ def test_s2_baseline_metrics(gate: StageRun) -> None:
 def test_post_fix_metrics_of_the_second_held_out_source(gate: StageRun) -> None:
     """Measured once after task 1.8, beside the recorded S2 baseline (SOURCE.md)."""
     assert _read_metrics(gate) == HELDOUT2_POST_FIX_METRICS
+
+
+def _synthetic(bound_fraction: float, open_structure: int, open_roles: int) -> RunMetrics:
+    return HELDOUT2_POST_FIX_METRICS.model_copy(
+        update={
+            "bound_fraction": bound_fraction,
+            "open_structure": open_structure,
+            "open_roles": open_roles,
+        }
+    )
+
+
+def test_the_thresholds_are_committed_for_both_held_out_sources() -> None:
+    assert GATE_THRESHOLDS.keys() == SOURCES.keys()
+    assert GATE_THRESHOLDS["heldout"] == GateThreshold(
+        min_bound_fraction=0.75, max_open_choices=2
+    )
+    assert GATE_THRESHOLDS["heldout2"] == GateThreshold(
+        min_bound_fraction=1.0, max_open_choices=3
+    )
+
+
+def test_a_bound_fraction_below_the_minimum_names_the_metric_value_and_threshold() -> None:
+    threshold = GateThreshold(min_bound_fraction=0.75, max_open_choices=2)
+
+    misses = gate_misses(_synthetic(0.5, 0, 1), threshold)
+
+    assert misses == (GateMiss(metric="bound_fraction", value=0.5, threshold=0.75),)
+    assert "bound_fraction" in str(misses[0])
+    assert "0.5" in str(misses[0]) and "0.75" in str(misses[0])
+
+
+def test_open_choices_over_the_maximum_name_the_metric_value_and_threshold() -> None:
+    threshold = GateThreshold(min_bound_fraction=0.75, max_open_choices=2)
+
+    misses = gate_misses(_synthetic(1.0, 2, 1), threshold)
+
+    assert misses == (GateMiss(metric="open_choices", value=3, threshold=2),)
+    assert "open_choices" in str(misses[0])
+    assert "3" in str(misses[0]) and "2" in str(misses[0])
+
+
+def test_a_run_missing_both_reports_both_misses() -> None:
+    threshold = GateThreshold(min_bound_fraction=1.0, max_open_choices=3)
+
+    misses = gate_misses(_synthetic(0.0, 4, 0), threshold)
+
+    assert [miss.metric for miss in misses] == ["bound_fraction", "open_choices"]
+
+
+def test_a_run_meeting_both_thresholds_has_no_miss() -> None:
+    threshold = GateThreshold(min_bound_fraction=0.75, max_open_choices=2)
+
+    assert gate_misses(_synthetic(0.75, 1, 1), threshold) == ()
