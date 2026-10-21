@@ -22,10 +22,10 @@ from sema.binding.spec_sections import (
     ValueSetRoles,
 )
 
-LEXICON_VERSION = "s2-2"
+LEXICON_VERSION = "s3-1"
 
 PredicateKind = Literal[
-    "key", "text_key", "text", "long_text", "low_cardinality", "date", "array", "any"
+    "key", "text_key", "text", "long_text", "low_cardinality", "date", "array", "any", "filled"
 ]
 ReferenceKind = Literal["vocabulary", "entity"]
 
@@ -60,6 +60,7 @@ class RoleEntry:
     tokens: tuple[str, ...]
     description: str
     predicate: PredicateKind
+    name_gated: bool = False
 
     @property
     def check(self) -> str:
@@ -68,7 +69,8 @@ class RoleEntry:
 
 # Settled in this order; code precedes the identifier because its words are narrower,
 # and a property's description precedes the property because dictionary headers name
-# both with the same leading word.
+# both with the same leading word. Identity roles come last and are name-gated: no
+# profile signature tells them apart, so only a column named for one is a candidate.
 ROLES: tuple[RoleEntry, ...] = (
     RoleEntry(
         "code", ("code", "value"), "the short code that identifies a term in its list", "key"
@@ -115,6 +117,28 @@ ROLES: tuple[RoleEntry, ...] = (
     ),
     RoleEntry("valid_to", ("valid_to", "expiry", "end"), "when a row stops applying", "date"),
     RoleEntry("synonyms", ("synonyms", "alias"), "other names for the same thing", "array"),
+    RoleEntry(
+        "title",
+        ("title", "heading"),
+        "a longer heading shown alongside the preferred name",
+        "any",
+        name_gated=True,
+    ),
+    # One vocabulary per list is common, so a constant column still qualifies.
+    RoleEntry(
+        "vocabulary_id",
+        ("vocabulary", "vocabulary_id"),
+        "the external vocabulary a term's concept code belongs to",
+        "filled",
+        name_gated=True,
+    ),
+    RoleEntry(
+        "concept_code",
+        ("concept_code", "external_code"),
+        "the term's code in its external vocabulary",
+        "any",
+        name_gated=True,
+    ),
 )
 
 COINCIDING_ROLES: frozenset[frozenset[str]] = frozenset({frozenset({"display", "name"})})

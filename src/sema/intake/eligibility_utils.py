@@ -224,12 +224,14 @@ PREDICATES: dict[str, Callable[[ColumnProfile, int], bool]] = {
     "date": _date,
     "array": _array,
     "any": _any,
+    "filled": lambda column, rows: column.null_rate < 1.0,
 }
 
 
 def eligible(entry: RoleEntry, columns: Iterable[ColumnProfile], row_count: int) -> tuple[str, ...]:
     test = PREDICATES[entry.predicate]
-    return tuple(column.name for column in columns if test(column, row_count))
+    passing = tuple(column.name for column in columns if test(column, row_count))
+    return lexicon_hits(entry.name, passing) if entry.name_gated else passing
 
 
 def _padded(text: str) -> str:
