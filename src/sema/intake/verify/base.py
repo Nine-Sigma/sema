@@ -34,6 +34,8 @@ class Ambiguity(BaseModel):
     choice: str | None = None
     confidence: float | None = None
     source: str | None = None
+    call_key: str | None = None
+    reason: str | None = None
 
     @model_validator(mode="after")
     def _choice_is_a_sourced_member(self) -> Self:

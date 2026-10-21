@@ -81,6 +81,9 @@ class ModelCalls:
         self._config = config
         self._warned_unpriced = False
 
+    def call_key(self, prompt: str, output_model: type[BaseModel]) -> str:
+        return prompt_hash(self._config.model, prompt, output_model.__name__)
+
     def call(self, stage: str, prompt: str, output_model: type[T]) -> T:
         schema_name = output_model.__name__
         recorded = self._replay(stage, prompt, schema_name)
@@ -122,7 +125,7 @@ class ModelCalls:
     def _invoke(self, stage: str, prompt: str, output_model: type[T]) -> T:
         model = self._config.model
         schema_name = output_model.__name__
-        key = prompt_hash(model, prompt, schema_name)
+        key = self.call_key(prompt, output_model)
         try:
             output = self.client.invoke(prompt, output_model, stage_name=stage)
         except LLMStageError as error:

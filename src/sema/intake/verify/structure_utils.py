@@ -14,13 +14,17 @@ BindingKey = tuple[str, tuple[tuple[str, str], ...], tuple[str, ...]]
 
 
 def partition_counts(proposal: StructureResult) -> Counter[str]:
-    """How often each relation appears across bound groups, ignores, and ambiguities."""
+    """How often each relation appears across bound groups, ignores, and open ambiguities.
+
+    A settled ambiguity stays on the list as the record of its choice; the binding it chose
+    is what covers the relation.
+    """
     counts: Counter[str] = Counter()
     for entry in proposal.bound:
         counts.update(set(entry.binding.relations))
     for binding in proposal.ignored:
         counts.update(set(binding.relations))
-    counts.update(ambiguity.subject for ambiguity in proposal.ambiguities)
+    counts.update(a.subject for a in proposal.ambiguities if a.choice is None)
     return counts
 
 

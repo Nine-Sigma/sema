@@ -8,6 +8,7 @@ must be on the ambiguity list. Pinned bindings only re-run ``verify``.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
 
 from sema.binding.spec_sections import Provider
@@ -63,7 +64,8 @@ def verify_structure(
     known = [e for e in proposal.bound if e.binding.template in BOUND_TEMPLATES]
     pinned = [e for e in known if e.source == HUMAN]
     for entry in pinned:
-        failures += _verified(entry.binding, profiles, tools)
+        failures += _verified(entry, profiles, tools)
+    failures += _shared_claim_failures(known)
     removed = {name for e in proposal.bound if e.source == HUMAN for name in e.binding.relations}
     removed |= {name for binding in proposal.ignored for name in binding.relations}
     listed = {ambiguity.subject for ambiguity in proposal.ambiguities}
@@ -146,15 +148,16 @@ def _group_failures(
         if binding_key(binding) not in keys:
             relations = dict.fromkeys(binding.relations)
             failures += [
-                failure(IN_ELIGIBILITY_SET, name, template=binding.template) for name in relations
+                failure(IN_ELIGIBILITY_SET, name, template=binding.template, source=entry.source)
+                for name in relations
             ]
         if not claims(binding):
             failures += [
-                failure(PRECEDENCE_APPLIED, name, template=binding.template)
+                failure(PRECEDENCE_APPLIED, name, template=binding.template, source=entry.source)
                 for name in dict.fromkeys(binding.relations)
                 if name in claimed
             ]
-        failures += _verified(binding, members, tools)
+        failures += _verified(entry, members, tools)
     contested = [a.subject for a in apply_precedence(found).ambiguities]
     failures += [
         failure(AMBIGUITY_LIST_COMPLETE, name, members=len(_over(found, name)))
@@ -164,16 +167,36 @@ def _group_failures(
     return failures
 
 
+def _shared_claim_failures(known: Sequence[BoundEntry]) -> list[Failure]:
+    """Two bound claims over one relation: each claiming entry fails, naming its source."""
+    claiming = [entry for entry in known if claims(entry.binding)]
+    counts = Counter(name for e in claiming for name in dict.fromkeys(e.binding.relations))
+    return [
+        failure(
+            PRECEDENCE_APPLIED,
+            name,
+            template=entry.binding.template,
+            source=entry.source,
+            claims=counts[name],
+        )
+        for entry in claiming
+        for name in dict.fromkeys(entry.binding.relations)
+        if counts[name] > 1
+    ]
+
+
 def _verified(
-    binding: SlotBinding, group: Sequence[RelationProfile], tools: ProfileTools
+    entry: BoundEntry, group: Sequence[RelationProfile], tools: ProfileTools
 ) -> list[Failure]:
+    binding = entry.binding
     verdict = BOUND_TEMPLATES[binding.template].verify(binding, list(group), tools)
     return [
         failure(
             TEMPLATE_VERIFIES,
             found.relation or (binding.relations[0] if binding.relations else ""),
             found.column,
-            **{**found.evidence, "template": binding.template, "template_check": found.check},
+            **found.evidence,
+            **dict(template=binding.template, template_check=found.check, source=entry.source),
         )
         for found in verdict.failures
     ]

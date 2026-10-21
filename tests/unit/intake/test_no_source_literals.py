@@ -1,4 +1,4 @@
-"""Generality gate: no fixture literal appears in the general intake code.
+"""Generality gate: no fixture literal appears in the general intake code or its prompts.
 
 The literals are read from the fixture files at test time, so a fixture added
 later is covered without editing this test.
@@ -6,7 +6,6 @@ later is covered without editing this test.
 
 from __future__ import annotations
 
-import ast
 import csv
 import dataclasses
 import inspect
@@ -14,10 +13,8 @@ import io
 import json
 import keyword
 import re
-import tokenize
 from collections.abc import Collection, Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import NamedTuple
 
 import openpyxl
 import pytest
@@ -26,33 +23,25 @@ from pydantic import BaseModel
 from sema.binding import spec_sections
 from sema.intake import lexicon
 from sema.intake.loaders.base import relation_name
+from tests.unit.intake.source_literals_env import (
+    REPO_ROOT,
+    SCAN_ROOT,
+    TOKEN,
+    Hit,
+    collapse,
+    find_hits,
+    scanned_prompts,
+    tokens_of,
+)
 
 pytestmark = pytest.mark.unit
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "intake"
-SCAN_ROOT = REPO_ROOT / "src" / "sema" / "intake"
-UNSCANNED_PACKAGES = ("loaders",)
 MIN_LITERAL_LENGTH = 3
 TABULAR_SUFFIXES = (".xlsx", ".csv")
 SEE_PHRASE = re.compile(r"\bsee\s+(.+?)\s+dataset\b", re.IGNORECASE | re.DOTALL)
-TOKEN = re.compile(r"\w+(?:-\w+)*")
 KEY_VALUE_WIDTH = 2
 TABLE_SCHEMA = FIXTURE_ROOT / "frictionless" / "table-schema.json"
-
-
-class Hit(NamedTuple):
-    path: str
-    lineno: int
-    literal: str
-
-
-def _collapse(text: str) -> str:
-    return " ".join(text.split()).casefold()
-
-
-def _tokens(text: str) -> tuple[str, ...]:
-    return tuple(TOKEN.findall(text.casefold()))
 
 
 def _texts(cells: tuple[object, ...]) -> list[str]:
@@ -120,7 +109,7 @@ def fixture_files(root: Path = FIXTURE_ROOT) -> list[Path]:
 
 def literals_of(path: Path) -> set[str]:
     reader = _xlsx_literals if path.suffix.lower() == ".xlsx" else _csv_literals
-    return {_collapse(text) for text in reader(path)}
+    return {collapse(text) for text in reader(path)}
 
 
 def _table_schema_vocabulary(node: object) -> Iterator[str]:
@@ -156,75 +145,10 @@ def fixture_literals(root: Path = FIXTURE_ROOT) -> dict[tuple[str, ...], str]:
     found: dict[tuple[str, ...], str] = {}
     for path in fixture_files(root):
         for literal in literals_of(path):
-            tokens = _tokens(literal)
+            tokens = tokens_of(literal)
             if len(literal) >= MIN_LITERAL_LENGTH and tokens and literal not in excluded:
                 found.setdefault(tokens, literal)
     return found
-
-
-def _docstring_nodes(tree: ast.Module) -> set[int]:
-    owners = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
-    return {
-        id(node.body[0].value)
-        for node in ast.walk(tree)
-        if isinstance(node, owners)
-        and node.body
-        and isinstance(node.body[0], ast.Expr)
-        and isinstance(node.body[0].value, ast.Constant)
-    }
-
-
-class SourceText(NamedTuple):
-    lineno: int
-    text: str
-    is_constant: bool
-
-
-def source_texts(source: str) -> Iterator[SourceText]:
-    """String constants other than docstrings, then comments, with line numbers."""
-    tree = ast.parse(source)
-    docstrings = _docstring_nodes(tree)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            if id(node) not in docstrings:
-                yield SourceText(node.lineno, node.value, True)
-    for token in tokenize.generate_tokens(io.StringIO(source).readline):
-        if token.type == tokenize.COMMENT:
-            yield SourceText(token.start[0], token.string.lstrip("#"), False)
-
-
-def _matches(text: SourceText, literals: Mapping[tuple[str, ...], str]) -> Iterator[str]:
-    """A multi-token literal hits anywhere; a single token only as a whole constant.
-
-    A lone common word ("values", "source") names a source only when code uses it as
-    an entire name; inside SQL or prose it is ordinary language.
-    """
-    tokens = _tokens(_collapse(text.text))
-    if text.is_constant and len(tokens) == 1 and (whole := literals.get(tokens)):
-        yield whole
-    widths = {len(key) for key in literals if 1 < len(key) <= len(tokens)}
-    for width in widths:
-        for start in range(len(tokens) - width + 1):
-            literal = literals.get(tokens[start : start + width])
-            if literal is not None:
-                yield literal
-
-
-def scanned_modules(root: Path = SCAN_ROOT) -> list[Path]:
-    return sorted(
-        path
-        for path in root.rglob("*.py")
-        if path.relative_to(root).parts[0] not in UNSCANNED_PACKAGES
-    )
-
-
-def find_hits(root: Path, literals: Mapping[tuple[str, ...], str]) -> list[Hit]:
-    hits: list[Hit] = []
-    for path in scanned_modules(root):
-        rel = path.relative_to(root).as_posix()
-        for text in source_texts(path.read_text(encoding="utf-8")):
-            hits.extend(Hit(rel, text.lineno, literal) for literal in _matches(text, literals))
-    return sorted(set(hits))
 
 
 def test_every_fixture_file_contributes_literals() -> None:
@@ -285,7 +209,7 @@ def test_multi_word_fixture_literal_of_lexicon_words_is_still_a_hit(tmp_path: Pa
     literals = fixture_literals()
     words = _lexicon_words()
     phrase = min(text for key, text in literals.items() if 1 < len(key) and set(key) <= words)
-    assert set(_tokens(phrase)) <= excluded_names()
+    assert set(tokens_of(phrase)) <= excluded_names()
     (tmp_path / "words.py").write_text(f"PHRASE = {phrase!r}\nWORDS = {tuple(phrase.split())!r}\n")
     assert find_hits(tmp_path, literals) == [Hit("words.py", 1, phrase)]
 
@@ -386,6 +310,36 @@ def test_partial_token_overlap_is_not_a_hit(tmp_path: Path) -> None:
     )
     (tmp_path / "exact.py").write_text("C = 'ALPHA\\n   Beta gamma'\n", "utf-8")
     assert find_hits(tmp_path, literals) == [Hit("exact.py", 1, "alpha beta")]
+
+
+def test_empty_prompts_directory_has_no_hit(tmp_path: Path) -> None:
+    (tmp_path / "prompts").mkdir()
+    assert find_hits(tmp_path, fixture_literals()) == []
+
+
+def test_planted_fixture_literal_in_a_prompt_file_is_flagged(tmp_path: Path) -> None:
+    literals = fixture_literals()
+    planted = _longest_plain_literal(literals, multi=True)
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "probe_v1.md").write_text(
+        f"# prompt: probe v1\n\nChoose a member.\nRead the {planted.upper()} relation.\n",
+        encoding="utf-8",
+    )
+    hits = find_hits(tmp_path, literals)
+    assert Hit("prompts/probe_v1.md", 4, planted) in hits
+    assert {hit.lineno for hit in hits} == {4}
+
+
+def test_single_token_literal_in_prompt_prose_is_not_a_hit(tmp_path: Path) -> None:
+    literals: dict[tuple[str, ...], str] = {("values",): "values"}
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "probe_v1.md").write_text("Values\nthe values shown\n", "utf-8")
+    assert find_hits(tmp_path, literals) == []
+
+
+def test_intake_prompt_files_are_scanned() -> None:
+    names = {path.name for path in scanned_prompts()}
+    assert "structure_v1.md" in names
 
 
 def test_general_intake_code_names_no_fixture_literal() -> None:

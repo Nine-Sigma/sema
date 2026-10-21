@@ -57,7 +57,7 @@ CODE_BOUND_CONFIDENCE = 1.0
 HINT_OVERLAP = "hint_overlap"
 SCHEMA_SLOTS = (entity_model.DICTIONARY, entity_model.HEADER, entity_model.RELATION)
 
-BindingSource = Literal["code", "human"]
+BindingSource = Literal["code", "human", "model"]
 
 
 class HintRejectedError(ValueError):
