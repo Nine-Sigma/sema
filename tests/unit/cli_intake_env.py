@@ -42,6 +42,7 @@ from tests.unit.intake.structure_env import A2_WORKBOOK, copy_code_tables
 
 STRUCTURE, ROLES = "structure", "roles"
 CLIENT_FACTORY = "sema.cli_intake._intake_client"
+DOTENV_LOADER = "dotenv.load_dotenv"
 APPROVER = "reviewer-cli"
 MAX_COST = 1.0
 INTAKE_ENV = {
@@ -128,6 +129,8 @@ def intake_cli(root: Path, monkeypatch: pytest.MonkeyPatch, *, model: bool = Tru
         monkeypatch.setenv(name, value)
     for name in CLEARED_ENV:
         monkeypatch.delenv(name, raising=False)
+    # The sema group loads .env on every call; a developer's .env must not refill the env.
+    monkeypatch.setattr(DOTENV_LOADER, lambda *args, **kwargs: False)
     cli = Cli(root, routed_client())
     if not model:
         return cli
