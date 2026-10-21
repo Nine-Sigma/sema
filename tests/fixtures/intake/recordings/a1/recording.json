@@ -1,0 +1,12 @@
+{
+  "source": "a1",
+  "provider": "openrouter",
+  "model": "openai/gpt-6-luna",
+  "prompt_versions": [
+    "roles v1",
+    "structure v1"
+  ],
+  "calls": 3,
+  "tokens": 11687,
+  "cost": 0.0032307000000000004
+}
