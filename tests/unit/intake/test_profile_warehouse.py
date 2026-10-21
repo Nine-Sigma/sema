@@ -14,10 +14,12 @@ from tests.unit.binding.fixtures.concept_library import query_fn
 from tests.unit.intake.profile_env import Env, column_of, make_tools, open_env, value_bearing
 from tests.unit.intake.warehouse_env import (
     CATALOG,
+    CODES_ROWS,
     CONCEPT_COLUMNS,
     SCHEMA,
     TABLE,
     FakeConnector,
+    create_codes,
     schema_metadata,
 )
 
@@ -35,10 +37,13 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Env]:
 
 
 def _landed_tools(env: Env) -> tuple[Any, FakeConnector]:
+    from sema.intake.ledger import Ledger
     from sema.intake.loaders.warehouse import land_warehouse
 
+    create_codes(env.warehouse)
     connector = FakeConnector(schema_metadata(), query=query_fn(env.warehouse))
-    land = land_warehouse(connector, catalog=CATALOG, schema=SCHEMA)
+    land_ledger = Ledger(env.ledger_dir.parent).run("land")
+    land = land_warehouse(connector, catalog=CATALOG, schema=SCHEMA, ledger=land_ledger)
     return make_tools(env, land=land), connector
 
 
@@ -71,6 +76,31 @@ def test_warehouse_describe_issues_no_describe_and_logs_only_aggregates(env: Env
     assert {line["provider"] for line in env.sql_lines()} == {"warehouse"}
     assert not value_bearing(env)
     assert connector.metadata_reads == [(CATALOG, SCHEMA)]
+
+
+def test_warehouse_land_passes_the_land_verifier(env: Env) -> None:
+    from sema.intake.verify.land import verify_land
+
+    tools, _ = _landed_tools(env)
+    land = tools.land
+
+    verdict = verify_land(land, tools, provider="warehouse")
+
+    assert [f.check for f in verdict.failures] == []
+    assert verdict.status == "pass"
+    assert land.relation(TABLE).row_count == CONCEPT_ROWS
+    assert land.relation("codes").row_count == CODES_ROWS
+
+
+def test_structure_ignores_no_warehouse_relation_that_has_rows(env: Env) -> None:
+    from sema.intake.shapes.ignore import NO_ROWS, REASON
+    from sema.intake.structure import run_structure
+
+    tools, _ = _landed_tools(env)
+
+    result = run_structure(tools.land, tools, provider="warehouse")
+
+    assert [b.relations for b in result.ignored if b.slots.get(REASON) == NO_ROWS] == []
 
 
 def test_intake_policy_from_a_bounded_values_build_config() -> None:

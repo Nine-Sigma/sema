@@ -36,7 +36,14 @@ from tests.unit.intake.profile_env import (
     reads,
     value_bearing,
 )
-from tests.unit.intake.warehouse_env import CATALOG, SCHEMA, TABLE, FakeConnector, schema_metadata
+from tests.unit.intake.warehouse_env import (
+    CATALOG,
+    SCHEMA,
+    TABLE,
+    FakeConnector,
+    create_codes,
+    schema_metadata,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -110,10 +117,13 @@ def test_describe_issues_one_aggregate_statement_per_relation(env: Env) -> None:
 
 
 def test_describe_logs_every_issued_statement(env: Env) -> None:
+    from sema.intake.ledger import Ledger
     from sema.intake.loaders.warehouse import land_warehouse
 
+    create_codes(env.warehouse)
     connector = FakeConnector(schema_metadata(), query=query_fn(env.warehouse))
-    land = land_warehouse(connector, catalog=CATALOG, schema=SCHEMA)
+    land_ledger = Ledger(env.ledger_dir.parent).run("land")
+    land = land_warehouse(connector, catalog=CATALOG, schema=SCHEMA, ledger=land_ledger)
     ref = RelationRef(provider="warehouse", name=f"{CATALOG}.{SCHEMA}.{TABLE}")
 
     described = make_tools(env, land=land).describe_relation(ref)

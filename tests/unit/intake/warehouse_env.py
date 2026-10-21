@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import duckdb
+
 from sema.connectors.base import Connector
 from sema.models.assertions import Assertion
 from sema.models.schema_metadata import (
@@ -30,6 +32,15 @@ CODES_COLUMNS = (
     ColumnMetadata(name="code", data_type="STRING", comment="a code"),
     ColumnMetadata(name="rank", data_type="BIGINT", comment=None),
 )
+
+
+CODES_ROWS = 4
+
+
+def create_codes(con: duckdb.DuckDBPyConnection) -> None:
+    """The ``codes`` object ``schema_metadata`` reports, so Land can count its rows."""
+    con.execute(f"CREATE TABLE {SCHEMA}.codes (code VARCHAR, rank BIGINT)")
+    con.execute(f"INSERT INTO {SCHEMA}.codes SELECT 'c' || i, i FROM range({CODES_ROWS}) t(i)")
 
 
 def schema_metadata() -> SchemaMetadata:

@@ -29,7 +29,7 @@ Every loader writes relations through `Staging.write_table` into a schema the ca
 
 Row-kind loaders (`locator_kind: row`) append a `_sema_locator` column to every row. The Athena loader keeps its tables byte-identical to the original showcase loader, so it adds no column and declares `locator_kind: relation` with the source file name as `locator`.
 
-The warehouse loader calls `Connector.read_schema_metadata(catalog, schema)` once and fills each relation's columns, types, and comments from the returned objects; it writes nothing to staging, declares `locator_kind: relation` with `<catalog>.<schema>` as `locator`, and records `row_count` 0 because the catalog read carries no counts. An `Unreadable` result raises `UnreadableSchemaError` naming the connector's reason before any statement runs.
+The warehouse loader calls `Connector.read_schema_metadata(catalog, schema)` once and fills each relation's columns, types, and comments from the returned objects; it writes nothing to staging, declares `locator_kind: relation` with `<catalog>.<schema>` as `locator`, and, because the catalog read carries no counts, counts each relation with one `SELECT COUNT(*)` through `ProfileTools.count_rows` at stage `land`, so the count is logged to the run ledger like every profiling statement. `land_warehouse` takes the run's `ledger` for that. An `Unreadable` result raises `UnreadableSchemaError` naming the connector's reason before any statement runs.
 
 Landed relation names replace non-word characters with `_`. Column names keep the header text, with surrounding whitespace stripped and each inner whitespace run (line breaks included) collapsed to one space, so a spec names the column a human sees.
 

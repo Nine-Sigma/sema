@@ -127,9 +127,12 @@ class ProfileTools:
         listings = []
         for table, comment in self._tables(catalog_ref):
             ref = RelationRef(provider=provider_name, name=f"{namespace}.{table}")
-            count = self._run(ref, f"SELECT COUNT(*) FROM {self.provider.relation_sql(ref)}")
-            listings.append(RelationListing(ref.name, int(count[0][0]), comment or None))
+            listings.append(RelationListing(ref.name, self.count_rows(ref), comment or None))
         return listings
+
+    def count_rows(self, ref: RelationRef) -> int:
+        count = self._run(ref, f"SELECT COUNT(*) FROM {self.provider.relation_sql(ref)}")
+        return int(count[0][0])
 
     def catalog(self, ref: RelationRef) -> list[CatalogColumn]:
         if ref.provider == "staging":

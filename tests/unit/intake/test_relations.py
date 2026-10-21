@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -234,12 +235,17 @@ def test_warehouse_statement_names_the_relation_with_backticks() -> None:
 CATALOG_STATEMENT = re.compile(r"\bDESCRIBE\b|\bSHOW\b|\binformation_schema\b", re.IGNORECASE)
 
 
-def test_warehouse_land_reads_the_schema_once_and_fills_columns_types_comments() -> None:
+def test_warehouse_land_reads_the_schema_once_and_fills_columns_types_comments(
+    tmp_path: Path,
+) -> None:
+    from sema.intake.ledger import Ledger
     from sema.intake.loaders.warehouse import land_warehouse
 
-    connector = FakeConnector(schema_metadata())
+    connector = FakeConnector(schema_metadata(), query=lambda sql: [(3,)])
 
-    land = land_warehouse(connector, catalog=CATALOG, schema=SCHEMA)
+    land = land_warehouse(
+        connector, catalog=CATALOG, schema=SCHEMA, ledger=Ledger(tmp_path).run("r")
+    )
 
     assert connector.metadata_reads == [(CATALOG, SCHEMA)]
     assert land.medium == "warehouse"
@@ -257,13 +263,37 @@ def test_warehouse_land_reads_the_schema_once_and_fills_columns_types_comments()
     assert not [q for q in connector.queries if CATALOG_STATEMENT.search(q)]
 
 
-def test_warehouse_land_fails_naming_the_unreadable_reason() -> None:
+def test_warehouse_land_counts_rows_through_the_logged_path(tmp_path: Path) -> None:
+    from sema.intake.ledger import Ledger
+    from sema.intake.loaders.warehouse import land_warehouse
+
+    connector = FakeConnector(schema_metadata(), query=lambda sql: [(3,)])
+
+    land = land_warehouse(
+        connector, catalog=CATALOG, schema=SCHEMA, ledger=Ledger(tmp_path).run("r")
+    )
+
+    assert {r.name: r.row_count for r in land.relations} == {TABLE: 3, "codes": 3}
+    logged = (tmp_path / "r" / "sql.jsonl").read_text().splitlines()
+    lines = [json.loads(line) for line in logged]
+    assert [line["statement"] for line in lines] == connector.queries
+    assert all(re.fullmatch(r"SELECT COUNT\(\*\) FROM \S+", q) for q in connector.queries)
+    assert {(line["stage"], line["provider"], line["value_bearing"]) for line in lines} == {
+        ("land", "warehouse", False)
+    }
+
+
+def test_warehouse_land_fails_naming_the_unreadable_reason(tmp_path: Path) -> None:
+    from sema.intake.ledger import Ledger
     from sema.intake.loaders.warehouse import land_warehouse
 
     connector = FakeConnector(unreadable())
 
     with pytest.raises(ValueError, match=re.escape(UNREADABLE_REASON)):
-        land_warehouse(connector, catalog=CATALOG, schema=SCHEMA)
+        land_warehouse(
+            connector, catalog=CATALOG, schema=SCHEMA, ledger=Ledger(tmp_path).run("r")
+        )
 
     assert connector.metadata_reads == [(CATALOG, SCHEMA)]
     assert connector.queries == []
+    assert not (tmp_path / "r" / "sql.jsonl").exists()
