@@ -230,7 +230,7 @@ def test_mentions_match_normalized_token_sequences() -> None:
 
 def test_property_type_note_binds_the_code_table_domain(env: Env) -> None:
     legals = [d for d in sheet(env.acris.source, "Column_Info") if "_Property_Legals_" in d]
-    domains = per_property(env.a10_roles.eligibilities, "domain")
+    domains = per_property(env.pinned_roles.eligibilities, "domain")
     by_subject = {(entry.relation, entry.subject): entry for entry in domains}
 
     assert len(legals) == 2
@@ -252,13 +252,12 @@ def test_nine_properties_reference_the_five_code_tables(env: Env) -> None:
 def test_referenced_code_tables_resolve_to_code_lists(env: Env) -> None:
     source, roles = env.acris.source, env.pinned_roles
     lists = [e for e in roles.structure.bound if e.binding.template == CONCEPT_LIST]
-    grouped = ref(source, GROUPED_CODE_TABLE)
     hint_shape = load_concept_source_spec(ACRIS_SPEC).shape or []
 
     assert {e.binding.relations[0]: e.binding.section for e in lists} == {
         ref(source, name): f"code_lists.{name}" for name in CODE_TABLES
     }
-    assert {e.source for e in lists if e.binding.relations[0] != grouped} == {"code"}
+    assert {e.source for e in lists} == {"human"}
     rendered = {(entry.section, entry.template) for entry in roles.structure.to_shape()}
     assert rendered == {(entry.section, entry.template) for entry in hint_shape}
     assert not [a for a in roles.ambiguities if set(a.members) == SECTION_MEMBERS]

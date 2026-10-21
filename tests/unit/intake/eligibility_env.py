@@ -101,10 +101,11 @@ RANKED_SQL = (
     "CREATE TABLE tw.flagged AS SELECT i AS id, 'Name ' || CAST(i AS VARCHAR) AS label,"
     " 'Y' AS flag FROM range(1, 21) r(i)",
 )
+# Integer codes: a text code beside a label is also a lone dictionary, so it would not bind.
 COLOURS_SQL = (
     "CREATE SCHEMA tc",
-    "CREATE TABLE tc.colours AS SELECT * FROM (VALUES ('RED', 'Red'), ('GREEN', 'Green'),"
-    " ('BLUE', 'Blue'), ('AMBER', 'Amber'), ('WHITE', 'White')) t(code, label)",
+    "CREATE TABLE tc.colours AS SELECT * FROM (VALUES (1, 'Red'), (2, 'Green'),"
+    " (3, 'Blue'), (4, 'Amber'), (5, 'White')) t(code, label)",
 )
 
 
@@ -195,18 +196,21 @@ def write_hint(directory: Path, raw: dict[str, Any]) -> ConceptSourceSpec:
     return load_concept_source_spec(path)
 
 
-def grouped_table_hint(directory: Path) -> ConceptSourceSpec:
-    """Pins only the grouped code table as a code list, so the others stay code-found."""
+def code_tables_hint(directory: Path) -> ConceptSourceSpec:
+    """Pins the code tables as code lists, the human decision their ambiguities wait for.
+
+    A lone code table is ambiguous between a code list and a header-less entity model, so
+    no code table is bound without a model or a reviewer; Roles needs them bound.
+    """
     raw = yaml.safe_load(ACRIS_SPEC.read_text())
     section = raw["concept_source"]
     keep = {"spec_version", "id", "identity_system", "release", "default_provider"}
     trimmed = {key: value for key, value in section.items() if key in keep}
     trimmed["shape"] = [
-        {"section": f"code_lists.{GROUPED_CODE_TABLE}", "template": CONCEPT_LIST}
+        {"section": f"code_lists.{entry['vocabulary_id']}", "template": CONCEPT_LIST}
+        for entry in section["code_lists"]
     ]
-    trimmed["code_lists"] = [
-        entry for entry in section["code_lists"] if entry["vocabulary_id"] == GROUPED_CODE_TABLE
-    ]
+    trimmed["code_lists"] = section["code_lists"]
     return write_hint(directory, {"concept_source": trimmed})
 
 
@@ -310,7 +314,7 @@ class Env:
 
     @cached_property
     def pinned_roles(self) -> Any:
-        hint = grouped_table_hint(self.root / "pinned")
+        hint = code_tables_hint(self.root / "pinned")
         structured = self.structured(self.acris, "pinned", hint)
         return run_roles(self.acris.source, structured, self.root / "pinned" / "roles")
 

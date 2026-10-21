@@ -30,6 +30,7 @@ from sema.intake.shapes.base_utils import JOIN_FLOOR, SIGNATURE_FLOORS, failure
 from sema.intake.shapes.precedence import claims
 from sema.intake.structure_hint_utils import hint_bindings
 from sema.intake.structure_utils import (
+    NO_TEMPLATE,
     JoinEdge,
     cross_edges,
     describe_failure,
@@ -77,7 +78,11 @@ class BoundEntry(BaseModel):
 
 
 class StructureResult(BaseModel):
-    """``groups`` lists every relation, ignored ones included, in landing order."""
+    """``groups`` lists every relation, ignored ones included, in landing order.
+
+    ``proposal_targets`` are the relations a layout proposal may bind: ``no_template``
+    relations and relations ignored as ``no_header``, in landing order.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -89,6 +94,7 @@ class StructureResult(BaseModel):
     ambiguities: tuple[Ambiguity, ...]
     edges: tuple[JoinEdge, ...]
     floors: dict[str, FloorValue]
+    proposal_targets: tuple[str, ...] = ()
 
     @property
     def schema_relations(self) -> tuple[str, ...]:
@@ -155,6 +161,7 @@ def run_structure(
         ambiguities=tuple(ambiguities),
         edges=tuple(graph.edges),
         floors=stage_floors(),
+        proposal_targets=_proposal_targets(profiles, ignored, ambiguities),
     )
 
 
@@ -178,6 +185,16 @@ def stage_floors() -> dict[str, FloorValue]:
     for template in TEMPLATES:
         floors |= getattr(template, "FLOORS", {})
     return floors
+
+
+def _proposal_targets(
+    profiles: Sequence[RelationProfile],
+    ignored: Sequence[SlotBinding],
+    ambiguities: Sequence[Ambiguity],
+) -> tuple[str, ...]:
+    targets = {a.subject for a in ambiguities if a.members == (NO_TEMPLATE,)}
+    targets |= {b.relations[0] for b in ignored if b.slots.get(ignore.REASON) == ignore.NO_HEADER}
+    return tuple(profile.ref.name for profile in profiles if profile.ref.name in targets)
 
 
 def _claimed(bindings: Iterable[SlotBinding]) -> set[str]:

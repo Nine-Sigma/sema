@@ -222,7 +222,7 @@ def test_choice_is_bound_with_source_model_confidence_and_call_key(
     codes: Source, codes_structure: Any, tmp_path: Path
 ) -> None:
     subject = ref(codes, GROUPED_CODE_TABLE)
-    assert open_subjects(codes_structure) == {subject}
+    assert open_subjects(codes_structure) == {ref(codes, name) for name in CODE_TABLES}
     client = answering(starting(FLAT_LIST))
 
     result, wired = _resolved(codes, codes_structure, client, tmp_path)
@@ -337,7 +337,7 @@ def test_abstain_leaves_the_entry_open_with_the_reason(
     assert entry.choice is None
     assert entry.source is None
     assert entry.reason == ABSTAIN_REASON
-    assert open_subjects(result) == {subject}
+    assert open_subjects(result) == {ref(codes, name) for name in CODE_TABLES}
 
 
 def _code_table_values(codes: Source) -> set[str]:

@@ -1,4 +1,7 @@
-"""entity_model: per_file dictionaries with an optional header, or one single relation."""
+"""entity_model: per_file dictionaries with an optional header, or one single relation.
+
+A dictionary with no header in its group is a candidate beside ``concept_list`` (S3 Decision 4).
+"""
 
 from __future__ import annotations
 
@@ -59,12 +62,23 @@ def test_every_acris_workbook_group_has_exactly_one_per_file_binding(acris: Sour
         assert only.slots["dictionary"] == acris.ref(f"{stem}__Column_Info"), stem
 
 
-def test_key_value_sheet_alone_is_not_a_dictionary(acris: Source) -> None:
-    assert candidates(ID, acris.group(f"{WORKBOOK}__Dataset_Info"), acris) == []
+def test_key_value_sheet_alone_is_a_lone_dictionary_candidate(acris: Source) -> None:
+    sheet = acris.ref(f"{WORKBOOK}__Dataset_Info")
+    group = acris.group(f"{WORKBOOK}__Dataset_Info")
+
+    (only,) = candidates(ID, group, acris)
+    decided = shapes("precedence").apply_precedence(
+        [only, *candidates("concept_list", group, acris)]
+    )
+
+    assert only.slots == {"layout": "per_file", "dictionary": sheet}
+    (ambiguity,) = decided.ambiguities
+    assert ambiguity.subject == sheet
+    assert {member.partition("(")[0] for member in ambiguity.members} == {"concept_list", ID}
 
 
-def test_per_file_requires_a_header_relation(memory: Memory) -> None:
-    source = memory(
+def _fields_and_info(memory: Memory) -> Source:
+    return memory(
         "em",
         "CREATE TABLE em.fields AS SELECT * FROM (VALUES ('code', 'The code', 'text'),"
         " ('name', 'The name', 'text'), ('rank', 'The rank', 'number'),"
@@ -72,15 +86,53 @@ def test_per_file_requires_a_header_relation(memory: Memory) -> None:
         "CREATE TABLE em.info AS SELECT * FROM (VALUES ('title', 'A dataset'),"
         " ('owner', 'A team')) t(key, value)",
     )
-    fields, info = source.profile("fields"), source.profile("info")
 
-    assert candidates(ID, [fields], source) == []
-    (only,) = candidates(ID, [fields, info], source)
+
+def test_lone_dictionary_is_a_per_file_candidate_with_no_header(memory: Memory) -> None:
+    source = _fields_and_info(memory)
+    fields = source.ref("fields")
+
+    (only,) = candidates(ID, [source.profile("fields")], source)
+
+    assert only.slots == {"layout": "per_file", "dictionary": fields}
+    assert only.relations == (fields,)
+
+
+def test_dictionary_beside_a_header_has_only_the_headed_binding(memory: Memory) -> None:
+    source = _fields_and_info(memory)
+
+    (only,) = candidates(ID, [source.profile("fields"), source.profile("info")], source)
+
     assert only.slots == {
         "layout": "per_file",
         "dictionary": source.ref("fields"),
         "header": source.ref("info"),
     }
+
+
+def test_lone_dictionary_is_ambiguous_against_concept_list(memory: Memory) -> None:
+    source = _fields_and_info(memory)
+    group = [source.profile("fields")]
+    found = candidates(ID, group, source) + candidates("concept_list", group, source)
+
+    decided = shapes("precedence").apply_precedence(found)
+
+    assert decided.candidates == ()
+    (ambiguity,) = decided.ambiguities
+    assert ambiguity.subject == source.ref("fields")
+    assert {member.partition("(")[0] for member in ambiguity.members} == {
+        "concept_list",
+        ID,
+    }
+    assert f"{ID}(dictionary={source.ref('fields')}, layout=per_file)" in ambiguity.members
+
+
+def test_verify_passes_a_per_file_binding_with_no_header(memory: Memory) -> None:
+    source = _fields_and_info(memory)
+    group = [source.profile("fields")]
+    (lone,) = candidates(ID, group, source)
+
+    assert verify(ID, lone, group, source).status == "pass"
 
 
 def test_omop_csv_is_single_relation_with_one_entity_and_property_column(omop: Source) -> None:
@@ -103,9 +155,11 @@ def test_code_tables_have_no_single_relation_binding(acris: Source) -> None:
         assert "single_relation" not in _layouts(found), name
 
 
-def test_code_tables_are_not_dictionaries_in_either_layout(acris: Source) -> None:
+def test_code_tables_are_lone_dictionaries_with_no_header(acris: Source) -> None:
     for name in CODE_TABLES:
-        assert candidates(ID, acris.group(name), acris) == [], name
+        (only,) = candidates(ID, acris.group(name), acris)
+        assert only.slots == {"layout": "per_file", "dictionary": acris.ref(name)}, name
+        assert only.relations == (acris.ref(name),), name
 
 
 def test_verify_passes_and_records_the_entity_cap(omop: Source) -> None:

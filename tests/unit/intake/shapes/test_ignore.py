@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -94,6 +95,21 @@ def test_headerless_relation_is_no_header_before_boilerplate(three: Source) -> N
     reasons = _reasons(three)
 
     assert {reasons[name] for name in _named(three, "Figures")} == {"no_header"}
+
+
+def test_headerless_relation_stays_ignored_and_is_a_proposal_target(three: Source) -> None:
+    structure = importlib.import_module("sema.intake.structure")
+    figures = _named(three, "Figures")
+
+    result = structure.run_structure(three.land, three.tools, provider=three.provider)
+
+    ignored = [b.relations[0] for b in result.ignored]
+    reasons = {b.relations[0]: b.slots["reason"] for b in result.ignored}
+    assert {name: reasons.get(name) for name in figures} == dict.fromkeys(figures, "no_header")
+    assert len(ignored) == len(set(ignored))
+    assert not set(figures) & {a.subject for a in result.ambiguities}
+    assert not set(figures) & {n for e in result.bound for n in e.binding.relations}
+    assert result.proposal_targets == tuple(figures)
 
 
 def test_relation_identical_across_three_groups_is_boilerplate(three: Source) -> None:

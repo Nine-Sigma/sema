@@ -42,7 +42,7 @@ from tests.unit.intake.pipeline_env import (
     run_stages,
     statement_relations,
 )
-from tests.unit.intake.structure_env import ACRIS, ACRIS_SPEC
+from tests.unit.intake.structure_env import ACRIS, ACRIS_SPEC, CODE_TABLES
 
 pytestmark = pytest.mark.unit
 
@@ -134,7 +134,7 @@ def test_registry_reaches_dry_run_with_zero_model_calls(hinted: StageRun) -> Non
     assert (landed.ledger.directory / "artifacts" / "dry_run_report.json").is_file()
 
 
-def test_without_the_hint_only_the_grouped_code_table_is_ambiguous(
+def test_without_the_hint_the_five_code_tables_are_ambiguous(
     acris: Landed, tmp_path: Path
 ) -> None:
     ledger = Ledger(tmp_path).run("unhinted")
@@ -143,7 +143,9 @@ def test_without_the_hint_only_the_grouped_code_table_is_ambiguous(
     )
     result = run_structure(acris.land, tools, provider=PROVIDER, hint=None)
 
-    assert [a.subject for a in result.ambiguities] == [acris.qualified(GROUPED_CODE_TABLE)]
+    subjects = [a.subject for a in result.ambiguities]
+    assert sorted(subjects) == sorted(acris.qualified(name) for name in CODE_TABLES)
+    assert result.proposal_targets == ()
 
 
 def test_hinted_run_binds_the_misspelled_property_to_the_grouped_table(

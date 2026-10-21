@@ -233,25 +233,25 @@ def test_a10_binds_fifteen_per_file_entity_models_with_the_key_value_header(
         assert entry.binding.slots["header"] == f"{stem}__Dataset_Info"
 
 
-def test_a10_binds_four_code_tables_as_concept_lists_with_the_section_open(
-    acris: Source, a10: Result
-) -> None:
-    lists = entries(a10(), "concept_list")
-    expected = {ref(acris, name) for name in CODE_TABLES if name != GROUPED_CODE_TABLE}
-
-    assert {entry.binding.relations for entry in lists} == {(name,) for name in expected}
-    assert all(entry.binding.section is None for entry in lists)
-    assert len(a10().bound) == 19
+def test_a10_binds_only_the_fifteen_entity_models(a10: Result) -> None:
+    assert {entry.binding.template for entry in a10().bound} == {"entity_model"}
+    assert len(a10().bound) == 15
 
 
-def test_a10_lists_exactly_one_ambiguity_with_three_members(acris: Source, a10: Result) -> None:
-    (ambiguity,) = a10().ambiguities
+def test_a10_lists_the_five_code_tables_with_their_members(acris: Source, a10: Result) -> None:
+    by_subject = {ambiguity.subject: ambiguity for ambiguity in a10().ambiguities}
 
-    assert ambiguity.subject == ref(acris, GROUPED_CODE_TABLE)
-    assert ambiguity.stage == "structure"
-    assert len(ambiguity.members) == 3
-    assert sum(m.startswith("concept_list(") for m in ambiguity.members) == 1
-    assert sum(m.startswith("concept_with_values_denormalized(") for m in ambiguity.members) == 2
+    assert len(a10().ambiguities) == len(CODE_TABLES)
+    assert set(by_subject) == {ref(acris, name) for name in CODE_TABLES}
+    for name in CODE_TABLES:
+        ambiguity = by_subject[ref(acris, name)]
+        expected = {"concept_list": 1, "entity_model": 1}
+        if name == GROUPED_CODE_TABLE:
+            expected["concept_with_values_denormalized"] = 2
+        assert ambiguity.stage == "structure"
+        assert Counter(m.partition("(")[0] for m in ambiguity.members) == expected, name
+        lone = f"entity_model(dictionary={ref(acris, name)}, layout=per_file)"
+        assert lone in ambiguity.members, name
 
 
 def test_code_bound_entries_carry_confidence_one(a10: Result) -> None:
@@ -278,11 +278,6 @@ def test_hinted_a10_renders_the_hint_shape(a10_hinted: Result) -> None:
     assert rendered == {(entry.section, entry.template) for entry in hint.shape}
 
 
-def test_shape_is_refused_while_a_section_is_unresolved(a10: Result) -> None:
-    with pytest.raises(ValueError):
-        a10().to_shape()
-
-
 def test_relation_eligible_for_two_templates_is_listed_with_both(tmp_path: Path) -> None:
     con = duckdb.connect(":memory:")
     for statement in OUTLINE_SQL:
@@ -294,8 +289,10 @@ def test_relation_eligible_for_two_templates_is_listed_with_both(tmp_path: Path)
     assert bound_relations(result) == []
     (ambiguity,) = result.ambiguities
     assert ambiguity.subject == "tw.outline"
+    # A text code beside a label is also a lone dictionary, so entity_model joins the two.
     assert {member.partition("(")[0] for member in ambiguity.members} == {
         "concept_list",
+        "entity_model",
         "path_codes",
     }
     assert all("tw.outline" in member for member in ambiguity.members)

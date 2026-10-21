@@ -73,18 +73,22 @@ def test_grouped_code_table_is_a_three_member_structure_ambiguity(acris: Source)
     assert sum("concept_list" in member for member in ambiguity.members) == 1
 
 
-def test_every_template_leaves_document_control_with_exactly_three_members(
+def test_every_template_leaves_document_control_with_exactly_four_members(
     acris: Source,
 ) -> None:
     group = acris.group(DOCUMENT_CONTROL)
-    expected = candidates("concept_list", group, acris) + candidates(ID, group, acris)
+    expected = [
+        *candidates("concept_list", group, acris),
+        *candidates("entity_model", group, acris),
+        *candidates(ID, group, acris),
+    ]
 
     result = shapes().apply_precedence(every_template_candidates(group, acris))
 
     (ambiguity,) = [a for a in result.ambiguities if a.subject == acris.ref(DOCUMENT_CONTROL)]
     member = shapes("precedence").member
     assert ambiguity.members == tuple(sorted(member(b) for b in expected))
-    assert len(ambiguity.members) == 3
+    assert len(ambiguity.members) == 4
     assert over(result.candidates, acris.ref(DOCUMENT_CONTROL)) == []
 
 

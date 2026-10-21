@@ -13,7 +13,13 @@ from sema.intake.loaders.tabular import land_tabular
 from sema.intake.shapes import concept_list
 from sema.intake.shapes.base import SlotBinding, profile_relations
 from tests.unit.intake.shapes.shapes_env import Source, staging_source, write_workbook
-from tests.unit.intake.structure_env import GROUPED_CODE_TABLE, fresh_tools, ref, run
+from tests.unit.intake.structure_env import (
+    CODE_TABLES,
+    GROUPED_CODE_TABLE,
+    fresh_tools,
+    ref,
+    run,
+)
 from tests.unit.intake.verify.conftest import Landed
 from tests.unit.intake.verify.verify_env import (
     STRUCTURE_CHECKS,
@@ -95,13 +101,13 @@ def test_hinted_acris_structure_output_passes(
     assert_passes(verdict, STRUCTURE_CHECKS)
 
 
-def test_unhinted_acris_output_with_its_one_ambiguity_passes(
+def test_unhinted_acris_output_with_its_five_ambiguities_passes(
     acris: Landed, acris_structure: Any, tmp_path: Path
 ) -> None:
-    grouped = ref(acris.source, GROUPED_CODE_TABLE)
+    code_tables = sorted(ref(acris.source, name) for name in CODE_TABLES)
     verdict = _verify(acris_structure, acris.source, tmp_path / "ledger" / "verify")
 
-    assert [a.subject for a in acris_structure.ambiguities] == [grouped]
+    assert sorted(a.subject for a in acris_structure.ambiguities) == code_tables
     assert_passes(verdict, STRUCTURE_CHECKS)
 
 
@@ -121,12 +127,14 @@ def test_code_chosen_binding_omitted_from_the_ambiguity_list_fails(
 def test_dropped_ambiguity_fails_the_partition_and_the_ambiguity_list(
     acris: Landed, acris_structure: Any, tmp_path: Path
 ) -> None:
-    grouped = ref(acris.source, GROUPED_CODE_TABLE)
+    code_tables = sorted(ref(acris.source, name) for name in CODE_TABLES)
     proposal = acris_structure.model_copy(update={"ambiguities": ()})
     verdict = _verify(proposal, acris.source, tmp_path / "ledger" / "verify")
 
-    assert [f.relation for f in failures(verdict, "partition_complete")] == [grouped]
-    assert [f.relation for f in failures(verdict, "ambiguity_list_complete")] == [grouped]
+    partition = failures(verdict, "partition_complete")
+    listed = failures(verdict, "ambiguity_list_complete")
+    assert sorted(f.relation for f in partition) == code_tables
+    assert sorted(f.relation for f in listed) == code_tables
     assert_named(verdict, STRUCTURE_CHECKS)
 
 
