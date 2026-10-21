@@ -2,10 +2,11 @@
 
 A loader-fixed binding spans its whole namespace, so it claims every relation the loader
 landed, and those relations leave every other template's candidate set first: a loader that
-fixes the relation names has already decided the shape. A claimed relation leaves the
-single-relation candidate sets. A relation stays ambiguous when two claims include it, or
-when it is unclaimed and holds more than one single-relation binding. Nothing here reads a
-name or prefers a template by identity.
+fixes the relation names has already decided the shape. A relation claimed once leaves the
+single-relation candidate sets; a relation claimed twice or more keeps them, so its ambiguity
+offers every verified reading. A relation stays ambiguous when two claims include it, or when
+it is unclaimed and holds more than one single-relation binding. Nothing here reads a name or
+prefers a template by identity.
 """
 
 from __future__ import annotations
@@ -49,11 +50,11 @@ def claims(binding: SlotBinding) -> bool:
 def apply_precedence(bindings: Sequence[SlotBinding]) -> Precedence:
     bindings = _without_loader_fixed_relations(bindings)
     claiming = [b for b in bindings if claims(b)]
-    claimed = _by_relation(claiming)
-    single = [b for b in bindings if not claims(b) and not set(b.relations) & claimed.keys()]
+    claimed_once = {r for r, members in _by_relation(claiming).items() if len(members) == 1}
+    single = [b for b in bindings if not claims(b) and not set(b.relations) & claimed_once]
     contested = {
         relation: members
-        for relation, members in (claimed | _by_relation(single)).items()
+        for relation, members in _by_relation(claiming + single).items()
         if len(members) > 1
     }
     kept = [b for b in claiming + single if not set(b.relations) & contested.keys()]
