@@ -25,9 +25,11 @@ from sema.intake.profile_utils import (
     RelationListing,
     RelationProfile,
     ValueSample,
+    CatalogColumn,
     aggregate_sql,
     catalog_columns,
     column_profiles,
+    count_where_sql,
     distinct_count_sql,
     distinct_tuples_sql,
     hierarchy_sql,
@@ -121,8 +123,11 @@ class ProfileTools:
             listings.append(RelationListing(ref.name, int(count[0][0]), comment or None))
         return listings
 
+    def catalog(self, ref: RelationRef) -> list[CatalogColumn]:
+        return catalog_columns(self._run(ref, self._columns_sql(ref)))
+
     def describe_relation(self, ref: RelationRef) -> RelationProfile:
-        catalog = catalog_columns(self._run(ref, self._columns_sql(ref)))
+        catalog = self.catalog(ref)
         quoted = [self.provider.quote(ref, column.name) for column in catalog]
         row = self._run(ref, aggregate_sql(self.provider.relation_sql(ref), quoted))[0]
         row_count, columns = column_profiles(catalog, row)
@@ -151,10 +156,23 @@ class ProfileTools:
         cycles, roots, depth = (int(value) for value in self._run(ref, statement)[0])
         return HierarchyCheck(cycle_count=cycles, root_count=roots, max_depth=depth)
 
-    def count_distinct(self, ref: RelationRef, columns: Sequence[str]) -> int:
+    def count_distinct(
+        self, ref: RelationRef, columns: Sequence[str], *, where: str | None = None
+    ) -> int:
         quoted = [self.provider.quote(ref, column) for column in columns]
-        statement = distinct_tuples_sql(self.provider.relation_sql(ref), quoted)
+        statement = distinct_tuples_sql(self.provider.relation_sql(ref), quoted, where)
         return int(self._run(ref, statement)[0][0])
+
+    def count_where(
+        self, ref: RelationRef, conditions: Sequence[str], *, where: str | None = None
+    ) -> tuple[int, ...]:
+        """The row count, then the rows meeting each condition.
+
+        Conditions are boolean SQL over identifiers quoted through ``provider``; each is
+        wrapped in a count, so a value never comes back.
+        """
+        statement = count_where_sql(self.provider.relation_sql(ref), conditions, where)
+        return tuple(int(value) for value in self._run(ref, statement)[0])
 
     def check_levels(self, ref: RelationRef, columns: Sequence[str]) -> LevelCheck:
         if len(columns) < 2:

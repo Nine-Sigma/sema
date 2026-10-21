@@ -249,13 +249,24 @@ def hierarchy_sql(relation_sql: str, id_col: str, parent_col: str) -> str:
     )
 
 
-def distinct_tuples_sql(relation_sql: str, quoted_columns: Sequence[str]) -> str:
+def distinct_tuples_sql(
+    relation_sql: str, quoted_columns: Sequence[str], where: str | None = None
+) -> str:
     """Distinct tuples among the rows where every column is non-null."""
     present = " AND ".join(f"{column} IS NOT NULL" for column in quoted_columns)
+    scoped = f"({where}) AND {present}" if where else present
     return (
         f"SELECT COUNT(*) FROM (SELECT DISTINCT {', '.join(quoted_columns)}"
-        f" FROM {relation_sql} WHERE {present}) t"
+        f" FROM {relation_sql} WHERE {scoped}) t"
     )
+
+
+def count_where_sql(relation_sql: str, conditions: Sequence[str], where: str | None) -> str:
+    """The row count, then one count per condition; nothing but counts comes back."""
+    counted = [f"COUNT(CASE WHEN {condition} THEN 1 END)" for condition in conditions]
+    parts = ["COUNT(*)", *counted]
+    scope = f" WHERE {where}" if where else ""
+    return f"SELECT {', '.join(parts)} FROM {relation_sql}{scope}"
 
 
 def levels_sql(relation_sql: str, quoted_columns: Sequence[str]) -> str:

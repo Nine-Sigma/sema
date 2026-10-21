@@ -1,0 +1,268 @@
+"""Roles verifier helpers: the spec's bound sections and each role's value predicate.
+
+Every value check is a count or a join rate over the bound relation, so it runs under
+``metadata_only`` without reading a value. Role names come from the spec role models.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+
+from pydantic import BaseModel
+
+from sema.binding.spec import ConceptSourceSpec
+from sema.binding.spec_sections import RelationRef, StatusRole
+from sema.intake import lexicon
+from sema.intake.eligibility_spec_utils import VALUE_SETS
+from sema.intake.eligibility_text_utils import CODE_LISTS, CONCEPTS
+from sema.intake.eligibility_utils import ARRAY_TYPE_MARKERS
+from sema.intake.profile import ProfileTools
+from sema.intake.profile_utils import TEXT_TYPE, RelationProfile, sql_string
+from sema.intake.shapes import entity_model
+from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR, is_text
+from sema.intake.shapes.base_utils import failure
+from sema.intake.structure_hint_utils import KEY_ROLE, SECTION_SEPARATOR
+from sema.intake.verify.base import Failure
+
+IDENTITY_UNIQUE = f"{KEY_ROLE}_unique"
+CODE_UNIQUE = "code_unique"
+DISPLAY_NULL_RATE = "display_null_rate"
+SYNONYMS_SHAPE = "synonyms_shape"
+STATUS_VALUES = "status_values"
+VALID_DATES = "valid_dates"
+REPLACED_BY_RESOLVES = "replaced_by_resolves"
+LANG_TAGS = "lang_tags"
+VALUE_CHECKS = (
+    IDENTITY_UNIQUE,
+    CODE_UNIQUE,
+    DISPLAY_NULL_RATE,
+    SYNONYMS_SHAPE,
+    STATUS_VALUES,
+    VALID_DATES,
+    REPLACED_BY_RESOLVES,
+    LANG_TAGS,
+)
+TIMESTAMP_TYPE = "TIMESTAMP"
+# The lexicon's date roles in settling order: the start, then the end.
+DATE_ROLES = tuple(entry.name for entry in lexicon.ROLES if entry.predicate == "date")
+BCP47_PATTERN = "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+
+
+@dataclass(frozen=True)
+class BoundSection:
+    """``vocabulary`` scopes code uniqueness; ``identity`` is what ``replaced_by`` names."""
+
+    path: str
+    relation: RelationRef
+    roles: BaseModel
+    filter: str | None = None
+    group_by: str | None = None
+    vocabulary: str | None = None
+    identity: str | None = None
+
+
+def bound_sections(spec: ConceptSourceSpec) -> list[BoundSection]:
+    found = []
+    if spec.concepts is not None:
+        concepts = spec.concepts
+        identity = getattr(concepts.roles, KEY_ROLE)
+        found.append(BoundSection(
+            CONCEPTS, concepts.relation, concepts.roles, concepts.filter,
+            group_by=concepts.group_by, identity=identity,
+        ))
+    if spec.value_sets is not None:
+        values = spec.value_sets
+        vocabulary = getattr(values.roles, KEY_ROLE)
+        found.append(BoundSection(
+            VALUE_SETS, values.relation, values.roles,
+            vocabulary=vocabulary, identity=values.roles.code,
+        ))
+    for entry in spec.code_lists or ():
+        found.append(BoundSection(
+            f"{CODE_LISTS}{SECTION_SEPARATOR}{entry.vocabulary_id}", entry.relation,
+            entry.roles, entry.filter, vocabulary=entry.roles.vocabulary_id,
+            identity=entry.roles.code,
+        ))
+    model = spec.entity_model
+    if model is None:
+        return found
+    entries = model.entities or ()
+    relations = [model.relation] if model.relation else [entry.relation for entry in entries]
+    return found + [
+        BoundSection(entity_model.SECTION, relation, model.roles, model.filter)
+        for relation in relations
+    ]
+
+
+ValueCheck = Callable[[BoundSection, dict[str, str], ProfileTools], list[Failure]]
+
+
+def role_columns(roles: BaseModel) -> dict[str, str]:
+    """Each role bound to one column; a status role binds its column."""
+    found = {}
+    for name in type(roles).model_fields:
+        value = getattr(roles, name)
+        if isinstance(value, StatusRole):
+            found[name] = value.column
+        elif isinstance(value, str):
+            found[name] = value
+    return found
+
+
+def value_failures(
+    section: BoundSection, profile: RelationProfile, tools: ProfileTools
+) -> list[Failure]:
+    present = {column.name for column in profile.columns}
+    roles = role_columns(section.roles)
+    bound = {role: column for role, column in roles.items() if column in present}
+    checks: tuple[ValueCheck, ...] = (
+        _identity_unique, _code_unique, _display_nulls, _status_values, _valid_dates,
+        _replaced_by, _lang_tags,
+    )
+    failures = [found for check in checks for found in check(section, bound, tools)]
+    return failures + _synonyms_shape(section, bound, profile)
+
+
+def _text(tools: ProfileTools, ref: RelationRef, column: str) -> str:
+    return f"CAST({tools.provider.quote(ref, column)} AS {TEXT_TYPE})"
+
+
+def _count(section: BoundSection, tools: ProfileTools, condition: str) -> tuple[int, int]:
+    rows, matched = tools.count_where(section.relation, [condition], where=section.filter)
+    return rows, matched
+
+
+def _identity_unique(
+    section: BoundSection, bound: dict[str, str], tools: ProfileTools
+) -> list[Failure]:
+    identity, group_by = bound.get(KEY_ROLE), section.group_by
+    if section.path != CONCEPTS or identity is None or group_by is None:
+        return []
+    ref, where = section.relation, section.filter
+    counts = [tools.count_distinct(ref, cols, where=where)
+              for cols in ([group_by], [identity], [group_by, identity])]
+    if len(set(counts)) == 1:
+        return []
+    groups, identities, pairs = counts
+    return [failure(IDENTITY_UNIQUE, ref.name, identity, groups=groups,
+                    identities=identities, pairs=pairs)]
+
+
+def _code_unique(
+    section: BoundSection, bound: dict[str, str], tools: ProfileTools
+) -> list[Failure]:
+    code = bound.get("code")
+    if code is None:
+        return []
+    columns = [c for c in (section.vocabulary, code) if c is not None]
+    ref = section.relation
+    present = " AND ".join(f"{tools.provider.quote(ref, c)} IS NOT NULL" for c in columns)
+    _, keyed = _count(section, tools, present)
+    distinct = tools.count_distinct(ref, columns, where=section.filter)
+    if distinct >= keyed:
+        return []
+    return [failure(CODE_UNIQUE, ref.name, code, rows=keyed, distinct=distinct)]
+
+
+def _display_nulls(
+    section: BoundSection, bound: dict[str, str], tools: ProfileTools
+) -> list[Failure]:
+    display = bound.get("display")
+    if display is None:
+        return []
+    ref = section.relation
+    quoted, text = tools.provider.quote(ref, display), _text(tools, ref, display)
+    rows, empty = _count(section, tools, f"({quoted} IS NULL OR TRIM({text}) = '')")
+    rate = empty / rows if rows else 0.0
+    if rate < lexicon.DISPLAY_NULL_RATE_FLOOR:
+        return []
+    return [failure(DISPLAY_NULL_RATE, ref.name, display, null_rate=rate,
+                    floor=lexicon.DISPLAY_NULL_RATE_FLOOR)]
+
+
+def _status_values(
+    section: BoundSection, bound: dict[str, str], tools: ProfileTools
+) -> list[Failure]:
+    status = getattr(section.roles, lexicon.STATUS_ROLE, None)
+    if not isinstance(status, StatusRole) or lexicon.STATUS_ROLE not in bound:
+        return []
+    ref = section.relation
+    declared = [*status.active_values, *status.retired_values]
+    listed = ", ".join(sql_string(value) for value in declared) or "NULL"
+    quoted = tools.provider.quote(ref, status.column)
+    condition = f"{quoted} IS NOT NULL AND {_text(tools, ref, status.column)} NOT IN ({listed})"
+    _, undeclared = _count(section, tools, condition)
+    if not undeclared:
+        return []
+    return [failure(STATUS_VALUES, ref.name, status.column, undeclared_rows=undeclared)]
+
+
+def _valid_dates(
+    section: BoundSection, bound: dict[str, str], tools: ProfileTools
+) -> list[Failure]:
+    ref = section.relation
+    dated = {role: bound[role] for role in DATE_ROLES if role in bound}
+    failures = []
+    for role, column in dated.items():
+        quoted, parsed = tools.provider.quote(ref, column), _parsed(tools, ref, column)
+        _, bad = _count(section, tools, f"{quoted} IS NOT NULL AND {parsed} IS NULL")
+        if bad:
+            failures.append(failure(VALID_DATES, ref.name, column, role=role, unparseable=bad))
+    if failures or len(dated) < len(DATE_ROLES):
+        return failures
+    start, end = (dated[role] for role in DATE_ROLES)
+    condition = f"{_parsed(tools, ref, start)} > {_parsed(tools, ref, end)}"
+    _, inverted = _count(section, tools, condition)
+    return [failure(VALID_DATES, ref.name, start, inverted_rows=inverted)] if inverted else []
+
+
+def _parsed(tools: ProfileTools, ref: RelationRef, column: str) -> str:
+    return f"TRY_CAST({_text(tools, ref, column)} AS {TIMESTAMP_TYPE})"
+
+
+def _replaced_by(
+    section: BoundSection, bound: dict[str, str], tools: ProfileTools
+) -> list[Failure]:
+    replaced_by, identity = bound.get("replaced_by"), section.identity
+    if replaced_by is None or identity is None:
+        return []
+    ref = section.relation
+    _, named = _count(section, tools, f"{tools.provider.quote(ref, replaced_by)} IS NOT NULL")
+    if not named:
+        return []
+    rate = tools.check_join(ref, replaced_by, ref, identity).resolve_a_to_b
+    if rate >= JOIN_RESOLVE_FLOOR:
+        return []
+    return [failure(REPLACED_BY_RESOLVES, ref.name, replaced_by, into=identity,
+                    resolve_rate=rate, floor=JOIN_RESOLVE_FLOOR)]
+
+
+def _lang_tags(
+    section: BoundSection, bound: dict[str, str], tools: ProfileTools
+) -> list[Failure]:
+    lang = bound.get("lang")
+    if lang is None:
+        return []
+    ref = section.relation
+    text, pattern = _text(tools, ref, lang), sql_string(BCP47_PATTERN)
+    matched = (
+        f"regexp_full_match({text}, {pattern})" if ref.provider == "staging"
+        else f"{text} RLIKE {pattern}"
+    )
+    quoted = tools.provider.quote(ref, lang)
+    _, bad = _count(section, tools, f"{quoted} IS NOT NULL AND NOT ({matched})")
+    return [failure(LANG_TAGS, ref.name, lang, rows=bad)] if bad else []
+
+
+def _synonyms_shape(
+    section: BoundSection, bound: dict[str, str], profile: RelationProfile
+) -> list[Failure]:
+    synonyms = bound.get("synonyms")
+    column = next((c for c in profile.columns if c.name == synonyms), None)
+    if column is None:
+        return []
+    kind = column.type.upper()
+    if is_text(column) or any(marker in kind for marker in ARRAY_TYPE_MARKERS):
+        return []
+    return [failure(SYNONYMS_SHAPE, section.relation.name, column.name, type=column.type)]
