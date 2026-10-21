@@ -19,7 +19,9 @@ from sema.intake.profile_utils import (
     ExternalRefCheck,
     HierarchyCheck,
     JoinCheck,
+    LevelCheck,
     NeedsValues,
+    PathCheck,
     RelationListing,
     RelationProfile,
     ValueSample,
@@ -27,9 +29,12 @@ from sema.intake.profile_utils import (
     catalog_columns,
     column_profiles,
     distinct_count_sql,
+    distinct_tuples_sql,
     hierarchy_sql,
     join_check,
     join_sql,
+    levels_sql,
+    paths_sql,
     sample_sql,
     staging_columns_sql,
     staging_tables_sql,
@@ -44,7 +49,9 @@ __all__ = [
     "ExternalRefCheck",
     "HierarchyCheck",
     "JoinCheck",
+    "LevelCheck",
     "NeedsValues",
+    "PathCheck",
     "ProfileRefusedError",
     "ProfileTools",
     "RelationListing",
@@ -143,6 +150,27 @@ class ProfileTools:
         )
         cycles, roots, depth = (int(value) for value in self._run(ref, statement)[0])
         return HierarchyCheck(cycle_count=cycles, root_count=roots, max_depth=depth)
+
+    def count_distinct(self, ref: RelationRef, columns: Sequence[str]) -> int:
+        quoted = [self.provider.quote(ref, column) for column in columns]
+        statement = distinct_tuples_sql(self.provider.relation_sql(ref), quoted)
+        return int(self._run(ref, statement)[0][0])
+
+    def check_levels(self, ref: RelationRef, columns: Sequence[str]) -> LevelCheck:
+        if len(columns) < 2:
+            raise ProfileRefusedError(f"a level check over {ref.name} needs two or more columns")
+        quoted = [self.provider.quote(ref, column) for column in columns]
+        row = self._run(ref, levels_sql(self.provider.relation_sql(ref), quoted))[0]
+        return LevelCheck(misplaced_nulls=int(row[0]), multi_parent=int(row[1]))
+
+    def check_paths(self, ref: RelationRef, column: str, separator: str) -> PathCheck:
+        if len(separator) != 1:
+            raise ProfileRefusedError(f"path separator {separator!r} is not one character")
+        statement = paths_sql(
+            self.provider.relation_sql(ref), self.provider.quote(ref, column), separator
+        )
+        codes, separated, malformed, implicit = (int(v) for v in self._run(ref, statement)[0])
+        return PathCheck(codes, separated, malformed, implicit)
 
     def resolve_external_refs(self, system: str, codes: Sequence[str]) -> ExternalRefCheck:
         vocabulary = self.vocabulary

@@ -30,7 +30,8 @@ from sema.log import logger
 
 LOADER = "semsql"
 LOADER_VERSION = "1"
-BASE_TABLES = ("statements", "entailed_edge", "prefix")
+REQUIRED_BASE_TABLES = ("statements", "entailed_edge")
+BASE_TABLES = (*REQUIRED_BASE_TABLES, "prefix")
 EXPOSED_VIEWS = (
     "rdfs_label_statement",
     "has_text_definition_statement",

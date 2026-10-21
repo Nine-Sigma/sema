@@ -36,6 +36,13 @@ OPTIONAL_VOCAB_FILES: tuple[str, ...] = (
 )
 
 
+def vocab_table(filename: str) -> str:
+    return Path(filename).stem.lower()
+
+
+REQUIRED_TABLES = tuple(vocab_table(filename) for filename in REQUIRED_VOCAB_FILES)
+
+
 def land_athena_bundle(
     bundle_dir: Path | str, staging: Staging, *, schema: str = VOCABULARY_SCHEMA
 ) -> LandResult:
@@ -70,7 +77,7 @@ def _assert_required_vocab_files(vocab_dir: Path) -> None:
 
 
 def _load_vocab_csv_into_duckdb(path: Path, staging: Staging, schema: str) -> str:
-    table_name = path.stem.lower()
+    table_name = vocab_table(path.name)
     logger.info("Loading vocabulary CSV {} into {}.{}", path.name, schema, table_name)
     staging.drop_table(schema, table_name)
     sanitized = str(path).replace("'", "''")

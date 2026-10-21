@@ -78,6 +78,20 @@ class HierarchyCheck:
 
 
 @dataclass(frozen=True)
+class LevelCheck:
+    misplaced_nulls: int
+    multi_parent: int
+
+
+@dataclass(frozen=True)
+class PathCheck:
+    code_count: int
+    separated: int
+    malformed: int
+    implicit_count: int
+
+
+@dataclass(frozen=True)
 class ExternalRefCheck:
     system: str
     resolve_rate: float | None
@@ -233,6 +247,54 @@ def hierarchy_sql(relation_sql: str, id_col: str, parent_col: str) -> str:
     )
 
 
+def distinct_tuples_sql(relation_sql: str, quoted_columns: Sequence[str]) -> str:
+    """Distinct tuples among the rows where every column is non-null."""
+    present = " AND ".join(f"{column} IS NOT NULL" for column in quoted_columns)
+    return (
+        f"SELECT COUNT(*) FROM (SELECT DISTINCT {', '.join(quoted_columns)}"
+        f" FROM {relation_sql} WHERE {present}) t"
+    )
+
+
+def levels_sql(relation_sql: str, quoted_columns: Sequence[str]) -> str:
+    """Rows with a null above a filled level, and level nodes reached by two prefix paths."""
+    misplaced = " OR ".join(
+        f"({column} IS NULL AND ({_any_filled(quoted_columns[index + 1 :])}))"
+        for index, column in enumerate(quoted_columns[:-1])
+    )
+    multi = " + ".join(
+        f"(SELECT COUNT(*) FROM (SELECT {column} FROM (SELECT DISTINCT"
+        f" {', '.join(quoted_columns[: depth + 1])} FROM {relation_sql}"
+        f" WHERE {column} IS NOT NULL) p{depth} GROUP BY {column} HAVING COUNT(*) > 1) m{depth})"
+        for depth, column in enumerate(quoted_columns)
+        if depth > 0
+    )
+    return f"SELECT (SELECT COUNT(*) FROM {relation_sql} WHERE {misplaced}), {multi}"
+
+
+def paths_sql(relation_sql: str, column: str, separator: str) -> str:
+    """Codes, codes holding the separator, codes with an empty segment, missing prefixes.
+
+    Prefixes are walked by cutting at the last separator, so the separator is one character.
+    """
+    sep, doubled = sql_string(separator), sql_string(separator * 2)
+
+    def parent(code: str) -> str:
+        return f"SUBSTR({code}, 1, LENGTH({code}) - INSTR(REVERSE({code}), {sep}))"
+
+    return (
+        "WITH RECURSIVE codes AS (SELECT DISTINCT"
+        f" CAST({column} AS {TEXT_TYPE}) AS code FROM {relation_sql} WHERE {column} IS NOT NULL),"
+        f" prefixes(path) AS (SELECT {parent('code')} FROM codes WHERE INSTR(code, {sep}) > 0"
+        f" UNION SELECT {parent('path')} FROM prefixes WHERE INSTR(path, {sep}) > 0)"
+        " SELECT (SELECT COUNT(*) FROM codes),"
+        f" (SELECT COUNT(*) FROM codes WHERE INSTR(code, {sep}) > 0),"
+        f" (SELECT COUNT(*) FROM codes WHERE SUBSTR(code, 1, 1) = {sep}"
+        f" OR SUBSTR(code, LENGTH(code), 1) = {sep} OR INSTR(code, {doubled}) > 0),"
+        " (SELECT COUNT(*) FROM prefixes WHERE path NOT IN (SELECT code FROM codes))"
+    )
+
+
 def distinct_count_sql(relation_sql: str, column: str) -> str:
     return f"SELECT COUNT(DISTINCT {column}) FROM {relation_sql}"
 
@@ -246,6 +308,10 @@ def sample_sql(relation_sql: str, column: str, limit: int) -> str:
 
 def text_sql(relation_sql: str, quoted_columns: Sequence[str]) -> str:
     return f"SELECT {', '.join(quoted_columns)} FROM {relation_sql}"
+
+
+def _any_filled(quoted_columns: Sequence[str]) -> str:
+    return " OR ".join(f"{column} IS NOT NULL" for column in quoted_columns)
 
 
 def _text_or_none(value: Any) -> str | None:

@@ -30,12 +30,15 @@ _ONTOLOGY = (
     " WHERE o.predicate = 'rdf:type' AND o.object = 'owl:Ontology'"
 )
 
+TERMS_RELATION = "semsql_terms"
+TERM_LABEL_COLUMN = "label"
+
 DERIVED_RELATIONS = {
-    "semsql_terms": f"""
+    TERMS_RELATION: f"""
         SELECT c.id AS subject,
                ({_ONTOLOGY}) AS ontology,
                (SELECT min(l.value) FROM rdfs_label_statement l
-                 WHERE l.subject = c.id) AS label,
+                 WHERE l.subject = c.id) AS {TERM_LABEL_COLUMN},
                (SELECT min(d.value) FROM has_text_definition_statement d
                  WHERE d.subject = c.id) AS definition,
                CASE WHEN c.id IN (SELECT id FROM deprecated_node)
