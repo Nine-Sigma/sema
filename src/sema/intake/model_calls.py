@@ -56,6 +56,11 @@ class BudgetExceededError(LLMStageError):
 def build_model_calls(
     config: IntakeModelConfig, ledger: RunLedger, registry: Registry, run_id: str
 ) -> ModelCalls:
+    return ModelCalls(build_intake_client(config), ledger, registry, run_id, config)
+
+
+def build_intake_client(config: IntakeModelConfig) -> IntakeClient:
+    """The provider client the intake config names; intake never uses the build default."""
     if config.provider is None:
         raise IntakeProviderNotSetError(
             "set INTAKE_MODEL_PROVIDER for intake; the build pipeline's provider is not used"
@@ -70,8 +75,7 @@ def build_model_calls(
             request_timeout=config.request_timeout,
         )
     )
-    client = LLMClient(llm, use_structured_output=config.use_structured_output)
-    return ModelCalls(client, ledger, registry, run_id, config)
+    return LLMClient(llm, use_structured_output=config.use_structured_output)
 
 
 def model_calls_for(
