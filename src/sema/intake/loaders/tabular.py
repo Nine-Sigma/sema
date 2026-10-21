@@ -43,6 +43,7 @@ from sema.intake.loaders.base import (
 from sema.intake.loaders.tabular_utils import (
     HEADER_TESTS,
     cell_text,
+    choose_delimiter,
     column_names,
     column_type,
     convert,
@@ -185,7 +186,8 @@ def _csv_dialect(path: Path) -> tuple[str, str]:
     """The sniffed dialect, unless its delimiter splits no row.
 
     ``sniff_csv`` can return a delimiter absent from every row when rows differ
-    in width; the candidate whose quote-aware parse splits the most rows wins.
+    in width; a replacement must split most rows, so a one-column file whose few
+    values hold a delimiter character stays one column.
     """
     with duckdb.connect(":memory:") as con:
         sniffed = con.execute(
@@ -194,23 +196,14 @@ def _csv_dialect(path: Path) -> tuple[str, str]:
     delimiter, quote = (str(sniffed[0]), str(sniffed[1])) if sniffed else (",", '"')
     delimiter = delimiter if len(delimiter) == 1 else ","
     quote = quote if len(quote) == 1 else '"'
-    if _split_score(path, delimiter, quote)[0] > 0:
-        return delimiter, quote
-    candidates = dict.fromkeys((delimiter, *CSV_DELIMITERS))
-    best = max(candidates, key=lambda candidate: _split_score(path, candidate, quote))
-    if best != delimiter:
-        logger.debug(f"{path.name}: sniffed delimiter {delimiter!r} splits no row; using {best!r}")
-    return best, quote
-
-
-def _split_score(path: Path, delimiter: str, quote: str) -> tuple[int, int]:
-    """Rows split into more than one field, then the total field count."""
-    split_rows = fields = 0
     with path.open(newline="", encoding="utf-8-sig") as handle:
-        for record in csv.reader(handle, delimiter=delimiter, quotechar=quote):
-            split_rows += len(record) > 1
-            fields += len(record)
-    return split_rows, fields
+        lines = handle.readlines()
+    chosen = choose_delimiter(lines, delimiter, CSV_DELIMITERS, quote)
+    if chosen != delimiter:
+        logger.debug(
+            f"{path.name}: sniffed delimiter {delimiter!r} splits no row; using {chosen!r}"
+        )
+    return chosen, quote
 
 
 def _rows_data(rows: list[list[Any]], label: str) -> _SheetData:

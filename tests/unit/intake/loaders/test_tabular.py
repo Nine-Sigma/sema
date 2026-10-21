@@ -216,3 +216,26 @@ def test_existing_csv_goldens_land_unchanged(
     assert relation.header_row == header_row
     assert relation.row_count == row_count
     assert result.headerless == ()
+
+
+def _one_column_text(separator: str, *, header: bool) -> str:
+    values = ["alpha", f"beta{separator} two", "gamma"]
+    values += ["delta", f"epsilon{separator}five", "zeta"]
+    return ("label\n" if header else "") + "\n".join(values) + "\n"
+
+
+@pytest.mark.parametrize("header", [True, False], ids=["header", "headerless"])
+@pytest.mark.parametrize("separator", [";", "|", "\t"], ids=["semicolon", "pipe", "tab"])
+def test_a_one_column_file_whose_minority_of_values_hold_a_delimiter_lands_one_column(
+    tmp_path: Path, staging: Staging, separator: str, header: bool
+) -> None:
+    from sema.intake.loaders.tabular import _csv_dialect
+
+    path = _write(tmp_path, "labels.csv", _one_column_text(separator, header=header))
+
+    assert _csv_dialect(path)[0] != separator
+    result = _land(path, staging)
+
+    (column, _) = _column_names(result, "labels")
+    assert column == "label" or not header
+    assert (f"beta{separator} two",) in _rows(staging, "labels", [column])

@@ -13,9 +13,11 @@ and ``007`` stay text, because a code column must keep each code's identity.
 
 from __future__ import annotations
 
+import csv
 import math
 import re
 from collections import Counter
+from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Any
 
@@ -218,3 +220,31 @@ def _as_text(value: Any) -> str:
     if isinstance(value, (date, datetime)):
         return value.isoformat()
     return str(value)
+
+
+def choose_delimiter(
+    lines: list[str], sniffed: str, candidates: Sequence[str], quote: str
+) -> str:
+    """``sniffed`` unless it splits no row and a candidate splits most non-empty rows."""
+    if _split_score(lines, sniffed, quote)[0] > 0:
+        return sniffed
+    scores = {
+        candidate: _split_score(lines, candidate, quote)
+        for candidate in dict.fromkeys(candidates)
+        if candidate != sniffed
+    }
+    if not scores:
+        return sniffed
+    best = max(scores, key=lambda candidate: scores[candidate][:2])
+    split_rows, _, non_empty_rows = scores[best]
+    return best if 2 * split_rows > non_empty_rows else sniffed
+
+
+def _split_score(lines: list[str], delimiter: str, quote: str) -> tuple[int, int, int]:
+    """Rows split into more than one field, total fields, and non-empty rows."""
+    split_rows = fields = non_empty_rows = 0
+    for record in csv.reader(lines, delimiter=delimiter, quotechar=quote):
+        split_rows += len(record) > 1
+        fields += len(record)
+        non_empty_rows += len(record) > 0
+    return split_rows, fields, non_empty_rows
