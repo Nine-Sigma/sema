@@ -25,6 +25,7 @@ from sema.intake.table_schema import ForeignKey, Reference, TableSchema, to_mani
 from sema.intake.table_schema_utils import (
     DictionaryRow,
     dictionary_flag,
+    inline_values,
     table_schema_from_rows,
 )
 from sema.log import logger
@@ -212,6 +213,7 @@ def _role_columns(model: EntityModelSpec) -> list[str | None]:
         roles.domain,
         roles.description,
         roles.entity_description,
+        *roles.notes,
     ]
 
 
@@ -235,7 +237,18 @@ def _row(
         fk_property=_cased(fk_property, model) if fk_property else None,
         domain=domains.get(prop) or _text(record, roles.domain),
         description=_text(record, roles.description),
+        values=_inline_values(record, [roles.description, *roles.notes]),
     )
+
+
+def _inline_values(record: Record, columns: list[str | None]) -> dict[str, str] | None:
+    """The first text, description before notes, that states a code list."""
+    for column in columns:
+        text = _text(record, column)
+        values = inline_values(text) if text else None
+        if values:
+            return values
+    return None
 
 
 def _entity_description(

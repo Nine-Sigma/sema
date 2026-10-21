@@ -57,6 +57,7 @@ class Field(_Descriptor):
     x_sema_raw_type: str | None = _aliased("x_sema_raw_type", "x-sema-raw-type")
     x_sema_domain: str | None = _aliased("x_sema_domain", "x-sema-domain")
     x_sema_sensitive: bool | None = _aliased("x_sema_sensitive", "x-sema-sensitive")
+    x_sema_values: dict[str, str] | None = _aliased("x_sema_values", "x-sema-values")
 
     @property
     def required(self) -> bool:
@@ -68,6 +69,9 @@ class TableSchema(_Descriptor):
     primary_key: list[str] | None = _aliased("primary_key", "primaryKey")
     foreign_keys: list[ForeignKey] | None = _aliased("foreign_keys", "foreignKeys")
     description: str | None = None
+    x_sema_values_extractor: str | None = _aliased(
+        "x_sema_values_extractor", "x-sema-values-extractor"
+    )
 
     def descriptor(self) -> dict[str, Any]:
         dumped: dict[str, Any] = self.model_dump(by_alias=True, exclude_none=True)
@@ -105,6 +109,8 @@ def _property(field: Field) -> dict[str, Any]:
     }
     if field.description:
         prop["definition"] = field.description
+    if field.x_sema_values:
+        prop["decoded_values"] = dict(field.x_sema_values)
     return prop
 
 

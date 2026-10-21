@@ -26,6 +26,7 @@ import pyarrow.parquet as pq
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.landing import (
     LOCATOR_COLUMN,
+    LOCATOR_ROW_SEPARATOR,
     SHEET_SEPARATOR,
     LandedRelation,
     LandResult,
@@ -202,7 +203,7 @@ def _rows_data(rows: list[list[Any]], label: str) -> _SheetData:
         name: pa.array([convert(v, types[name]) for v in values], ARROW_TYPES[types[name]])
         for name, values in columns.items()
     }
-    locators = [f"{label}!{number}" for number, _ in body]
+    locators = [f"{label}{LOCATOR_ROW_SEPARATOR}{number}" for number, _ in body]
     arrays[LOCATOR_COLUMN] = pa.array(locators, pa.string())
     empty = tuple(
         name for name, values in columns.items() if all(cell_text(v) is None for v in values)

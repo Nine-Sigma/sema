@@ -19,7 +19,10 @@ from sema.binding.spec import (
     ExternalRefRole,
     RelationRef,
 )
+from sema.intake.landing import LOCATOR_COLUMN, LOCATOR_ROW_SEPARATOR
 from sema.intake.relations import RelationProvider
+from sema.log import logger
+
 Record = dict[str, Any]
 RefKey = tuple[str, str]
 
@@ -69,7 +72,9 @@ def fetch(
     where: str | None = None,
 ) -> list[Record]:
     """Rows as column-keyed dicts, sorted so the import is order-independent."""
-    records = fetch_in_order(provider, relation, columns, where)
+    names = _names(columns)
+    sql = select_sql(provider, relation, names, where)
+    records = _select(provider, relation, names, sql)
     return sorted(records, key=lambda r: [str(value) for value in r.values()])
 
 
@@ -79,13 +84,50 @@ def fetch_in_order(
     columns: Iterable[str | None],
     where: str | None = None,
 ) -> list[Record]:
-    """Rows in the order the provider returns them, which for staging is landed order."""
-    names = list(dict.fromkeys(c for c in columns if c))
-    query = provider.query(relation)
-    return [
-        dict(zip(names, row))
-        for row in query(select_sql(provider, relation, names, where))
-    ]
+    """Rows in landed physical order, which a provider's scan order does not guarantee.
+
+    A relation with the landing locator orders by the locator's row number; one
+    without orders by the selected columns.
+    """
+    names = _names(columns)
+    if LOCATOR_COLUMN not in provider.columns(relation):
+        logger.info(
+            "Relation {} has no {} column, so it has no physical row order; "
+            "reading it ordered by {}",
+            relation.name,
+            LOCATOR_COLUMN,
+            names,
+        )
+        order = ", ".join(provider.quote(relation, name) for name in names)
+        sql = f"{select_sql(provider, relation, names, where)} ORDER BY {order}"
+        return _select(provider, relation, names, sql)
+    located = list(dict.fromkeys([*names, LOCATOR_COLUMN]))
+    sql = select_sql(provider, relation, located, where)
+    records = sorted(
+        _select(provider, relation, located, sql),
+        key=lambda record: locator_row(record[LOCATOR_COLUMN]),
+    )
+    if LOCATOR_COLUMN not in names:
+        for record in records:
+            del record[LOCATOR_COLUMN]
+    return records
+
+
+def locator_row(locator: Any) -> tuple[int, int, str]:
+    """Sorts by the number after the last separator; non-numeric locators last, by text."""
+    text = "" if locator is None else str(locator)
+    suffix = text.rsplit(LOCATOR_ROW_SEPARATOR, 1)[-1]
+    return (0, int(suffix), text) if suffix.isdecimal() else (1, 0, text)
+
+
+def _names(columns: Iterable[str | None]) -> list[str]:
+    return list(dict.fromkeys(c for c in columns if c))
+
+
+def _select(
+    provider: RelationProvider, relation: RelationRef, names: list[str], sql: str
+) -> list[Record]:
+    return [dict(zip(names, row)) for row in provider.query(relation)(sql)]
 
 
 def as_text(value: Any) -> str | None:

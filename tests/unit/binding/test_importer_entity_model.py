@@ -10,6 +10,7 @@ import yaml
 
 from sema.binding.spec import ConceptSourceSpec
 from sema.ingest.duckdb_staging import Staging
+from sema.intake.landing import LOCATOR_COLUMN
 from sema.targets.adapters.manifest_parser import parse_manifest_raw
 
 pytestmark = pytest.mark.unit
@@ -149,11 +150,13 @@ CUSTOMERS_COLUMNS = (
 
 
 def _create(staging: Staging, name: str, columns: tuple[str, ...], rows: Any) -> None:
-    quoted = ", ".join(f'"{column}" VARCHAR' for column in columns)
+    """Landed like the tabular loader: a trailing locator, data from sheet row 2."""
+    quoted = ", ".join(f'"{column}" VARCHAR' for column in (*columns, LOCATOR_COLUMN))
     staging.execute(f'CREATE TABLE land."{name}" ({quoted})')
-    for row in rows:
-        marks = ", ".join("?" for _ in row)
-        staging.execute(f'INSERT INTO land."{name}" VALUES ({marks})', list(row))
+    for number, row in enumerate(rows, start=2):
+        values = [*row, f"{name}.xlsx!{number}"]
+        marks = ", ".join("?" for _ in values)
+        staging.execute(f'INSERT INTO land."{name}" VALUES ({marks})', values)
 
 
 def _per_file_staging(staging: Staging) -> None:

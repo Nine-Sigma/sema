@@ -57,6 +57,16 @@ DOMAINS = {
     ("ACRIS - Real Property Parties", "State", "State_Codes"),
     ("ACRIS - Personal Property Parties", "State", "State_Codes"),
 }
+BOROUGHS = {"1": "Manhattan", "2": "Bronx", "3": "Brooklyn", "4": "Queens"}
+LOTS = {"P": "partial", "E": "entire"}
+INLINE_VALUES = {
+    (REAL_MASTER, "Recorded Borough"): BOROUGHS,
+    ("ACRIS - Real Property Legals", "Borough"): BOROUGHS,
+    ("ACRIS - Real Property Legals", "Partial Lot"): LOTS,
+    (PERSONAL_MASTER, "Recorded Borough"): BOROUGHS,
+    ("ACRIS - Personal Property Legals", "Borough"): BOROUGHS,
+    ("ACRIS - Personal Property Legals", "Partial Lot"): LOTS,
+}
 LEGALS_DESCRIPTION = (
     "The properties under which real property documents recorded in ACRIS are indexed."
 )
@@ -220,3 +230,45 @@ def test_manifest_parses(imported: _Imported) -> None:
     assert len(parsed.entities) == ENTITIES
     assert len(parsed.vocabularies) == len(TERMS)
     assert all(entity.obligation is None for entity in parsed.entities)
+
+
+def test_six_fields_carry_inline_values(imported: _Imported) -> None:
+    schemas = imported.result.table_schemas
+
+    found = {
+        (name.split(".", 1)[1], field.name): field.x_sema_values
+        for name, schema in schemas.items()
+        for field in schema.fields
+        if field.x_sema_values
+    }
+    assert len(found) == 6
+    assert found == INLINE_VALUES
+    assert all(list(found[key]) == list(INLINE_VALUES[key]) for key in found)
+
+
+def test_schemas_with_inline_values_record_the_extractor_version(
+    imported: _Imported,
+) -> None:
+    from sema.intake.lexicon import PATTERNS_VERSION
+
+    schemas = imported.result.table_schemas
+    owners = {f"acris.{owner}" for owner, _ in INLINE_VALUES}
+
+    for name in owners:
+        descriptor = schemas[name].descriptor()
+        assert descriptor["x-sema-values-extractor"] == PATTERNS_VERSION
+        jsonschema.validate(descriptor, JSON_SCHEMA)
+
+
+def test_the_same_six_manifest_properties_carry_decoded_values(
+    imported: _Imported,
+) -> None:
+    parsed = parse_manifest_raw(yaml.safe_load(yaml.safe_dump(imported.result.manifest)))
+
+    found = {
+        (entity.qualified_name.split(".", 1)[1], prop.name): prop.decoded_values
+        for entity in parsed.entities
+        for prop in entity.properties
+        if prop.decoded_values
+    }
+    assert found == INLINE_VALUES

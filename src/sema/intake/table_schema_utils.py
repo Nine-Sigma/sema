@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from sema.intake.lexicon import PATTERNS, PATTERNS_VERSION
 from sema.intake.table_schema import (
     Constraints,
     Field,
@@ -50,6 +51,7 @@ _TYPE_NAMES: tuple[tuple[FrictionlessType, frozenset[str]], ...] = (
     ),
     ("boolean", frozenset({"boolean", "bool"})),
 )
+_MIN_INLINE_PAIRS = 2
 _FLAG_TEXT = {"yes": True, "no": False, "y": True, "n": False, "true": True,
               "false": False, "1": True, "0": False}
 
@@ -64,6 +66,16 @@ class DictionaryRow:
     fk_property: str | None = None
     domain: str | None = None
     description: str | None = None
+    values: dict[str, str] | None = None
+
+
+def inline_values(text: str) -> dict[str, str] | None:
+    """Ordered ``code -> label`` pairs, or None below the two-pair minimum."""
+    pairs: dict[str, str] = {}
+    for pattern in PATTERNS:
+        for match in pattern.finditer(text):
+            pairs.setdefault(match["code"], match["display"].strip())
+    return pairs if len(pairs) >= _MIN_INLINE_PAIRS else None
 
 
 def frictionless_type(raw_type: str, column: str) -> FrictionlessType:
@@ -97,11 +109,13 @@ def table_schema_from_rows(
 ) -> TableSchema:
     """``foreign_keys`` are declared beside the rows, after the row-derived ones."""
     rows = list(rows)
+    valued = any(row.values for row in rows)
     return TableSchema(
         fields=[_field(entity, row) for row in rows],
         primary_key=[row.property for row in rows if row.primary_key] or None,
         foreign_keys=[*_foreign_keys(entity, rows), *foreign_keys] or None,
         description=description,
+        x_sema_values_extractor=PATTERNS_VERSION if valued else None,
     )
 
 
@@ -114,6 +128,7 @@ def _field(entity: str, row: DictionaryRow) -> Field:
         constraints=Constraints(required=True) if row.required else None,
         x_sema_raw_type=row.raw_type,
         x_sema_domain=row.domain,
+        x_sema_values=row.values,
     )
 
 

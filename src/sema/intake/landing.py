@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import Literal
 
 LOCATOR_COLUMN = "_sema_locator"
+LOCATOR_ROW_SEPARATOR = "!"
 SHEET_SEPARATOR = "__"
 
 Medium = Literal["tabular", "semsql", "dictionary", "athena"]

@@ -178,3 +178,54 @@ def test_domain_becomes_a_constraint_and_never_a_vocabulary_binding() -> None:
     ]
     assert all(p.vocabulary_binding is None for p in entity.properties)
     assert all(not p.synonyms for p in entity.properties)
+
+
+# Inline code lists: x-sema-values on a field, x-sema-values-extractor on the schema.
+
+BOROUGH_VALUES = {"1": "Manhattan", "2": "Bronx", "3": "Brooklyn", "4": "Queens"}
+
+
+def _valued_schema() -> Any:
+    from sema.intake.lexicon import PATTERNS_VERSION
+    from sema.intake.table_schema import Field, TableSchema
+
+    return TableSchema.model_validate(
+        {
+            "fields": [
+                Field(name="borough", type="any", x_sema_values=BOROUGH_VALUES),
+                Field(name="lot", type="any"),
+            ],
+            "x-sema-values-extractor": PATTERNS_VERSION,
+        }
+    )
+
+
+def test_inline_values_serialize_under_their_extension_keys_and_validate() -> None:
+    from sema.intake.lexicon import PATTERNS_VERSION
+
+    descriptor = _valued_schema().descriptor()
+
+    jsonschema.validate(descriptor, JSON_SCHEMA)
+    assert descriptor["x-sema-values-extractor"] == PATTERNS_VERSION
+    borough, lot = descriptor["fields"]
+    assert borough["x-sema-values"] == BOROUGH_VALUES
+    assert list(borough["x-sema-values"]) == ["1", "2", "3", "4"]
+    assert "x-sema-values" not in lot
+
+
+def test_inline_values_parse_back_from_the_descriptor() -> None:
+    from sema.intake.table_schema import TableSchema
+
+    schema = _valued_schema()
+
+    assert TableSchema.model_validate(schema.descriptor()) == schema
+    assert schema.fields[0].x_sema_values == BOROUGH_VALUES
+
+
+def test_inline_values_project_to_decoded_values() -> None:
+    entity = _project(_valued_schema(), "ex.legals")
+
+    props = {p.name: p for p in entity.properties}
+    assert props["borough"].decoded_values == BOROUGH_VALUES
+    assert list(props["borough"].decoded_values) == ["1", "2", "3", "4"]
+    assert props["lot"].decoded_values == {}
