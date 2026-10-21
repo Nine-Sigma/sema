@@ -49,11 +49,13 @@ def run_metrics(
     ignored = Counter(
         binding.slots[ignore.REASON] for binding in structure.ignored for _ in binding.relations
     )
+    # A no_header ignore stays scored so ignoring a real table cannot raise the fraction.
+    scored = relations - sum(n for reason, n in ignored.items() if reason != ignore.NO_HEADER)
     return RunMetrics(
         relations=relations,
         ignored=dict(ignored),
         bound=bound,
-        bound_fraction=bound / relations if relations else 0.0,
+        bound_fraction=bound / scored if scored > 0 else 0.0,
         open_structure=_open(structure.ambiguities),
         open_roles=_open(roles.ambiguities) if roles is not None else 0,
         proposals_made=proposals_made,

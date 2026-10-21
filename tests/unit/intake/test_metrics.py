@@ -157,7 +157,44 @@ def test_bound_counts_relations_not_bindings() -> None:
     metrics = run_metrics(land, structure, _roles(structure), _record())
 
     assert metrics.bound == 3
-    assert metrics.bound_fraction == pytest.approx(3 / 8)
+    # Three of the eight are ignored with a verified reason, so they leave the denominator.
+    assert metrics.bound_fraction == pytest.approx(3 / 5)
+
+
+def test_bound_fraction_excludes_relations_ignored_as_no_rows_or_boilerplate() -> None:
+    land = _land("r1", "r2", "r3", "r4", "r5")
+    structure = _structure(
+        bound=(_bound(concept_list.ID, "r1"), _bound(concept_list.ID, "r2")),
+        ignored=(_ignored("r3", ignore.NO_ROWS), _ignored("r4", ignore.BOILERPLATE)),
+    )
+
+    metrics = run_metrics(land, structure, _roles(structure), _record())
+
+    assert (metrics.relations, metrics.bound) == (5, 2)
+    assert metrics.bound_fraction == pytest.approx(2 / 3)
+
+
+def test_a_no_header_ignore_stays_in_the_bound_fraction_denominator() -> None:
+    land = _land("r1", "r2", "r3", "r4")
+    structure = _structure(
+        bound=(_bound(concept_list.ID, "r1"),),
+        ignored=(_ignored("r2", ignore.NO_HEADER), _ignored("r3", ignore.NO_ROWS)),
+    )
+
+    metrics = run_metrics(land, structure, _roles(structure), _record())
+
+    assert metrics.bound_fraction == pytest.approx(1 / 3)
+
+
+def test_bound_fraction_is_zero_when_every_relation_is_ignored() -> None:
+    land = _land("r1", "r2")
+    structure = _structure(
+        ignored=(_ignored("r1", ignore.NO_ROWS), _ignored("r2", ignore.BOILERPLATE)),
+    )
+
+    metrics = run_metrics(land, structure, _roles(structure), _record())
+
+    assert (metrics.bound, metrics.bound_fraction) == (0, 0.0)
 
 
 def test_ignored_counts_relations_by_reason() -> None:
