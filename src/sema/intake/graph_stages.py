@@ -34,6 +34,7 @@ from sema.intake.ledger import Ledger
 from sema.intake.loaders.detect import NoLoaderError, land_source
 from sema.intake.model_calls import IntakeClient, model_calls_for
 from sema.intake.profile import EvidencePolicy, EvidenceTier, ProfileTools
+from sema.intake.profile_utils import NeedsValues
 from sema.intake.proposal import ProposalResult, propose_layouts
 from sema.intake.registry import Registry
 from sema.intake.relations import RelationProvider
@@ -171,6 +172,13 @@ class Stages:
     def resolved_roles(self, approvals: Approvals) -> RolesResult:
         return self._once((RESOLVE_ROLES, approvals), lambda: self._resolved_roles(approvals))
 
+    def value_requests(self, node: str, approvals: Approvals) -> tuple[NeedsValues, ...]:
+        """The value reads ``node`` asked for: a layout proposal's, or any Roles tool's."""
+        if node != ROLES:
+            return self.proposals(approvals).value_requests
+        self.roles(approvals)
+        return tuple(dict.fromkeys(self._role_tools(approvals).value_requests))
+
     def current(self, reviewed: Reviewed) -> Current:
         relevant = reviewed.relevant()
         return self._once((DECIDE, relevant), lambda: self._current(relevant))
@@ -227,7 +235,7 @@ class Stages:
         )
         choices = {**kept, **stated_choices(decisions)}
         roles = run_roles(
-            structure, self.profiles(DECIDE), self.tools(DECIDE, structure),
+            structure, self.profiles(DECIDE), self.tools(DECIDE, structure, reviewed.approvals),
             hint=self.hint(), embedder=self.embedder, choices=choices,
         )
         return structure, roles
@@ -258,16 +266,22 @@ class Stages:
             self.resolved(), self.land(), tools, self.calls, provider=PROVIDER
         )
 
+    def _role_tools(self, approvals: Approvals) -> ProfileTools:
+        structure = self.proposals(approvals).structure
+        return self._once(
+            ("role_tools", approvals), lambda: self.tools(ROLES, structure, approvals)
+        )
+
     def _roles(self, approvals: Approvals) -> RolesResult:
         structure = self.proposals(approvals).structure
-        tools = self.tools(ROLES, structure)
+        tools = self._role_tools(approvals)
         return run_roles(
             structure, self.profiles(ROLES), tools, hint=self.hint(), embedder=self.embedder
         )
 
     def _resolved_roles(self, approvals: Approvals) -> RolesResult:
         structure = self.proposals(approvals).structure
-        tools = self.tools(RESOLVE_ROLES, structure)
+        tools = self.tools(RESOLVE_ROLES, structure, approvals)
         return resolve_roles(
             self.roles(approvals), structure, self.land(), tools, self.calls,
             provider=PROVIDER, hint=self.hint(), embedder=self.embedder,

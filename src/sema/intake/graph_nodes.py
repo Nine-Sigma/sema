@@ -5,6 +5,7 @@ its node event, verdict, and artifacts. The graph module wires them and owns the
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,7 @@ from sema.intake.graph_utils import (
     model_bound,
     proposal_summary,
     reviewed_of,
+    route_value_ask,
     unapproved,
     value_payload,
     verdict_update,
@@ -53,6 +55,7 @@ from sema.intake.graph_utils import (
 from sema.intake.metrics import RunMetrics, run_metrics
 from sema.intake.eligibility_utils import Embedder
 from sema.intake.model_calls import BUDGET_REASON, IntakeClient
+from sema.intake.profile_utils import NeedsValues
 from sema.intake.verify.base import Ambiguity, Verdict
 from sema.intake.verify.land import verify_land
 from sema.intake.verify.structure import verify_structure
@@ -127,15 +130,16 @@ class Nodes:
         approvals = approvals_of(state)
         proposal = stages.proposals(approvals)
         _write(stages, update, STRUCTURE_ARTIFACT, proposal.structure)
-        if unapproved(proposal.value_requests, approvals):
-            return update | {"asking": True, "value_asks": state.get("value_asks", 0) + 1}
+        if asked := _asking(state, PROPOSE, stages.value_requests(PROPOSE, approvals)):
+            return update | asked
         verdict = verify_structure(proposal.structure, stages.land(), stages.tools(PROPOSE))
-        return update | {"asking": False} | self._verdict(state, PROPOSE, STRUCTURE, verdict)
+        return update | {"asking": None} | self._verdict(state, PROPOSE, STRUCTURE, verdict)
 
     def roles(self, state: IngestState) -> Update:
+        """Roles asks for the values a policy withheld from its tools before it resolves."""
         stages, update = self._enter(state, ROLES)
-        stages.roles(approvals_of(state))
-        return update
+        requests = stages.value_requests(ROLES, approvals_of(state))
+        return update | (_asking(state, ROLES, requests) or {"asking": None})
 
     def resolve_roles(self, state: IngestState) -> Update:
         stages, update = self._enter(state, RESOLVE_ROLES)
@@ -144,7 +148,7 @@ class Nodes:
         spec = assemble_spec(stages.descriptor(), roles)
         if spec is not None:
             _write(stages, update, SPEC_ARTIFACT, spec)
-        tools = stages.tools(RESOLVE_ROLES, stages.proposals(approvals).structure)
+        tools = stages.tools(RESOLVE_ROLES, stages.proposals(approvals).structure, approvals)
         verdict = self.session.hooks.verify_roles(roles, tools, spec=spec)
         update["has_spec"] = spec is not None
         return update | self._verdict(state, RESOLVE_ROLES, ROLES, verdict)
@@ -167,13 +171,14 @@ class Nodes:
         """The payload the value interrupt presents: every column not yet approved."""
         stages, _ = self._enter(state, VALUE_ASK)
         approvals = approvals_of(state)
-        requests = unapproved(stages.proposals(approvals).value_requests, approvals)
+        asker = route_value_ask(state)
+        requests = unapproved(stages.value_requests(asker, approvals), approvals)
         stages.registry.advance(state["run_id"], VALUE_ASK, WAITING)
         return value_payload(requests)
 
     def after_values(self, state: IngestState, payload: dict[str, Any]) -> Update:
         approvals = [*state.get("approvals", []), *approved_pairs(payload)]
-        return {"approvals": approvals, "asking": False, "reached": [VALUE_ASK]}
+        return {"approvals": approvals, "reached": [VALUE_ASK]}
 
     def review(self, state: IngestState) -> dict[str, Any]:
         """Writes what Review presents and returns its payload: open structure entries, then
@@ -321,6 +326,13 @@ class Nodes:
         )
         _write(stages, update, METRICS_ARTIFACT, metrics)
         return metrics
+
+
+def _asking(state: IngestState, node: str, requests: Sequence[NeedsValues]) -> Update:
+    """The update that sends ``node`` to the value ask, or empty when nothing is withheld."""
+    if not unapproved(requests, approvals_of(state)):
+        return {}
+    return {"asking": node, "value_asks": state.get("value_asks", 0) + 1}
 
 
 def _write(stages: Stages, update: Update, name: str, obj: BaseModel) -> None:

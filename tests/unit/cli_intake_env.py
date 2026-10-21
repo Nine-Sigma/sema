@@ -122,6 +122,16 @@ class Cli:
     def approve(self, run: GraphRun, *options: str | Path) -> dict[str, Any]:
         return self.ok("approve", run.run_id, "--approver", APPROVER, *options)
 
+    def reviewed(self, source: Path, descriptor: Path, *options: str | Path) -> GraphRun:
+        """Discover a source whose Roles asks for values once, approve them with
+        ``--values``, and stop at Review."""
+        asked = self.ok("discover", source, "--descriptor", descriptor, *options)
+        assert asked["stopped_at"] == "value_ask", asked
+        run = self.graph_run(asked["run_id"])
+        printed = self.approve(run, "--values")
+        assert (printed["stopped_at"], printed["run_metrics"]["value_asks"]) == ("review", 1)
+        return run
+
 
 def intake_cli(root: Path, monkeypatch: pytest.MonkeyPatch, *, model: bool = True) -> Cli:
     """``model=False`` for commands that read only the registry and ledger."""

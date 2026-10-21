@@ -121,6 +121,7 @@ class ProfileTools:
         self.vocabulary = vocabulary
         self.loaded_systems = loaded_systems
         self.land = land
+        self.value_requests: list[NeedsValues] = []
 
     def list_relations(self, provider_name: Provider, namespace: str) -> list[RelationListing]:
         catalog_ref = RelationRef(provider=provider_name, name=namespace)
@@ -225,7 +226,9 @@ class ProfileTools:
                 f"column {column} of {ref.name} is bound to sensitive and is never sampled"
             )
         if not self._values_allowed(ref, column):
-            return NeedsValues(relation=ref.name, columns=(column,))
+            request = NeedsValues(relation=ref.name, columns=(column,))
+            self.value_requests.append(request)
+            return request
         limit = max(0, min(n, SAMPLE_CAP))
         relation_sql, quoted = self.provider.relation_sql(ref), self.provider.quote(ref, column)
         rows = self._run(ref, sample_sql(relation_sql, quoted, limit), value_bearing=True)

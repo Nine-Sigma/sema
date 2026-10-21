@@ -65,7 +65,7 @@ class IngestState(TypedDict, total=False):
     reason: str | None
     stopped: bool
     has_spec: bool
-    asking: bool
+    asking: str | None
     value_asks: int
     approvals: list[list[str]]
     decisions: list[dict[str, str]]
@@ -122,7 +122,7 @@ def initial_state(
         reason=None,
         stopped=False,
         has_spec=False,
-        asking=False,
+        asking=None,
         value_asks=0,
         approvals=[],
         decisions=[],
@@ -229,9 +229,21 @@ def route_resolve_structure(state: IngestState) -> str:
     return after_verdict(state, RESOLVE_STRUCTURE, PROPOSE)
 
 
+def _asked(state: IngestState, node: str) -> bool:
+    return state.get("asking") == node and not state.get("stopped")
+
+
 def route_propose(state: IngestState) -> str:
-    asking = state.get("asking") and not state.get("stopped")
-    return VALUE_ASK if asking else after_verdict(state, PROPOSE, ROLES)
+    return VALUE_ASK if _asked(state, PROPOSE) else after_verdict(state, PROPOSE, ROLES)
+
+
+def route_roles(state: IngestState) -> str:
+    return VALUE_ASK if _asked(state, ROLES) else RESOLVE_ROLES
+
+
+def route_value_ask(state: IngestState) -> str:
+    """An approval re-enters the node that asked."""
+    return state.get("asking") or PROPOSE
 
 
 def route_resolve_roles(state: IngestState) -> str:

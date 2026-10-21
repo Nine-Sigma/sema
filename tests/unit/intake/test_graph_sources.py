@@ -47,6 +47,7 @@ from tests.unit.intake.graph_env import (
     graph,
     model_names,
     routed_client,
+    through_values,
 )
 from tests.unit.intake.graph_sources_env import (
     A3_DESCRIPTOR,
@@ -243,6 +244,7 @@ def test_ddl_file_lands_through_the_dictionary_loader(tmp_path: Path) -> None:
 
 def test_workbook_still_lands_as_tabular(tmp_path: Path) -> None:
     run = discover_with(tmp_path, A2_WORKBOOK, A2_DESCRIPTOR, routed_client())
+    through_values(run)
 
     assert run.artifact("land_result")["medium"] == "tabular"
     assert run.outcome.node == "review"

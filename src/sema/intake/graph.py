@@ -57,6 +57,8 @@ from sema.intake.graph_utils import (
     route_resolve_roles,
     route_resolve_structure,
     route_review,
+    route_roles,
+    route_value_ask,
 )
 from sema.intake.model_calls import IntakeClient
 from sema.intake.profile import EvidenceTier
@@ -277,8 +279,6 @@ def _graph(
         graph.add_node(name, _traced(tracer, name, body, None if name in INTERRUPTS else nodes))
     graph.add_edge(START, LAND)
     graph.add_edge(STRUCTURE, RESOLVE_STRUCTURE)
-    graph.add_edge(VALUE_ASK, PROPOSE)
-    graph.add_edge(ROLES, RESOLVE_ROLES)
     graph.add_edge(ENRICH, DRY_RUN)
     graph.add_edge(IMPORT, END)
     routes: dict[Hashable, str] = {name: name for name in (*ROUTES, END_ROUTE)}
@@ -286,6 +286,8 @@ def _graph(
     graph.add_conditional_edges(LAND, route_land, routes)
     graph.add_conditional_edges(RESOLVE_STRUCTURE, route_resolve_structure, routes)
     graph.add_conditional_edges(PROPOSE, route_propose, routes)
+    graph.add_conditional_edges(VALUE_ASK, route_value_ask, routes)
+    graph.add_conditional_edges(ROLES, route_roles, routes)
     graph.add_conditional_edges(RESOLVE_ROLES, route_resolve_roles, routes)
     graph.add_conditional_edges(DRY_RUN, route_dry_run, routes)
     graph.add_conditional_edges(REVIEW, route_review, routes)

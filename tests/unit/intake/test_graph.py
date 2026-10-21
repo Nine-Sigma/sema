@@ -80,6 +80,7 @@ from tests.unit.intake.graph_env import (
     routed_client,
     settings,
     subsequence,
+    through_values,
 )
 from tests.unit.intake.eligibility_env import descriptor
 from tests.unit.intake.enrichment_env import manifest_property, synonym_for
@@ -101,6 +102,8 @@ A2_ORDER = [
     ("node", "resolve_structure"), ("verdict", "structure"),
     ("node", "propose_layouts"), ("verdict", "structure"),
     ("node", "roles"),
+    ("node", "value_ask"), ("node", "value_ask"),
+    ("node", "roles"),
     ("node", "resolve_roles"), ("verdict", "roles"),
     ("node", "dry_run"), ("verdict", "dry_run"),
     ("node", "review"),
@@ -108,7 +111,10 @@ A2_ORDER = [
 
 
 def _a2(tmp_path: Path, **options: object) -> GraphRun:
-    return discover(tmp_path, A2_WORKBOOK, A2_DESCRIPTOR, routed_client(), **options)
+    """A2 at Review, after the one value ask its settled status column makes."""
+    run = discover(tmp_path, A2_WORKBOOK, A2_DESCRIPTOR, routed_client(), **options)
+    through_values(run)
+    return run
 
 
 def _failing_roles(*_args: object, **_kwargs: object) -> Verdict:

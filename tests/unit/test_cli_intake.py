@@ -161,7 +161,7 @@ def test_discover_threads_its_options_to_the_graph(
 
 
 def test_approve_imports_and_records_the_approver(cli: Cli) -> None:
-    run = cli.discover(A2_WORKBOOK, A2_DESCRIPTOR)
+    run = cli.reviewed(A2_WORKBOOK, A2_DESCRIPTOR)
 
     printed = cli.approve(run)
 
@@ -175,7 +175,7 @@ def test_approve_imports_and_records_the_approver(cli: Cli) -> None:
 def test_approve_with_an_edited_spec_presents_review_again_with_zero_calls(
     cli: Cli,
 ) -> None:
-    run = cli.discover(A2_WORKBOOK, A2_DESCRIPTOR)
+    run = cli.reviewed(A2_WORKBOOK, A2_DESCRIPTOR)
     edited = run.artifact("spec")
     edited["value_sets"]["roles"]["replaced_by"] = "successor"
     path = cli.root.parent / "edited.spec.yaml"
@@ -240,7 +240,7 @@ def test_a_decision_outside_the_members_fails_naming_them_and_changes_nothing(
 
 
 def test_reject_records_the_approver_and_imports_nothing(cli: Cli) -> None:
-    run = cli.discover(A2_WORKBOOK, A2_DESCRIPTOR)
+    run = cli.reviewed(A2_WORKBOOK, A2_DESCRIPTOR)
 
     printed = cli.approve(run, "--reject")
 
@@ -254,7 +254,7 @@ def test_reject_records_the_approver_and_imports_nothing(cli: Cli) -> None:
 def test_a_run_not_at_review_is_refused_naming_its_status(
     cli: Cli, options: tuple[str, ...]
 ) -> None:
-    run = cli.discover(A2_WORKBOOK, A2_DESCRIPTOR)
+    run = cli.reviewed(A2_WORKBOOK, A2_DESCRIPTOR)
     cli.approve(run)
     before = snapshot(run)
     cli.client = routed_client()
@@ -299,7 +299,7 @@ def test_a_plain_approve_at_value_ask_is_refused_pointing_at_values(cli: Cli) ->
 def test_values_on_a_run_not_at_value_ask_is_refused_naming_its_status(
     cli: Cli, approved: bool
 ) -> None:
-    run = cli.discover(A2_WORKBOOK, A2_DESCRIPTOR)
+    run = cli.reviewed(A2_WORKBOOK, A2_DESCRIPTOR)
     if approved:
         cli.approve(run)
     before = snapshot(run)

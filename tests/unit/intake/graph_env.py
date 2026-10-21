@@ -40,6 +40,7 @@ CHECKPOINT_FILE = "checkpoints.sqlite"
 IMPORT_DIR = "import"
 MAX_CALLS = 200
 APPROVER = "reviewer-a"
+VALUE_ASK, REVIEW = "value_ask", "review"
 
 STRUCTURE_BATCH = "StructureBatch_v1"
 ROLES_CHOICE = "RolesChoice_v1"
@@ -243,6 +244,22 @@ def discover(
         source, descriptor=descriptor, client=client, **settings(root), **options
     )
     return GraphRun(root, outcome.run_id, client, outcome)
+
+
+def through_values(run: GraphRun, **options: Any) -> Any:
+    """Approves the one value ask a ``metadata_only`` run stops at, then continues.
+
+    A source with a settled status column asks for its values before Roles resolves
+    (ingestion-graph: interrupts are nodes); ``options`` override ``settings`` (a cap).
+    """
+    assert run.outcome.node == VALUE_ASK, run.outcome.node
+    run.outcome = graph().approve_values(
+        run.run_id, client=run.client, **{**settings(run.root), **options}
+    )
+    assert run.outcome.node != VALUE_ASK, "the run asked for values twice"
+    if run.outcome.node == REVIEW:
+        assert run.artifact("run_metrics")["value_asks"] == 1
+    return run.outcome
 
 
 def approve(run: GraphRun, client: MagicMock | None = None, **options: Any) -> Any:
