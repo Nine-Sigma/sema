@@ -80,12 +80,12 @@ A hint (a hand-written spec) pins the bindings it names as `source: human` befor
 
 ## Roles
 
-`run_roles` computes one `RoleEligibility` per role of each bound binding: the `members` that satisfy the role's predicate, the hints consulted, `excluded_by`, the `choice`, its confidence, and its `source`. Roles are settled in the fixed order of `lexicon.ROLES`. For each role:
+`run_roles` computes one `RoleEligibility` per role of each bound binding: the `members` that satisfy the role's predicate, the hints consulted, `excluded_by`, the `choice`, its confidence, and its `source`. Roles are settled in the fixed order of `lexicon.ROLES`. A role that no role model of its target requires is optional, and its members end with `none` (`lexicon.NO_REFERENCE`); `none` counts as a member, so one column plus `none` stays open unless a hint settles it, and an optional role with no eligible column settles on `none`. A `none` choice leaves the role unbound: it never reaches the spec, a value read, or a column check. For each role:
 
 1. One member settles it with `source: code`.
 2. Else the role map already settled in this run for the same template and relation signature settles it with `source: memory`, so identical sheets are decided once.
 3. Else the lexicon settles it when exactly one member's name matches the role's tokens whole-token, after normalization (case fold, case changes split, punctuation removed, whitespace collapsed, trailing plural `s` stripped; English only).
-4. Else the embedding rank settles it when an embedder and a margin floor are given and the margin reaches the floor. `EMBEDDING_MARGIN_FLOOR` (0.10) is measured once over the A2, A3, A8, and ACRIS fixtures by `scripts/measure_embedding_margin.py`, never a held-out source, so no wrong top choice on that set settles; a caller may pass another floor, or `None` to record the rank only.
+4. Else the embedding rank settles it when at least two columns remain, an embedder and a margin floor are given, and the margin reaches the floor. `EMBEDDING_MARGIN_FLOOR` (0.10) is measured once over the A2, A3, A8, and ACRIS fixtures by `scripts/measure_embedding_margin.py`, never a held-out source, so no wrong top choice on that set settles; a caller may pass another floor, or `None` to record the rank only.
 5. Else the role stays open.
 
 A settled column leaves later roles' sets, recorded as `excluded_by`, unless the pair is in `lexicon.COINCIDING_ROLES`. Every role that had more than one member before narrowing is listed as an ambiguity, settled or not, so the review sees what the hint decided.

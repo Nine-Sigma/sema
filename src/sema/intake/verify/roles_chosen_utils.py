@@ -83,9 +83,9 @@ def closed_required(roles: RolesResult) -> list[RoleEligibility]:
 
 def chosen_columns(eligibilities: Iterable[RoleEligibility], relation: str) -> dict[str, str]:
     return {
-        e.role: e.choice
+        e.role: e.column
         for e in eligibilities
-        if e.relation == relation and e.subject is None and e.choice is not None
+        if e.relation == relation and e.subject is None and e.column is not None
     }
 
 
@@ -106,8 +106,8 @@ def with_sources(
     """Each role-check failure on a column names the sources of the entries that chose it."""
     sources: dict[tuple[str, str], set[str]] = {}
     for e in eligibilities:
-        if e.subject is None and e.choice is not None and e.source is not None:
-            sources.setdefault((e.relation, e.choice), set()).add(e.source)
+        if e.subject is None and e.column is not None and e.source is not None:
+            sources.setdefault((e.relation, e.column), set()).add(e.source)
     found = []
     for failure in failures:
         if failure.check not in checks or failure.column is None:

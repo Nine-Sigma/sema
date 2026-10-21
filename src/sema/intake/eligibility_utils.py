@@ -90,6 +90,11 @@ class RoleEligibility(BaseModel):
             confidence = SOURCE_CONFIDENCE[source]
         return self.model_copy(update=dict(choice=choice, source=source, confidence=confidence))
 
+    @property
+    def column(self) -> str | None:
+        """The bound column; a ``none`` choice answers the role with no column."""
+        return None if self.choice == lexicon.NO_REFERENCE else self.choice
+
     def hinted(self, *hints: Hint) -> RoleEligibility:
         return self.model_copy(update={"hints": (*self.hints, *hints)})
 

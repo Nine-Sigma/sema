@@ -230,6 +230,12 @@ def _relation_roles(
     key = (target.template, profile.signature)
     remembered = hints.memory.recall(key) if hints.memory is not None else None
     fields = {name for model in target.models for name in model.model_fields}
+    required = {
+        name
+        for model in target.models
+        for name, field in model.model_fields.items()
+        if field.is_required()
+    }
     taken: dict[str, str] = {}
     found = []
     for role, column in target.slotted.items():
@@ -239,10 +245,12 @@ def _relation_roles(
     for entry in lexicon.ROLES:
         if entry.name not in fields or entry.name in target.slotted:
             continue
-        settled = _settle(entry, profile, taken, remembered, hints, stated.get(entry.name))
+        optional = entry.name not in required
+        human = stated.get(entry.name)
+        settled = _settle(entry, profile, taken, remembered, hints, human, optional)
         found.append(settled)
-        if settled.choice is not None:
-            taken.setdefault(settled.choice, entry.name)
+        if settled.column is not None:
+            taken.setdefault(settled.column, entry.name)
     if hints.memory is not None and remembered is None:
         hints.memory.remember(key, {e.role: e.choice for e in found if e.choice is not None})
     return found
@@ -255,8 +263,11 @@ def _settle(
     remembered: Mapping[str, str] | None,
     hints: Hints,
     stated: Any,
+    optional: bool,
 ) -> RoleEligibility:
+    """An optional role offers ``none`` as its last member, so "no column" is answerable."""
     members = eligible(entry, profile.columns, profile.row_count)
+    members = (*members, lexicon.NO_REFERENCE) if optional else members
     excluded = {
         column: role
         for column, role in taken.items()
@@ -293,16 +304,17 @@ def _narrow(
     remaining: Sequence[str],
     hints: Hints,
 ) -> RoleEligibility:
-    hits = lexicon_hits(entry.name, remaining)
+    hits = lexicon_hits(entry.name, [m for m in remaining if m != lexicon.NO_REFERENCE])
     if hits:
         base = base.hinted(Hint(source="lexicon", matches=hits))
     if len(hits) == 1:
         return base.settled(hits[0], "lexicon")
     if len(remaining) == 1:
         return base.settled(remaining[0], "code")
-    if hints.embedder is None:
-        return base
     columns = [column for column in profile.columns if column.name in remaining]
+    # An embedding margin ranks columns against each other; one column has no rival.
+    if hints.embedder is None or len(columns) < 2:
+        return base
     ranked = embedding_rank(hints.embedder, entry, columns)
     base = base.hinted(ranked)
     floor, margin = hints.margin_floor, ranked.margin
@@ -328,9 +340,9 @@ def _read_dictionaries(
         if header is not None:
             headers[header.relation] = header
         choices = {
-            e.role: str(e.choice)
+            e.role: str(e.column)
             for e in found
-            if e.relation == profile.ref.name and e.subject is None and e.choice is not None
+            if e.relation == profile.ref.name and e.subject is None and e.column is not None
         }
         notes[profile.ref.name] = note_columns(profile, choices.values())
         own_notes = notes[profile.ref.name]
@@ -351,7 +363,7 @@ def _statuses(
     """
     statuses: dict[str, StatusRole] = {}
     for entry in found:
-        column = entry.choice
+        column = entry.column
         if entry.role != lexicon.STATUS_ROLE or column is None or entry.source == "human":
             continue
         if lexicon.STATUS_ROLE in stated.get(entry.relation, {}):

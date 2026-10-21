@@ -110,7 +110,8 @@ def test_a8_sets_before_hints(env: Env) -> None:
     assert set(roles["concept_id"].members) == {"id", "code"}
     assert set(roles["code"].members) == {"id", "code"}
     assert set(roles["name"].members) == {"label", "description"}
-    assert set(roles["definition"].members) == {"label", "description"}
+    # `definition` is optional, so it also offers "none" (14.3 pause decision).
+    assert set(roles["definition"].members) == {"label", "description", lexicon().NO_REFERENCE}
 
 
 def test_a8_lexicon_settles_with_cross_role_exclusion(env: Env) -> None:
@@ -156,7 +157,7 @@ def test_embedding_with_a_clear_margin_settles_the_definition(env: Env) -> None:
     found = _ranked(env, embedder=embedder, margin_floor=FLOOR)
     definition = by_role(found)["definition"]
 
-    assert set(definition.members) == {"zorbit_text", "quaxle_body"}
+    assert set(definition.members) == {"zorbit_text", "quaxle_body", lexicon().NO_REFERENCE}
     assert (definition.choice, definition.source) == ("zorbit_text", "embedding")
     assert _embedding(definition).rank[0][0] == "zorbit_text"
     assert _embedding(definition).margin == pytest.approx(1.0)

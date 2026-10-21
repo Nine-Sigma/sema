@@ -52,10 +52,12 @@ MEMORY_TABLES: Tables = {
         [(f"T{i:02d}", f"Vell entry {i}", f"Mox {i % 15}") for i in range(1, 21)],
     ),
 }
-# `pell` is the only low-cardinality column, so code settles `status` on it.
+# `pell_status` is the only low-cardinality column and its name carries the status word,
+# so the lexicon settles `status` on it (one column plus "none" no longer settles by code).
+CONFLICT_STATUS = "pell_status"
 CONFLICT_TABLES: Tables = {
     "zeta": (
-        ("zorb", "quax", "pell"),
+        ("zorb", "quax", CONFLICT_STATUS),
         [(f"C{i:02d}", f"Quill {i}", "active" if i % 2 else "retired") for i in range(1, 21)],
     ),
 }

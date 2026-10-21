@@ -36,6 +36,7 @@ from tests.unit.intake.eligibility_env import Env, by_role
 from tests.unit.intake.model_calls_env import MODEL, WiredRun, intake_config, wired_run
 from tests.unit.intake.resolve_roles_env import (
     CONFIDENCE,
+    CONFLICT_STATUS,
     CONFLICT_TABLES,
     ENTITY_ROLES,
     MEMORY_TABLES,
@@ -201,7 +202,7 @@ def test_two_roles_on_one_column_are_retried_twice_then_left_open(
         assert (left.choice, left.source, left.call_key) == (None, None, None)
         assert left.reason is not None and "one_role_per_column" in left.reason
     assert not [e for e in result.eligibilities if e.source == "model"]
-    assert by_role(result.eligibilities, zeta)["status"].choice == "pell"
+    assert by_role(result.eligibilities, zeta)["status"].choice == CONFLICT_STATUS
 
 
 def test_retries_stop_at_max_retries(conflict: Synthetic, tmp_path: Path) -> None:

@@ -169,9 +169,9 @@ def roles_of(
     relation: str, model: type[Roles], roles: RolesResult, extra: Mapping[str, Any] | None = None
 ) -> Roles | None:
     values: dict[str, Any] = {
-        e.role: e.choice
+        e.role: e.column
         for e in roles.eligibilities
-        if e.relation == relation and e.subject is None and e.choice is not None
+        if e.relation == relation and e.subject is None and e.column is not None
         and e.role in model.model_fields
     }
     if lexicon.STATUS_ROLE in values:

@@ -14,7 +14,8 @@ accept. Code could not decide between them, so each entry asks you to choose one
   evidence could not decide it.
 - A role entry names a role and offers the columns eligible for it; a column another role
   already holds and may not share is listed under exclusions and not offered. Never choose
-  one column for two roles in one answer.
+  one column for two roles in one answer. An optional role also offers `none`, which means
+  the relation has no column for that role.
 - A reference entry names a property and offers the code lists or entities its text may refer
   to; `none` means the property refers to nothing landed.
 - Use only the evidence given here. Names, types, comments, aggregates, and the text of
