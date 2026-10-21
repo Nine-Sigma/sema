@@ -25,6 +25,11 @@ Care Site {EN_DASH} Main,site_id,Care sites
 Person (v2)/Core,person_id,People
 LAB,lab_id,Labs
 """
+UNDESCRIBED = """\
+table_name,column_name,table_note
+Visit Log - Daily,visit_id,
+LAB,lab_id,
+"""
 COLLIDING = """\
 table_name,column_name,table_note
 Real-Property Master,doc_id,Hyphenated
@@ -147,6 +152,25 @@ def test_source_name_is_kept_as_the_context_card_label(tmp_path: Path) -> None:
     for qualified_name, source in CONVERTED.items():
         assert source in cards[qualified_name]["curated_synonyms"]
     assert "curated_synonyms" not in cards["ex.LAB"]
+
+
+def test_converted_entity_without_description_gets_a_card_naming_its_source(
+    tmp_path: Path,
+) -> None:
+    result = _import(tmp_path, _spec(release="2026-10-20"), UNDESCRIBED)
+
+    entities = {e["qualified_name"]: e for e in result.manifest["entities"]}
+    card = entities["ex.visit_log_daily"]["context_card"]
+    assert card == {
+        "card_version": "2026.10.20",
+        "description": "Visit Log - Daily",
+        "curated_synonyms": ["Visit Log - Daily"],
+    }
+    assert "context_card" not in entities["ex.LAB"]
+    normalized = _normalize(result, tmp_path / "manifest.yaml")
+    cards = {c.entity_ref.qualified_name: c for c in normalized.context_cards}
+    assert cards["ex.visit_log_daily"].description == "Visit Log - Daily"
+    assert cards["ex.visit_log_daily"].curated_synonyms == ["Visit Log - Daily"]
 
 
 def test_two_names_converting_to_one_identifier_fail_naming_both(

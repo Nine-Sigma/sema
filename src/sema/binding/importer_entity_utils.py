@@ -79,7 +79,7 @@ def entity_records(spec: ConceptSourceSpec, tables: EntityTables) -> list[Record
         )
         label = tables.labels.get(qualified_name)
         if label is not None:
-            _add_label(record, label)
+            _add_label(record, label, version)
         records.append(record)
     return records
 
@@ -215,16 +215,16 @@ def _claim(
     return qualified_name
 
 
-def _add_label(record: Record, label: str) -> None:
+def _add_label(record: Record, label: str, version: str) -> None:
+    """A renamed entity always keeps its source name; with no description, that name is it."""
     card = record.get("context_card")
     if card is None:
         logger.info(
-            "Entity {} states no description, so no context card carries its "
-            "source name {!r}",
+            "Entity {} states no description; its card describes it by its source name {!r}",
             record["qualified_name"],
             label,
         )
-        return
+        card = record["context_card"] = {"card_version": version, "description": label}
     card["curated_synonyms"] = [label]
 
 
