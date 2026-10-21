@@ -1,4 +1,8 @@
-"""concept_and_value_set: a concept relation, a value relation, and a resolving key pair."""
+"""concept_and_value_set: a concept relation, a value relation, and a resolving key pair.
+
+The value relation holds a non-null code unique within each key group, because a value set
+contributes values of its own rather than repeating or annotating its concept.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +16,7 @@ from sema.intake.shapes.base_utils import (
     JOIN_FLOOR,
     failure,
     may_resolve,
+    nonnull_rows,
     slot_columns,
     slot_relations,
     verdict,
@@ -27,7 +32,7 @@ KeyPair = tuple[RelationProfile, ColumnProfile, RelationProfile, ColumnProfile]
 
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
-    return [_binding(*pair) for pair in _key_pairs(group) if not _join_failures(*pair, tools)]
+    return [_binding(*pair) for pair in _key_pairs(group) if not _pair_failures(*pair, tools)]
 
 
 def verify(
@@ -46,7 +51,7 @@ def verify(
     key, value_key = keys[0], value_keys[0]
     if not is_id(concepts, key):
         failures.append(failure("concept_key_is_id", concepts.ref.name, key.name))
-    failures += _join_failures(concepts, key, values, value_key, tools)
+    failures += _pair_failures(concepts, key, values, value_key, tools)
     return verdict(failures, JOIN_FLOOR)
 
 
@@ -61,6 +66,35 @@ def _key_pairs(group: Sequence[RelationProfile]) -> Iterator[KeyPair]:
 
 def _repeats(column: ColumnProfile) -> bool:
     return 0.0 < column.distinct_ratio < 1.0
+
+
+def _pair_failures(
+    concepts: RelationProfile,
+    key: ColumnProfile,
+    values: RelationProfile,
+    value_key: ColumnProfile,
+    tools: ProfileTools,
+) -> list[Failure]:
+    return _join_failures(concepts, key, values, value_key, tools) or _value_code_failures(
+        values, value_key, tools
+    )
+
+
+def _value_code_failures(
+    values: RelationProfile, value_key: ColumnProfile, tools: ProfileTools
+) -> list[Failure]:
+    keyed = nonnull_rows(values, value_key)
+    codes = [
+        column
+        for column in values.columns
+        if column.name != value_key.name
+        and column.null_rate == 0.0
+        and column.distinct_count * value_key.distinct_count >= keyed
+    ]
+    for code in codes:
+        if tools.count_distinct(values.ref, [value_key.name, code.name]) == keyed:
+            return []
+    return [failure("value_code_unique_per_key", values.ref.name, value_key.name)]
 
 
 def _join_failures(

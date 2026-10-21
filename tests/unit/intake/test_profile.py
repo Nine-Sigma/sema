@@ -18,6 +18,7 @@ from tests.unit.intake.profile_env import (
     HIERARCHY,
     ODD,
     ODD_COLUMN,
+    PATHS,
     SAMPLE_CAP,
     SYN_CONCEPT,
     VALUES,
@@ -174,6 +175,73 @@ def test_hierarchy_reports_a_two_node_cycle(env: Env) -> None:
     assert checked.cycle_count > 0
     assert checked.root_count == 0
     assert not value_bearing(env)
+
+
+# count_distinct, check_levels, check_paths
+
+
+@pytest.mark.parametrize(
+    ("columns", "expected"),
+    [
+        (["concept_code"], 3),
+        (["concept_code", "code"], 9),
+        (["concept_code", "status"], 4),
+        (["concept_code", "successor"], 1),
+    ],
+)
+def test_count_distinct_counts_tuples_over_non_null_rows(
+    env: Env, columns: list[str], expected: int
+) -> None:
+    assert make_tools(env).count_distinct(VALUES, columns) == expected
+    assert len(env.sql_lines()) == 1 and not value_bearing(env)
+
+
+@pytest.mark.parametrize(
+    ("columns", "misplaced", "multi_parent"),
+    [(["l1", "l2", "l3"], 0, 0), (["l2", "l1"], 0, 1), (["l3", "l2"], 1, 1)],
+)
+def test_check_levels_counts_misplaced_nulls_and_multi_parent_nodes(
+    env: Env, columns: list[str], misplaced: int, multi_parent: int
+) -> None:
+    checked = make_tools(env).check_levels(HIERARCHY, columns)
+
+    assert (checked.misplaced_nulls, checked.multi_parent) == (misplaced, multi_parent)
+    assert len(env.sql_lines()) == 1 and not value_bearing(env)
+
+
+def test_check_levels_refuses_one_column_before_a_statement(env: Env) -> None:
+    from sema.intake.profile import ProfileRefusedError
+
+    with pytest.raises(ProfileRefusedError):
+        make_tools(env).check_levels(HIERARCHY, ["l1"])
+
+    assert env.issued == [] and env.sql_lines() == []
+
+
+def test_check_paths_counts_codes_and_implicit_prefixes(env: Env) -> None:
+    tools = make_tools(env)
+
+    dotted = tools.check_paths(PATHS, "code", ".")
+    slashed = tools.check_paths(PATHS, "code", "/")
+    odd = tools.check_paths(PATHS, "odd", ".")
+
+    assert (dotted.code_count, dotted.separated, dotted.malformed) == (4, 1, 0)
+    assert dotted.implicit_count == 1
+    assert (slashed.separated, slashed.malformed, slashed.implicit_count) == (0, 0, 0)
+    assert (odd.code_count, odd.separated, odd.malformed) == (5, 4, 3)
+    assert len(env.sql_lines()) == 3 and not value_bearing(env)
+
+
+@pytest.mark.parametrize("separator", ["", "..", " / "])
+def test_check_paths_refuses_a_separator_that_is_not_one_character(
+    env: Env, separator: str
+) -> None:
+    from sema.intake.profile import ProfileRefusedError
+
+    with pytest.raises(ProfileRefusedError, match="one character"):
+        make_tools(env).check_paths(PATHS, "code", separator)
+
+    assert env.issued == [] and env.sql_lines() == []
 
 
 # resolve_external_refs

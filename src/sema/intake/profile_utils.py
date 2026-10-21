@@ -21,6 +21,7 @@ Cardinality = Literal["one_to_one", "one_to_many", "many_to_one", "many_to_many"
 TEXT_TYPE = "STRING"
 STAGING_DEFAULT_SCHEMA = "main"
 AGGREGATES_PER_COLUMN = 3
+WHITESPACE_CODE_POINTS = (9, 10, 13, 32)
 CARDINALITIES: dict[tuple[bool, bool], Cardinality] = {
     (False, False): "one_to_one",
     (False, True): "one_to_many",
@@ -89,6 +90,7 @@ class PathCheck:
     separated: int
     malformed: int
     implicit_count: int
+    spaced: int
 
 
 @dataclass(frozen=True)
@@ -273,11 +275,13 @@ def levels_sql(relation_sql: str, quoted_columns: Sequence[str]) -> str:
 
 
 def paths_sql(relation_sql: str, column: str, separator: str) -> str:
-    """Codes, codes holding the separator, codes with an empty segment, missing prefixes.
+    """Codes, codes holding the separator, codes with an empty segment, missing prefixes,
+    and codes holding whitespace.
 
     Prefixes are walked by cutting at the last separator, so the separator is one character.
     """
     sep, doubled = sql_string(separator), sql_string(separator * 2)
+    spaced = " OR ".join(f"INSTR(code, CHR({point})) > 0" for point in WHITESPACE_CODE_POINTS)
 
     def parent(code: str) -> str:
         return f"SUBSTR({code}, 1, LENGTH({code}) - INSTR(REVERSE({code}), {sep}))"
@@ -291,7 +295,8 @@ def paths_sql(relation_sql: str, column: str, separator: str) -> str:
         f" (SELECT COUNT(*) FROM codes WHERE INSTR(code, {sep}) > 0),"
         f" (SELECT COUNT(*) FROM codes WHERE SUBSTR(code, 1, 1) = {sep}"
         f" OR SUBSTR(code, LENGTH(code), 1) = {sep} OR INSTR(code, {doubled}) > 0),"
-        " (SELECT COUNT(*) FROM prefixes WHERE path NOT IN (SELECT code FROM codes))"
+        " (SELECT COUNT(*) FROM prefixes WHERE path NOT IN (SELECT code FROM codes)),"
+        f" (SELECT COUNT(*) FROM codes WHERE {spaced})"
     )
 
 

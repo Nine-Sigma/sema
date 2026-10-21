@@ -7,6 +7,7 @@ from collections.abc import Iterator
 import pytest
 
 from tests.unit.intake.shapes.shapes_env import (
+    Memory,
     Source,
     binding,
     candidates,
@@ -20,13 +21,6 @@ pytestmark = pytest.mark.unit
 
 ID = "concept_and_value_set"
 CONCEPTS, VALUES, HIERARCHY = "codes_a2__Concepts", "codes_a2__Values", "codes_a2__Hierarchy"
-HIERARCHY_KEYS = (
-    "Hierarchy.l1 (constant ATTR) and Hierarchy.l2 (COLOR, DIM, DIM) resolve into"
-    " Concepts.concept_code at 1.0 with the Hierarchy side repeating, so the rule as written"
-    " (key resolves above the join floor, one-to-many) also yields (Concepts, Hierarchy, l1)"
-    " and (Concepts, Hierarchy, l2); excluding them needs a predicate the spec does not state,"
-    " such as the value relation carrying its own id signature"
-)
 RENAMED = {
     CONCEPTS: (
         "t_a",
@@ -66,9 +60,29 @@ def test_a2_concept_code_is_a_join_key_on_both_sides(a2: Source) -> None:
     assert set(pair.relations) == {a2.ref(CONCEPTS), a2.ref(VALUES)}
 
 
-@pytest.mark.xfail(strict=True, reason=HIERARCHY_KEYS)
 def test_a2_has_no_other_key_pair(a2: Source) -> None:
     assert _keys(candidates(ID, a2.profiles(), a2)) == {_expected(a2)}
+
+
+def test_value_relation_needs_a_non_null_code_unique_within_each_key_group(
+    memory: Memory,
+) -> None:
+    source = memory(
+        "cvs",
+        "CREATE TABLE cvs.concepts AS SELECT * FROM (VALUES ('a', 'Alpha'), ('b', 'Beta'),"
+        " ('c', 'Gamma')) t(k, name)",
+        "CREATE TABLE cvs.repeating AS SELECT * FROM (VALUES ('a', 'x'), ('a', 'x'),"
+        " ('b', 'y'), ('b', 'y'), ('c', 'z'), ('c', 'z')) t(k, tag)",
+        "CREATE TABLE cvs.nullable AS SELECT * FROM (VALUES ('a', '1'), ('a', '2'),"
+        " ('b', '1'), ('b', NULL), ('c', '1'), ('c', '2')) t(k, code)",
+        "CREATE TABLE cvs.valued AS SELECT * FROM (VALUES ('a', '1'), ('a', '2'),"
+        " ('b', '1'), ('b', '2'), ('c', '1'), ('c', '2')) t(k, code)",
+    )
+
+    found = candidates(ID, source.profiles(), source)
+
+    assert _keys(found) == {(source.ref("concepts"), source.ref("valued"), "k", "k")}
+    assert source.value_bearing() == []
 
 
 def test_a2_values_and_concepts_pair_only_through_concept_code(a2: Source) -> None:

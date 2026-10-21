@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from sema.ingest.duckdb_staging import Staging
@@ -100,3 +101,21 @@ def cycle(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Source]:
     con.execute("INSERT INTO loop.cycle VALUES ('A', 'B'), ('B', 'A')")
     yield warehouse_source(con, "loop", tmp_path_factory.mktemp("cycle") / "ledger" / "run")
     con.close()
+
+
+@pytest.fixture
+def memory(tmp_path: Path) -> Iterator[Callable[..., Source]]:
+    """Build a source over in-memory tables: ``memory(schema, *statements)``."""
+    connections: list[duckdb.DuckDBPyConnection] = []
+
+    def build(schema: str, *statements: str) -> Source:
+        con = duckdb.connect(":memory:")
+        connections.append(con)
+        con.execute(f"CREATE SCHEMA {schema}")
+        for statement in statements:
+            con.execute(statement)
+        return warehouse_source(con, schema, tmp_path / schema / "ledger" / "run")
+
+    yield build
+    for con in connections:
+        con.close()

@@ -25,13 +25,6 @@ SYN_EQUIVALENT_COLUMNS = (
     " group_by binding; no aggregate separates the id from its functionally equivalent"
     " label columns without reading a name"
 )
-ALL_TEMPLATES_ON_DOCUMENT_CONTROL = (
-    "under the rules as written entity_model per_file (DOC. TYPE is a unique non-null text"
-    " column beside other text columns) and path_codes (the unique DOC. TYPE DESCRIPTION"
-    " splits into non-empty segments on '-' and on '/') are also eligible, so the ambiguity"
-    " has six members; level_columns fails here (a PARTY1 TYPE value sits under more than"
-    " one CLASS CODE DESCRIPTION) but holds on the other four code tables"
-)
 
 
 def _group_by(bindings: list[object]) -> set[str]:
@@ -80,16 +73,19 @@ def test_grouped_code_table_is_a_three_member_structure_ambiguity(acris: Source)
     assert sum("concept_list" in member for member in ambiguity.members) == 1
 
 
-@pytest.mark.xfail(strict=True, reason=ALL_TEMPLATES_ON_DOCUMENT_CONTROL)
 def test_every_template_leaves_document_control_with_exactly_three_members(
     acris: Source,
 ) -> None:
     group = acris.group(DOCUMENT_CONTROL)
+    expected = candidates("concept_list", group, acris) + candidates(ID, group, acris)
 
     result = shapes().apply_precedence(every_template_candidates(group, acris))
 
     (ambiguity,) = [a for a in result.ambiguities if a.subject == acris.ref(DOCUMENT_CONTROL)]
+    member = shapes("precedence").member
+    assert ambiguity.members == tuple(sorted(member(b) for b in expected))
     assert len(ambiguity.members) == 3
+    assert over(result.candidates, acris.ref(DOCUMENT_CONTROL)) == []
 
 
 def test_verify_passes_and_records_the_group_ratio_floor(acris: Source) -> None:

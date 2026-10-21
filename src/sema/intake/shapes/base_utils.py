@@ -92,9 +92,15 @@ def fixed_relation_sets(
     ]
 
 
-def fixed_binding(template: str, relations: dict[str, RelationProfile]) -> SlotBinding:
+def fixed_binding(
+    template: str, relations: dict[str, RelationProfile], group: Sequence[RelationProfile]
+) -> SlotBinding:
+    """The binding spans every relation of the namespace, because its loader landed them all."""
     slots = {name: profile.ref.name for name, profile in relations.items()}
-    return SlotBinding(template=template, slots=slots, relations=tuple(slots.values()))
+    schemas = {profile.landed.schema for profile in relations.values()}
+    landed = [profile.ref.name for profile in group if profile.landed.schema in schemas]
+    spanned = tuple(dict.fromkeys([*slots.values(), *landed]))
+    return SlotBinding(template=template, slots=slots, relations=spanned)
 
 
 def fixed_failures(

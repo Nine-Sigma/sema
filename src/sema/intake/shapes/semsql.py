@@ -31,7 +31,7 @@ FLOORS: dict[str, FloorValue] = {"LABEL_COVERAGE_FLOOR": LABEL_COVERAGE_FLOOR}
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
     return [
-        fixed_binding(ID, relations)
+        fixed_binding(ID, relations, group)
         for relations in fixed_relation_sets(group, REQUIRED)
         if not _coverage_failures(relations[TERMS_RELATION])
     ]

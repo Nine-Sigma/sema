@@ -1,7 +1,8 @@
 """level_columns: ordered columns where nulls sit only below and each prefix path is one node.
 
 Under that rule a shallower level is never more null than a deeper one and, at equal null
-rates, never has more distinct nodes, so the order is read from those aggregates.
+rates, never has more distinct nodes, so the order is read from those aggregates. A level
+that is neither constant nor unique is interior; without one the relation is a flat list.
 """
 
 from __future__ import annotations
@@ -60,10 +61,16 @@ def _depth_key(column: ColumnProfile) -> tuple[float, int]:
     return column.null_rate, column.distinct_count
 
 
+def _is_interior(column: ColumnProfile | None) -> bool:
+    return column is not None and not column.is_constant and 0.0 < column.distinct_ratio < 1.0
+
+
 def _failures(
     profile: RelationProfile, levels: Sequence[str], tools: ProfileTools
 ) -> list[Failure]:
     relation = profile.ref.name
+    if not any(_is_interior(profile.column(name)) for name in levels):
+        return [failure("interior_level", relation, levels=len(levels))]
     checked = tools.check_levels(profile.ref, levels)
     failures = []
     if checked.misplaced_nulls:

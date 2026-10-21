@@ -169,8 +169,10 @@ class ProfileTools:
         statement = paths_sql(
             self.provider.relation_sql(ref), self.provider.quote(ref, column), separator
         )
-        codes, separated, malformed, implicit = (int(v) for v in self._run(ref, statement)[0])
-        return PathCheck(codes, separated, malformed, implicit)
+        codes, separated, malformed, implicit, spaced = (
+            int(value) for value in self._run(ref, statement)[0]
+        )
+        return PathCheck(codes, separated, malformed, implicit, spaced)
 
     def resolve_external_refs(self, system: str, codes: Sequence[str]) -> ExternalRefCheck:
         vocabulary = self.vocabulary

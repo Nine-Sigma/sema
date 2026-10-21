@@ -1,4 +1,4 @@
-"""path_codes: a code column whose separator splits every code into non-empty segments.
+"""path_codes: one-token codes whose separator splits each code into non-empty segments.
 
 Prefixes that are not codes themselves are implicit; the binding carries their count, never
 the prefixes, because a prefix is a value.
@@ -57,6 +57,8 @@ def _check(
         failures.append(failure("separator_used", relation, code.name, separator=separator))
     if checked.malformed:
         failures.append(failure("segments_non_empty", relation, code.name, codes=checked.malformed))
+    if checked.spaced:
+        failures.append(failure("code_is_one_token", relation, code.name, codes=checked.spaced))
     evidence: dict[str, float | str] = {
         "implicit_count": float(checked.implicit_count),
         "separated": float(checked.separated),

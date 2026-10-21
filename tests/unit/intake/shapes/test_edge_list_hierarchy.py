@@ -52,6 +52,7 @@ def test_verify_of_a_forced_cycle_fails_no_cycles(cycle: Source) -> None:
     (failure,) = [f for f in verdict.failures if f.check == "no_cycles"]
     assert failure.relation == relation
     assert failure.evidence["cycle_count"] == 2
+    assert not {"A", "B"} & {str(value) for value in failure.evidence.values()}
 
 
 def test_v2_binding_verifies_and_records_the_join_floor(v2: Source) -> None:

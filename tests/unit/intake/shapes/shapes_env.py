@@ -105,6 +105,9 @@ class Source:
         return [line for line in self.sql_lines() if line["value_bearing"]]
 
 
+Memory = Callable[..., Source]
+
+
 def staging_source(staging: Any, land: LandResult, ledger_dir: Path) -> Source:
     provider = RelationProvider(warehouse=None, staging=staging)
     return Source(land, make_tools(provider, ledger_dir), "staging", ledger_dir)

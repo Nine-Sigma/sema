@@ -1,6 +1,7 @@
 """Candidate precedence (Decision 17): multi-relation bindings claim their relations.
 
-A claimed relation leaves the single-relation candidate sets. A relation stays ambiguous when
+A loader-fixed binding spans its whole namespace, so it claims every relation the loader
+landed. A claimed relation leaves the single-relation candidate sets. A relation stays ambiguous when
 two claims include it, or when it is unclaimed and holds more than one single-relation
 binding. Nothing here reads a name or prefers a template by identity.
 """

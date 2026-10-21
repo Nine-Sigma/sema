@@ -4,11 +4,30 @@ from __future__ import annotations
 
 import pytest
 
-from tests.unit.intake.shapes.shapes_env import Source, binding, candidates, over, shapes
+from tests.unit.intake.shapes.shapes_env import (
+    Memory,
+    Source,
+    binding,
+    candidates,
+    every_template_candidates,
+    over,
+    shapes,
+)
 
 pytestmark = pytest.mark.unit
 
 CONCEPTS, VALUES = "codes_a2__Concepts", "codes_a2__Values"
+
+
+def _loader_fixed_namespace(memory: Memory) -> Source:
+    from sema.intake.loaders.athena import REQUIRED_TABLES
+
+    empty = [f"CREATE TABLE ath.{name} (c VARCHAR)" for name in REQUIRED_TABLES]
+    extra = (
+        "CREATE TABLE ath.extra AS SELECT * FROM (VALUES ('A1', 'Alpha'), ('A2', 'Beta'),"
+        " ('A3', 'Gamma')) t(code, label)"
+    )
+    return memory("ath", *empty, extra)
 
 
 def _a2_claim(a2: Source) -> object:
@@ -107,3 +126,15 @@ def test_a_lone_single_relation_candidate_is_not_ambiguous(acris: Source) -> Non
 
     assert result.ambiguities == ()
     assert result.candidates == (listed,)
+
+
+def test_a_loader_fixed_binding_claims_every_relation_of_its_group(memory: Memory) -> None:
+    source = _loader_fixed_namespace(memory)
+    group = source.profiles()
+    assert len(candidates("athena_bundle", group, source)) == 1
+    assert over(candidates("concept_list", group, source), source.ref("extra"))
+
+    result = shapes().apply_precedence(every_template_candidates(group, source))
+
+    assert [b.template for b in result.candidates] == ["athena_bundle"]
+    assert result.ambiguities == ()

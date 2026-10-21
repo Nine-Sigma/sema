@@ -29,6 +29,7 @@ CYCLE = RelationRef(provider="staging", name="land_t.cycle")
 WIDE = RelationRef(provider="staging", name="land_t.wide")
 ODD = RelationRef(provider="staging", name="land_t.odd rel")
 ODD_COLUMN = 'col "q" name'
+PATHS = RelationRef(provider="staging", name="land_t.paths")
 SYN_CONCEPT = RelationRef(provider="warehouse", name="lib.concept")
 
 A2_LABELS = {"Red", "Green", "Blue", "Teal (old)", "Small", "Medium", "Large", "Round", "Square"}
@@ -95,6 +96,10 @@ def _extra_relations(staging: Staging) -> None:
         'CREATE TABLE "land_t"."wide" AS SELECT'
         " 'v' || LPAD(CAST(i AS VARCHAR), 3, '0') AS v, i % 2 AS flag"
         f" FROM range({WIDE_DISTINCT}) t(i)"
+    )
+    staging.execute(
+        'CREATE TABLE "land_t"."paths" AS SELECT * FROM (VALUES'
+        " ('1', 'a'), ('1.2.3', 'b.c'), ('2', '.d'), (NULL, 'e..f'), ('3', 'g.')) t(code, odd)"
     )
     quoted = ODD_COLUMN.replace('"', '""')
     staging.execute(f'CREATE TABLE "land_t"."odd rel" ("{quoted}" VARCHAR)')

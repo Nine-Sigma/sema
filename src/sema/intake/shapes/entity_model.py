@@ -1,10 +1,11 @@
-"""entity_model: per_file dictionaries with an optional key-value header, or one relation.
+"""entity_model: per_file dictionaries with a key-value header, or one relation.
 
 ``per_file``: in a stem group, a dictionary (a unique non-null text column beside another
-text column) and a header (two columns, unique non-null first). A key-value relation in a
-group that holds another dictionary is a header only. ``single_relation``: an entity column
-and a property column unique within each entity whose global ratio stays below the id floor,
-because property names recur across entities while codes do not.
+text column) and the required header (two columns, unique non-null first), because a lone
+dictionary is indistinguishable from a code list. A key-value relation in a group that holds
+another dictionary is a header only. ``single_relation``: an entity column and a property
+column unique within each entity whose global ratio stays below the id floor, because
+property names recur across entities while codes do not.
 """
 
 from __future__ import annotations
@@ -87,10 +88,8 @@ def _per_file_bindings(group: Sequence[RelationProfile]) -> list[SlotBinding]:
     headers = [p for p in group if is_key_value(p)]
     found = []
     for dictionary in (p for p in group if is_dictionary(p) and not header_only(p, group)):
-        own: list[RelationProfile | None] = [
-            header for header in headers if header.ref.name != dictionary.ref.name
-        ]
-        found += [_per_file_binding(dictionary, header) for header in own or [None]]
+        own = [header for header in headers if header.ref.name != dictionary.ref.name]
+        found += [_per_file_binding(dictionary, header) for header in own]
     return found
 
 
@@ -105,18 +104,17 @@ def _single_bindings(profile: RelationProfile, tools: ProfileTools) -> list[Slot
 
 
 def _per_file_failures(binding: SlotBinding, group: Sequence[RelationProfile]) -> list[Failure]:
-    slots = (DICTIONARY, HEADER) if binding.slots.get(HEADER) else (DICTIONARY,)
-    found, failures = slot_relations(group, binding, slots)
+    found, failures = slot_relations(group, binding, (DICTIONARY, HEADER))
     if failures:
         return failures
-    dictionary, header = found[0], found[-1]
+    dictionary, header = found
     if not is_dictionary(dictionary):
         failures.append(failure("dictionary_signature", dictionary.ref.name))
     if header_only(dictionary, group):
         failures.append(failure("header_only", dictionary.ref.name))
-    if header is not dictionary and not is_key_value(header):
+    if not is_key_value(header):
         failures.append(failure("header_key_value", header.ref.name, width=len(header.columns)))
-    if len(found) > 1 and header is dictionary:
+    if header is dictionary:
         failures.append(failure("header_is_another_relation", header.ref.name))
     return failures
 
@@ -147,11 +145,10 @@ def _property_failures(
     return []
 
 
-def _per_file_binding(dictionary: RelationProfile, header: RelationProfile | None) -> SlotBinding:
-    slots = {LAYOUT: PER_FILE, DICTIONARY: dictionary.ref.name}
-    if header is not None:
-        slots[HEADER] = header.ref.name
-    return SlotBinding(template=ID, slots=slots, relations=tuple(slots.values())[1:])
+def _per_file_binding(dictionary: RelationProfile, header: RelationProfile) -> SlotBinding:
+    relations = (dictionary.ref.name, header.ref.name)
+    slots = {LAYOUT: PER_FILE, DICTIONARY: relations[0], HEADER: relations[1]}
+    return SlotBinding(template=ID, slots=slots, relations=relations)
 
 
 def _single_binding(

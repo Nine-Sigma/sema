@@ -23,7 +23,7 @@ ID = "athena_bundle"
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
     sets = fixed_relation_sets(group, REQUIRED_TABLES)
-    return [fixed_binding(ID, relations) for relations in sets]
+    return [fixed_binding(ID, relations, group) for relations in sets]
 
 
 def verify(
