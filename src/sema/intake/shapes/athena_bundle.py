@@ -21,9 +21,10 @@ from sema.intake.shapes.base_utils import (
 from sema.intake.verify.base import Verdict
 
 ID = "athena_bundle"
-# The loader's required tables fill these: the vocabulary table holds one concept per
-# vocabulary, the concept table its values, the relationship table the typed relationships
-# (hierarchical ones included). The ancestor table is a closure, not a parent column.
+# No hierarchy: the ancestor table is a transitive closure no hierarchy form expresses, so it
+# stays staged as-is. The hierarchical flag lives on the optional relationship table, which a
+# one-relation relationships section cannot join. No term details: the concept table holds no
+# definition or external reference; its validity columns are lifecycle roles of its values.
 SECTIONS = (
     section_of(ConceptsSpec),
     section_of(ValueSetsSpec),

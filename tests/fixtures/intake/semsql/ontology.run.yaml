@@ -1,0 +1,9 @@
+# A3 run descriptor: the values of ontology.spec.yaml that no predicate derives.
+id: ex-ontology
+identity_system: EX
+release: "2026-10-01"
+scheme:
+  qualified_name: ex.ontology
+  description: Example ontology landed through semantic-sql
+term_storage:
+  inline_cap: 100

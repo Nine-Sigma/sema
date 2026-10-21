@@ -133,6 +133,9 @@ REFERENCE_ROLES: tuple[tuple[str, ReferenceKind], ...] = (
 )
 NO_REFERENCE = "none"
 
+# The one role a value set adds over a code list: the key tying each value to its concept.
+(KEY_ROLE,) = sorted(set(ValueSetRoles.model_fields) - set(CodeListRoles.model_fields))
+
 _ROLE_MODELS = (ConceptRoles, CodeListRoles, ValueSetRoles, EntityModelRoles)
 # The hierarchy section binds its parent column directly, so no role model declares it.
 _UNMODELLED_ROLES = frozenset({"parent"})

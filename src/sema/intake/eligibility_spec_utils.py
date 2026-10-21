@@ -41,7 +41,16 @@ from sema.intake.eligibility_text_utils import (
     HeaderReading,
 )
 from sema.intake.eligibility_utils import DeclaredJoin, RoleEligibility, RunDescriptor
-from sema.intake.shapes import concept_and_value_set, concept_list, entity_model, level_columns
+from sema.intake.loaders import athena, semsql_utils
+from sema.intake.shapes import (
+    athena_bundle,
+    concept_and_value_set,
+    concept_list,
+    entity_model,
+    filled_sections,
+    level_columns,
+    semsql,
+)
 from sema.intake.shapes.base import SlotBinding
 from sema.intake.shapes.base_utils import section_of
 from sema.intake.structure import StructureResult
@@ -54,6 +63,7 @@ VALUE_SETS = section_of(ValueSetsSpec)
 HIERARCHY = section_of(LevelColumnsHierarchy)
 Roles = TypeVar("Roles", bound=BaseModel)
 Part = dict[str, Any]
+LoaderSections = Callable[[Mapping[str, RelationRef], str], dict[str, BaseModel]]
 
 
 @dataclass(frozen=True)
@@ -72,7 +82,7 @@ class RolesResult:
 
 def assemble(descriptor: RunDescriptor, roles: RolesResult) -> ConceptSourceSpec | None:
     structure = roles.structure
-    if structure.ambiguities or any(e.binding.section is None for e in structure.bound):
+    if structure.ambiguities or any(not filled_sections(e.binding) for e in structure.bound):
         logger.info("no spec assembled: the structure still lists open bindings or sections")
         return None
     parts: list[Part | None] = []
@@ -81,7 +91,9 @@ def assemble(descriptor: RunDescriptor, roles: RolesResult) -> ConceptSourceSpec
         parts.append(_entity_model(models, roles, descriptor))
     for entry in structure.bound:
         builder = BUILDERS.get(entry.binding.template)
-        if builder is not None:
+        if entry.binding.template in LOADER_SECTIONS:
+            parts.append(_loader_fixed(entry.binding, roles, descriptor.identity_system))
+        elif builder is not None:
             parts.append(builder(entry.binding, roles))
         elif entry.binding.template != entity_model.ID:
             logger.info("no spec assembled: {} has no assembly rule", entry.binding.template)
@@ -173,6 +185,17 @@ def roles_of(
         logger.info("no spec assembled: {} has no settled {}", relation, missing)
         return None
     return model.model_validate(values)
+
+
+def _loader_fixed(binding: SlotBinding, roles: RolesResult, identity_system: str) -> Part | None:
+    relations = {slot: roles.refs[name] for slot, name in binding.slots.items()}
+    rendered = LOADER_SECTIONS[binding.template](relations, identity_system)
+    sections = filled_sections(binding)
+    missing = [name for name in sections if name not in rendered]
+    if missing:
+        logger.info("no spec assembled: {} renders no {}", binding.template, missing)
+        return None
+    return {name: rendered[name] for name in sections}
 
 
 def _concept_list(binding: SlotBinding, roles: RolesResult) -> Part | None:
@@ -280,4 +303,9 @@ BUILDERS: Mapping[str, Callable[[SlotBinding, RolesResult], Part | None]] = {
     concept_list.ID: _concept_list,
     concept_and_value_set.ID: _concept_and_value_set,
     level_columns.ID: _level_columns,
+}
+# The loader writes these relations itself, so it renders their sections; Roles binds none.
+LOADER_SECTIONS: Mapping[str, LoaderSections] = {
+    semsql.ID: semsql_utils.fixed_sections,
+    athena_bundle.ID: athena.fixed_sections,
 }

@@ -10,7 +10,6 @@ from collections.abc import Callable, Mapping
 
 from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import (
-    CodeListRoles,
     CodeListSpec,
     ConceptsSpec,
     EntityModelSpec,
@@ -18,8 +17,8 @@ from sema.binding.spec_sections import (
     ParentColumnHierarchy,
     PathCodesHierarchy,
     RelationRef,
-    ValueSetRoles,
 )
+from sema.intake import lexicon
 from sema.intake.shapes import (
     concept_and_value_set,
     concept_list,
@@ -35,8 +34,7 @@ from sema.intake.verify.base import Failure
 
 SECTION_SEPARATOR = "."
 HINT_SECTION = "hint_section"
-# The one role a value set adds over a code list: the key tying each value to its concept.
-(KEY_ROLE,) = sorted(set(ValueSetRoles.model_fields) - set(CodeListRoles.model_fields))
+KEY_ROLE = lexicon.KEY_ROLE
 
 Builder = Callable[[ConceptSourceSpec, object], list[SlotBinding]]
 

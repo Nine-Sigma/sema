@@ -11,6 +11,25 @@ without saying how it was made, so the justification is
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
+from pydantic import BaseModel
+
+from sema.binding.spec_sections import (
+    ConceptRoles,
+    ConceptsSpec,
+    DetailRoles,
+    DetailsSpec,
+    MappingRoles,
+    MappingsSpec,
+    ParentColumnHierarchy,
+    RelationRef,
+    StatusRole,
+    ValueSetRoles,
+    ValueSetsSpec,
+)
+from sema.intake.lexicon import KEY_ROLE
+
 MAPPING_JUSTIFICATION = "semapv:UnspecifiedMatching"
 MAPPING_PREDICATES = (
     "skos:exactMatch",
@@ -31,7 +50,10 @@ _ONTOLOGY = (
 )
 
 TERMS_RELATION = "semsql_terms"
+EDGES_RELATION = "semsql_edges"
+MAPPINGS_RELATION = "semsql_mappings"
 TERM_LABEL_COLUMN = "label"
+SUBCLASS_PREDICATE = "rdfs:subClassOf"
 
 DERIVED_RELATIONS = {
     TERMS_RELATION: f"""
@@ -51,16 +73,16 @@ DERIVED_RELATIONS = {
           FROM class_node c
          ORDER BY c.id
     """,
-    "semsql_edges": """
+    EDGES_RELATION: f"""
         SELECT subject, predicate, object FROM edge
-         WHERE predicate = 'rdfs:subClassOf'
+         WHERE predicate = '{SUBCLASS_PREDICATE}'
          ORDER BY subject, object
     """,
     "semsql_synonyms": """
         SELECT subject, value, predicate FROM has_exact_synonym_statement
          ORDER BY subject, value
     """,
-    "semsql_mappings": f"""
+    MAPPINGS_RELATION: f"""
         SELECT subject AS subject_id,
                predicate AS predicate_id,
                coalesce(object, value) AS object_id,
@@ -81,3 +103,48 @@ VERSION_SQL = (
     " WHERE subject = ? AND predicate = 'owl:versionIRI'"
     " ORDER BY object LIMIT 1"
 )
+
+
+def fixed_sections(
+    relations: Mapping[str, RelationRef], identity_system: str
+) -> dict[str, BaseModel]:
+    """The sections a spec binds over the derived relations; none names an identity system."""
+    terms, ontology = relations[TERMS_RELATION], "ontology"
+    concept = {KEY_ROLE: ontology}
+    return {
+        "concepts": ConceptsSpec(
+            relation=terms,
+            group_by=ontology,
+            roles=ConceptRoles.model_validate(concept | {"name": ontology}),
+        ),
+        "value_sets": ValueSetsSpec(
+            relation=terms,
+            roles=ValueSetRoles.model_validate(concept | {
+                "code": "subject",
+                "display": TERM_LABEL_COLUMN,
+                "synonyms": "synonyms",
+                "status": StatusRole(
+                    column="deprecated", active_values=["false"], retired_values=["true"]
+                ),
+                "replaced_by": "replaced_by",
+            }),
+        ),
+        "term_details": DetailsSpec(
+            relation=terms, on=["subject", "subject"], roles=DetailRoles(definition="definition")
+        ),
+        "hierarchy": ParentColumnHierarchy(
+            relation=relations[EDGES_RELATION],
+            child_column="subject",
+            parent_column="object",
+            relationship_type=SUBCLASS_PREDICATE,
+        ),
+        "mappings": MappingsSpec(
+            relation=relations[MAPPINGS_RELATION],
+            roles=MappingRoles(
+                subject_id="subject_id",
+                predicate_id="predicate_id",
+                object_id="object_id",
+                mapping_justification="mapping_justification",
+            ),
+        ),
+    }
