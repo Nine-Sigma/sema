@@ -88,6 +88,9 @@ class StructureResult(BaseModel):
 
     ``proposal_targets`` are the relations a layout proposal may bind: ``no_template``
     relations and relations ignored as ``no_header``, in landing order.
+
+    ``ambiguities`` lists open entries only; ``settled`` keeps each entry a model or a
+    reviewer settled, with its choice, confidence, source, and call key.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -101,6 +104,20 @@ class StructureResult(BaseModel):
     edges: tuple[JoinEdge, ...]
     floors: dict[str, FloorValue]
     proposal_targets: tuple[str, ...] = ()
+    settled: tuple[Ambiguity, ...] = ()
+
+    def with_settled(self) -> StructureResult:
+        """Entries carrying a choice or a source leave the open list for ``settled``."""
+        moving = [a.choice is not None or a.source is not None for a in self.ambiguities]
+        if not any(moving):
+            return self
+        pairs = list(zip(self.ambiguities, moving, strict=True))
+        update = {
+            "ambiguities": tuple(a for a, moved in pairs if not moved),
+            "settled": (*self.settled, *(a for a, moved in pairs if moved)),
+        }
+        result: StructureResult = self.model_copy(update=update)
+        return result
 
     @property
     def schema_relations(self) -> tuple[str, ...]:

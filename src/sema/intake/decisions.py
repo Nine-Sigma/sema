@@ -3,8 +3,9 @@
 A decisions file is a YAML list of ``{stage, subject, choice}``. Each decision is checked
 against the ambiguity list Review presented; ``choice`` is a member of its entry or
 ``IGNORE``. A structure decision binds the chosen member's binding, or ignores the relation
-with reason ``human``, and the entry leaves the ambiguity list. Role decisions enter Roles as
-stated choices; ``IGNORE`` states ``none``. Every decided binding is still verified.
+with reason ``human``, and the entry moves from the open list to ``settled``. Role decisions
+enter Roles as stated choices; ``IGNORE`` states ``none``. Every decided binding is still
+verified.
 """
 
 from __future__ import annotations
@@ -122,12 +123,13 @@ def apply_structure_decisions(
     logger.info(
         "structure decisions: {} bound, {} ignored as human", len(bound), len(ignored)
     )
-    return structure.model_copy(update=dict(
+    decided: StructureResult = structure.model_copy(update=dict(
         bound=(*structure.bound, *bound.values()),
         ignored=(*structure.ignored, *ignored),
-        ambiguities=tuple(a for a in structure.ambiguities if not _decided(a, chosen)),
+        ambiguities=tuple(_decided(a, chosen) for a in structure.ambiguities),
         proposal_targets=tuple(t for t in structure.proposal_targets if t not in dropped),
     ))
+    return decided.with_settled()
 
 
 def stated_choices(decisions: Iterable[Decision]) -> dict[str, StatedChoice]:
@@ -147,5 +149,14 @@ def _human(binding: SlotBinding) -> BoundEntry:
     return BoundEntry(binding=binding, confidence=HUMAN_CONFIDENCE, source=HUMAN_BINDING)
 
 
-def _decided(ambiguity: Ambiguity, chosen: dict[str, Decision]) -> bool:
-    return ambiguity.stage == STRUCTURE_STAGE and ambiguity.subject in chosen
+def _decided(ambiguity: Ambiguity, chosen: dict[str, Decision]) -> Ambiguity:
+    """The entry with the reviewer's choice written onto it; ``ignore`` closes it unbound."""
+    decision = chosen.get(ambiguity.subject)
+    if ambiguity.stage != STRUCTURE_STAGE or decision is None:
+        return ambiguity
+    fields: dict[str, object] = dict(
+        confidence=HUMAN_CONFIDENCE, source=HUMAN_BINDING, call_key=None
+    )
+    if decision.choice == IGNORE:
+        return ambiguity.model_copy(update=fields | {"choice": None, "reason": IGNORE})
+    return ambiguity.model_copy(update=fields | {"choice": decision.choice})

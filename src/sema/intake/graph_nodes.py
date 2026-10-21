@@ -161,7 +161,8 @@ class Nodes:
         return {"approvals": approvals, "asking": False, "reached": [VALUE_ASK]}
 
     def review(self, state: IngestState) -> dict[str, Any]:
-        """Writes what Review presents and returns its payload, open entries first."""
+        """Writes what Review presents and returns its payload: open structure entries, then
+        settled ones with their source, then role entries."""
         stages, update = self._enter(state, REVIEW)
         current = stages.current(reviewed_of(state))
         listed = self._ambiguity_lists(stages, current, update)
@@ -281,7 +282,8 @@ class Nodes:
         for stage, listed in ((STRUCTURE, current.structure.ambiguities), (ROLES, roles)):
             entry = AmbiguityList(stage=stage, count=len(listed), ambiguities=tuple(listed))
             _write(stages, update, stage + AMBIGUITY_SUFFIX, entry)
-        return [*current.structure.ambiguities, *roles]
+        structure = current.structure
+        return [*structure.ambiguities, *structure.settled, *roles]
 
     def _metrics(
         self, stages: Stages, state: IngestState, current: Current, update: Update

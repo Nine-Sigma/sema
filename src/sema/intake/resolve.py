@@ -134,7 +134,7 @@ def resolve_structure(
     )
     for start in range(0, len(pending), MAX_STRUCTURE_BATCH):
         _settle(run, pending[start : start + MAX_STRUCTURE_BATCH], max_retries)
-    result = run.proposal()
+    result = run.proposal().with_settled()
     settled = sum(1 for entry in pending if run.ambiguities[entry.position].choice is not None)
     logger.info(
         "resolve structure: {} of {} open entries settled by the model, {} bound",

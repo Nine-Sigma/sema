@@ -2,8 +2,9 @@
 
 Pinned API: ``sema.intake.resolve.resolve_structure(structure, land, tools, calls, *,
 provider="staging", max_retries=2) -> StructureResult``. A choice is written onto its
-ambiguity entry (``choice``, ``confidence``, ``source: model``, ``call_key``) and bound with
-``source: model``; an entry with no choice is open. ``sema.intake.resolve`` is imported
+ambiguity entry (``choice``, ``confidence``, ``source: model``, ``call_key``), the entry
+moves from ``ambiguities`` (open entries only) to ``settled``, and it is bound with
+``source: model``; an entry with no choice stays open. ``sema.intake.resolve`` is imported
 lazily so a missing module fails each test on its own.
 """
 
@@ -133,7 +134,7 @@ def open_subjects(result: Any) -> set[str]:
 
 
 def chosen(result: Any, subject: str) -> Any:
-    (found,) = [a for a in result.ambiguities if a.subject == subject and a.choice is not None]
+    (found,) = [a for a in getattr(result, "settled", ()) if a.subject == subject]
     return found
 
 
@@ -240,7 +241,7 @@ def test_choice_is_bound_with_source_model_confidence_and_call_key(
     assert settled.confidence == CONFIDENCE
     assert settled.call_key == key
     assert f"{key}.json" in wired.call_files()
-    assert subject not in open_subjects(result)
+    assert subject not in {a.subject for a in result.ambiguities}
 
 
 def test_code_bound_entries_are_kept_unchanged(

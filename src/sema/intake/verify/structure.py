@@ -74,7 +74,7 @@ def verify_structure(
     removed = {name for e in proposal.bound if e.source == HUMAN for name in e.binding.relations}
     removed |= {name for e in stated for name in e.binding.relations}
     removed |= {name for binding in proposal.ignored for name in binding.relations}
-    listed = {ambiguity.subject for ambiguity in proposal.ambiguities}
+    listed = {a.subject for a in (*proposal.ambiguities, *proposal.settled)}
     coded = [e for e in known if e.source != HUMAN and e not in stated]
     for group in proposal.groups:
         members = [by_name[name] for name in group if name in by_name and name not in removed]
