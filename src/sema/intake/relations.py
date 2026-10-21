@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from itertools import takewhile
 from typing import Any
 
 from sema.binding.spec_sections import RelationRef
@@ -52,6 +53,11 @@ class RelationProvider:
     def relation_sql(self, ref: RelationRef) -> str:
         return ".".join(self.quote(ref, part) for part in ref.name.split("."))
 
+    def columns(self, ref: RelationRef) -> list[str]:
+        """Column names in table order; a warehouse listing stops at its first section."""
+        described = self.query(ref)(f"DESCRIBE TABLE {self.relation_sql(ref)}")
+        return [str(row[0]) for row in takewhile(_is_column_row, described)]
+
     def require(self, refs: Iterable[RelationRef]) -> None:
         for ref in refs:
             if not self._supplies(ref):
@@ -71,6 +77,10 @@ class RelationProvider:
             return rows
 
         return run
+
+
+def _is_column_row(row: tuple[Any, ...]) -> bool:
+    return bool(row[0]) and not str(row[0]).startswith("#")
 
 
 def _missing(ref: RelationRef) -> MissingProviderError:

@@ -13,10 +13,16 @@ from typing import Any
 
 import yaml
 
-from sema.binding.importer_entity_utils import entity_model_entities
+from sema.binding.importer_entity_utils import entity_records, entity_table_schemas
 from sema.binding.importer_evidence_utils import column_bindings, value_mappings
 from sema.binding.importer_relationships_utils import hierarchy_rows, relationship_rows
-from sema.binding.importer_terms_utils import TermRow, collect_terms
+from sema.binding.importer_terms_utils import (
+    Collected,
+    code_lists,
+    collect_terms,
+    store_terms,
+    term_columns,
+)
 from sema.binding.importer_utils import (
     Details,
     Record,
@@ -39,7 +45,7 @@ from sema.binding.mappings_utils import (
     read_mappings,
     subject_index,
 )
-from sema.binding.models import AuthoredEvidence, Retirement
+from sema.binding.models import AuthoredEvidence
 from sema.binding.spec import ConceptSourceSpec, ConceptsSpec, ValueSetsSpec
 from sema.binding.term_staging import (
     clear_term_staging,
@@ -48,6 +54,7 @@ from sema.binding.term_staging import (
 )
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.relations import RelationProvider
+from sema.intake.table_schema import TableSchema
 from sema.log import logger
 
 MANIFEST_VERSION = 1
@@ -56,17 +63,11 @@ CONCEPT_SCHEME_KIND = "CONCEPT_SCHEME"
 
 @dataclass(frozen=True)
 class ConceptImport:
+    """``table_schemas`` is keyed by the manifest entity qualified name."""
+
     manifest: dict[str, Any]
     authored: AuthoredEvidence
-
-
-@dataclass
-class _Collected:
-    properties: dict[str, Record] = field(default_factory=dict)
-    vocabularies: list[Record] = field(default_factory=list)
-    terms: list[Record] = field(default_factory=list)
-    staged: list[TermRow] = field(default_factory=list)
-    retirements: list[Retirement] = field(default_factory=list)
+    table_schemas: dict[str, TableSchema] = field(default_factory=dict)
 
 
 def import_concept_source(
@@ -78,11 +79,15 @@ def import_concept_source(
 ) -> ConceptImport:
     provider.require(spec.relation_refs())
     _log_shape(spec)
-    collected = _Collected()
+    collected = Collected()
     if spec.concepts:
         _concept_properties(spec, spec.concepts, provider, collected)
     if spec.value_sets:
         _value_sets(spec, spec.value_sets, provider, collected, staging)
+    code_lists(spec, provider, collected, staging)
+    schemas = (
+        entity_table_schemas(spec, spec.entity_model, provider) if spec.entity_model else {}
+    )
     loaded = _loaded_refs(spec, collected)
     mappings = _apply_mappings(spec, provider, collected, loaded)
     manifest: dict[str, Any] = {
@@ -95,11 +100,7 @@ def import_concept_source(
         "vocabularies": collected.vocabularies,
         "terms": collected.terms,
         "entities": _scheme_entities(spec, list(collected.properties.values()))
-        + (
-            entity_model_entities(spec, spec.entity_model, provider)
-            if spec.entity_model
-            else []
-        ),
+        + entity_records(spec, schemas),
         "relationships": _relationship_rows(spec, provider, loaded),
     }
     authored = _authored(spec, provider, dataset_map, mappings, collected)
@@ -108,7 +109,7 @@ def import_concept_source(
     elif staging is not None and spec.spec_version >= 2:
         clear_term_staging(staging, spec.external_namespace)
     _log_summary(spec, collected, manifest)
-    return ConceptImport(manifest=manifest, authored=authored)
+    return ConceptImport(manifest=manifest, authored=authored, table_schemas=schemas)
 
 
 def write_import(
@@ -129,7 +130,7 @@ def _log_shape(spec: ConceptSourceSpec) -> None:
 
 
 def _log_summary(
-    spec: ConceptSourceSpec, collected: _Collected, manifest: dict[str, Any]
+    spec: ConceptSourceSpec, collected: Collected, manifest: dict[str, Any]
 ) -> None:
     logger.info(
         "Imported concept source {}: {} concepts, {} terms, {} relationships",
@@ -154,7 +155,7 @@ def _authored(
     provider: RelationProvider,
     dataset_map: dict[str, str],
     mappings: list[SssomMapping],
-    collected: _Collected,
+    collected: Collected,
 ) -> AuthoredEvidence:
     bindings, value_maps = spec.authored_bindings, spec.value_mappings
     return AuthoredEvidence(
@@ -167,7 +168,7 @@ def _authored(
     )
 
 
-def _loaded_refs(spec: ConceptSourceSpec, collected: _Collected) -> set[RefKey]:
+def _loaded_refs(spec: ConceptSourceSpec, collected: Collected) -> set[RefKey]:
     """Concept ids, and for version 2 also term codes, as relationship endpoints."""
     ids = set(collected.properties)
     if spec.spec_version >= 2:
@@ -190,7 +191,7 @@ def _relationship_rows(
 def _apply_mappings(
     spec: ConceptSourceSpec,
     provider: RelationProvider,
-    collected: _Collected,
+    collected: Collected,
     loaded: set[RefKey],
 ) -> list[SssomMapping]:
     if spec.mappings is None:
@@ -208,7 +209,7 @@ def _apply_mappings(
 
 
 def _scheme_entities(spec: ConceptSourceSpec, properties: list[Record]) -> list[Record]:
-    if spec.concepts is None or spec.scheme is None:
+    if spec.scheme is None or (spec.concepts is None and not properties):
         return []
     return [
         {
@@ -227,7 +228,7 @@ def _concept_properties(
     spec: ConceptSourceSpec,
     concepts: ConceptsSpec,
     provider: RelationProvider,
-    collected: _Collected,
+    collected: Collected,
 ) -> None:
     roles = concepts.roles
     join_column = spec.concept_details.on[0] if spec.concept_details else None
@@ -305,7 +306,7 @@ def _value_sets(
     spec: ConceptSourceSpec,
     value_sets: ValueSetsSpec,
     provider: RelationProvider,
-    collected: _Collected,
+    collected: Collected,
     staging: Staging | None,
 ) -> None:
     roles = value_sets.roles
@@ -314,17 +315,7 @@ def _value_sets(
     rows = fetch(
         provider,
         value_sets.relation,
-        [
-            roles.concept_id,
-            roles.code,
-            roles.display,
-            roles.display_fallback,
-            roles.vocabulary_id,
-            roles.concept_code,
-            roles.synonyms,
-            join_column,
-            *lifecycle_columns(roles),
-        ],
+        [roles.concept_id, *term_columns(roles), join_column],
         scope,
     )
     details: dict[str, Details] = {}
@@ -338,33 +329,5 @@ def _value_sets(
         vocabulary = f"VS_{concept_id}"
         terms = collect_terms(spec, roles, relation, vocabulary, group, details)
         collected.properties[concept_id]["vocabulary_binding"] = {"vocabulary": vocabulary}
-        if _above_cap(spec, vocabulary, terms, staging):
-            collected.vocabularies.append({"name": vocabulary, "source": "EXTERNAL"})
-            collected.staged.extend(terms)
-        else:
-            _add_inline(collected, vocabulary, terms)
+        store_terms(spec, collected, vocabulary, terms, staging)
 
-
-def _above_cap(
-    spec: ConceptSourceSpec, vocabulary: str, terms: list[TermRow], staging: Staging | None
-) -> bool:
-    cap = spec.term_storage.inline_cap
-    if spec.spec_version < 2 or len(terms) <= cap:
-        return False
-    if staging is None:
-        raise ValueError(
-            f"vocabulary {vocabulary} has {len(terms)} terms, above inline_cap {cap}; "
-            "term staging needs a staging database (--staging)"
-        )
-    return True
-
-
-def _add_inline(collected: _Collected, vocabulary: str, terms: list[TermRow]) -> None:
-    collected.vocabularies.append({"name": vocabulary, "source": "INLINE"})
-    for term in terms:
-        if term.lifecycle.retired:
-            collected.retirements.append(
-                retirement_row("term", vocabulary, term.code, term.lifecycle)
-            )
-        else:
-            collected.terms.append(term.manifest_record())

@@ -57,7 +57,7 @@ _FLAG_TEXT = {"yes": True, "no": False, "y": True, "n": False, "true": True,
 @dataclass(frozen=True)
 class DictionaryRow:
     property: str
-    raw_type: str
+    raw_type: str | None
     required: bool = False
     primary_key: bool = False
     fk_entity: str | None = None
@@ -89,21 +89,27 @@ def dictionary_flag(value: Any) -> bool:
 
 
 def table_schema_from_rows(
-    entity: str, rows: Iterable[DictionaryRow], *, description: str | None = None
+    entity: str,
+    rows: Iterable[DictionaryRow],
+    *,
+    description: str | None = None,
+    foreign_keys: Iterable[ForeignKey] = (),
 ) -> TableSchema:
+    """``foreign_keys`` are declared beside the rows, after the row-derived ones."""
     rows = list(rows)
     return TableSchema(
         fields=[_field(entity, row) for row in rows],
         primary_key=[row.property for row in rows if row.primary_key] or None,
-        foreign_keys=_foreign_keys(entity, rows) or None,
+        foreign_keys=[*_foreign_keys(entity, rows), *foreign_keys] or None,
         description=description,
     )
 
 
 def _field(entity: str, row: DictionaryRow) -> Field:
+    column = f"{entity}.{row.property}"
     return Field(
         name=row.property,
-        type=frictionless_type(row.raw_type, f"{entity}.{row.property}"),
+        type="any" if row.raw_type is None else frictionless_type(row.raw_type, column),
         description=row.description,
         constraints=Constraints(required=True) if row.required else None,
         x_sema_raw_type=row.raw_type,

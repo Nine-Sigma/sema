@@ -18,15 +18,20 @@ from pydantic import Field, field_validator, model_validator
 from sema.binding.spec_sections import (
     AuthoredBindingRoles,
     AuthoredBindingsSpec,
+    CodeListConcept,
+    CodeListRoles,
+    CodeListSpec,
     ConceptRoles,
     ConceptsSpec,
     DetailRoles,
     DetailsSpec,
+    DeclaredForeignKey,
     EndpointFallback,
     EndpointRole,
     EntityModelRoles,
     EntityModelSpec,
     ExternalRefRole,
+    HeaderKeys,
     HierarchySpec,
     LevelColumnsHierarchy,
     LifecycleRoles,
@@ -34,6 +39,7 @@ from sema.binding.spec_sections import (
     MappingsSpec,
     ParentColumnHierarchy,
     PathCodesHierarchy,
+    PerFileEntry,
     Provider,
     RelationRef,
     RelationshipRoles,
@@ -58,6 +64,7 @@ VERSION_2_FIELDS: tuple[tuple[str, str], ...] = (
     ("", "mappings"),
     ("", "term_storage"),
     ("", "entity_model"),
+    ("", "code_lists"),
     *(("concepts.roles", name) for name in _LIFECYCLE_FIELDS),
     *(("value_sets.roles", name) for name in _LIFECYCLE_FIELDS),
 )
@@ -77,6 +84,7 @@ RELATION_SECTIONS = (
     "mappings",
     "entity_model",
 )
+ENTRY_RELATION_KEYS = ("relation", "header")
 
 
 class ConceptSourceSpec(_SpecModel):
@@ -98,6 +106,7 @@ class ConceptSourceSpec(_SpecModel):
     mappings: MappingsSpec | None = None
     term_storage: TermStorageSpec = Field(default_factory=TermStorageSpec)
     entity_model: EntityModelSpec | None = None
+    code_lists: list[CodeListSpec] | None = None
 
     @property
     def external_namespace(self) -> str:
@@ -111,6 +120,10 @@ class ConceptSourceSpec(_SpecModel):
             relation = getattr(getattr(self, section), "relation", None)
             if isinstance(relation, RelationRef):
                 refs.append(relation)
+        entries = self.entity_model.entities if self.entity_model else None
+        for entry in entries or []:
+            refs += [entry.relation] + ([entry.header] if entry.header else [])
+        refs += [entry.relation for entry in self.code_lists or []]
         return refs
 
     @field_validator("spec_version")
@@ -137,16 +150,28 @@ class ConceptSourceSpec(_SpecModel):
             if isinstance(body, dict) and "relation" in body:
                 relation = _relation_ref(section, body["relation"], provider, version)
                 resolved[section] = {**body, "relation": relation}
+        model = resolved.get("entity_model")
+        if isinstance(model, dict) and isinstance(model.get("entities"), list):
+            entries = _resolve_entries(model["entities"], provider, version)
+            resolved["entity_model"] = {**model, "entities": entries}
+        if isinstance(resolved.get("code_lists"), list):
+            resolved["code_lists"] = _resolve_entries(
+                resolved["code_lists"], provider, version
+            )
         return resolved
 
     @model_validator(mode="after")
     def _check_sections(self) -> ConceptSourceSpec:
         if self.spec_version == 1:
             _gate_version_1(self)
-        if self.concepts is None and self.entity_model is None:
-            raise ValueError("a spec needs `concepts` or `entity_model`; it has neither")
+        if not (self.concepts or self.entity_model or self.code_lists):
+            raise ValueError(
+                "a spec needs one of `concepts`, `entity_model`, or `code_lists`; "
+                "it has none"
+            )
         if self.concepts is not None and self.scheme is None:
             raise ValueError("`scheme` is required when `concepts` is present")
+        _check_code_lists(self)
         _check_single_hierarchy(self)
         _check_scope_providers(self)
         return self
@@ -160,6 +185,37 @@ def _relation_ref(section: str, value: Any, provider: str, version: Any) -> Any:
             f"{section}.relation as an object requires spec_version: 2"
         )
     return value
+
+
+def _resolve_entries(entries: list[Any], provider: str, version: Any) -> list[Any]:
+    resolved: list[Any] = []
+    for entry in entries:
+        if isinstance(entry, dict):
+            entry = {
+                **entry,
+                **{
+                    key: _relation_ref(key, entry[key], provider, version)
+                    for key in ENTRY_RELATION_KEYS
+                    if entry.get(key) is not None
+                },
+            }
+        resolved.append(entry)
+    return resolved
+
+
+def _check_code_lists(spec: ConceptSourceSpec) -> None:
+    seen: set[str] = set()
+    for entry in spec.code_lists or []:
+        if entry.vocabulary_id in seen:
+            raise ValueError(
+                f"code_lists vocabulary_id {entry.vocabulary_id!r} is declared twice"
+            )
+        seen.add(entry.vocabulary_id)
+        if entry.concept is not None and spec.scheme is None:
+            raise ValueError(
+                f"code_lists {entry.vocabulary_id!r} declares a concept, which needs "
+                "a `scheme`"
+            )
 
 
 def _gate_version_1(spec: ConceptSourceSpec) -> None:
@@ -232,16 +288,21 @@ def load_dataset_map(path: Path) -> dict[str, str]:
 __all__ = [
     "AuthoredBindingRoles",
     "AuthoredBindingsSpec",
+    "CodeListConcept",
+    "CodeListRoles",
+    "CodeListSpec",
     "ConceptRoles",
     "ConceptSourceSpec",
     "ConceptsSpec",
     "DetailRoles",
     "DetailsSpec",
+    "DeclaredForeignKey",
     "EndpointFallback",
     "EndpointRole",
     "EntityModelRoles",
     "EntityModelSpec",
     "ExternalRefRole",
+    "HeaderKeys",
     "HierarchySpec",
     "LevelColumnsHierarchy",
     "LifecycleRoles",
@@ -249,6 +310,7 @@ __all__ = [
     "MappingsSpec",
     "ParentColumnHierarchy",
     "PathCodesHierarchy",
+    "PerFileEntry",
     "Provider",
     "RelationRef",
     "RelationshipRoles",

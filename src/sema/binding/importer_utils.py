@@ -69,13 +69,23 @@ def fetch(
     where: str | None = None,
 ) -> list[Record]:
     """Rows as column-keyed dicts, sorted so the import is order-independent."""
+    records = fetch_in_order(provider, relation, columns, where)
+    return sorted(records, key=lambda r: [str(value) for value in r.values()])
+
+
+def fetch_in_order(
+    provider: RelationProvider,
+    relation: RelationRef,
+    columns: Iterable[str | None],
+    where: str | None = None,
+) -> list[Record]:
+    """Rows in the order the provider returns them, which for staging is landed order."""
     names = list(dict.fromkeys(c for c in columns if c))
     query = provider.query(relation)
-    records = [
+    return [
         dict(zip(names, row))
         for row in query(select_sql(provider, relation, names, where))
     ]
-    return sorted(records, key=lambda r: [str(r[name]) for name in names])
 
 
 def as_text(value: Any) -> str | None:

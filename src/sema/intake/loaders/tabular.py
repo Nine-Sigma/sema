@@ -24,7 +24,13 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.landing import LOCATOR_COLUMN, LandedRelation, LandResult, utc_now
+from sema.intake.landing import (
+    LOCATOR_COLUMN,
+    SHEET_SEPARATOR,
+    LandedRelation,
+    LandResult,
+    utc_now,
+)
 from sema.intake.loaders.base import (
     DEFAULT_POLICY_CLASS,
     ensure_schema,
@@ -123,7 +129,7 @@ def _plan(path: Path) -> list[_Sheet]:
     workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
     try:
         return [
-            _Sheet(path=path, label=title, name=relation_name(f"{path.stem}__{title}"))
+            _Sheet(path=path, label=title, name=relation_name(path.stem + SHEET_SEPARATOR + title))
             for title in workbook.sheetnames
         ]
     finally:

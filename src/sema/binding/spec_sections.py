@@ -73,14 +73,17 @@ class ConceptsSpec(_SpecModel):
     filter: str | None = None
 
 
-class ValueSetRoles(LifecycleRoles):
-    concept_id: str
+class CodeListRoles(LifecycleRoles):
     code: str
     display: str
     display_fallback: str | None = None
     vocabulary_id: str | None = None
     concept_code: str | None = None
     synonyms: str | None = None
+
+
+class ValueSetRoles(CodeListRoles):
+    concept_id: str
 
 
 class ValueSetsSpec(_SpecModel):
@@ -225,9 +228,9 @@ class TermStorageSpec(_SpecModel):
 
 
 class EntityModelRoles(_SpecModel):
-    entity: str
+    entity: str | None = None
     property: str
-    type: str
+    type: str | None = None
     required: str | None = None
     primary_key: str | None = None
     fk_entity: str | None = None
@@ -235,14 +238,91 @@ class EntityModelRoles(_SpecModel):
     domain: str | None = None
     description: str | None = None
     entity_description: str | None = None
+    notes: list[str] = Field(default_factory=list)
+
+
+class DeclaredForeignKey(_SpecModel):
+    columns: list[str] = Field(min_length=1)
+    entity: str = Field(min_length=1)
+    reference_columns: list[str] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _paired_columns(self) -> DeclaredForeignKey:
+        if len(self.columns) != len(self.reference_columns):
+            raise ValueError(
+                f"foreign key to {self.entity} pairs {len(self.columns)} columns "
+                f"with {len(self.reference_columns)} reference_columns"
+            )
+        return self
+
+
+class PerFileEntry(_SpecModel):
+    """``domains`` maps a property name to the vocabulary id that constrains it."""
+
+    relation: RelationRef
+    header: RelationRef | None = None
+    entity: str | None = None
+    foreign_keys: list[DeclaredForeignKey] = Field(default_factory=list)
+    domains: dict[str, str] = Field(default_factory=dict)
+
+
+class HeaderKeys(_SpecModel):
+    """Omitted keys are found by the lexicon's header tokens."""
+
+    name: str | None = None
+    description: str | None = None
+    text: list[str] = Field(default_factory=list)
 
 
 class EntityModelSpec(_SpecModel):
     """``entity_case: lower`` lowercases entity, property, and foreign key names."""
 
-    relation: RelationRef
+    layout: Literal["single_relation", "per_file"] = "single_relation"
+    relation: RelationRef | None = None
+    entities: list[PerFileEntry] | None = None
+    header_keys: HeaderKeys | None = None
     roles: EntityModelRoles
     entity_case: Literal["preserve", "lower"] = "preserve"
+    filter: str | None = None
+
+    @model_validator(mode="after")
+    def _layout_parts(self) -> EntityModelSpec:
+        if self.layout == "per_file":
+            _check_per_file(self)
+            return self
+        if self.relation is None:
+            raise ValueError("a single_relation entity_model needs `relation`")
+        if self.roles.entity is None:
+            raise ValueError("a single_relation entity_model needs the `entity` role")
+        if self.entities is not None or self.header_keys is not None:
+            raise ValueError(
+                "`entities` and `header_keys` need `layout: per_file`"
+            )
+        return self
+
+
+def _check_per_file(model: EntityModelSpec) -> None:
+    if not model.entities:
+        raise ValueError("a per_file entity_model needs `entities`")
+    if model.relation is not None:
+        raise ValueError("a per_file entity_model names its relations in `entities`")
+    if model.roles.entity is not None:
+        raise ValueError(
+            "per_file entries name their entity; drop the `entity` role"
+        )
+
+
+class CodeListConcept(_SpecModel):
+    concept_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    definition: str | None = None
+
+
+class CodeListSpec(_SpecModel):
+    vocabulary_id: str = Field(min_length=1)
+    relation: RelationRef
+    roles: CodeListRoles
+    concept: CodeListConcept | None = None
     filter: str | None = None
 
 
