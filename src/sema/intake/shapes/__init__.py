@@ -27,6 +27,7 @@ __all__ = [
     "SlotBinding",
     "Template",
     "apply_precedence",
+    "filled_sections",
 ]
 
 TEMPLATES: tuple[Template, ...] = (
@@ -41,3 +42,11 @@ TEMPLATES: tuple[Template, ...] = (
     entity_model,
     ignore,
 )
+
+
+def filled_sections(binding: SlotBinding) -> tuple[str, ...]:
+    """The binding's own section, else the sections its template's loader fills."""
+    if binding.section is not None:
+        return (binding.section,)
+    template = next((t for t in TEMPLATES if t.ID == binding.template), None)
+    return tuple(getattr(template, "SECTIONS", ()))

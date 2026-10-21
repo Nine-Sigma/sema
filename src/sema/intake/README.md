@@ -68,7 +68,7 @@ The tabular loader picks the header as the first of the first 50 rows where at l
 
 A hint (a hand-written spec) pins the bindings it names as `source: human` before step 3. Each pinned binding still passes its template's `verify`; a failing or overlapping hint raises `HintRejectedError` and binds nothing.
 
-`StructureResult` holds `order`, `groups` (every relation, ignored ones included, in landing order), `signatures`, `bound`, `ignored`, `ambiguities`, `edges`, and `floors` (every floor the stage used, so a moved floor is visible). `schema_relations` lists the dictionary and header relations of bound entity models. `to_shape()` renders the spec's `shape` list once every bound section is resolved, and raises before that.
+`StructureResult` holds `order`, `groups` (every relation, ignored ones included, in landing order), `signatures`, `bound`, `ignored`, `ambiguities`, `edges`, and `floors` (every floor the stage used, so a moved floor is visible). `schema_relations` lists the dictionary and header relations of bound entity models. `to_shape()` renders the spec's `shape` list once every bound section is resolved, and raises before that. A loader-fixed binding (`semsql`, `athena_bundle`) is resolved when bound: its sections are the template module's `SECTIONS`, the sections its loader fills, read through `shapes.filled_sections` by both `to_shape()` and the Roles verifier.
 
 ## Roles
 
@@ -94,7 +94,7 @@ Every verifier returns a `Verdict` (`verify.base`): `status` (`pass` or `fail`),
 |---|---|
 | Land | `all_landed`, `row_counts_match`, `header_row_valid`, `types_parse`, `locator_present`, `policy_class_permitted` |
 | Structure | `partition_complete` (every landed relation exactly once across bound, ignored, and ambiguous), `unknown_template`, `in_eligibility_set`, `template_verifies`, `precedence_applied`, `ignore_reason_known`, `ignore_profile_holds`, `ambiguity_list_complete` |
-| Roles | `required_roles_bound`, `column_exists`, `in_eligibility_set`, `one_role_per_column`, `section_resolved`, `ambiguity_list_complete`, `external_refs_resolve`, plus per-role value checks (key and code uniqueness, display null rate, synonyms shape, status values, valid dates, `replaced_by` resolves, language tags) |
+| Roles | `required_roles_bound`, `column_exists`, `in_eligibility_set`, `one_role_per_column` (a concept key and `name` may share a column when it is the `group_by` key and the counts show one value and no nulls), `section_resolved`, `ambiguity_list_complete`, `external_refs_resolve`, plus per-role value checks (key and code uniqueness, display null rate, synonyms shape, status values, valid dates, `replaced_by` resolves, language tags) |
 | Dry run | `import_completed`, `counts_in_range`, `unique_active_code`, `manifest_parses`, `inline_under_cap`, `replaced_by_active` |
 
 Under `metadata_only`, a check that needs values it may not read (for example external mappings with no loaded vocabulary) is listed as an `unverifiable` ambiguity rather than passed or failed.

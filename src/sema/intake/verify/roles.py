@@ -18,15 +18,18 @@ from sema.intake.eligibility_spec_utils import RolesResult
 from sema.intake.eligibility_text_utils import STAGE
 from sema.intake.eligibility_utils import RoleEligibility
 from sema.intake.profile import SAMPLE_CAP, ProfileTools, ValueSample
+from sema.intake.shapes import filled_sections
 from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR
 from sema.intake.shapes.base_utils import JOIN_FLOOR, failure, section_of
 from sema.intake.structure import StructureResult
 from sema.intake.structure_hint_utils import section_at
 from sema.intake.verify.base import Ambiguity, Failure, FloorValue, Verdict
 from sema.intake.verify.roles_utils import (
+    GROUP_KEY_ROLES,
     VALUE_CHECKS,
     BoundSection,
     bound_sections,
+    constant_group_key,
     role_columns,
     value_failures,
 )
@@ -67,7 +70,7 @@ def verify_roles(
         for section in bound_sections(spec):
             profile = tools.describe_relation(section.relation)
             present = {column.name for column in profile.columns}
-            failures += _binding_failures(section, present, roles.eligibilities)
+            failures += _binding_failures(section, present, roles.eligibilities, tools)
             failures += value_failures(section, profile, tools)
         found, unverifiable = _external_refs(spec, tools)
         failures += found
@@ -79,7 +82,7 @@ def _section_failures(structure: StructureResult) -> list[Failure]:
     return [
         failure(SECTION_RESOLVED, entry.binding.relations[0], template=entry.binding.template)
         for entry in structure.bound
-        if entry.binding.section is None and entry.binding.relations
+        if not filled_sections(entry.binding) and entry.binding.relations
     ]
 
 
@@ -109,7 +112,10 @@ def _required_failures(structure: StructureResult, spec: ConceptSourceSpec) -> l
 
 
 def _binding_failures(
-    section: BoundSection, present: set[str], eligibilities: Sequence[RoleEligibility]
+    section: BoundSection,
+    present: set[str],
+    eligibilities: Sequence[RoleEligibility],
+    tools: ProfileTools,
 ) -> list[Failure]:
     relation = section.relation.name
     bound = role_columns(section.roles)
@@ -130,7 +136,7 @@ def _binding_failures(
     failures += [
         failure(ONE_ROLE_PER_COLUMN, relation, column, roles=held)
         for column, held in by_column.items()
-        if not _may_share(held)
+        if not _may_share(held) and not _shared_group_key(section, column, held, tools)
     ]
     return failures
 
@@ -147,6 +153,12 @@ def _eligibility_sets(
 
 def _may_share(held: Sequence[str]) -> bool:
     return all(lexicon.coincide(first, second) for first, second in combinations(held, 2))
+
+
+def _shared_group_key(
+    section: BoundSection, column: str, held: Sequence[str], tools: ProfileTools
+) -> bool:
+    return frozenset(held) == GROUP_KEY_ROLES and constant_group_key(section, column, tools)
 
 
 def _external_refs(

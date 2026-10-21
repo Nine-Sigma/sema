@@ -17,18 +17,14 @@ from sema.intake.loaders.athena import land_athena_bundle
 from sema.intake.loaders.semsql import land_semsql
 from sema.intake.loaders.tabular import land_tabular
 from sema.intake.profile import ProfileRefusedError
-from sema.intake.shapes import TEMPLATES
-from sema.intake.shapes.base import (
-    ID_DISTINCT_RATIO_FLOOR,
-    JOIN_RESOLVE_FLOOR,
-    LABEL_MEAN_LENGTH_BOUNDS,
-)
+from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR
 from tests.unit.intake.shapes.shapes_env import Source, warehouse_source
 from tests.unit.intake.structure_env import (
     A2_BOUND,
     A2_SHAPE,
     A2_WORKBOOK,
     A3_DB,
+    A3_SECTIONS,
     ACRIS,
     ACRIS_SPEC,
     CODE_TABLES,
@@ -44,6 +40,7 @@ from tests.unit.intake.structure_env import (
     copy_code_tables,
     entries,
     entry_over,
+    expected_stage_floors,
     fresh_tools,
     ignored_relations,
     joins,
@@ -360,6 +357,17 @@ def test_a2_shape_is_code_bound_with_confidence_one(a2_result: Result) -> None:
     assert [(e.section, e.template) for e in a2_result().to_shape()] == A2_SHAPE
 
 
+def test_a3_shape_names_semsql_for_every_section_its_loader_fills(
+    a3: Source, tmp_path: Path
+) -> None:
+    result = run(a3, fresh_tools(a3, tmp_path / "ledger" / "structure"))
+
+    assert {(e.binding.template, e.confidence, e.source) for e in result.bound} == {
+        ("semsql", 1.0, "code")
+    }
+    shape = sorted((entry.section, entry.template) for entry in result.to_shape())
+    assert shape == sorted((section, "semsql") for section in A3_SECTIONS)
+
 def test_structure_issues_no_value_bearing_statement(a10: Result, acris_ledger: Path) -> None:
     a10()
     lines = sql_lines(acris_ledger)
@@ -370,16 +378,8 @@ def test_structure_issues_no_value_bearing_statement(a10: Result, acris_ledger: 
 
 
 def test_floors_are_the_union_of_every_template_and_the_base(a10: Result) -> None:
-    expected: dict[str, Any] = {
-        "ID_DISTINCT_RATIO_FLOOR": ID_DISTINCT_RATIO_FLOOR,
-        "LABEL_MEAN_LENGTH_BOUNDS": LABEL_MEAN_LENGTH_BOUNDS,
-        "JOIN_RESOLVE_FLOOR": JOIN_RESOLVE_FLOOR,
-    }
-    for template in TEMPLATES:
-        expected |= getattr(template, "FLOORS", {})
-
     floors = {k: tuple(v) if isinstance(v, list) else v for k, v in a10().floors.items()}
-    assert floors == expected
+    assert floors == expected_stage_floors()
 
 
 def test_bound_dictionaries_and_headers_are_the_schema_relations(

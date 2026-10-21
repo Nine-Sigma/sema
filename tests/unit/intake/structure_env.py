@@ -21,11 +21,19 @@ from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.landing import LandResult
 from sema.intake.profile import ProfileTools
+from sema.intake.shapes import TEMPLATES
+from sema.intake.shapes.base import (
+    ID_DISTINCT_RATIO_FLOOR,
+    JOIN_RESOLVE_FLOOR,
+    LABEL_MEAN_LENGTH_BOUNDS,
+)
 from tests.unit.intake.shapes.shapes_env import FIXTURES, Source, make_tools, staging_source
 
 A2_WORKBOOK = FIXTURES / "tabular" / "codes_a2.xlsx"
 A2_SPEC = FIXTURES / "tabular" / "codes_a2.spec.yaml"
 A3_DB = FIXTURES / "semsql" / "ontology.db"
+# The sections of the committed A3 spec, each read from a relation the semsql loader lands.
+A3_SECTIONS = ("concepts", "value_sets", "term_details", "hierarchy", "mappings")
 ACRIS = FIXTURES / "acris"
 ACRIS_SPEC = ACRIS / "acris.spec.yaml"
 HELDOUT = FIXTURES / "heldout"
@@ -78,6 +86,17 @@ def fresh_tools(source: Source, ledger_dir: Path, **kwargs: Any) -> ProfileTools
 
 def run(source: Source, tools: ProfileTools, hint: ConceptSourceSpec | None = None) -> Any:
     return structure().run_structure(source.land, tools, provider=source.provider, hint=hint)
+
+
+def expected_stage_floors() -> dict[str, Any]:
+    expected: dict[str, Any] = {
+        "ID_DISTINCT_RATIO_FLOOR": ID_DISTINCT_RATIO_FLOOR,
+        "LABEL_MEAN_LENGTH_BOUNDS": LABEL_MEAN_LENGTH_BOUNDS,
+        "JOIN_RESOLVE_FLOOR": JOIN_RESOLVE_FLOOR,
+    }
+    for template in TEMPLATES:
+        expected |= getattr(template, "FLOORS", {})
+    return expected
 
 
 def copy_code_tables(target: Path) -> Path:

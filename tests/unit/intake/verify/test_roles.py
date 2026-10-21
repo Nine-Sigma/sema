@@ -76,6 +76,12 @@ def a2_roles(a2: Landed, a2_structure: Any) -> Any:
     return run_roles(a2.source, a2_structure, a2.root / "ledger" / "a2_roles")
 
 
+@pytest.fixture(scope="module")
+def a3_roles(a3: Landed) -> Any:
+    structured = a3.structure("a3_roles_structure")
+    return run_roles(a3.source, structured, a3.root / "ledger" / "a3_roles")
+
+
 def _a2_edited(tmp_path: Path, **value_set_roles: str) -> ConceptSourceSpec:
     def edit(section: dict[str, Any]) -> None:
         section["value_sets"]["roles"].update(value_set_roles)
@@ -216,4 +222,40 @@ def test_dated_rows_in_order_pass_the_date_check(
     verdict = _verify(source, roles, tmp_path / "ledger" / "verify", spec)
 
     assert not failures(verdict, "valid_dates")
+    assert_named(verdict, ROLES_CHECKS)
+
+
+def test_a3_spec_passes_with_its_loader_section_and_constant_shared_key(
+    a3: Landed, a3_roles: Any, tmp_path: Path
+) -> None:
+    spec = load_concept_source_spec(A3_SPEC)
+    assert spec.concepts is not None
+    assert spec.concepts.group_by == "ontology", "precondition: A3 groups by the constant key"
+
+    verdict = _verify(a3.source, a3_roles, tmp_path / "ledger" / "verify", spec)
+
+    assert_passes(verdict, ROLES_CHECKS)
+
+
+@pytest.mark.parametrize(
+    ("group_by", "shared"),
+    [("subject", "subject"), ("ontology", "label")],
+    ids=["non_constant_group_by", "not_the_group_by_key"],
+)
+def test_concept_key_and_name_sharing_a_non_constant_column_fail(
+    a3: Landed, a3_roles: Any, tmp_path: Path, group_by: str, shared: str
+) -> None:
+    def edit(section: dict[str, Any]) -> None:
+        section["concepts"].update(
+            group_by=group_by, roles={"concept_id": shared, "name": shared}
+        )
+
+    spec = edited_spec(A3_SPEC, tmp_path / "spec", edit)
+    verdict = _verify(a3.source, a3_roles, tmp_path / "ledger" / "verify", spec)
+
+    found = failures(verdict, "one_role_per_column")
+    terms = ref(a3.source, "semsql_terms")
+    assert [(f.relation, f.column, f.evidence["roles"]) for f in found] == [
+        (terms, shared, ["concept_id", "name"])
+    ]
     assert_named(verdict, ROLES_CHECKS)

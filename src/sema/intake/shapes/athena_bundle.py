@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from sema.binding.spec_sections import ConceptsSpec, RelationshipsSpec, ValueSetsSpec
 from sema.intake.loaders.athena import REQUIRED_TABLES
 from sema.intake.profile import ProfileTools
 from sema.intake.shapes.base import RelationProfile, SlotBinding
@@ -14,11 +15,20 @@ from sema.intake.shapes.base_utils import (
     fixed_binding,
     fixed_failures,
     fixed_relation_sets,
+    section_of,
     verdict,
 )
 from sema.intake.verify.base import Verdict
 
 ID = "athena_bundle"
+# The loader's required tables fill these: the vocabulary table holds one concept per
+# vocabulary, the concept table its values, the relationship table the typed relationships
+# (hierarchical ones included). The ancestor table is a closure, not a parent column.
+SECTIONS = (
+    section_of(ConceptsSpec),
+    section_of(ValueSetsSpec),
+    section_of(RelationshipsSpec),
+)
 
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:

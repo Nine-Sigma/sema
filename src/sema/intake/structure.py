@@ -19,7 +19,7 @@ from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import Provider, ShapeEntry
 from sema.intake.landing import LandResult
 from sema.intake.profile import ProfileTools
-from sema.intake.shapes import TEMPLATES, entity_model, ignore
+from sema.intake.shapes import TEMPLATES, entity_model, filled_sections, ignore
 from sema.intake.shapes.base import (
     RelationProfile,
     RelationSignature,
@@ -105,13 +105,13 @@ class StructureResult(BaseModel):
     def to_shape(self) -> list[ShapeEntry]:
         pairs: dict[tuple[str, str], None] = {}
         for entry in self.bound:
-            section = entry.binding.section
-            if section is None:
+            sections = filled_sections(entry.binding)
+            if not sections:
                 raise ValueError(
                     f"the section of {entry.binding.template} over"
                     f" {', '.join(entry.binding.relations)} is unresolved until Roles"
                 )
-            pairs[(section, entry.binding.template)] = None
+            pairs |= {(section, entry.binding.template): None for section in sections}
         return [ShapeEntry(section=section, template=template) for section, template in pairs]
 
 

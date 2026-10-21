@@ -8,6 +8,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from sema.binding.spec_sections import (
+    ConceptsSpec,
+    MappingsSpec,
+    ParentColumnHierarchy,
+    ValueSetsSpec,
+)
 from sema.intake.loaders.semsql import REQUIRED_BASE_TABLES
 from sema.intake.loaders.semsql_utils import DERIVED_RELATIONS, TERM_LABEL_COLUMN, TERMS_RELATION
 from sema.intake.profile import ProfileTools
@@ -18,12 +24,24 @@ from sema.intake.shapes.base_utils import (
     fixed_binding,
     fixed_failures,
     fixed_relation_sets,
+    named_section,
+    section_of,
     verdict,
 )
 from sema.intake.verify.base import Failure, FloorValue, Verdict
 
 ID = "semsql"
 REQUIRED = (*DERIVED_RELATIONS, *REQUIRED_BASE_TABLES)
+# The loader's derived relations fill these: the terms relation holds the ontology as the
+# concept, each class as a value with its definition; the edges relation the subclass
+# hierarchy; the mappings relation the mappings.
+SECTIONS = (
+    section_of(ConceptsSpec),
+    section_of(ValueSetsSpec),
+    named_section("term_details"),
+    section_of(ParentColumnHierarchy),
+    section_of(MappingsSpec),
+)
 # Measured: A3 fixture semsql_terms labels 50 of 50 classes (coverage 1.0).
 LABEL_COVERAGE_FLOOR = 0.9
 FLOORS: dict[str, FloorValue] = {"LABEL_COVERAGE_FLOOR": LABEL_COVERAGE_FLOOR}

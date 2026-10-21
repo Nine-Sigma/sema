@@ -47,6 +47,8 @@ TIMESTAMP_TYPE = "TIMESTAMP"
 # The lexicon's date roles in settling order: the start, then the end.
 DATE_ROLES = tuple(entry.name for entry in lexicon.ROLES if entry.predicate == "date")
 BCP47_PATTERN = "^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+# A concept key and its name may share a column that is the group's constant key.
+GROUP_KEY_ROLES = frozenset({KEY_ROLE, "name"})
 
 
 @dataclass(frozen=True)
@@ -108,6 +110,16 @@ def role_columns(roles: BaseModel) -> dict[str, str]:
         elif isinstance(value, str):
             found[name] = value
     return found
+
+
+def constant_group_key(section: BoundSection, column: str, tools: ProfileTools) -> bool:
+    """The column is the section's ``group_by`` key and holds one value on every row."""
+    if section.group_by != column:
+        return False
+    ref, where = section.relation, section.filter
+    is_null = f"{tools.provider.quote(ref, column)} IS NULL"
+    rows, nulls = tools.count_where(ref, [is_null], where=where)
+    return rows > 0 and not nulls and tools.count_distinct(ref, [column], where=where) == 1
 
 
 def value_failures(

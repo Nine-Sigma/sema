@@ -35,6 +35,13 @@ def section_of(model: type) -> str:
     )
 
 
+def named_section(name: str) -> str:
+    """A section whose model several sections share, so it is named and checked here."""
+    if name not in ConceptSourceSpec.model_fields:
+        raise ValueError(f"{name} is not a section of the concept source spec")
+    return name
+
+
 def failure(check: str, relation: str, column: str | None = None, **evidence: Any) -> Failure:
     return Failure(check=check, relation=relation, column=column, evidence=evidence)
 
