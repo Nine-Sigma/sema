@@ -1,0 +1,18 @@
+# A8: the role-ambiguity CSV landed by the tabular loader into schema land_a8.
+# The columns a reviewer binds; the embedding margin measurement reads it as ground truth.
+concept_source:
+  spec_version: 2
+  id: ambiguity-a8
+  identity_system: a8
+  release: "2026-10"
+  default_provider: staging
+  scheme:
+    qualified_name: a8.items
+    description: Synthetic items whose role predicates cannot choose alone
+  concepts:
+    relation: land_a8.ambiguity_a8
+    group_by: id
+    roles:
+      concept_id: id
+      name: label
+      definition: description

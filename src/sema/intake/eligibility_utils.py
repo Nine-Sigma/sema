@@ -1,8 +1,8 @@
 """Role eligibility shapes and the pure rules under them (design Decisions 6, 7, 20).
 
 Predicates read column aggregates only. Lexicon and mention matching compare whole
-normalized token sequences. The embedding rank is optional and settles nothing until
-``EMBEDDING_MARGIN_FLOOR`` is measured on a real provider.
+normalized token sequences. The embedding rank is optional and settles a role only when
+its margin reaches ``EMBEDDING_MARGIN_FLOOR``.
 """
 
 from __future__ import annotations
@@ -33,7 +33,10 @@ __all__ = [
     "normalize",
 ]
 
-EMBEDDING_MARGIN_FLOOR: float | None = None
+# Measured 2026-10-21 by scripts/measure_embedding_margin.py over A2, A3, A8, ACRIS (38 role
+# entries): one wrong top choice at 0.0893 (A2 display); correct margins 0.0274 to 0.0785.
+# Floor = ceil to 0.01 of the widest wrong margin, plus 0.01.
+EMBEDDING_MARGIN_FLOOR: float = 0.10
 EligibilitySource = Literal["code", "memory", "lexicon", "embedding", "human", "model"]
 HintSource = Literal["memory", "lexicon", "embedding"]
 # Ordinal, not calibrated: S3 calibrates confidence against the gold set.

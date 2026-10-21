@@ -81,7 +81,7 @@ A hint (a hand-written spec) pins the bindings it names as `source: human` befor
 1. One member settles it with `source: code`.
 2. Else the role map already settled in this run for the same template and relation signature settles it with `source: memory`, so identical sheets are decided once.
 3. Else the lexicon settles it when exactly one member's name matches the role's tokens whole-token, after normalization (case fold, case changes split, punctuation removed, whitespace collapsed, trailing plural `s` stripped; English only).
-4. Else the embedding rank settles it when an embedder and a margin floor are given and the margin reaches the floor. `EMBEDDING_MARGIN_FLOOR` is unset in S2, so this step runs only when a caller passes a floor.
+4. Else the embedding rank settles it when an embedder and a margin floor are given and the margin reaches the floor. `EMBEDDING_MARGIN_FLOOR` (0.10) is measured once over the A2, A3, A8, and ACRIS fixtures by `scripts/measure_embedding_margin.py`, never a held-out source, so no wrong top choice on that set settles; a caller may pass another floor, or `None` to record the rank only.
 5. Else the role stays open.
 
 A settled column leaves later roles' sets, recorded as `excluded_by`, unless the pair is in `lexicon.COINCIDING_ROLES`. Every role that had more than one member before narrowing is listed as an ambiguity, settled or not, so the review sees what the hint decided.

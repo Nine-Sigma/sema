@@ -96,10 +96,12 @@ def test_lexicon_declares_the_spec_tokens_in_a_fixed_role_order() -> None:
     assert order.index("name") < order.index("definition")
 
 
-def test_floors_are_named_and_the_embedding_floor_is_unset() -> None:
+def test_floors_are_named_and_the_embedding_floor_is_measured() -> None:
     for name in FLOORS:
         assert isinstance(getattr(lexicon(), name), int | float), name
-    assert eligibility_utils().EMBEDDING_MARGIN_FLOOR is None
+    floor = eligibility_utils().EMBEDDING_MARGIN_FLOOR
+    assert isinstance(floor, float)
+    assert 0.0 < floor < 1.0
 
 
 def test_a8_sets_before_hints(env: Env) -> None:
@@ -177,7 +179,8 @@ def test_embedding_below_the_floor_records_the_rank_without_a_choice(env: Env) -
 
 
 def test_embedding_without_a_floor_records_the_rank_only(env: Env) -> None:
-    definition = by_role(_ranked(env, embedder=clear_embedder()))["definition"]
+    found = _ranked(env, embedder=clear_embedder(), margin_floor=None)
+    definition = by_role(found)["definition"]
 
     assert _embedding(definition).margin == pytest.approx(1.0)
     assert definition.choice is None
