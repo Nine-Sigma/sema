@@ -1,0 +1,111 @@
+{
+  "concept_count": 5,
+  "vocabulary_count": 3,
+  "vocabularies": {
+    "VS_COLOR": {
+      "term_count": 4,
+      "seeded": [
+        {
+          "code": "BLUE",
+          "display": "Blue"
+        },
+        {
+          "code": "GREEN",
+          "display": "Green"
+        },
+        {
+          "code": "RED",
+          "display": "Red"
+        }
+      ],
+      "longest": [
+        {
+          "code": "GREEN",
+          "display": "Green"
+        },
+        {
+          "code": "BLUE",
+          "display": "Blue"
+        },
+        {
+          "code": "RED",
+          "display": "Red"
+        }
+      ],
+      "near_duplicates": [],
+      "null_required": [],
+      "duplicate_codes": []
+    },
+    "VS_SHAPE": {
+      "term_count": 2,
+      "seeded": [
+        {
+          "code": "ROUND",
+          "display": "Round"
+        },
+        {
+          "code": "SQUARE",
+          "display": "Square"
+        }
+      ],
+      "longest": [
+        {
+          "code": "SQUARE",
+          "display": "Square"
+        },
+        {
+          "code": "ROUND",
+          "display": "Round"
+        }
+      ],
+      "near_duplicates": [],
+      "null_required": [],
+      "duplicate_codes": []
+    },
+    "VS_SIZE": {
+      "term_count": 3,
+      "seeded": [
+        {
+          "code": "L",
+          "display": "Large"
+        },
+        {
+          "code": "M",
+          "display": "Medium"
+        },
+        {
+          "code": "S",
+          "display": "Small"
+        }
+      ],
+      "longest": [
+        {
+          "code": "M",
+          "display": "Medium"
+        },
+        {
+          "code": "L",
+          "display": "Large"
+        },
+        {
+          "code": "S",
+          "display": "Small"
+        }
+      ],
+      "near_duplicates": [],
+      "null_required": [],
+      "duplicate_codes": []
+    }
+  },
+  "root_count": 1,
+  "max_depth": 2,
+  "orphan_parents": 0,
+  "lifecycle": {
+    "active": 8,
+    "retired": 1,
+    "replaced": 1
+  },
+  "external_refs": {},
+  "entities": {},
+  "without_obligation": {}
+}
