@@ -9,6 +9,7 @@ The stages run in this order, each with its own verifier and each writing to one
 | Land | a loader, below | `verify.land.verify_land(land, tools)` |
 | Structure | `structure.run_structure(land, tools, provider=..., hint=None)` | `verify.structure.verify_structure(result, land, tools)` |
 | Roles | `eligibility.run_roles(structure, profiles, tools, hint=None, embedder=None)`, then `eligibility.assemble_spec(descriptor, roles)` | `verify.roles.verify_roles(roles, tools, spec=spec)` |
+| Enrich (optional) | `enrichment.enrich(spec, roles, tools, calls, ledger, enabled=False)`: engine stages B and C with domain layers off, written to the `enrichment` artifact; Import applies it with `enrichment.apply_enrichment(manifest, enrichment)`, filling only empty fields | none; it changes no structural decision |
 | Dry run | `binding.importer.import_concept_source`, then `report.dry_run(spec, provider, staging, ledger)` | `verify.dry_run.verify_dry_run(spec, imported, structure=..., tools=...)` |
 
 ## The generality rule
