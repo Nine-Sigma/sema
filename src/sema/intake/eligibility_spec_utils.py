@@ -40,12 +40,18 @@ from sema.intake.eligibility_text_utils import (
     VOCABULARY_ROLE,
     HeaderReading,
 )
-from sema.intake.eligibility_utils import DeclaredJoin, RoleEligibility, RunDescriptor
+from sema.intake.eligibility_utils import (
+    DeclaredJoin,
+    RoleEligibility,
+    RunDescriptor,
+    scope_of,
+)
 from sema.intake.loaders import athena, semsql_utils
 from sema.intake.shapes import (
     athena_bundle,
     concept_and_value_set,
     concept_list,
+    concept_with_values_denormalized,
     entity_model,
     filled_sections,
     level_columns,
@@ -139,6 +145,11 @@ def _stated_models(
     roles = getattr(section, "roles", None)
     if not isinstance(roles, BaseModel):
         return []
+    if binding.template == concept_with_values_denormalized.ID:
+        relation = binding.relations[0]
+        values = hint.value_sets
+        valued = [(scope_of(relation, VALUE_SETS), values.roles)] if values is not None else []
+        return [(relation, roles), *valued]
     if binding.template != concept_and_value_set.ID:
         return [(binding.relations[0], roles)]
     found: list[tuple[str, BaseModel]] = [
@@ -166,20 +177,26 @@ def _merge(parts: Sequence[Part | None]) -> Part | None:
 
 
 def roles_of(
-    relation: str, model: type[Roles], roles: RolesResult, extra: Mapping[str, Any] | None = None
+    relation: str,
+    model: type[Roles],
+    roles: RolesResult,
+    extra: Mapping[str, Any] | None = None,
+    section: str | None = None,
 ) -> Roles | None:
+    """``section`` picks one side of a relation that feeds two sections."""
+    scope = scope_of(relation, section)
     values: dict[str, Any] = {
         e.role: e.column
         for e in roles.eligibilities
-        if e.relation == relation and e.subject is None and e.column is not None
-        and e.role in model.model_fields
+        if e.relation == relation and e.section == section and e.subject is None
+        and e.column is not None and e.role in model.model_fields
     }
     if lexicon.STATUS_ROLE in values:
-        status = roles.statuses.get(relation)
+        status = roles.statuses.get(scope)
         values.pop(lexicon.STATUS_ROLE)
         values |= {lexicon.STATUS_ROLE: status} if status is not None else {}
     values |= dict(extra or {})
-    values |= {k: v for k, v in roles.stated.get(relation, {}).items() if k in model.model_fields}
+    values |= {k: v for k, v in roles.stated.get(scope, {}).items() if k in model.model_fields}
     missing = [n for n, f in model.model_fields.items() if f.is_required() and n not in values]
     if missing:
         logger.info("no spec assembled: {} has no settled {}", relation, missing)
@@ -228,6 +245,21 @@ def _concept_and_value_set(binding: SlotBinding, roles: RolesResult) -> Part | N
             relation=roles.refs[concepts], group_by=group_by, roles=concept_roles
         ),
         VALUE_SETS: ValueSetsSpec(relation=roles.refs[values], roles=value_roles),
+    }
+
+
+def _denormalized(binding: SlotBinding, roles: RolesResult) -> Part | None:
+    template = concept_with_values_denormalized
+    relation = binding.slots[template.RELATION]
+    concept_roles = roles_of(relation, ConceptRoles, roles)
+    value_roles = roles_of(relation, ValueSetRoles, roles, section=VALUE_SETS)
+    if concept_roles is None or value_roles is None:
+        return None
+    ref = roles.refs[relation]
+    group_by = binding.slots[template.GROUP_BY]
+    return {
+        CONCEPTS: ConceptsSpec(relation=ref, group_by=group_by, roles=concept_roles),
+        VALUE_SETS: ValueSetsSpec(relation=ref, roles=value_roles),
     }
 
 
@@ -302,6 +334,7 @@ def _entry(binding: SlotBinding, roles: RolesResult) -> PerFileEntry:
 BUILDERS: Mapping[str, Callable[[SlotBinding, RolesResult], Part | None]] = {
     concept_list.ID: _concept_list,
     concept_and_value_set.ID: _concept_and_value_set,
+    concept_with_values_denormalized.ID: _denormalized,
     level_columns.ID: _level_columns,
 }
 # The loader writes these relations itself, so it renders their sections; Roles binds none.

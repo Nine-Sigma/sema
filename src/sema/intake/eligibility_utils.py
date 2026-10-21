@@ -72,6 +72,7 @@ class RoleEligibility(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     relation: str
+    section: str | None = None
     role: str
     subject: str | None = None
     members: tuple[str, ...]
@@ -110,8 +111,13 @@ class StatedChoice(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
 
 
+def scope_of(relation: str, section: str | None) -> str:
+    """A relation, qualified by the section when one relation feeds two sections."""
+    return relation if section is None else f"{relation}.{section}"
+
+
 def subject_of(entry: RoleEligibility) -> str:
-    parts = (entry.relation, entry.role, entry.subject)
+    parts = (scope_of(entry.relation, entry.section), entry.role, entry.subject)
     return ".".join(part for part in parts if part is not None)
 
 

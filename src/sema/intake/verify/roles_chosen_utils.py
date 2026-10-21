@@ -17,7 +17,7 @@ from sema.intake import lexicon
 from sema.intake.eligibility import Target, role_targets
 from sema.intake.eligibility_spec_utils import VALUE_SETS, RolesResult
 from sema.intake.eligibility_text_utils import CODE_LISTS, CONCEPTS
-from sema.intake.eligibility_utils import RoleEligibility
+from sema.intake.eligibility_utils import RoleEligibility, scope_of
 from sema.intake.structure_hint_utils import KEY_ROLE, SECTION_SEPARATOR
 from sema.intake.verify.base import Failure
 from sema.intake.verify.roles_utils import BoundSection
@@ -33,19 +33,20 @@ SECTION_OF_MODEL: dict[type[BaseModel], str] = {
 
 def chosen_sections(roles: RolesResult, relations: Collection[str]) -> list[BoundSection]:
     """One section per named relation a binding gives roles to, over its chosen roles."""
-    wanted = set(relations)
+    done: set[tuple[str, str | None]] = set()
     found = []
     for entry in roles.structure.bound:
         for target in role_targets(entry.binding):
-            if target.relation in wanted and target.relation in roles.refs:
-                wanted.discard(target.relation)
+            side = (target.relation, target.section)
+            if target.relation in relations and target.relation in roles.refs and side not in done:
+                done.add(side)
                 found.append(_section(roles, target, entry.binding.section))
     return found
 
 
 def _section(roles: RolesResult, target: Target, section: str | None) -> BoundSection:
-    bound = chosen_columns(roles.eligibilities, target.relation)
-    model = _roles_model(bound, roles.statuses.get(target.relation))
+    bound = chosen_columns(roles.eligibilities, target.relation, target.section)
+    model = _roles_model(bound, roles.statuses.get(scope_of(target.relation, target.section)))
     ref, key, code = roles.refs[target.relation], bound.get(KEY_ROLE), bound.get("code")
     path = _path(target, section)
     if path == CONCEPTS:
@@ -81,11 +82,14 @@ def closed_required(roles: RolesResult) -> list[RoleEligibility]:
     ]
 
 
-def chosen_columns(eligibilities: Iterable[RoleEligibility], relation: str) -> dict[str, str]:
+def chosen_columns(
+    eligibilities: Iterable[RoleEligibility], relation: str, section: str | None = None
+) -> dict[str, str]:
     return {
         e.role: e.column
         for e in eligibilities
-        if e.relation == relation and e.subject is None and e.column is not None
+        if e.relation == relation and e.section == section and e.subject is None
+        and e.column is not None
     }
 
 

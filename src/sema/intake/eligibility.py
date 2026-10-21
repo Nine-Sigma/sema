@@ -13,21 +13,17 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from pydantic import BaseModel
-
 from sema.binding.spec import ConceptSourceSpec
-from sema.binding.spec_sections import (
-    CodeListRoles,
-    ConceptRoles,
-    EntityModelRoles,
-    StatusRole,
-    ValueSetRoles,
-)
+from sema.binding.spec_sections import StatusRole
 from sema.intake import lexicon
 from sema.intake.eligibility_spec_utils import RolesResult, assemble, stated_roles
+from sema.intake.eligibility_target_utils import (
+    Target,
+    memory_key,
+    role_targets,
+    side_profile,
+)
 from sema.intake.eligibility_text_utils import (
-    CODE_LISTS,
-    CONCEPTS,
     STAGE,
     Dictionary,
     HeaderReading,
@@ -51,34 +47,23 @@ from sema.intake.eligibility_utils import (
     eligible,
     embedding_rank,
     lexicon_hits,
+    scope_of,
     status_classes,
     subject_of,
     with_stated,
 )
 from sema.intake.profile import SAMPLE_CAP, ProfileRefusedError, ProfileTools, ValueSample
-from sema.intake.shapes import (
-    concept_and_value_set,
-    concept_list,
-    concept_with_values_denormalized,
-    entity_model,
-)
+from sema.intake.shapes import entity_model
 from sema.intake.shapes.base import RelationProfile, SlotBinding
 from sema.intake.structure import StructureResult
-from sema.intake.structure_hint_utils import KEY_ROLE, SECTION_SEPARATOR
 from sema.intake.verify.base import Ambiguity
 from sema.log import logger
 
-__all__ = ["RolesResult", "ambiguities", "assemble_spec", "compute", "run_roles"]
+__all__ = [
+    "RolesResult", "Target", "ambiguities", "assemble_spec", "compute", "role_targets", "run_roles",
+]
 
 UNRESOLVED_REFERENCE = "unresolved_reference"
-
-
-@dataclass(frozen=True)
-class Target:
-    template: str
-    relation: str
-    models: tuple[type[BaseModel], ...]
-    slotted: dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -87,6 +72,7 @@ class Hints:
     embedder: Embedder | None
     margin_floor: float | None
     choices: Mapping[str, StatedChoice]
+    tools: ProfileTools | None = None
 
 
 def compute(
@@ -97,9 +83,11 @@ def compute(
     embedder: Embedder | None = None,
     margin_floor: float | None = EMBEDDING_MARGIN_FLOOR,
     stated: Mapping[str, Mapping[str, Any]] | None = None,
+    tools: ProfileTools | None = None,
 ) -> list[RoleEligibility]:
     by_name = {profile.ref.name: profile for profile in profiles}
-    return _compute(binding, by_name, Hints(memory, embedder, margin_floor, {}), stated or {})
+    hints = Hints(memory, embedder, margin_floor, {}, tools)
+    return _compute(binding, by_name, hints, stated or {})
 
 
 def ambiguities(eligibilities: Iterable[RoleEligibility]) -> list[Ambiguity]:
@@ -137,7 +125,7 @@ def run_roles(
 ) -> RolesResult:
     """``choices`` are stated choices by ambiguity subject (model answers, decisions)."""
     by_name = {profile.ref.name: profile for profile in profiles}
-    hints = Hints(RoleMemory(), embedder, margin_floor, choices or {})
+    hints = Hints(RoleMemory(), embedder, margin_floor, choices or {}, tools)
     stated = stated_roles(hint, structure) if hint is not None else {}
     keys = hint.entity_model.header_keys if hint is not None and hint.entity_model else None
     models = [e.binding for e in structure.bound if e.binding.template == entity_model.ID]
@@ -174,42 +162,6 @@ def assemble_spec(descriptor: RunDescriptor, roles: RolesResult) -> ConceptSourc
     return assemble(descriptor, roles)
 
 
-def role_targets(binding: SlotBinding) -> list[Target]:
-    slots, template = binding.slots, binding.template
-    if template == concept_list.ID:
-        models = _section_models(binding.section)
-        return [Target(template, slots[concept_list.RELATION], models, {})]
-    if template == concept_with_values_denormalized.ID:
-        relation = slots[concept_with_values_denormalized.RELATION]
-        return [Target(template, relation, (ConceptRoles,), {})]
-    if template == concept_and_value_set.ID:
-        shape = concept_and_value_set
-        return [
-            Target(template, slots[shape.CONCEPT_RELATION], (ConceptRoles,),
-                   {KEY_ROLE: slots[shape.CONCEPT_KEY]}),
-            Target(template, slots[shape.VALUE_RELATION], (ValueSetRoles,),
-                   {KEY_ROLE: slots[shape.VALUE_KEY]}),
-        ]
-    if template != entity_model.ID:
-        return []
-    if is_dictionary_binding(binding):
-        return [Target(template, slots[entity_model.DICTIONARY], (EntityModelRoles,), {})]
-    slotted = {
-        entity_model.ENTITY: slots[entity_model.ENTITY],
-        lexicon.ENTITY_PROPERTY_ROLE: slots[entity_model.PROPERTY],
-    }
-    return [Target(template, slots[entity_model.RELATION], (EntityModelRoles,), slotted)]
-
-
-def _section_models(section: str | None) -> tuple[type[BaseModel], ...]:
-    head = (section or "").partition(SECTION_SEPARATOR)[0]
-    if head == CONCEPTS:
-        return (ConceptRoles,)
-    if head == CODE_LISTS:
-        return (CodeListRoles,)
-    return (ConceptRoles, CodeListRoles)
-
-
 def _compute(
     binding: SlotBinding,
     by_name: Mapping[str, RelationProfile],
@@ -220,14 +172,16 @@ def _compute(
     for target in role_targets(binding):
         profile = by_name.get(target.relation)
         if profile is not None:
-            found += _relation_roles(profile, target, hints, stated.get(target.relation, {}))
+            scope = scope_of(target.relation, target.section)
+            side = side_profile(profile, target, hints.tools)
+            found += _relation_roles(side, target, hints, stated.get(scope, {}))
     return found
 
 
 def _relation_roles(
     profile: RelationProfile, target: Target, hints: Hints, stated: Mapping[str, Any]
 ) -> list[RoleEligibility]:
-    key = (target.template, profile.signature)
+    key = memory_key(target, profile)
     remembered = hints.memory.recall(key) if hints.memory is not None else None
     fields = {name for model in target.models for name in model.model_fields}
     required = {
@@ -240,14 +194,18 @@ def _relation_roles(
     found = []
     for role, column in target.slotted.items():
         taken[column] = role
-        slotted = RoleEligibility(relation=profile.ref.name, role=role, members=(column,))
+        slotted = RoleEligibility(
+            relation=profile.ref.name, section=target.section, role=role, members=(column,)
+        )
         found.append(slotted.settled(column, "code"))
     for entry in lexicon.ROLES:
         if entry.name not in fields or entry.name in target.slotted:
             continue
         optional = entry.name not in required
         human = stated.get(entry.name)
-        settled = _settle(entry, profile, taken, remembered, hints, human, optional)
+        settled = _settle(
+            entry, profile, taken, remembered, hints, human, optional, target.section
+        )
         found.append(settled)
         if settled.column is not None:
             taken.setdefault(settled.column, entry.name)
@@ -264,6 +222,7 @@ def _settle(
     hints: Hints,
     stated: Any,
     optional: bool,
+    section: str | None = None,
 ) -> RoleEligibility:
     """An optional role offers ``none`` as its last member, so "no column" is answerable."""
     members = eligible(entry, profile.columns, profile.row_count)
@@ -275,6 +234,7 @@ def _settle(
     }
     base = RoleEligibility(
         relation=profile.ref.name,
+        section=section,
         role=entry.name,
         members=members,
         exclusions=excluded,
@@ -366,7 +326,8 @@ def _statuses(
         column = entry.column
         if entry.role != lexicon.STATUS_ROLE or column is None or entry.source == "human":
             continue
-        if lexicon.STATUS_ROLE in stated.get(entry.relation, {}):
+        scope = scope_of(entry.relation, entry.section)
+        if lexicon.STATUS_ROLE in stated.get(scope, {}):
             continue
         try:
             sample = tools.sample_values(by_name[entry.relation].ref, column, SAMPLE_CAP)
@@ -376,7 +337,7 @@ def _statuses(
         classes = status_classes(sample.values) if isinstance(sample, ValueSample) else None
         if classes is not None:
             active, retired = classes
-            statuses[entry.relation] = StatusRole(
+            statuses[scope] = StatusRole(
                 column=column, active_values=active, retired_values=retired
             )
     return statuses
