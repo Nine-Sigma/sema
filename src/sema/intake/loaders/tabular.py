@@ -55,6 +55,7 @@ from sema.log import logger
 LOADER = "tabular"
 LOADER_VERSION = "1"
 SUFFIXES = (".csv", ".parquet", ".xlsx")
+CSV_DELIMITERS = (",", ";", "\t", "|")
 ARROW_TYPES = {
     "VARCHAR": pa.string(),
     "BIGINT": pa.int64(),
@@ -181,15 +182,35 @@ def _csv_rows(path: Path) -> list[list[Any]]:
 
 
 def _csv_dialect(path: Path) -> tuple[str, str]:
+    """The sniffed dialect, unless its delimiter splits no row.
+
+    ``sniff_csv`` can return a delimiter absent from every row when rows differ
+    in width; the candidate whose quote-aware parse splits the most rows wins.
+    """
     with duckdb.connect(":memory:") as con:
         sniffed = con.execute(
             "SELECT Delimiter, Quote FROM sniff_csv(?)", [str(path)]
         ).fetchone()
     delimiter, quote = (str(sniffed[0]), str(sniffed[1])) if sniffed else (",", '"')
-    return (
-        delimiter if len(delimiter) == 1 else ",",
-        quote if len(quote) == 1 else '"',
-    )
+    delimiter = delimiter if len(delimiter) == 1 else ","
+    quote = quote if len(quote) == 1 else '"'
+    if _split_score(path, delimiter, quote)[0] > 0:
+        return delimiter, quote
+    candidates = dict.fromkeys((delimiter, *CSV_DELIMITERS))
+    best = max(candidates, key=lambda candidate: _split_score(path, candidate, quote))
+    if best != delimiter:
+        logger.debug(f"{path.name}: sniffed delimiter {delimiter!r} splits no row; using {best!r}")
+    return best, quote
+
+
+def _split_score(path: Path, delimiter: str, quote: str) -> tuple[int, int]:
+    """Rows split into more than one field, then the total field count."""
+    split_rows = fields = 0
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        for record in csv.reader(handle, delimiter=delimiter, quotechar=quote):
+            split_rows += len(record) > 1
+            fields += len(record)
+    return split_rows, fields
 
 
 def _rows_data(rows: list[list[Any]], label: str) -> _SheetData:

@@ -32,3 +32,13 @@ not mark the relation headerless. Structure binds it as one `concept_list`
 `header_row_valid`: DuckDB `sniff_csv` returns delimiter `|` for this ragged
 CSV and the tabular loader's `_csv_dialect` accepts it. Roles lists 1 open
 choice and assembles no spec.
+
+Post-fix (task 1.8, measured once after the tabular loader stopped accepting a
+sniffed delimiter that splits no row), recorded beside the S2 baseline in
+`tests/unit/intake/test_heldout_gate.py`: the loader splits the CSV on a
+delimiter that splits its rows, lands 1 relation with positional columns, and
+marks it headerless. The Land verdict passes. Structure ignores the relation as
+`no_header` (partition and Structure verdict pass), so 0 relations are bound
+(bound fraction 0.0), Roles lists 0 open choices, and no spec is assembled.
+Run metrics: relations 1, ignored `{no_header: 1}`, bound 0, open structure 0,
+open roles 0, proposals 0/0, model calls 0, tokens 0, cost 0.0, value asks 0.

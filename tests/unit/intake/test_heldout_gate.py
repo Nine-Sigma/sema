@@ -38,6 +38,49 @@ HELDOUT2 = HELDOUT.parent / "heldout2"
 
 
 @dataclass(frozen=True)
+class LandBaseline:
+    status: str
+    failed_checks: tuple[str, ...]
+    data_columns: int
+    headerless: bool
+
+
+# Recorded when the second held-out source was sealed (5469dcb), before task 1.8 fixed
+# the CSV delimiter choice; kept as data so the post-fix run is read beside it.
+HELDOUT2_S2_BASELINE_METRICS = RunMetrics(
+    relations=1,
+    ignored={},
+    bound=1,
+    bound_fraction=1.0,
+    open_structure=0,
+    open_roles=1,
+    proposals_made=0,
+    proposals_bound=0,
+    model_calls=0,
+    tokens=0,
+    cost=0.0,
+    value_asks=0,
+)
+HELDOUT2_S2_BASELINE_LAND = LandBaseline(
+    status="fail", failed_checks=("header_row_valid",), data_columns=1, headerless=False
+)
+HELDOUT2_POST_FIX_METRICS = RunMetrics(
+    relations=1,
+    ignored={"no_header": 1},
+    bound=0,
+    bound_fraction=0.0,
+    open_structure=0,
+    open_roles=0,
+    proposals_made=0,
+    proposals_bound=0,
+    model_calls=0,
+    tokens=0,
+    cost=0.0,
+    value_asks=0,
+)
+
+
+@dataclass(frozen=True)
 class HeldOut:
     directory: Path
     schema: str
@@ -101,23 +144,20 @@ def test_every_relation_is_accounted_for_exactly_once(gate: StageRun) -> None:
     assert partition_failures(gate.landed, gate.structure) == []
 
 
-@pytest.mark.parametrize("gate", ["heldout"], indirect=True)
 def test_land_verdict_passes(gate: StageRun) -> None:
     assert gate.land_verdict.status == "pass", describe(gate.land_verdict)
 
 
 @pytest.mark.parametrize("gate", ["heldout2"], indirect=True)
-def test_s2_baseline_land_verdict_of_the_second_held_out_source(gate: StageRun) -> None:
-    """Recorded S2 baseline: the ragged CSV lands as one column named by its first line."""
+def test_the_ragged_csv_of_the_second_held_out_source_lands_headerless(
+    gate: StageRun,
+) -> None:
     (relation,) = gate.landed.land.relations
     data_columns = [name for name, _ in relation.columns if not name.startswith("_sema_")]
 
-    assert gate.land_verdict.status == "fail"
-    assert [(f.check, f.relation) for f in gate.land_verdict.failures] == [
-        ("header_row_valid", gate.landed.qualified(relation.name))
-    ]
-    assert data_columns == [gate.land_verdict.failures[0].column]
-    assert gate.landed.land.headerless == ()
+    assert gate.landed.land.headerless == (relation.name,)
+    assert relation.header_row is None
+    assert len(data_columns) > HELDOUT2_S2_BASELINE_LAND.data_columns
 
 
 def test_structure_verdict_passes(gate: StageRun) -> None:
@@ -178,15 +218,6 @@ def test_s2_baseline_metrics(gate: StageRun) -> None:
 
 
 @pytest.mark.parametrize("gate", ["heldout2"], indirect=True)
-def test_s2_baseline_metrics_of_the_second_held_out_source(gate: StageRun) -> None:
-    """Recorded S2 baseline with no model, measured once when the source was sealed."""
-    written = _read_metrics(gate)
-
-    assert written.relations == 1
-    assert written.bound == 1
-    assert written.bound_fraction == pytest.approx(1.0)
-    assert written.ignored == {}
-    assert (written.open_structure, written.open_roles) == (0, 1)
-    assert (written.proposals_made, written.proposals_bound) == (0, 0)
-    assert (written.model_calls, written.tokens, written.cost) == (0, 0, 0.0)
-    assert written.value_asks == 0
+def test_post_fix_metrics_of_the_second_held_out_source(gate: StageRun) -> None:
+    """Measured once after task 1.8, beside the recorded S2 baseline (SOURCE.md)."""
+    assert _read_metrics(gate) == HELDOUT2_POST_FIX_METRICS
