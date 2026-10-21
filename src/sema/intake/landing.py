@@ -18,7 +18,7 @@ LOCATOR_COLUMN = "_sema_locator"
 LOCATOR_ROW_SEPARATOR = "!"
 SHEET_SEPARATOR = "__"
 
-Medium = Literal["tabular", "semsql", "dictionary", "athena", "warehouse"]
+Medium = Literal["tabular", "semsql", "dictionary", "athena", "database", "warehouse"]
 LocatorKind = Literal["row", "relation"]
 Columns = tuple[tuple[str, str], ...]
 
