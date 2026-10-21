@@ -30,6 +30,22 @@ def _loader_fixed_namespace(memory: Memory) -> Source:
     return memory("ath", *empty, extra)
 
 
+def _loader_fixed_namespace_with_a_value_set(memory: Memory) -> Source:
+    from sema.intake.loaders.athena import REQUIRED_TABLES
+
+    empty = [f"CREATE TABLE fix.{name} (c VARCHAR)" for name in REQUIRED_TABLES]
+    topics = (
+        "CREATE TABLE fix.topic AS SELECT * FROM (VALUES ('T1', 'First topic'),"
+        " ('T2', 'Second topic'), ('T3', 'Third topic')) t(code, label)"
+    )
+    members = (
+        "CREATE TABLE fix.member AS SELECT * FROM (VALUES ('T1', 'M1', 'One'),"
+        " ('T1', 'M2', 'Two'), ('T2', 'M1', 'One'), ('T2', 'M3', 'Three'),"
+        " ('T3', 'M2', 'Two'), ('T3', 'M4', 'Four')) t(topic, item, item_label)"
+    )
+    return memory("fix", *empty, topics, members)
+
+
 def _a2_claim(a2: Source) -> object:
     pairs = candidates("concept_and_value_set", a2.profiles(), a2)
     return next(
@@ -137,4 +153,21 @@ def test_a_loader_fixed_binding_claims_every_relation_of_its_group(memory: Memor
     result = shapes().apply_precedence(every_template_candidates(group, source))
 
     assert [b.template for b in result.candidates] == ["athena_bundle"]
+    assert result.ambiguities == ()
+
+
+def test_a_loader_fixed_claim_removes_its_namespace_from_other_multi_relation_claims(
+    memory: Memory,
+) -> None:
+    source = _loader_fixed_namespace_with_a_value_set(memory)
+    group = source.profiles()
+    topics, members = source.ref("topic"), source.ref("member")
+    (fixed,) = candidates("athena_bundle", group, source)
+    assert {topics, members} <= set(fixed.relations)
+    pairs = candidates("concept_and_value_set", group, source)
+    assert any(set(b.relations) == {topics, members} for b in pairs)
+
+    result = shapes().apply_precedence(every_template_candidates(group, source))
+
+    assert result.candidates == (fixed,)
     assert result.ambiguities == ()

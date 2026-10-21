@@ -1,6 +1,7 @@
 """edge_list_hierarchy: concept ids with a resolving parent column or edge relation, acyclic.
 
-A parent column keeps the binding on the concept relation; an edge relation spans two.
+A parent column keeps the binding on the concept relation; an edge relation spans two and
+holds exactly two columns that resolve into the ids, because a third makes it a level table.
 """
 
 from __future__ import annotations
@@ -8,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from itertools import permutations
 
-from sema.binding.spec_sections import RelationRef
+from sema.binding.spec_sections import ParentColumnHierarchy, RelationRef
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR, RelationProfile, SlotBinding, is_id
@@ -16,6 +17,7 @@ from sema.intake.shapes.base_utils import (
     JOIN_FLOOR,
     failure,
     may_resolve,
+    section_of,
     slot_columns,
     slot_relations,
     verdict,
@@ -23,8 +25,10 @@ from sema.intake.shapes.base_utils import (
 from sema.intake.verify.base import Failure, Verdict
 
 ID = "edge_list_hierarchy"
+SECTION = section_of(ParentColumnHierarchy)
 CONCEPT_RELATION, IDENTIFIER, PARENT = "concept_relation", "id", "parent"
 EDGE_RELATION, CHILD = "edge_relation", "child"
+EDGE_LINK_COUNT = 2
 Checked = tuple[list[Failure], dict[str, float | str]]
 
 
@@ -55,6 +59,7 @@ def verify(
     if not is_id(concepts, key):
         failures.append(failure("id_is_unique", concepts.ref.name, key.name))
     if edge_form:
+        failures += _link_count_failures(concepts, key, edges, tools)
         failures += _edge_check(concepts, key, edges, links[0], links[1], tools)[0]
     else:
         failures += _parent_check(concepts, key, links[0], tools)[0]
@@ -78,11 +83,9 @@ def _parent_bindings(
 def _edge_bindings(
     concepts: RelationProfile, key: ColumnProfile, edges: RelationProfile, tools: ProfileTools
 ) -> list[SlotBinding]:
-    resolving = [
-        column
-        for column in edges.columns
-        if may_resolve(column, key) and not _resolve_failures(edges, column, concepts, key, tools)
-    ]
+    resolving = _links(concepts, key, edges, tools)
+    if len(resolving) != EDGE_LINK_COUNT:
+        return []
     found = []
     for child, parent in permutations(resolving, 2):
         failures, evidence = _acyclic(edges.ref, child.name, parent.name, tools)
@@ -91,6 +94,25 @@ def _edge_bindings(
             slots |= {EDGE_RELATION: edges.ref.name, CHILD: child.name, PARENT: parent.name}
             found.append(_binding(slots, evidence, concepts, edges))
     return found
+
+
+def _links(
+    concepts: RelationProfile, key: ColumnProfile, edges: RelationProfile, tools: ProfileTools
+) -> list[ColumnProfile]:
+    return [
+        column
+        for column in edges.columns
+        if may_resolve(column, key) and not _resolve_failures(edges, column, concepts, key, tools)
+    ]
+
+
+def _link_count_failures(
+    concepts: RelationProfile, key: ColumnProfile, edges: RelationProfile, tools: ProfileTools
+) -> list[Failure]:
+    count = len(_links(concepts, key, edges, tools))
+    if count == EDGE_LINK_COUNT:
+        return []
+    return [failure("edge_link_count", edges.ref.name, link_count=count)]
 
 
 def _parent_check(

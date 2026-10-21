@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from sema.binding.spec import EntityModelSpec
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import (
@@ -24,6 +25,7 @@ from sema.intake.shapes.base import (
 from sema.intake.shapes.base_utils import (
     ID_FLOOR,
     failure,
+    section_of,
     slot_columns,
     slot_relations,
     verdict,
@@ -31,6 +33,7 @@ from sema.intake.shapes.base_utils import (
 from sema.intake.verify.base import Failure, FloorValue, Verdict
 
 ID = "entity_model"
+SECTION = section_of(EntityModelSpec)
 LAYOUT, PER_FILE, SINGLE_RELATION = "layout", "per_file", "single_relation"
 DICTIONARY, HEADER = "dictionary", "header"
 RELATION, ENTITY, PROPERTY = "relation", "entity", "property"

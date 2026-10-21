@@ -9,13 +9,15 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from sema.binding.spec_sections import LevelColumnsHierarchy
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import RelationProfile, SlotBinding
-from sema.intake.shapes.base_utils import failure, slot_relations, verdict
+from sema.intake.shapes.base_utils import failure, section_of, slot_relations, verdict
 from sema.intake.verify.base import Failure, Verdict
 
 ID = "level_columns"
+SECTION = section_of(LevelColumnsHierarchy)
 RELATION, LEVEL = "relation", "level_"
 MIN_LEVELS = 2
 

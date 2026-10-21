@@ -1,9 +1,11 @@
 """Candidate precedence (Decision 17): multi-relation bindings claim their relations.
 
 A loader-fixed binding spans its whole namespace, so it claims every relation the loader
-landed. A claimed relation leaves the single-relation candidate sets. A relation stays ambiguous when
-two claims include it, or when it is unclaimed and holds more than one single-relation
-binding. Nothing here reads a name or prefers a template by identity.
+landed, and those relations leave every other template's candidate set first: a loader that
+fixes the relation names has already decided the shape. A claimed relation leaves the
+single-relation candidate sets. A relation stays ambiguous when two claims include it, or
+when it is unclaimed and holds more than one single-relation binding. Nothing here reads a
+name or prefers a template by identity.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ MULTI_RELATION = frozenset(
         athena_bundle.ID,
     }
 )
+LOADER_FIXED = frozenset({semsql.ID, athena_bundle.ID})
 STAGE = "structure"
 
 
@@ -44,6 +47,7 @@ def claims(binding: SlotBinding) -> bool:
 
 
 def apply_precedence(bindings: Sequence[SlotBinding]) -> Precedence:
+    bindings = _without_loader_fixed_relations(bindings)
     claiming = [b for b in bindings if claims(b)]
     claimed = _by_relation(claiming)
     single = [b for b in bindings if not claims(b) and not set(b.relations) & claimed.keys()]
@@ -60,6 +64,11 @@ def apply_precedence(bindings: Sequence[SlotBinding]) -> Precedence:
 def member(binding: SlotBinding) -> str:
     slots = ", ".join(f"{slot}={value}" for slot, value in sorted(binding.slots.items()))
     return f"{binding.template}({slots})"
+
+
+def _without_loader_fixed_relations(bindings: Sequence[SlotBinding]) -> list[SlotBinding]:
+    fixed = {r for b in bindings if b.template in LOADER_FIXED for r in b.relations}
+    return [b for b in bindings if b.template in LOADER_FIXED or not set(b.relations) & fixed]
 
 
 def _by_relation(bindings: Sequence[SlotBinding]) -> dict[str, list[SlotBinding]]:

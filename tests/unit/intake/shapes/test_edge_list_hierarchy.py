@@ -4,11 +4,34 @@ from __future__ import annotations
 
 import pytest
 
-from tests.unit.intake.shapes.shapes_env import Source, base, binding, candidates, over, verify
+from tests.unit.intake.shapes.shapes_env import (
+    Memory,
+    Source,
+    base,
+    binding,
+    candidates,
+    over,
+    verify,
+)
 
 pytestmark = pytest.mark.unit
 
 ID = "edge_list_hierarchy"
+NODES = (
+    "CREATE TABLE {schema}.nodes AS SELECT * FROM (VALUES ('A', 'Alpha'), ('B', 'Bravo'),"
+    " ('C', 'Charlie'), ('D', 'Delta'), ('E', 'Echo'), ('F', 'Foxtrot')) t(id, label)"
+)
+# Three columns that each resolve into the node ids: a level table, not an edge list.
+LEVELS = (
+    "CREATE TABLE lv.levels AS SELECT * FROM (VALUES ('A', 'B', 'C'), ('A', 'B', 'D'),"
+    " ('A', 'E', 'F')) t(top, mid, leaf)"
+)
+# Two columns that resolve into the node ids beside one that does not.
+PAIRS = (
+    "CREATE TABLE pr.pairs AS SELECT * FROM (VALUES ('B', 'A', 'seen once'),"
+    " ('C', 'B', 'seen twice'), ('D', 'B', 'seen once'), ('E', 'A', 'seen twice'),"
+    " ('F', 'E', 'seen once')) t(child, parent, note)"
+)
 
 
 def _with_slots(bindings: list[object], **slots: str) -> list[object]:
@@ -70,3 +93,35 @@ def test_templates_read_no_value_while_checking_hierarchies(v2: Source, cycle: S
     candidates(ID, cycle.profiles(), cycle)
 
     assert v2.value_bearing() == [] and cycle.value_bearing() == []
+
+
+def _edge_bindings(source: Source, edges: str) -> list[object]:
+    return _with_slots(candidates(ID, source.profiles(), source), edge_relation=edges)
+
+
+def test_three_link_relation_is_not_an_edge_relation(memory: Memory) -> None:
+    source = memory("lv", NODES.format(schema="lv"), LEVELS)
+
+    assert _edge_bindings(source, source.ref("levels")) == []
+
+
+def test_verify_of_a_forced_edge_binding_over_three_link_columns_fails(memory: Memory) -> None:
+    source = memory("lv", NODES.format(schema="lv"), LEVELS)
+    nodes, levels = source.ref("nodes"), source.ref("levels")
+    slots = {"concept_relation": nodes, "id": "id", "edge_relation": levels}
+    forced = binding(ID, (nodes, levels), **slots, child="mid", parent="top")
+
+    assert verify(ID, forced, source.profiles(), source).status == "fail"
+
+
+def test_two_link_relation_with_a_non_resolving_column_is_an_edge_relation(
+    memory: Memory,
+) -> None:
+    source = memory("pr", NODES.format(schema="pr"), PAIRS)
+    nodes, pairs = source.ref("nodes"), source.ref("pairs")
+
+    found = _with_slots(_edge_bindings(source, pairs), child="child", parent="parent")
+
+    (only,) = found
+    assert only.relations == (nodes, pairs)
+    assert only.slots["concept_relation"] == nodes and only.slots["id"] == "id"

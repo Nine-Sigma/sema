@@ -8,13 +8,21 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from sema.binding.spec_sections import PathCodesHierarchy
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import RelationProfile, SlotBinding, is_id, is_text
-from sema.intake.shapes.base_utils import failure, slot_columns, slot_relations, verdict
+from sema.intake.shapes.base_utils import (
+    failure,
+    section_of,
+    slot_columns,
+    slot_relations,
+    verdict,
+)
 from sema.intake.verify.base import Failure, Verdict
 
 ID = "path_codes"
+SECTION = section_of(PathCodesHierarchy)
 RELATION, CODE, SEPARATOR = "relation", "code", "separator"
 SEPARATORS = (".", "/", "-", ":", "|", ">")
 Checked = tuple[list[Failure], dict[str, float | str]]

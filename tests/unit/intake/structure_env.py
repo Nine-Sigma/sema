@@ -43,16 +43,10 @@ GROUPED_CODE_TABLE = "Document_Control_Codes"
 # Remarks resolve 1.0 both ways, Master 0.79/0.65 and References 0.44/0.67 do not.
 TWIN_SUBJECTS = ("Legals", "Parties", "Remarks")
 A2_SHAPE = [("concepts", "concept_and_value_set"), ("hierarchy", "level_columns")]
-A2_SHAPE_CONTESTED = (
-    "the six steps as written leave A2 ambiguous: edge_list_hierarchy has six edge-relation"
-    " bindings over Concepts with Hierarchy as the edge relation (each of l1, l2, l3 resolves"
-    " into Concepts.concept_code at 1.0 and every child/parent permutation is acyclic), each a"
-    " multi-relation claim on Concepts and Hierarchy; Concepts is then claimed by both"
-    " concept_and_value_set and edge_list_hierarchy, Hierarchy by six edge_list_hierarchy"
-    " bindings, so level_columns is dropped as a single-relation candidate over a claimed"
-    " relation and precedence may not prefer a template by identity; no code-bound shape"
-    " [concepts/concept_and_value_set, hierarchy/level_columns] follows without a hint"
-)
+A2_BOUND = {
+    "concept_and_value_set": {"codes_a2__Concepts", "codes_a2__Values"},
+    "level_columns": {"codes_a2__Hierarchy"},
+}
 # Dotted codes beside labels: eligible for concept_list and for path_codes, nothing else.
 OUTLINE_SQL = (
     "CREATE SCHEMA tw",
@@ -114,6 +108,14 @@ def namespace(source: Source) -> set[str]:
 
 def bound_relations(result: Any) -> list[str]:
     return [name for entry in result.bound for name in entry.binding.relations]
+
+
+def bound_by_template(result: Any) -> dict[str, set[str]]:
+    found: dict[str, set[str]] = {}
+    for entry in result.bound:
+        names = {name.rpartition(".")[2] for name in entry.binding.relations}
+        found.setdefault(entry.binding.template, set()).update(names)
+    return found
 
 
 def ignored_relations(result: Any) -> list[str]:

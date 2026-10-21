@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from itertools import product
 
+from sema.binding.spec_sections import ConceptsSpec
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR, RelationProfile, SlotBinding, is_id
@@ -17,6 +18,7 @@ from sema.intake.shapes.base_utils import (
     failure,
     may_resolve,
     nonnull_rows,
+    section_of,
     slot_columns,
     slot_relations,
     verdict,
@@ -24,6 +26,7 @@ from sema.intake.shapes.base_utils import (
 from sema.intake.verify.base import Failure, Verdict
 
 ID = "concept_and_value_set"
+SECTION = section_of(ConceptsSpec)
 CONCEPT_RELATION, VALUE_RELATION = "concept_relation", "value_relation"
 CONCEPT_KEY, VALUE_KEY = "concept_key", "value_key"
 ONE_TO_MANY = "one_to_many"

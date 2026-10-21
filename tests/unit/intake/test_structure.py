@@ -25,8 +25,8 @@ from sema.intake.shapes.base import (
 )
 from tests.unit.intake.shapes.shapes_env import Source, warehouse_source
 from tests.unit.intake.structure_env import (
+    A2_BOUND,
     A2_SHAPE,
-    A2_SHAPE_CONTESTED,
     A2_WORKBOOK,
     A3_DB,
     ACRIS,
@@ -39,6 +39,7 @@ from tests.unit.intake.structure_env import (
     TWIN_SUBJECTS,
     assert_partition,
     a2_hint,
+    bound_by_template,
     bound_relations,
     copy_code_tables,
     entries,
@@ -352,9 +353,9 @@ def test_a2_hint_pins_its_templates_as_human(a2: Source, tmp_path: Path) -> None
     assert_partition(a2, result)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=A2_SHAPE_CONTESTED)
 def test_a2_shape_is_code_bound_with_confidence_one(a2_result: Result) -> None:
     assert a2_result().ambiguities == ()
+    assert bound_by_template(a2_result()) == A2_BOUND
     assert {(entry.confidence, entry.source) for entry in a2_result().bound} == {(1.0, "code")}
     assert [(e.section, e.template) for e in a2_result().to_shape()] == A2_SHAPE
 

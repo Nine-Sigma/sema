@@ -52,7 +52,7 @@ def group_candidates(group: Profiles, tools: ProfileTools) -> list[SlotBinding]:
     if not group:
         return []
     return [
-        binding
+        binding.model_copy(update={"section": getattr(template, "SECTION", None)})
         for template in TEMPLATES
         if template.ID != ignore.ID
         for binding in template.candidates(group, tools)

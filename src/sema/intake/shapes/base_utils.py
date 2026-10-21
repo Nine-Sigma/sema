@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, get_args
 
+from sema.binding.spec import ConceptSourceSpec
 from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import (
     ID_DISTINCT_RATIO_FLOOR,
@@ -23,6 +24,15 @@ SIGNATURE_FLOORS: dict[str, FloorValue] = {
 }
 IN_GROUP = "in_group"
 COLUMN_EXISTS = "column_exists"
+
+
+def section_of(model: type) -> str:
+    """The spec section whose field holds ``model``, so no template spells a section name."""
+    return next(
+        name
+        for name, field in ConceptSourceSpec.model_fields.items()
+        if model is field.annotation or model in get_args(field.annotation)
+    )
 
 
 def failure(check: str, relation: str, column: str | None = None, **evidence: Any) -> Failure:
