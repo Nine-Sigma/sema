@@ -18,6 +18,8 @@ from sema.targets.hashing_utils import canonical_dumps
 
 
 _DESCRIPTOR_NON_SCHEMA_FIELDS: tuple[str, ...] = ("display_name", "owner")
+# Omitted when empty so targets that declare none keep their pre-existing digest.
+_ENTITY_OPTIONAL_LIST_FIELDS: tuple[str, ...] = ("declared_joins", "declared_domains")
 
 
 def _project_descriptor(descriptor: BaseModel) -> dict[str, object]:
@@ -27,10 +29,18 @@ def _project_descriptor(descriptor: BaseModel) -> dict[str, object]:
     return raw
 
 
+def _project_entity(entity: BaseModel) -> dict[str, object]:
+    raw = entity.model_dump(mode="json")
+    for field in _ENTITY_OPTIONAL_LIST_FIELDS:
+        if not raw.get(field):
+            raw.pop(field, None)
+    return raw
+
+
 def _project_schema_bearing(model: NormalizedTargetModel) -> dict[str, object]:
     return {
         "descriptor": _project_descriptor(model.descriptor),
-        "entities": [e.model_dump(mode="json") for e in model.entities],
+        "entities": [_project_entity(e) for e in model.entities],
         "obligations": [o.model_dump(mode="json") for o in model.obligations],
         "vocabularies": [v.model_dump(mode="json") for v in model.vocabularies],
         "vocabulary_bindings": [

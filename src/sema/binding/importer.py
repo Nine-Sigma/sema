@@ -13,7 +13,12 @@ from typing import Any
 
 import yaml
 
-from sema.binding.importer_entity_utils import entity_records, entity_table_schemas
+from sema.binding.identifier_utils import card_version
+from sema.binding.importer_entity_utils import (
+    EntityTables,
+    entity_records,
+    entity_table_schemas,
+)
 from sema.binding.importer_evidence_utils import column_bindings, value_mappings
 from sema.binding.importer_relationships_utils import hierarchy_rows, relationship_rows
 from sema.binding.importer_terms_utils import (
@@ -85,8 +90,10 @@ def import_concept_source(
     if spec.value_sets:
         _value_sets(spec, spec.value_sets, provider, collected, staging)
     code_lists(spec, provider, collected, staging)
-    schemas = (
-        entity_table_schemas(spec, spec.entity_model, provider) if spec.entity_model else {}
+    tables = (
+        entity_table_schemas(spec, spec.entity_model, provider)
+        if spec.entity_model
+        else EntityTables()
     )
     loaded = _loaded_refs(spec, collected)
     mappings = _apply_mappings(spec, provider, collected, loaded)
@@ -100,7 +107,7 @@ def import_concept_source(
         "vocabularies": collected.vocabularies,
         "terms": collected.terms,
         "entities": _scheme_entities(spec, list(collected.properties.values()))
-        + entity_records(spec, schemas),
+        + entity_records(spec, tables),
         "relationships": _relationship_rows(spec, provider, loaded),
     }
     authored = _authored(spec, provider, dataset_map, mappings, collected)
@@ -109,7 +116,9 @@ def import_concept_source(
     elif staging is not None and spec.spec_version >= 2:
         clear_term_staging(staging, spec.external_namespace)
     _log_summary(spec, collected, manifest)
-    return ConceptImport(manifest=manifest, authored=authored, table_schemas=schemas)
+    return ConceptImport(
+        manifest=manifest, authored=authored, table_schemas=tables.schemas
+    )
 
 
 def write_import(
@@ -217,7 +226,7 @@ def _scheme_entities(spec: ConceptSourceSpec, properties: list[Record]) -> list[
             "kind": CONCEPT_SCHEME_KIND,
             "properties": properties,
             "context_card": {
-                "card_version": spec.release,
+                "card_version": card_version(spec.release),
                 "description": spec.scheme.description,
             },
         }

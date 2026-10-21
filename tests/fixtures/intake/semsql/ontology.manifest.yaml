@@ -320,7 +320,7 @@ entities:
     vocabulary_binding:
       vocabulary: VS_http://example.org/ex.owl
   context_card:
-    card_version: '2026-10-01'
+    card_version: 2026.10.01
     description: Example ontology landed through semantic-sql
 relationships:
 - from:

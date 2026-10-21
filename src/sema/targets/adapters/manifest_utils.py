@@ -19,6 +19,7 @@ from sema.models.target.completeness import (
     SemanticCompletenessAnnotations,
 )
 from sema.models.target.context_card import TargetContextCard
+from sema.models.target.declared import DeclaredDomainDecl, DeclaredJoinDecl
 from sema.models.target.endpoints import EdgeEndpointDecl, EdgeEndpointsDecl
 from sema.models.target.entity import TargetEntityDecl
 from sema.models.target.obligation import TargetObligationDecl
@@ -186,6 +187,10 @@ def to_target_entity(
         properties=[to_target_property(p) for p in entity.properties],
         completeness=completeness,
         endpoints=to_endpoints_decl(parsed, entity, target_model_id),
+        declared_joins=[DeclaredJoinDecl(**join.model_dump()) for join in entity.joins],
+        declared_domains=[
+            DeclaredDomainDecl(**domain.model_dump()) for domain in entity.domains
+        ],
     )
 
 

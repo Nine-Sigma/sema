@@ -11,6 +11,7 @@ from sema.models.planner._enums import (
     TargetArtifactKind,
 )
 from sema.models.target.completeness import SemanticCompletenessAnnotations
+from sema.models.target.declared import DeclarationEvidence
 from sema.models.target.refs import ConceptRef, ExternalRef, VocabularySource
 
 
@@ -89,6 +90,22 @@ class ManifestDomainConstraint(BaseModel):
     domain_id: str = Field(min_length=1)
 
 
+class ManifestDeclaredJoin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    referenced_entity: str = Field(min_length=1)
+    join_keys: list[tuple[str, str]] = Field(min_length=1)
+    evidence: DeclarationEvidence
+
+
+class ManifestDeclaredDomain(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    property_name: str = Field(min_length=1)
+    domain_id: str = Field(min_length=1)
+    evidence: DeclarationEvidence
+
+
 class ManifestRowClause(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -144,6 +161,8 @@ class ManifestEntity(BaseModel):
     endpoints: ManifestEndpoints | None = None
     properties: list[ManifestProperty] = Field(default_factory=list)
     obligation: ManifestObligation | None = None
+    joins: list[ManifestDeclaredJoin] = Field(default_factory=list)
+    domains: list[ManifestDeclaredDomain] = Field(default_factory=list)
     context_card: ManifestContextCard | None = None
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ FIXTURES = Path(__file__).parents[2] / "fixtures" / "intake"
 ACRIS = FIXTURES / "acris"
 SPEC = ACRIS / "acris.spec.yaml"
 RUN = ACRIS / "acris.run.yaml"
+QUALIFIED_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$")
 JSON_SCHEMA = json.loads((FIXTURES / "frictionless" / "table-schema.json").read_text())
 SCHEMA = "land_acris"
 ENTITIES = 15
@@ -34,38 +36,38 @@ TERMS = {
     "UCC_Collateral_Codes": 8,
 }
 JOIN_COLUMNS = ["Document ID", "Good Through Date"]
-REAL_MASTER = "ACRIS - Real Property Master"
-PERSONAL_MASTER = "ACRIS - Personal Property Master"
+REAL_MASTER = "acris_real_property_master"
+PERSONAL_MASTER = "acris_personal_property_master"
 FOREIGN_KEYS = {
-    ("ACRIS - Real Property Legals", REAL_MASTER),
-    ("ACRIS - Real Property Parties", REAL_MASTER),
-    ("ACRIS - Real Property Remarks", REAL_MASTER),
-    ("ACRIS - Real Property References", REAL_MASTER),
-    ("ACRIS - Personal Property Legals", PERSONAL_MASTER),
-    ("ACRIS - Personal Property Parties", PERSONAL_MASTER),
-    ("ACRIS - Personal Property Remarks", PERSONAL_MASTER),
-    ("ACRIS - Personal Property References", PERSONAL_MASTER),
+    ("acris_real_property_legals", REAL_MASTER),
+    ("acris_real_property_parties", REAL_MASTER),
+    ("acris_real_property_remarks", REAL_MASTER),
+    ("acris_real_property_references", REAL_MASTER),
+    ("acris_personal_property_legals", PERSONAL_MASTER),
+    ("acris_personal_property_parties", PERSONAL_MASTER),
+    ("acris_personal_property_remarks", PERSONAL_MASTER),
+    ("acris_personal_property_references", PERSONAL_MASTER),
 }
 DOMAINS = {
-    ("ACRIS - Real Property Legals", "Property Type", "Property_Types_Codes"),
-    ("ACRIS - Personal Property Legals", "Property Type", "Property_Types_Codes"),
-    ("ACRIS - Real Property Master", "Docoument Type", "Document_Control_Codes"),
-    ("ACRIS - Personal Property Master", "Docoument Type", "Document_Control_Codes"),
-    ("ACRIS - Personal Property Master", "UCC Collateral", "UCC_Collateral_Codes"),
-    ("ACRIS - Real Property Parties", "Country", "Country_Codes"),
-    ("ACRIS - Personal Property Parties", "Country", "Country_Codes"),
-    ("ACRIS - Real Property Parties", "State", "State_Codes"),
-    ("ACRIS - Personal Property Parties", "State", "State_Codes"),
+    ("acris_real_property_legals", "Property Type", "Property_Types_Codes"),
+    ("acris_personal_property_legals", "Property Type", "Property_Types_Codes"),
+    ("acris_real_property_master", "Docoument Type", "Document_Control_Codes"),
+    ("acris_personal_property_master", "Docoument Type", "Document_Control_Codes"),
+    ("acris_personal_property_master", "UCC Collateral", "UCC_Collateral_Codes"),
+    ("acris_real_property_parties", "Country", "Country_Codes"),
+    ("acris_personal_property_parties", "Country", "Country_Codes"),
+    ("acris_real_property_parties", "State", "State_Codes"),
+    ("acris_personal_property_parties", "State", "State_Codes"),
 }
 BOROUGHS = {"1": "Manhattan", "2": "Bronx", "3": "Brooklyn", "4": "Queens"}
 LOTS = {"P": "partial", "E": "entire"}
 INLINE_VALUES = {
     (REAL_MASTER, "Recorded Borough"): BOROUGHS,
-    ("ACRIS - Real Property Legals", "Borough"): BOROUGHS,
-    ("ACRIS - Real Property Legals", "Partial Lot"): LOTS,
+    ("acris_real_property_legals", "Borough"): BOROUGHS,
+    ("acris_real_property_legals", "Partial Lot"): LOTS,
     (PERSONAL_MASTER, "Recorded Borough"): BOROUGHS,
-    ("ACRIS - Personal Property Legals", "Borough"): BOROUGHS,
-    ("ACRIS - Personal Property Legals", "Partial Lot"): LOTS,
+    ("acris_personal_property_legals", "Borough"): BOROUGHS,
+    ("acris_personal_property_legals", "Partial Lot"): LOTS,
 }
 LEGALS_DESCRIPTION = (
     "The properties under which real property documents recorded in ACRIS are indexed."
@@ -156,7 +158,10 @@ def test_fifteen_entities_named_from_their_headers(imported: _Imported) -> None:
 
     assert len(entities) == ENTITIES
     names = {e["qualified_name"] for e in entities}
-    assert names == {f"acris.{name}" for name in _dataset_names(imported.landed)}
+    assert len(names) == ENTITIES
+    assert all(QUALIFIED_NAME.match(name) for name in names)
+    labels = {label for e in entities for label in e["context_card"]["curated_synonyms"]}
+    assert labels == _dataset_names(imported.landed)
     kinds = {e["kind"] for e in imported.result.manifest["entities"]}
     assert kinds == {"TABLE_ROW"}
 
@@ -170,8 +175,9 @@ def test_entities_hold_125_properties(imported: _Imported) -> None:
 def test_header_description_reaches_the_context_card(imported: _Imported) -> None:
     entities = {e["qualified_name"]: e for e in _table_rows(imported.result)}
 
-    card = entities["acris.ACRIS - Real Property Legals"]["context_card"]
+    card = entities["acris.acris_real_property_legals"]["context_card"]
     assert card["description"] == LEGALS_DESCRIPTION
+    assert card["curated_synonyms"] == ["ACRIS - Real Property Legals"]
 
 
 def test_five_vocabularies_with_their_term_counts(imported: _Imported) -> None:

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
+from sema.binding.identifier_utils import card_version, entity_identifier
 from sema.binding.importer_utils import (
     Record,
     as_text,
@@ -33,6 +34,7 @@ from sema.intake.table_schema_utils import (
 from sema.log import logger
 
 HeaderPair = tuple[str, str | None]
+SourceNames = dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -43,36 +45,43 @@ class Header:
     prose: dict[str, str | None]
 
 
+@dataclass(frozen=True)
+class EntityTables:
+    """Keyed by qualified name; ``labels`` holds the source name of each converted one."""
+
+    schemas: dict[str, TableSchema] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
+
+
 def entity_table_schemas(
     spec: ConceptSourceSpec, model: EntityModelSpec, provider: RelationProvider
-) -> dict[str, TableSchema]:
-    """Table Schemas keyed by the manifest entity qualified name."""
+) -> EntityTables:
     if model.layout == "per_file":
-        schemas = _per_file_schemas(spec, model, provider)
+        tables = _per_file_schemas(spec, model, provider)
     else:
-        schemas = _single_relation_schemas(spec, model, provider)
+        tables = _single_relation_schemas(spec, model, provider)
     if model.roles.type is None:
-        for qualified_name, schema in schemas.items():
+        for qualified_name, schema in tables.schemas.items():
             logger.info(
                 "Entity {}: no type role, so its {} fields are typed any",
                 qualified_name,
                 len(schema.fields),
             )
-    return schemas
+    return tables
 
 
-def entity_records(
-    spec: ConceptSourceSpec, schemas: dict[str, TableSchema]
-) -> list[Record]:
-    return [
-        to_manifest_entity(
-            schema,
-            qualified_name,
-            namespace=spec.identity_system,
-            card_version=spec.release,
+def entity_records(spec: ConceptSourceSpec, tables: EntityTables) -> list[Record]:
+    version = card_version(spec.release)
+    records = []
+    for qualified_name, schema in tables.schemas.items():
+        record = to_manifest_entity(
+            schema, qualified_name, namespace=spec.identity_system, card_version=version
         )
-        for qualified_name, schema in schemas.items()
-    ]
+        label = tables.labels.get(qualified_name)
+        if label is not None:
+            _add_label(record, label)
+        records.append(record)
+    return records
 
 
 def read_header(
@@ -155,43 +164,78 @@ def _value_of(pairs: list[HeaderPair], key: str | None) -> str | None:
 
 def _single_relation_schemas(
     spec: ConceptSourceSpec, model: EntityModelSpec, provider: RelationProvider
-) -> dict[str, TableSchema]:
+) -> EntityTables:
     roles = model.roles
     if model.relation is None or roles.entity is None:
         raise ValueError(f"spec {spec.id}: single_relation needs a relation and entity")
     rows = fetch(provider, model.relation, _role_columns(model), model.filter)
-    schemas: dict[str, TableSchema] = {}
+    tables = EntityTables()
+    sources: SourceNames = {}
     for entity, group in sorted(group_by_key(rows, roles.entity).items()):
-        name = _cased(entity, model)
+        name = _entity_name(entity, model)
+        qualified_name = _claim(spec, tables, sources, entity, model)
         dictionary = [row for record in group if (row := _row(record, model, {}))]
-        schemas[f"{spec.identity_system}.{name}"] = table_schema_from_rows(
+        tables.schemas[qualified_name] = table_schema_from_rows(
             name, dictionary, description=_entity_description(name, group, model)
         )
-    return schemas
+    return tables
 
 
 def _per_file_schemas(
     spec: ConceptSourceSpec, model: EntityModelSpec, provider: RelationProvider
-) -> dict[str, TableSchema]:
-    schemas: dict[str, TableSchema] = {}
+) -> EntityTables:
+    tables = EntityTables()
+    sources: SourceNames = {}
     for entry in model.entities or []:
-        name, schema = _per_file_schema(model, entry, provider)
-        qualified_name = f"{spec.identity_system}.{name}"
-        if qualified_name in schemas:
-            raise ValueError(
-                f"spec {spec.id}: two per_file entries resolve to entity {name!r}; "
-                "name one with `entity`"
-            )
-        schemas[qualified_name] = schema
-    return schemas
+        source, schema = _per_file_schema(model, entry, provider)
+        tables.schemas[_claim(spec, tables, sources, source, model)] = schema
+    return tables
+
+
+def _claim(
+    spec: ConceptSourceSpec,
+    tables: EntityTables,
+    sources: SourceNames,
+    source: str,
+    model: EntityModelSpec,
+) -> str:
+    """The qualified name ``source`` takes; two sources taking one name fail the import."""
+    cased = _cased(source, model)
+    name = entity_identifier(cased)
+    qualified_name = f"{spec.identity_system}.{name}"
+    taken = sources.get(qualified_name)
+    if taken is not None:
+        raise ValueError(
+            f"spec {spec.id}: entity names {taken!r} and {source!r} both become "
+            f"entity {qualified_name!r}; one import needs distinct entity names"
+        )
+    sources[qualified_name] = source
+    if name != cased:
+        tables.labels[qualified_name] = source
+    return qualified_name
+
+
+def _add_label(record: Record, label: str) -> None:
+    card = record.get("context_card")
+    if card is None:
+        logger.info(
+            "Entity {} states no description, so no context card carries its "
+            "source name {!r}",
+            record["qualified_name"],
+            label,
+        )
+        return
+    card["curated_synonyms"] = [label]
 
 
 def _per_file_schema(
     model: EntityModelSpec, entry: PerFileEntry, provider: RelationProvider
 ) -> tuple[str, TableSchema]:
+    """The entity's source name, and its Table Schema."""
     header = read_header(provider, entry.header, model.header_keys) if entry.header else None
     named = entry.entity or (header.name if header else None)
-    name = _cased(named or file_stem(entry.relation.name), model)
+    source = named or file_stem(entry.relation.name)
+    name = _entity_name(source, model)
     rows = fetch_in_order(provider, entry.relation, _role_columns(model), model.filter)
     dictionary = [row for record in rows if (row := _row(record, model, entry.domains))]
     description = header.description if header else None
@@ -199,7 +243,7 @@ def _per_file_schema(
         ForeignKey(
             fields=[_cased(column, model) for column in fk.columns],
             reference=Reference(
-                resource=_cased(fk.entity, model),
+                resource=_entity_name(fk.entity, model),
                 fields=[_cased(column, model) for column in fk.reference_columns],
             ),
         )
@@ -211,7 +255,7 @@ def _per_file_schema(
         description=description or _entity_description(name, rows, model),
         foreign_keys=declared,
     )
-    return name, schema
+    return source, schema
 
 
 def _role_columns(model: EntityModelSpec) -> list[str | None]:
@@ -247,7 +291,7 @@ def _row(
         primary_key=dictionary_flag(record[roles.primary_key])
         if roles.primary_key
         else False,
-        fk_entity=_cased(fk_entity, model) if fk_entity else None,
+        fk_entity=_entity_name(fk_entity, model) if fk_entity else None,
         fk_property=_cased(fk_property, model) if fk_property else None,
         domain=domains.get(prop) or _text(record, roles.domain),
         description=_text(record, roles.description),
@@ -288,3 +332,7 @@ def _text(record: Record, column: str | None) -> str | None:
 
 def _cased(name: str, model: EntityModelSpec) -> str:
     return name.lower() if model.entity_case == "lower" else name
+
+
+def _entity_name(name: str, model: EntityModelSpec) -> str:
+    return entity_identifier(_cased(name, model))

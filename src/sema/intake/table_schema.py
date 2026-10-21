@@ -20,6 +20,7 @@ FrictionlessType = Literal[
     "string", "number", "integer", "boolean", "date", "datetime", "any"
 ]
 TABLE_ROW_KIND = "TABLE_ROW"
+DECLARED_EVIDENCE = "declared"
 
 
 def _aliased(name: str, key: str) -> Any:
@@ -93,6 +94,8 @@ def to_manifest_entity(
     obligation = _obligation(schema, qualified_name, namespace)
     if obligation is not None:
         entity["obligation"] = obligation
+    else:
+        entity.update(_declared(schema, namespace))
     if schema.description:
         entity["context_card"] = {
             "card_version": card_version,
@@ -126,7 +129,7 @@ def _obligation(
     if not keys:
         logger.info(
             "Entity {} has no primary key stated; no obligation, its {} required "
-            "fields stay non-nullable and its {} foreign keys are not carried",
+            "fields stay non-nullable and its {} foreign keys are declared joins",
             qualified_name,
             len(required),
             len(foreign_keys),
@@ -138,14 +141,31 @@ def _obligation(
     }
     if foreign_keys:
         obligation["foreign_keys"] = [_foreign_key(fk, namespace) for fk in foreign_keys]
-    domains = [
+    domains = _domains(schema)
+    if domains:
+        obligation["domain_constraints"] = domains
+    return obligation
+
+
+def _declared(schema: TableSchema, namespace: str) -> dict[str, Any]:
+    """Unenforced joins and domains for an entity whose keys are not stated."""
+    evidence = {"evidence": DECLARED_EVIDENCE}
+    declared: dict[str, Any] = {}
+    joins = [_foreign_key(fk, namespace) | evidence for fk in schema.foreign_keys or []]
+    if joins:
+        declared["joins"] = joins
+    domains = [domain | evidence for domain in _domains(schema)]
+    if domains:
+        declared["domains"] = domains
+    return declared
+
+
+def _domains(schema: TableSchema) -> list[dict[str, Any]]:
+    return [
         {"property_name": field.name, "domain_id": field.x_sema_domain}
         for field in schema.fields
         if field.x_sema_domain
     ]
-    if domains:
-        obligation["domain_constraints"] = domains
-    return obligation
 
 
 def _foreign_key(foreign_key: ForeignKey, namespace: str) -> dict[str, Any]:

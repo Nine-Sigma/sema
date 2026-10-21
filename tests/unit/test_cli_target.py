@@ -1,17 +1,30 @@
-"""CLI tests for `sema target load --manifest <path>`."""
+"""CLI tests for `sema target load`, `import`, and `project`."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from click.testing import CliRunner
 
 from sema.cli_target import target_group
+from sema.graph.loader import GraphLoader
+from sema.graph.physical_catalog import PhysicalColumn, StaticPhysicalCatalogSource
+from sema.graph.target_join_paths import DECLARED_JOIN_CONFIDENCE
 from sema.targets.registry import _clear_for_tests
+from tests.unit.intake.test_acris_import import (
+    ENTITIES,
+    FOREIGN_KEYS,
+    _Imported,
+    imported,
+)
 
 pytestmark = pytest.mark.unit
+
+__all__ = ["imported"]
 
 _GOLDEN = (
     Path(__file__).resolve().parents[1]
@@ -161,3 +174,198 @@ def test_target_import_staging_spec_without_staging_names_provider_and_relation(
     assert "staging" in result.output
     assert "land.codes" in result.output
     assert not (tmp_path / "manifest.yaml").exists()
+
+
+# `sema target project`: the catalog and the loader come from two module
+# factories, `_project_catalog_source` and `_project_loader(writer)`, which the
+# tests replace the same way the import tests replace `_import_connector`.
+
+_CATALOG = "cat"
+_SCHEMA = "sch"
+
+
+def _table_rows(imported: _Imported) -> list[dict[str, Any]]:
+    return [e for e in imported.result.manifest["entities"] if e["kind"] == "TABLE_ROW"]
+
+
+def _tables(imported: _Imported) -> dict[str, str]:
+    names = sorted(e["qualified_name"] for e in _table_rows(imported))
+    return {name: f"table_{i:02d}" for i, name in enumerate(names)}
+
+
+def _static_catalog(imported: _Imported) -> StaticPhysicalCatalogSource:
+    tables = _tables(imported)
+    return StaticPhysicalCatalogSource(
+        {
+            (_CATALOG, _SCHEMA, tables[e["qualified_name"]]): [
+                PhysicalColumn(name=p["name"], data_type="string", nullable=True)
+                for p in e["properties"]
+            ]
+            for e in _table_rows(imported)
+        }
+    )
+
+
+def _project_args(
+    tmp_path: Path, imported: _Imported, entity_tables: dict[str, str] | None
+) -> list[str]:
+    import yaml
+
+    manifest = tmp_path / "manifest.yaml"
+    manifest.write_text(yaml.safe_dump(imported.result.manifest, sort_keys=False))
+    args = ["project", "--manifest", str(manifest), "--writer", "in-memory"]
+    if entity_tables is None:
+        return args
+    binding = tmp_path / "binding.yaml"
+    binding.write_text(
+        yaml.safe_dump(
+            {"catalog": _CATALOG, "schema": _SCHEMA, "entity_tables": entity_tables},
+            sort_keys=False,
+        )
+    )
+    return [*args, "--binding", str(binding)]
+
+
+def _fake_project(
+    monkeypatch: pytest.MonkeyPatch, imported: _Imported
+) -> tuple[MagicMock, list[str]]:
+    loader = MagicMock(spec=GraphLoader)
+    writers: list[str] = []
+
+    def project_loader(writer: str) -> MagicMock:
+        writers.append(writer)
+        return loader
+
+    catalog = _static_catalog(imported)
+    monkeypatch.setattr("sema.cli_target._project_loader", project_loader)
+    monkeypatch.setattr(
+        "sema.cli_target._project_catalog_source", lambda *a, **k: catalog
+    )
+    return loader, writers
+
+
+def _join_paths(loader: MagicMock) -> dict[str, dict[str, Any]]:
+    paths = {}
+    for call in loader.upsert_join_path.call_args_list:
+        paths[call.args[0]] = call.kwargs
+    return paths
+
+
+def _uses(loader: MagicMock) -> dict[str, set[str]]:
+    uses: dict[str, set[str]] = {}
+    for call in loader.add_join_path_uses.call_args_list:
+        uses.setdefault(call.args[0], set()).add(call.args[1])
+    return uses
+
+
+def _declared_pairs(imported: _Imported) -> list[tuple[str, str]]:
+    return [
+        (e["qualified_name"], join["referenced_entity"])
+        for e in _table_rows(imported)
+        for join in e.get("joins", [])
+    ]
+
+
+def _ref(table: str) -> str:
+    return f"{_CATALOG}.{_SCHEMA}.{table}"
+
+
+def test_target_project_writes_eight_declared_join_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, imported: _Imported
+) -> None:
+    loader, writers = _fake_project(monkeypatch, imported)
+    tables = _tables(imported)
+
+    result = CliRunner().invoke(
+        target_group, _project_args(tmp_path, imported, tables)
+    )
+
+    assert result.exit_code == 0, result.output
+    assert writers == ["in-memory"]
+    paths = _join_paths(loader)
+    assert len(paths) == len(FOREIGN_KEYS)
+    assert {p["source"] for p in paths.values()} == {"manifest_declared"}
+    assert {p["confidence"] for p in paths.values()} == {DECLARED_JOIN_CONFIDENCE}
+    expected_pairs = {
+        frozenset({_ref(tables[entity]), _ref(tables[referenced])})
+        for entity, referenced in _declared_pairs(imported)
+    }
+    assert len(expected_pairs) == len(FOREIGN_KEYS)
+    assert {frozenset(refs) for refs in _uses(loader).values()} == expected_pairs
+    assert "paths written 8" in result.output
+    assert "joins skipped 0" in result.output
+
+
+def test_target_project_projects_every_bound_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, imported: _Imported
+) -> None:
+    loader, _ = _fake_project(monkeypatch, imported)
+    tables = _tables(imported)
+
+    result = CliRunner().invoke(
+        target_group, _project_args(tmp_path, imported, tables)
+    )
+
+    assert result.exit_code == 0, result.output
+    projected = {call.args[0] for call in loader.upsert_table.call_args_list}
+    assert projected == set(tables.values())
+    assert len(projected) == ENTITIES
+
+
+def test_target_project_with_an_empty_binding_skips_all_eight_joins(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, imported: _Imported
+) -> None:
+    loader, _ = _fake_project(monkeypatch, imported)
+
+    result = CliRunner().invoke(target_group, _project_args(tmp_path, imported, {}))
+
+    assert result.exit_code == 0, result.output
+    loader.upsert_join_path.assert_not_called()
+    assert "paths written 0" in result.output
+    assert "joins skipped 8" in result.output
+
+
+def test_target_project_without_binding_fails_naming_the_option(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, imported: _Imported
+) -> None:
+    loader, _ = _fake_project(monkeypatch, imported)
+
+    result = CliRunner().invoke(target_group, _project_args(tmp_path, imported, None))
+
+    assert result.exit_code != 0
+    assert "--binding" in result.output
+    loader.upsert_join_path.assert_not_called()
+
+
+def test_target_project_in_memory_writer_never_opens_neo4j(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, imported: _Imported
+) -> None:
+    def no_driver(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("the in-memory writer must not open a Neo4j driver")
+
+    catalog = _static_catalog(imported)
+    monkeypatch.setattr(
+        "sema.cli_target._project_catalog_source", lambda *a, **k: catalog
+    )
+    monkeypatch.setattr("neo4j.GraphDatabase.driver", no_driver)
+
+    result = CliRunner().invoke(
+        target_group, _project_args(tmp_path, imported, _tables(imported))
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "paths written 8" in result.output
+    assert "joins skipped 0" in result.output
+
+
+def test_target_load_options_are_unchanged() -> None:
+    from sema.cli_target import load_cmd
+
+    assert [p.name for p in load_cmd.params] == ["manifest_path", "writer", "skip_facets"]
+
+    result = CliRunner().invoke(
+        target_group, ["load", "--manifest", str(_GOLDEN), "--binding", "b.yaml"]
+    )
+
+    assert result.exit_code != 0
+    assert "No such option" in result.output

@@ -289,9 +289,10 @@ def test_header_token_tie_takes_the_first_key_in_reading_order(tmp_path: Path) -
 def test_per_file_entity_is_named_and_described_from_its_header(tmp_path: Path) -> None:
     result = _per_file_import(tmp_path, _per_file_spec([_orders_entry()]))
 
-    entity = _entities(result)["ex.Customer Orders"]
+    entity = _entities(result)["ex.customer_orders"]
     assert entity["kind"] == "TABLE_ROW"
     assert entity["context_card"]["description"] == "One row per order placed."
+    assert entity["context_card"]["curated_synonyms"] == ["Customer Orders"]
     props = {p["name"]: p for p in entity["properties"]}
     assert list(props) == ["Order ID", "Customer ID", "Status"]
     assert props["Customer ID"]["definition"] == "Customer who placed the order"
@@ -323,11 +324,11 @@ def test_type_omitted_gives_any_fields_and_logs_a_count_per_entity(tmp_path: Pat
     with captured_log() as messages:
         result = _per_file_import(tmp_path, spec)
 
-    for name in ("ex.Customer Orders", "ex.customers"):
+    for name in ("ex.customer_orders", "ex.customers"):
         fields = _table_schema(result, name).fields
         assert {f.type for f in fields} == {"any"}
         assert {f.x_sema_raw_type for f in fields} == {None}
-    assert any("Customer Orders" in m and re.search(r"\b3\b", m) for m in messages)
+    assert any("customer_orders" in m and re.search(r"\b3\b", m) for m in messages)
     assert any("customers" in m and re.search(r"\b2\b", m) for m in messages)
 
 
@@ -348,12 +349,12 @@ def test_declared_foreign_keys_and_domains_reach_the_table_schema(tmp_path: Path
 
     result = _per_file_import(tmp_path, spec)
 
-    schema = _table_schema(result, "ex.Customer Orders")
+    schema = _table_schema(result, "ex.customer_orders")
     reference = Reference(resource="customers", fields=["Customer ID"])
     assert schema.foreign_keys == [ForeignKey(fields=["Customer ID"], reference=reference)]
     domains = {f.name: f.x_sema_domain for f in schema.fields}
     assert domains == {"Order ID": None, "Customer ID": None, "Status": "Order_Status"}
-    assert "obligation" not in _entities(result)["ex.Customer Orders"]
+    assert "obligation" not in _entities(result)["ex.customer_orders"]
 
 
 def test_table_schemas_cover_every_entity_and_validate(tmp_path: Path) -> None:
@@ -390,4 +391,4 @@ def test_per_file_manifest_parses(tmp_path: Path) -> None:
 
     parsed = parse_manifest_raw(yaml.safe_load(yaml.safe_dump(result.manifest)))
     names = sorted(e.qualified_name for e in parsed.entities)
-    assert names == ["ex.Customer Orders", "ex.customers"]
+    assert names == ["ex.customer_orders", "ex.customers"]
