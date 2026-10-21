@@ -102,9 +102,10 @@ def settle_choices(batch: Sequence[OpenEntry], choices: Sequence[Choice], key: s
         )
         updates[entry.position] = entry.ambiguity.model_copy(update=fields)
         binding = entry.bindings[choice]
-        chosen.setdefault(
-            choice, BoundEntry(binding=binding, confidence=confidence, source=MODEL_SOURCE)
+        bound = BoundEntry(
+            binding=binding, confidence=confidence, source=MODEL_SOURCE, call_key=key
         )
+        chosen.setdefault(choice, bound)
     return Settlement(key, updates, chosen)
 
 

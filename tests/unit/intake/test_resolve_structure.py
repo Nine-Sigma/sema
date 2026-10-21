@@ -233,6 +233,7 @@ def test_choice_is_bound_with_source_model_confidence_and_call_key(
     assert entry.binding.template == "concept_list"
     assert entry.source == "model"
     assert entry.confidence == CONFIDENCE
+    assert entry.call_key == key
     settled = chosen(result, subject)
     assert settled.choice == member(entry.binding)
     assert settled.source == "model"
