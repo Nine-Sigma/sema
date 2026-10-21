@@ -4,7 +4,8 @@ Candidates are recomputed per proposal group over the relations no human pinned 
 ignore removed, so a code-bound binding must be one the predicates produced, survive
 precedence, and pass its template's ``verify``; a relation precedence leaves contested
 must be on the ambiguity list. Only claims in force (kept by precedence, or bound) take a
-relation from a single-relation binding. Pinned bindings only re-run ``verify``.
+relation from a single-relation binding. Pinned bindings, and model proposals over a
+proposal target or a view, only re-run ``verify`` over what they were stated over.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from sema.intake.verify.structure_utils import (
     boilerplate_column,
     partition_counts,
 )
+from sema.intake.views.verify_utils import verify_over
 
 PARTITION_COMPLETE = "partition_complete"
 UNKNOWN_TEMPLATE = "unknown_template"
@@ -47,6 +49,7 @@ CHECKS = (
     AMBIGUITY_LIST_COMPLETE,
 )
 HUMAN = "human"
+MODEL = "model"
 BOUND_TEMPLATES = {template.ID: template for template in TEMPLATES if template.ID != ignore.ID}
 
 
@@ -63,14 +66,16 @@ def verify_structure(
     failures += _template_failures(proposal)
     failures += _ignore_failures(proposal.ignored, profiles, tools)
     known = [e for e in proposal.bound if e.binding.template in BOUND_TEMPLATES]
-    pinned = [e for e in known if e.source == HUMAN]
-    for entry in pinned:
+    targets = set(proposal.proposal_targets)
+    stated = [e for e in known if e.source == HUMAN or _proposed(e, targets)]
+    for entry in stated:
         failures += _verified(entry, profiles, tools)
     failures += _shared_claim_failures(known)
     removed = {name for e in proposal.bound if e.source == HUMAN for name in e.binding.relations}
+    removed |= {name for e in stated for name in e.binding.relations}
     removed |= {name for binding in proposal.ignored for name in binding.relations}
     listed = {ambiguity.subject for ambiguity in proposal.ambiguities}
-    coded = [e for e in known if e.source != HUMAN]
+    coded = [e for e in known if e.source != HUMAN and e not in stated]
     for group in proposal.groups:
         members = [by_name[name] for name in group if name in by_name and name not in removed]
         failures += _group_failures(members, coded, known, listed, tools)
@@ -183,11 +188,17 @@ def _shared_claim_failures(known: Sequence[BoundEntry]) -> list[Failure]:
     ]
 
 
+def _proposed(entry: BoundEntry, targets: set[str]) -> bool:
+    """A model proposal: over a view, or over a relation no code candidate could bind."""
+    spans_target = bool(targets & set(entry.binding.relations))
+    return entry.source == MODEL and (entry.view is not None or spans_target)
+
+
 def _verified(
     entry: BoundEntry, group: Sequence[RelationProfile], tools: ProfileTools
 ) -> list[Failure]:
     binding = entry.binding
-    verdict = BOUND_TEMPLATES[binding.template].verify(binding, list(group), tools)
+    template = BOUND_TEMPLATES[binding.template]
     return [
         failure(
             TEMPLATE_VERIFIES,
@@ -196,7 +207,7 @@ def _verified(
             **found.evidence,
             **dict(template=binding.template, template_check=found.check, source=entry.source),
         )
-        for found in verdict.failures
+        for found in verify_over(template, binding, entry.view, group, tools)
     ]
 
 

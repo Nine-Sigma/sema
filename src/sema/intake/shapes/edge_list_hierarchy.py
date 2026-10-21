@@ -12,7 +12,13 @@ from itertools import permutations
 from sema.binding.spec_sections import ParentColumnHierarchy, RelationRef
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
-from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR, RelationProfile, SlotBinding, is_id
+from sema.intake.shapes.base import (
+    JOIN_RESOLVE_FLOOR,
+    RelationProfile,
+    Slot,
+    SlotBinding,
+    is_id,
+)
 from sema.intake.shapes.base_utils import (
     JOIN_FLOOR,
     failure,
@@ -28,6 +34,14 @@ ID = "edge_list_hierarchy"
 SECTION = section_of(ParentColumnHierarchy)
 CONCEPT_RELATION, IDENTIFIER, PARENT = "concept_relation", "id", "parent"
 EDGE_RELATION, CHILD = "edge_relation", "child"
+# The edge relation is optional: a proposal naming one relation reads the parent column form.
+SLOTS = (
+    Slot(CONCEPT_RELATION, "relation"),
+    Slot(EDGE_RELATION, "relation"),
+    Slot(IDENTIFIER, "column"),
+    Slot(PARENT, "column"),
+    Slot(CHILD, "column"),
+)
 EDGE_LINK_COUNT = 2
 Checked = tuple[list[Failure], dict[str, float | str]]
 

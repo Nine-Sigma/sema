@@ -8,12 +8,19 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from sema.intake.profile import ProfileTools
-from sema.intake.shapes.base import RelationProfile, SlotBinding, id_columns, label_columns
+from sema.intake.shapes.base import (
+    RelationProfile,
+    Slot,
+    SlotBinding,
+    id_columns,
+    label_columns,
+)
 from sema.intake.shapes.base_utils import SIGNATURE_FLOORS, failure, slot_relations, verdict
 from sema.intake.verify.base import Failure, Verdict
 
 ID = "concept_list"
 RELATION = "relation"
+SLOTS = (Slot(RELATION, "relation"),)
 
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
@@ -25,12 +25,15 @@ __all__ = [
     "ColumnProfile",
     "RelationProfile",
     "RelationSignature",
+    "Slot",
     "SlotBinding",
+    "SlotKind",
     "Template",
     "id_columns",
     "is_text",
     "label_columns",
     "profile_relations",
+    "relation_profile",
 ]
 
 # Measured: the syn-library concept relation's key 1.0 and A2 Concepts.concept_code 1.0,
@@ -47,6 +50,7 @@ TEXT_TYPES = frozenset({"VARCHAR", "STRING", "TEXT", "CHAR"})
 SIZED_TEXT_PREFIXES = ("VARCHAR(", "CHAR(", "STRING(")
 
 RelationSignature = tuple[tuple[str, str], ...]
+SlotKind = Literal["relation", "column", "literal"]
 
 
 @dataclass(frozen=True)
@@ -82,6 +86,19 @@ class SlotBinding(BaseModel):
     relations: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class Slot:
+    """A slot a layout proposal fills: a relation, a column, or one of ``values``.
+
+    ``when`` names a literal slot and the value under which this slot applies.
+    """
+
+    name: str
+    kind: SlotKind
+    values: tuple[str, ...] = ()
+    when: tuple[str, str] | None = None
+
+
 class Template(Protocol):
     ID: str
 
@@ -98,15 +115,24 @@ def profile_relations(
     land: LandResult, tools: ProfileTools, provider: Provider = "staging"
 ) -> list[RelationProfile]:
     headerless = set(land.headerless)
-    profiles = []
-    for landed in land.relations:
-        ref = RelationRef(provider=provider, name=f"{landed.schema}.{landed.name}")
-        described = tools.describe_relation(ref)
-        columns = tuple(c for c in described.columns if c.name != LOCATOR_COLUMN)
-        profiles.append(
-            RelationProfile(ref, landed, described.row_count, columns, landed.name in headerless)
+    return [
+        relation_profile(
+            RelationRef(provider=provider, name=f"{landed.schema}.{landed.name}"),
+            landed,
+            tools,
+            headerless=landed.name in headerless,
         )
-    return profiles
+        for landed in land.relations
+    ]
+
+
+def relation_profile(
+    ref: RelationRef, landed: LandedRelation, tools: ProfileTools, *, headerless: bool
+) -> RelationProfile:
+    """The profile of ``ref``; the locator is never a column a template reads."""
+    described = tools.describe_relation(ref)
+    columns = tuple(c for c in described.columns if c.name != LOCATOR_COLUMN)
+    return RelationProfile(ref, landed, described.row_count, columns, headerless)
 
 
 def is_text(column: ColumnProfile) -> bool:

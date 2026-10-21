@@ -19,6 +19,7 @@ from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import (
     ID_DISTINCT_RATIO_FLOOR,
     RelationProfile,
+    Slot,
     SlotBinding,
     is_id,
     is_text,
@@ -43,6 +44,14 @@ RELATION, ENTITY, PROPERTY = "relation", "entity", "property"
 ENTITY_DISTINCT_RATIO_CAP = 0.5
 FLOORS: dict[str, FloorValue] = {**ID_FLOOR, "ENTITY_DISTINCT_RATIO_CAP": ENTITY_DISTINCT_RATIO_CAP}
 KEY_VALUE_WIDTH = 2
+SLOTS = (
+    Slot(LAYOUT, "literal", (PER_FILE, SINGLE_RELATION)),
+    Slot(DICTIONARY, "relation", when=(LAYOUT, PER_FILE)),
+    Slot(HEADER, "relation", when=(LAYOUT, PER_FILE)),
+    Slot(RELATION, "relation", when=(LAYOUT, SINGLE_RELATION)),
+    Slot(ENTITY, "column", when=(LAYOUT, SINGLE_RELATION)),
+    Slot(PROPERTY, "column", when=(LAYOUT, SINGLE_RELATION)),
+)
 MIN_ENTITIES = 2
 
 

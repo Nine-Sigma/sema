@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 
+from sema.ingest.duckdb_staging_utils import escape_sql_literal
+
 LOCATOR_COLUMN = "_sema_locator"
 LOCATOR_ROW_SEPARATOR = "!"
 SHEET_SEPARATOR = "__"
@@ -60,6 +62,17 @@ class LandResult:
 
     def relation(self, name: str) -> LandedRelation:
         return next(r for r in self.relations if r.name == name)
+
+
+def locator_order_sql(quoted_locator: str) -> str:
+    """Landed row order in staging SQL: the number after the last separator, then the text.
+
+    It orders as ``locator_row`` sorts, so a numeric row part orders numerically (row 2
+    before row 10) and a locator without one sorts last.
+    """
+    separator = escape_sql_literal(LOCATOR_ROW_SEPARATOR)
+    number = f"TRY_CAST(string_split({quoted_locator}, '{separator}')[-1] AS BIGINT)"
+    return f"{number} NULLS LAST, {quoted_locator}"
 
 
 def utc_now() -> str:

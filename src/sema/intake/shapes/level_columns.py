@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from sema.binding.spec_sections import LevelColumnsHierarchy
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
-from sema.intake.shapes.base import RelationProfile, SlotBinding
+from sema.intake.shapes.base import RelationProfile, Slot, SlotBinding
 from sema.intake.shapes.base_utils import failure, section_of, slot_relations, verdict
 from sema.intake.verify.base import Failure, Verdict
 
@@ -20,6 +20,13 @@ ID = "level_columns"
 SECTION = section_of(LevelColumnsHierarchy)
 RELATION, LEVEL = "relation", "level_"
 MIN_LEVELS = 2
+# A proposal offers this many level slots, which keeps its output model far under the
+# provider key cap; deeper level tables are found by code, not proposed.
+PROPOSED_LEVELS = 8
+SLOTS = (
+    Slot(RELATION, "relation"),
+    *(Slot(f"{LEVEL}{depth}", "column") for depth in range(1, PROPOSED_LEVELS + 1)),
+)
 
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:

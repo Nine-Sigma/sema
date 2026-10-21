@@ -42,6 +42,7 @@ from sema.intake.structure_utils import (
     within_edges,
 )
 from sema.intake.verify.base import Ambiguity, Failure, FloorValue
+from sema.intake.views.base import ViewSpec
 from sema.log import logger
 
 __all__ = [
@@ -70,11 +71,16 @@ class HintRejectedError(ValueError):
 
 
 class BoundEntry(BaseModel):
+    """``view`` is the view a model proposal was verified over; the binding names the landed
+    relation, never the view."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     binding: SlotBinding
     confidence: float = Field(default=CODE_BOUND_CONFIDENCE, ge=0.0, le=1.0)
     source: BindingSource
+    call_key: str | None = None
+    view: ViewSpec | None = None
 
 
 class StructureResult(BaseModel):

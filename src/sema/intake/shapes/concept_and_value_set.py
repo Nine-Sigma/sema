@@ -12,7 +12,13 @@ from itertools import product
 from sema.binding.spec_sections import ConceptsSpec
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
-from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR, RelationProfile, SlotBinding, is_id
+from sema.intake.shapes.base import (
+    JOIN_RESOLVE_FLOOR,
+    RelationProfile,
+    Slot,
+    SlotBinding,
+    is_id,
+)
 from sema.intake.shapes.base_utils import (
     JOIN_FLOOR,
     failure,
@@ -29,6 +35,12 @@ ID = "concept_and_value_set"
 SECTION = section_of(ConceptsSpec)
 CONCEPT_RELATION, VALUE_RELATION = "concept_relation", "value_relation"
 CONCEPT_KEY, VALUE_KEY = "concept_key", "value_key"
+SLOTS = (
+    Slot(CONCEPT_RELATION, "relation"),
+    Slot(VALUE_RELATION, "relation"),
+    Slot(CONCEPT_KEY, "column"),
+    Slot(VALUE_KEY, "column"),
+)
 ONE_TO_MANY = "one_to_many"
 
 KeyPair = tuple[RelationProfile, ColumnProfile, RelationProfile, ColumnProfile]

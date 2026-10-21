@@ -36,6 +36,7 @@ ENTRY_PREFIX = "entry_"
 ROLE_PREFIX = "role_"
 REFERENCE_PREFIX = "reference_"
 SLOT_PREFIX = "slot_"
+LITERAL_PREFIX = "literal_"
 LAYOUT_ANSWERS = ("propose", ABSTAIN, "needs_values")
 FORBID_EXTRA = ConfigDict(extra="forbid")
 
@@ -126,14 +127,23 @@ def slot_field(slot: str) -> str:
     return checked_field(SLOT_PREFIX, slot)
 
 
+def literal_field(slot: str) -> str:
+    return checked_field(LITERAL_PREFIX, slot)
+
+
 def layout_model(
     templates: Sequence[str],
     views: Sequence[str],
     columns: Sequence[str],
     relations: Sequence[str],
     slots: Sequence[str],
+    literals: Mapping[str, Sequence[str]] | None = None,
 ) -> type[BaseModel]:
-    """A layout proposal over the closed template set, the view registry, and a group."""
+    """A layout proposal over the closed template set, the view registry, and a group.
+
+    ``slots`` are column slots over ``columns``; ``literals`` maps each literal slot to the
+    values it may take.
+    """
     refuse_sentinel(columns, NONE, "column")
     column = enum_type(columns)
     fields: Fields = {
@@ -142,6 +152,10 @@ def layout_model(
         "view": (_optional(views, "view"), ...),
         "view_columns": (list[column], ...),  # type: ignore[valid-type]
         **{slot_field(slot): (_optional(columns, slot_field(slot)), ...) for slot in slots},
+        **{
+            literal_field(slot): (_optional(values, literal_field(slot)), ...)
+            for slot, values in (literals or {}).items()
+        },
         "relations": (list[enum_type(relations)], ...),  # type: ignore[misc]
         "needs_values": (list[column], ...),  # type: ignore[valid-type]
         "confidence": (float, ...),
@@ -195,6 +209,7 @@ def _sample_layout() -> type[BaseModel]:
         columns=_sample_members("_col", 6),
         relations=_sample_members("relation", 3),
         slots=_sample_members("slot", 8),
+        literals={"literal_0": _sample_members("value", 6)},
     )
 
 

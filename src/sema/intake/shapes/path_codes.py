@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from sema.binding.spec_sections import PathCodesHierarchy
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
-from sema.intake.shapes.base import RelationProfile, SlotBinding, is_id, is_text
+from sema.intake.shapes.base import RelationProfile, Slot, SlotBinding, is_id, is_text
 from sema.intake.shapes.base_utils import (
     failure,
     section_of,
@@ -25,6 +25,11 @@ ID = "path_codes"
 SECTION = section_of(PathCodesHierarchy)
 RELATION, CODE, SEPARATOR = "relation", "code", "separator"
 SEPARATORS = (".", "/", "-", ":", "|", ">")
+SLOTS = (
+    Slot(RELATION, "relation"),
+    Slot(CODE, "column"),
+    Slot(SEPARATOR, "literal", SEPARATORS),
+)
 Checked = tuple[list[Failure], dict[str, float | str]]
 
 

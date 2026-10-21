@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from sema.binding.spec_sections import ConceptsSpec
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
-from sema.intake.shapes.base import RelationProfile, SlotBinding
+from sema.intake.shapes.base import RelationProfile, Slot, SlotBinding
 from sema.intake.shapes.base_utils import (
     failure,
     section_of,
@@ -20,6 +20,7 @@ from sema.intake.verify.base import Failure, FloorValue, Verdict
 ID = "concept_with_values_denormalized"
 SECTION = section_of(ConceptsSpec)
 RELATION, GROUP_BY = "relation", "group_by"
+SLOTS = (Slot(RELATION, "relation"), Slot(GROUP_BY, "column"))
 # Measured: syn-library data_element.data_element_id holds 4 distinct values over 9 rows
 # (0.444); every other syn and A2 id column is 1.0.
 DENORMALIZED_GROUP_RATIO_FLOOR = 0.5

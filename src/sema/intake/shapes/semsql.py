@@ -17,7 +17,7 @@ from sema.binding.spec_sections import (
 from sema.intake.loaders.semsql import REQUIRED_BASE_TABLES
 from sema.intake.loaders.semsql_utils import DERIVED_RELATIONS, TERM_LABEL_COLUMN, TERMS_RELATION
 from sema.intake.profile import ProfileTools
-from sema.intake.shapes.base import RelationProfile, SlotBinding
+from sema.intake.shapes.base import RelationProfile, Slot, SlotBinding
 from sema.intake.shapes.base_utils import (
     failure,
     find,
@@ -32,6 +32,7 @@ from sema.intake.verify.base import Failure, FloorValue, Verdict
 
 ID = "semsql"
 REQUIRED = (*DERIVED_RELATIONS, *REQUIRED_BASE_TABLES)
+SLOTS = tuple(Slot(name, "relation") for name in REQUIRED)
 # The loader's derived relations fill these: the terms relation holds the ontology as the
 # concept, each class as a value with its definition; the edges relation the subclass
 # hierarchy; the mappings relation the mappings.
