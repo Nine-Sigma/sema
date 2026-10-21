@@ -1,0 +1,7 @@
+# A1 run descriptor: the values of standard_library.spec.yaml that no predicate derives.
+id: partner-standard-library
+identity_system: partner
+release: "2026-09"
+scheme:
+  qualified_name: prt_standard_library.demographics
+  description: "partner Standard Library data elements for the demographics domain"
