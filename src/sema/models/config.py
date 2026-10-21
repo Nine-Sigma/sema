@@ -6,6 +6,9 @@ import yaml
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Defaults differ by caller: build reads values (``full``), intake starts at ``metadata_only``.
+EvidenceTier = Literal["metadata_only", "bounded_values", "full"]
+
 
 class DatabricksConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="DATABRICKS_")
@@ -105,7 +108,7 @@ class BuildConfig(BaseSettings):
     enable_fk_detection: bool = True
     materialize_structural_fk: bool = False
 
-    evidence_policy: Literal["metadata_only", "bounded_values", "full"] = "full"
+    evidence_policy: EvidenceTier = "full"
     max_distinct_values_read: int = 200
     max_unmatched_reported: int = 20
     judge_workers: int = 4

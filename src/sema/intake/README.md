@@ -21,13 +21,15 @@ A count in a test scenario is evidence that a general rule holds, never the rule
 
 Every loader writes relations through `Staging.write_table` into a schema the caller names, creates that schema when it is absent, and returns one `LandResult` (`sema.intake.landing`):
 
-- `medium`: `tabular`, `semsql`, `dictionary`, or `athena`.
+- `medium`: `tabular`, `semsql`, `dictionary`, `athena`, or `warehouse`.
 - `source_identity`: what was landed, for example file names with SHA-256 digests, or an ontology IRI and version IRI.
 - `relations`: one `LandedRelation` per relation, with its columns and types, row count, header row (tabular only), all-null columns, and a `Provenance` record: `source_uri`, `loader`, `loader_version`, `landed_at` (ISO 8601 UTC), `policy_class`, `locator_kind`, and `locator`.
 - `headerless`: the tabular relations that landed with positional column names because no row passed the header tests.
 - `schema_snapshot`: relation names and columns only, so two landings of one source compare equal.
 
 Row-kind loaders (`locator_kind: row`) append a `_sema_locator` column to every row. The Athena loader keeps its tables byte-identical to the original showcase loader, so it adds no column and declares `locator_kind: relation` with the source file name as `locator`.
+
+The warehouse loader calls `Connector.read_schema_metadata(catalog, schema)` once and fills each relation's columns, types, and comments from the returned objects; it writes nothing to staging, declares `locator_kind: relation` with `<catalog>.<schema>` as `locator`, and records `row_count` 0 because the catalog read carries no counts. An `Unreadable` result raises `UnreadableSchemaError` naming the connector's reason before any statement runs.
 
 Landed relation names replace non-word characters with `_`. Column names keep the header text, with surrounding whitespace stripped and each inner whitespace run (line breaks included) collapsed to one space, so a spec names the column a human sees.
 
@@ -39,6 +41,7 @@ Landed relation names replace non-word characters with `_`. Column names keep th
 | semsql (OWL, OBO, SKOS via a prebuilt semantic-sql SQLite file) | `loaders.semsql.land_semsql(path, staging, schema=...)` | `statements`, `entailed_edge`, `prefix`, the label, definition, synonym, mapping, deprecation, class, and edge views, plus `semsql_terms`, `semsql_edges`, `semsql_synonyms`, `semsql_mappings` | subject IRI (prefix for `prefix`) |
 | Dictionary (PostgreSQL DDL) | `loaders.dictionary.land_ddl(path, staging, schema=...)` | `<file stem>__columns`: `entity`, `property`, `raw_type`, `nullable`, `ordinal` | `<file name>!<entity>.<property>` |
 | Athena bundle | `loaders.athena.land_athena_bundle(bundle_dir, staging)` | `vocabulary_omop.concept`, `concept_relationship`, and the rest of the bundle | none; relation-level |
+| Warehouse schema | `loaders.warehouse.land_warehouse(connector, catalog=..., schema=...)` | every object the connector reports, as `<catalog>.<schema>.<object>`; nothing is copied | none; relation-level |
 
 The tabular loader picks the header as the first of the first 50 rows where at least 80 percent of cells are non-empty, non-numeric strings, those strings are unique ignoring case, and none recurs in its column. The width of that test is the highest column index holding a non-empty cell anywhere in the window, so trailing empty columns do not lower the score. A sheet where no row passes lands with columns `_col_1` to `_col_n`, a null header row, and its name in `LandResult.headerless`; the other sheets still land. Merged cells are not expanded. A column is typed as a number only when every text cell survives the round trip, so `1.10`, `007`, and integers beyond 64 bits stay text. A header named `_sema_locator` fails the landing.
 
@@ -48,9 +51,10 @@ The tabular loader picks the header as the first of the first 50 rows where at l
 
 ## Profiling and evidence policy
 
-`profile.ProfileTools(provider, EvidencePolicy(tier=...), ledger, stage=..., structure=None)` is the only way the Structure, Roles, and dry-run stages read landed data. `tier` is `metadata_only` (the intake default), `bounded_values`, or `full`. Every statement is written to the ledger's `sql.jsonl` before it runs, with its stage, provider, `value_bearing`, and `schema_relation` flags.
+`profile.ProfileTools(provider, EvidencePolicy(tier=...), ledger, stage=..., structure=None, land=None)` is the only way the Structure, Roles, and dry-run stages read landed data. `tier` is `metadata_only` (the intake default), `bounded_values`, or `full`; the type is `sema.models.config.EvidenceTier`, shared with `BuildConfig.evidence_policy` (build default `full`), and `EvidencePolicy.from_build_config` copies a build's tier and `max_distinct_values_read`. Every statement is written to the ledger's `sql.jsonl` before it runs, with its stage, provider, `value_bearing`, and `schema_relation` flags.
 
-- `describe_relation` issues one catalog read and one aggregate statement per relation (row count, non-null count, distinct count, and mean text length per column) and never reads a value.
+- `catalog` reads a staging relation through `duckdb_columns()` and a warehouse relation from `land`, issuing no statement; a warehouse relation missing from `land` is refused. `list_relations` lists a warehouse namespace from `land` the same way.
+- `describe_relation` issues the catalog read above and one aggregate statement per relation (row count, non-null count, distinct count, and mean text length per column) and never reads a value.
 - `check_join`, `check_hierarchy`, `count_distinct`, `count_where`, `check_levels`, and `check_paths` return aggregates only. A join check across providers is refused before any statement.
 - `sample_values` returns values only when the policy allows them for that column.
 - `read_schema_text` is the schema-relation rule: once Structure binds a relation as an `entity_model` dictionary or header, its rows describe another relation's schema, so its text may be read under any tier. The statement is logged with `value_bearing: true` and `schema_relation: true`. Any other relation, and any column in `policy.sensitive`, is refused. The audit rule under `metadata_only` is that every value-bearing statement in the Structure and Roles stages carries `schema_relation: true`.

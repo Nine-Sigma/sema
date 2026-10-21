@@ -11,6 +11,17 @@ import pytest
 
 from sema.binding.spec import ConceptSourceSpec, RelationRef
 from sema.ingest.duckdb_staging import Staging
+from tests.unit.intake.warehouse_env import (
+    CATALOG,
+    CODES_COLUMNS,
+    CONCEPT_COLUMNS,
+    SCHEMA,
+    TABLE,
+    UNREADABLE_REASON,
+    FakeConnector,
+    schema_metadata,
+    unreadable,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -216,3 +227,43 @@ def test_warehouse_statement_names_the_relation_with_backticks() -> None:
     )
 
     assert statements == ["SELECT `code`, `label` FROM `cat`.`schema`.`concept`"]
+
+
+# warehouse Land (design Decision 8)
+
+CATALOG_STATEMENT = re.compile(r"\bDESCRIBE\b|\bSHOW\b|\binformation_schema\b", re.IGNORECASE)
+
+
+def test_warehouse_land_reads_the_schema_once_and_fills_columns_types_comments() -> None:
+    from sema.intake.loaders.warehouse import land_warehouse
+
+    connector = FakeConnector(schema_metadata())
+
+    land = land_warehouse(connector, catalog=CATALOG, schema=SCHEMA)
+
+    assert connector.metadata_reads == [(CATALOG, SCHEMA)]
+    assert land.medium == "warehouse"
+    namespace = f"{CATALOG}.{SCHEMA}"
+    assert sorted((r.schema, r.name) for r in land.relations) == [
+        (namespace, "codes"),
+        (namespace, TABLE),
+    ]
+    concept = land.relation(TABLE)
+    assert concept.columns == tuple((c.name, c.data_type) for c in CONCEPT_COLUMNS)
+    assert dict(concept.comments) == {c.name: c.comment for c in CONCEPT_COLUMNS if c.comment}
+    codes = land.relation("codes")
+    assert codes.columns == tuple((c.name, c.data_type) for c in CODES_COLUMNS)
+    assert dict(codes.comments) == {"code": "a code"}
+    assert not [q for q in connector.queries if CATALOG_STATEMENT.search(q)]
+
+
+def test_warehouse_land_fails_naming_the_unreadable_reason() -> None:
+    from sema.intake.loaders.warehouse import land_warehouse
+
+    connector = FakeConnector(unreadable())
+
+    with pytest.raises(ValueError, match=re.escape(UNREADABLE_REASON)):
+        land_warehouse(connector, catalog=CATALOG, schema=SCHEMA)
+
+    assert connector.metadata_reads == [(CATALOG, SCHEMA)]
+    assert connector.queries == []

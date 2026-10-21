@@ -101,7 +101,14 @@ def tools_for(
 ) -> ProfileTools:
     ledger = Ledger(ledger_dir.parent).run(ledger_dir.name)
     policy = EvidencePolicy(tier=tier)
-    return ProfileTools(source.tools.provider, policy, ledger, stage=stage, structure=structure)
+    return ProfileTools(
+        source.tools.provider,
+        policy,
+        ledger,
+        stage=stage,
+        structure=structure,
+        land=source.tools.land,
+    )
 
 
 def failures(verdict: Any, check: str) -> list[Any]:

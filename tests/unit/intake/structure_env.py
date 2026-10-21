@@ -78,10 +78,10 @@ def land(root: Path, name: str, lander: Lander, path: Path) -> tuple[Staging, So
 
 
 def fresh_tools(source: Source, ledger_dir: Path, **kwargs: Any) -> ProfileTools:
-    tools = make_tools(source.tools.provider, ledger_dir)
+    tools = make_tools(source.tools.provider, ledger_dir, source.tools.land)
     if not kwargs:
         return tools
-    return ProfileTools(tools.provider, tools.policy, tools.ledger, **kwargs)
+    return ProfileTools(tools.provider, tools.policy, tools.ledger, land=tools.land, **kwargs)
 
 
 def run(source: Source, tools: ProfileTools, hint: ConceptSourceSpec | None = None) -> Any:

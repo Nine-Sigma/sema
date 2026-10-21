@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from itertools import takewhile
 from typing import Any, Literal
 
 from sema.binding.spec_sections import RelationRef
@@ -140,23 +139,9 @@ def staging_tables_sql(namespace: str) -> str:
     )
 
 
-def warehouse_tables_sql(quoted_catalog: str | None, schema: str) -> str:
-    source = f"{quoted_catalog}.information_schema.tables" if quoted_catalog else (
-        "information_schema.tables"
-    )
-    return (
-        f"SELECT table_name, comment FROM {source}"
-        f" WHERE table_schema = {sql_string(schema)} ORDER BY table_name"
-    )
-
-
 def catalog_columns(rows: Sequence[tuple[Any, ...]]) -> list[CatalogColumn]:
-    """Catalog rows as (name, type, comment); a warehouse listing stops at its first section."""
-    described = takewhile(lambda row: bool(row[0]) and not str(row[0]).startswith("#"), rows)
-    return [
-        CatalogColumn(str(row[0]), str(row[1]), _text_or_none(row[2] if len(row) > 2 else None))
-        for row in described
-    ]
+    """Staging catalog rows as (name, type, comment)."""
+    return [CatalogColumn(str(row[0]), str(row[1]), _text_or_none(row[2])) for row in rows]
 
 
 def aggregate_sql(relation_sql: str, quoted_columns: Sequence[str]) -> str:

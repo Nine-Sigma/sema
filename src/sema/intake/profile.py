@@ -9,11 +9,12 @@ Every statement is written to the run ledger before it is issued.
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
-from typing import Any, Literal, Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from sema.binding.spec_sections import Provider, RelationRef
+from sema.intake.landing import LandedRelation, LandResult
 from sema.intake.ledger import RunLedger
 from sema.intake.profile_utils import (
     ExternalRefCheck,
@@ -41,13 +42,13 @@ from sema.intake.profile_utils import (
     staging_columns_sql,
     staging_tables_sql,
     text_sql,
-    warehouse_tables_sql,
 )
 from sema.intake.relations import RelationProvider
-from sema.models.config import BuildConfig
+from sema.models.config import BuildConfig, EvidenceTier
 
 __all__ = [
     "EvidencePolicy",
+    "EvidenceTier",
     "ExternalRefCheck",
     "HierarchyCheck",
     "JoinCheck",
@@ -61,7 +62,6 @@ __all__ = [
     "ValueSample",
 ]
 
-EvidenceTier = Literal["metadata_only", "bounded_values", "full"]
 ColumnKey = tuple[str, str]
 SAMPLE_CAP = 20
 DEFAULT_MAX_DISTINCT_VALUES_READ: int = BuildConfig.model_fields["max_distinct_values_read"].default
@@ -76,10 +76,17 @@ class EvidencePolicy(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    tier: EvidenceTier
+    tier: EvidenceTier = "metadata_only"
     allowlist: frozenset[ColumnKey] = frozenset()
     max_distinct_values_read: int = Field(default=DEFAULT_MAX_DISTINCT_VALUES_READ, ge=0)
     sensitive: frozenset[ColumnKey] = frozenset()
+
+    @classmethod
+    def from_build_config(cls, config: BuildConfig) -> EvidencePolicy:
+        return cls(
+            tier=config.evidence_policy,
+            max_distinct_values_read=config.max_distinct_values_read,
+        )
 
 
 class SchemaRelations(Protocol):
@@ -104,6 +111,7 @@ class ProfileTools:
         structure: SchemaRelations | None = None,
         vocabulary: CodeLookup | None = None,
         loaded_systems: frozenset[str] = frozenset(),
+        land: LandResult | None = None,
     ) -> None:
         self.provider = provider
         self.policy = policy
@@ -112,19 +120,23 @@ class ProfileTools:
         self.structure = structure
         self.vocabulary = vocabulary
         self.loaded_systems = loaded_systems
+        self.land = land
 
     def list_relations(self, provider_name: Provider, namespace: str) -> list[RelationListing]:
         catalog_ref = RelationRef(provider=provider_name, name=namespace)
-        listed = self._run(catalog_ref, self._tables_sql(catalog_ref))
         listings = []
-        for table, comment in ((str(row[0]), row[1]) for row in listed):
+        for table, comment in self._tables(catalog_ref):
             ref = RelationRef(provider=provider_name, name=f"{namespace}.{table}")
             count = self._run(ref, f"SELECT COUNT(*) FROM {self.provider.relation_sql(ref)}")
             listings.append(RelationListing(ref.name, int(count[0][0]), comment or None))
         return listings
 
     def catalog(self, ref: RelationRef) -> list[CatalogColumn]:
-        return catalog_columns(self._run(ref, self._columns_sql(ref)))
+        if ref.provider == "staging":
+            return catalog_columns(self._run(ref, staging_columns_sql(ref)))
+        landed = self._landed(ref.name)
+        comments = dict(landed.comments)
+        return [CatalogColumn(name, kind, comments.get(name)) for name, kind in landed.columns]
 
     def describe_relation(self, ref: RelationRef) -> RelationProfile:
         catalog = self.catalog(ref)
@@ -246,17 +258,32 @@ class ProfileTools:
         distinct = int(self._run(ref, statement)[0][0])
         return distinct <= self.policy.max_distinct_values_read
 
-    def _columns_sql(self, ref: RelationRef) -> str:
-        if ref.provider == "staging":
-            return staging_columns_sql(ref)
-        return f"DESCRIBE TABLE {self.provider.relation_sql(ref)}"
-
-    def _tables_sql(self, catalog_ref: RelationRef) -> str:
+    def _tables(self, catalog_ref: RelationRef) -> list[tuple[str, str | None]]:
         if catalog_ref.provider == "staging":
-            return staging_tables_sql(catalog_ref.name)
-        catalog, _, schema = catalog_ref.name.rpartition(".")
-        quoted = self.provider.quote(catalog_ref, catalog) if catalog else None
-        return warehouse_tables_sql(quoted, schema)
+            listed = self._run(catalog_ref, staging_tables_sql(catalog_ref.name))
+            return [(str(row[0]), row[1] or None) for row in listed]
+        relations = self._warehouse_land().relations
+        names = sorted(r.name for r in relations if r.schema == catalog_ref.name)
+        return [(name, None) for name in names]
+
+    def _landed(self, name: str) -> LandedRelation:
+        landed = next(
+            (r for r in self._warehouse_land().relations if f"{r.schema}.{r.name}" == name), None
+        )
+        if landed is None:
+            raise ProfileRefusedError(
+                f"warehouse relation {name} is not in the warehouse Land, so its catalog"
+                " facts are unknown"
+            )
+        return landed
+
+    def _warehouse_land(self) -> LandResult:
+        if self.land is None:
+            raise ProfileRefusedError(
+                "warehouse catalog facts come only from the landed relations, and no Land"
+                " was given"
+            )
+        return self.land
 
     def _run(
         self,

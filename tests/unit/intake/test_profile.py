@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from sema.binding.spec_sections import RelationRef
+from tests.unit.binding.fixtures.concept_library import query_fn
 from tests.unit.intake.profile_env import (
     A2_CONCEPT_TEXT,
     A2_LABELS,
@@ -34,6 +36,7 @@ from tests.unit.intake.profile_env import (
     reads,
     value_bearing,
 )
+from tests.unit.intake.warehouse_env import CATALOG, SCHEMA, TABLE, FakeConnector, schema_metadata
 
 pytestmark = pytest.mark.unit
 
@@ -107,7 +110,13 @@ def test_describe_issues_one_aggregate_statement_per_relation(env: Env) -> None:
 
 
 def test_describe_logs_every_issued_statement(env: Env) -> None:
-    described = make_tools(env).describe_relation(SYN_CONCEPT)
+    from sema.intake.loaders.warehouse import land_warehouse
+
+    connector = FakeConnector(schema_metadata(), query=query_fn(env.warehouse))
+    land = land_warehouse(connector, catalog=CATALOG, schema=SCHEMA)
+    ref = RelationRef(provider="warehouse", name=f"{CATALOG}.{SCHEMA}.{TABLE}")
+
+    described = make_tools(env, land=land).describe_relation(ref)
 
     assert described.row_count == 7
     concept_id = column_of(described, "concept_id")

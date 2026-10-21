@@ -57,10 +57,12 @@ def base() -> ModuleType:
     return shapes("base")
 
 
-def make_tools(provider: RelationProvider, ledger_dir: Path) -> ProfileTools:
+def make_tools(
+    provider: RelationProvider, ledger_dir: Path, land: LandResult | None = None
+) -> ProfileTools:
     ledger = Ledger(ledger_dir.parent).run(ledger_dir.name)
     policy = EvidencePolicy(tier="metadata_only")
-    return ProfileTools(provider, policy, ledger, stage="structure")
+    return ProfileTools(provider, policy, ledger, stage="structure", land=land)
 
 
 @dataclass
@@ -118,7 +120,7 @@ def warehouse_source(con: duckdb.DuckDBPyConnection, schema: str, ledger_dir: Pa
 
     land = land_of_schema(lambda sql: con.execute(sql).fetchall(), schema)
     provider = RelationProvider(warehouse=query_fn(con), staging=None)
-    return Source(land, make_tools(provider, ledger_dir), "warehouse", ledger_dir)
+    return Source(land, make_tools(provider, ledger_dir, land), "warehouse", ledger_dir)
 
 
 def land_of_schema(run: Run, schema: str) -> LandResult:
