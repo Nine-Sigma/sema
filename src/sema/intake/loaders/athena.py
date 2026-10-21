@@ -17,10 +17,7 @@ from pydantic import BaseModel
 from sema.binding.spec_sections import (
     ConceptRoles,
     ConceptsSpec,
-    EndpointRole,
     RelationRef,
-    RelationshipRoles,
-    RelationshipsSpec,
     ValueSetRoles,
     ValueSetsSpec,
 )
@@ -59,10 +56,7 @@ REQUIRED_TABLES = tuple(vocab_table(filename) for filename in REQUIRED_VOCAB_FIL
 def fixed_sections(
     relations: Mapping[str, RelationRef], identity_system: str
 ) -> dict[str, BaseModel]:
-    """Each vocabulary is a concept, its concepts the values, related by their numeric ids."""
-    def endpoint(column: str) -> EndpointRole:
-        return EndpointRole(system=identity_system, id=column)
-
+    """Each vocabulary is a concept and its concepts the values; the system is unused."""
     return {
         "concepts": ConceptsSpec(
             relation=relations["vocabulary"],
@@ -74,14 +68,6 @@ def fixed_sections(
             roles=ValueSetRoles(
                 concept_id="vocabulary_id", code="concept_id", display="concept_name"
             ),
-        ),
-        "relationships": RelationshipsSpec(
-            relation=relations["concept_relationship"],
-            roles=RelationshipRoles.model_validate({
-                "from": endpoint("concept_id_1"),
-                "to": endpoint("concept_id_2"),
-                "type": "relationship_id",
-            }),
         ),
     }
 

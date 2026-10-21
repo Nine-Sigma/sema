@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sema.binding.spec_sections import ConceptsSpec, RelationshipsSpec, ValueSetsSpec
+from sema.binding.spec_sections import ConceptsSpec, ValueSetsSpec
 from sema.intake.loaders.athena import REQUIRED_TABLES
 from sema.intake.profile import ProfileTools
 from sema.intake.shapes.base import RelationProfile, SlotBinding
@@ -21,15 +21,11 @@ from sema.intake.shapes.base_utils import (
 from sema.intake.verify.base import Verdict
 
 ID = "athena_bundle"
-# No hierarchy: the ancestor table is a transitive closure no hierarchy form expresses, so it
-# stays staged as-is. The hierarchical flag lives on the optional relationship table, which a
-# one-relation relationships section cannot join. No term details: the concept table holds no
-# definition or external reference; its validity columns are lifecycle roles of its values.
-SECTIONS = (
-    section_of(ConceptsSpec),
-    section_of(ValueSetsSpec),
-    section_of(RelationshipsSpec),
-)
+# The importer scopes relationships to concepts, so the term-level relationship table, like the
+# ancestor closure no hierarchy form expresses, stays staged directly by the loader (importer gap
+# bug-757, S4). No term details: the concept table holds no definition or external reference;
+# its validity columns are lifecycle roles of its values.
+SECTIONS = (section_of(ConceptsSpec), section_of(ValueSetsSpec))
 
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
