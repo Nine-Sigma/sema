@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Any
 
 from sema.binding.importer_utils import (
     Record,
@@ -85,11 +87,23 @@ def read_header(
     if len(columns) < 2:
         raise ValueError(f"header relation {ref.name} needs a key and a value column")
     key_column, value_column = columns[:2]
-    pairs: list[HeaderPair] = [(key_column, value_column)]
-    for record in fetch_in_order(provider, ref, [key_column, value_column]):
-        key = as_text(record[key_column])
+    rows = fetch_in_order(provider, ref, [key_column, value_column])
+    return header_of(
+        [(key_column, value_column)],
+        ((record[key_column], record[value_column]) for record in rows),
+        keys,
+    )
+
+
+def header_of(
+    first: list[HeaderPair], rows: Iterable[tuple[Any, Any]], keys: HeaderKeys | None
+) -> Header:
+    """The reading rule over pairs already read in landed order; blank keys are skipped."""
+    pairs = list(first)
+    for raw_key, raw_value in rows:
+        key = as_text(raw_key)
         if key is not None:
-            pairs.append((key, as_text(record[value_column])))
+            pairs.append((key, as_text(raw_value)))
     stated = keys or HeaderKeys()
     name_key = _header_key(pairs, stated.name, HEADER_KEY_TOKENS["name"], set())
     taken = {name_key} - {None}

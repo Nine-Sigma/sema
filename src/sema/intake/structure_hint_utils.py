@@ -46,7 +46,7 @@ def hint_bindings(hint: ConceptSourceSpec) -> tuple[list[SlotBinding], list[Fail
     failures: list[Failure] = []
     for entry in hint.shape or ():
         builder = BUILDERS.get(entry.template)
-        section = _section(hint, entry.section)
+        section = section_at(hint, entry.section)
         built = builder(hint, section) if builder is not None and section is not None else []
         if not built:
             failures.append(
@@ -56,7 +56,7 @@ def hint_bindings(hint: ConceptSourceSpec) -> tuple[list[SlotBinding], list[Fail
     return bindings, failures
 
 
-def _section(hint: ConceptSourceSpec, path: str) -> object | None:
+def section_at(hint: ConceptSourceSpec, path: str) -> object | None:
     head, _, tail = path.partition(SECTION_SEPARATOR)
     value = getattr(hint, head) if head in type(hint).model_fields else None
     if not tail:

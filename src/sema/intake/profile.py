@@ -207,6 +207,11 @@ class ProfileTools:
                 f"relation {ref.name} is not bound as an entity_model dictionary or header,"
                 " so its text is data, not schema"
             )
+        if sensitive := [c for c in columns if (ref.name, c) in self.policy.sensitive]:
+            raise ProfileRefusedError(
+                f"columns {', '.join(sensitive)} of {ref.name} are bound to sensitive,"
+                " so their text is never read"
+            )
         quoted = [self.provider.quote(ref, column) for column in columns]
         statement = text_sql(self.provider.relation_sql(ref), quoted)
         return self._run(ref, statement, value_bearing=True, schema_relation=True)
