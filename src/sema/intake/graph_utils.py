@@ -285,7 +285,8 @@ def route_review(state: IngestState) -> str:
 
 
 def route_decide(state: IngestState) -> str:
-    passed = state.get("verdict") == PASS and state.get("has_spec") and not state.get("stopped")
+    """A settled spec always dry-runs before Review, budget stop or not."""
+    passed = state.get("verdict") == PASS and state.get("has_spec")
     return DRY_RUN if passed else REVIEW
 
 

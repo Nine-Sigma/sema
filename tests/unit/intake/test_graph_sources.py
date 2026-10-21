@@ -33,6 +33,7 @@ import yaml
 
 from sema.intake.model_calls import BudgetExceededError
 from sema.intake.ledger import Ledger
+from tests.unit.intake.catalog_env import write_catalog
 from tests.unit.intake.decisions_env import flat_list, open_entries, presented, write_decisions
 from tests.unit.intake.eligibility_env import clear_embedder
 from tests.unit.intake.graph_env import (
@@ -204,6 +205,69 @@ def test_edited_spec_settles_a_budget_stop_with_zero_calls(tmp_path: Path) -> No
     assert run.row().model_calls == CALL_CAP
     assert run.nodes(mark)[0] == "decide"
     assert run.nodes(mark)[-1] == "review"
+
+
+def _a2_settled(root: Path, cap: int) -> tuple[GraphRun, int]:
+    """A2 under ``cap`` settled by a decisions file closing every open entry as ``none``;
+    a cap of 0 refuses its one Roles call, so the run stops at Review by the budget."""
+    run = discover_with(
+        root, A2_WORKBOOK, A2_DESCRIPTOR, routed_client(), config={"max_calls": cap}
+    )
+    through_values(run, config=intake_config(max_calls=cap))
+    payload = run.outcome.payload
+    opened = [e for e in payload["ambiguities"] if e["choice"] is None and e["source"] is None]
+    assert opened and payload["spec"] is not None
+    rows = [(entry["stage"], entry["subject"], "none") for entry in opened]
+    path = write_decisions(root / "decisions.yaml", rows)
+    calls, mark = run.client.invoke.call_count, run.mark()
+    run.outcome = _settle(run, cap, decisions=path)
+    assert run.client.invoke.call_count == calls
+    return run, mark
+
+
+@pytest.mark.parametrize("cap", [0, WIDE_CALL_CAP], ids=["budget-stopped", "not-stopped"])
+def test_decisions_dry_run_the_settled_spec_before_review(tmp_path: Path, cap: int) -> None:
+    run, mark = _a2_settled(tmp_path, cap)
+    stopped = cap == 0
+
+    assert run.outcome.node == "review"
+    assert run.nodes(mark) == ["decide", "dry_run", "review"]
+    assert [kind for kind, stage in run.steps(mark) if stage == "dry_run"] == ["node", "verdict"]
+    assert run.outcome.payload["dry_run"] is not None
+    assert run.row().model_calls == (0 if stopped else 1)
+    # A2's one Roles call was never recorded, so decide's recomputation is refused again.
+    assert run.row().reason == ("budget_exceeded" if stopped else None)
+
+
+def test_a_decide_with_no_refused_call_clears_the_budget_reason(tmp_path: Path) -> None:
+    """The cap refuses Enrich's first call; decide recomputes only recorded calls."""
+    source, run_descriptor = write_catalog(tmp_path / "inputs")
+    run = discover_with(
+        tmp_path, source, run_descriptor, routed_client(),
+        config={"max_calls": 1}, tier="full", enrich=True,
+    )
+    assert (run.row().reason, run.client.invoke.call_count) == ("budget_exceeded", 1)
+    edited = tmp_path / "edited.spec.yaml"
+    edited.write_text(yaml.safe_dump({"concept_source": run.artifact("spec")}, sort_keys=False))
+    mark = run.mark()
+
+    outcome = _settle(run, 1, spec=edited)
+
+    assert getattr(outcome, "node") == "review"
+    assert run.nodes(mark) == ["decide", "dry_run", "review"]
+    assert (run.row().stage, run.row().status, run.row().reason) == REVIEW_ROW
+    assert run.client.invoke.call_count == 1
+
+
+def test_a_budget_stopped_run_imports_only_after_its_dry_run(tmp_path: Path) -> None:
+    run, mark = _a2_settled(tmp_path, 0)
+
+    outcome = _settle(run, 0)
+
+    assert outcome is not None and run.row().status == "approved"
+    later = run.nodes(mark)
+    assert "dry_run" in later and later.index("dry_run") < later.index("import")
+    assert run.client.invoke.call_count == 0
 
 
 # --- 2. Land picks the existing loader by medium --------------------------------------
