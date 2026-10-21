@@ -1,0 +1,15 @@
+{
+  "model": "openai/gpt-6-luna",
+  "output": {
+    "confidences": [
+      0.99
+    ],
+    "reasons": [
+      "The claims in force assign the definition role to none for this relation."
+    ],
+    "role_status": "none"
+  },
+  "prompt": "# prompt: roles v1\n\nYou choose what the columns and properties of one relation landed from a source stand for.\nCode has profiled the relation and proved, for each entry below, the members its predicates\naccept. Code could not decide between them, so each entry asks you to choose one.\n\n## How to answer\n\n- Answer the field named under each entry with exactly one member listed there, or `abstain`\n  when the evidence below does not separate the members.\n- Fill `confidences` and `reasons` with one item per entry, in entry order from entry 0. A list\n  of any other length fails the whole answer.\n- A reason is one short sentence naming the evidence that decided the choice, or why the\n  evidence could not decide it.\n- A role entry names a role and offers the columns eligible for it; a column another role\n  already holds and may not share is listed under exclusions and not offered. Never choose\n  one column for two roles in one answer. An optional role also offers `none`, which means\n  the relation has no column for that role.\n- A reference entry names a property and offers the code lists or entities its text may refer\n  to; `none` means the property refers to nothing landed.\n- Use only the evidence given here. Names, types, comments, aggregates, and the text of\n  relations that describe the schema are shown; data values are not.\n\n## Claims in force\n\n- `code`: `concept_code` (lexicon)\n- `concept_id`: `concept_prt_id` (lexicon)\n- `name`: `vocabulary_id` (code)\n- `display`: `vocabulary_id` (code)\n- `definition`: `none` (code)\n- `valid_from`: `none` (code)\n- `valid_to`: `none` (code)\n- `synonyms`: `none` (code)\n- `title`: `none` (code)\n- `vocabulary_id`: `none` (code)\n- `concept_code`: `none` (code)\n\n## Failed checks from previous answers\n\nnone\n\n## Relations\n\n### standard_library.standard_library_concept\nrows: 48\ncolumns:\n- concept_prt_id: type VARCHAR, distinct 48, distinct ratio 1, null rate 0, mean length 8.812, unique\n- concept_athena_id: type VARCHAR, distinct 32, distinct ratio 1, null rate 0.3333, mean length 7\n- vocabulary_id: type VARCHAR, distinct 2, distinct ratio 0.04167, null rate 0, mean length 7.958\n- concept_code: type VARCHAR, distinct 48, distinct ratio 1, null rate 0, mean length 7.792, unique\n- definition: type VARCHAR, distinct 1, distinct ratio 0.08333, null rate 0.75, mean length 35, constant\n\n## Entries\n\n### entry 0: standard_library.standard_library_concept.status\nfield: `role_status`\nmembers:\n- `definition`\n- `none`\nhints: settled_by: none\nexclusions: vocabulary_id: name\n",
+  "schema_name": "RolesChoice_v1",
+  "tokens": 968
+}
