@@ -1,7 +1,9 @@
 """concept_and_value_set: a concept relation, a value relation, and a resolving key pair.
 
 The value relation holds a non-null code unique within each key group, because a value set
-contributes values of its own rather than repeating or annotating its concept.
+contributes values of its own rather than repeating or annotating its concept. Those codes do
+not resolve into the concept id: when they do, every value is a concept and the value relation
+links concepts to concepts.
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ SLOTS = (
     Slot(VALUE_KEY, "column"),
 )
 ONE_TO_MANY = "one_to_many"
+VALUES_ARE_NOT_CONCEPTS = "values_are_not_concepts"
 
 KeyPair = tuple[RelationProfile, ColumnProfile, RelationProfile, ColumnProfile]
 
@@ -91,25 +94,47 @@ def _pair_failures(
     tools: ProfileTools,
 ) -> list[Failure]:
     return _join_failures(concepts, key, values, value_key, tools) or _value_code_failures(
-        values, value_key, tools
+        concepts, key, values, value_key, tools
     )
 
 
 def _value_code_failures(
-    values: RelationProfile, value_key: ColumnProfile, tools: ProfileTools
+    concepts: RelationProfile,
+    key: ColumnProfile,
+    values: RelationProfile,
+    value_key: ColumnProfile,
+    tools: ProfileTools,
 ) -> list[Failure]:
+    codes = _value_codes(values, value_key, tools)
+    if not codes:
+        return [failure("value_code_unique_per_key", values.ref.name, value_key.name)]
+    failures = []
+    for code in (c for c in codes if may_resolve(c, key)):
+        joined = tools.check_join(concepts.ref, key.name, values.ref, code.name)
+        if joined.resolve_b_to_a >= JOIN_RESOLVE_FLOOR:
+            failures.append(
+                failure(
+                    VALUES_ARE_NOT_CONCEPTS,
+                    values.ref.name,
+                    code.name,
+                    resolve=joined.resolve_b_to_a,
+                )
+            )
+    return failures
+
+
+def _value_codes(
+    values: RelationProfile, value_key: ColumnProfile, tools: ProfileTools
+) -> list[ColumnProfile]:
     keyed = nonnull_rows(values, value_key)
-    codes = [
+    return [
         column
         for column in values.columns
         if column.name != value_key.name
         and column.null_rate == 0.0
         and column.distinct_count * value_key.distinct_count >= keyed
+        and tools.count_distinct(values.ref, [value_key.name, column.name]) == keyed
     ]
-    for code in codes:
-        if tools.count_distinct(values.ref, [value_key.name, code.name]) == keyed:
-            return []
-    return [failure("value_code_unique_per_key", values.ref.name, value_key.name)]
 
 
 def _join_failures(
