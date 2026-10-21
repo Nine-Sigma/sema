@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import builtins
+import importlib
 import io
 import os
 from collections.abc import Callable
@@ -13,7 +14,16 @@ import pytest
 
 from sema.intake.ledger import Ledger
 from sema.intake.registry import Registry
-from tests.unit.intake.graph_env import REGISTRY_FILE, graph
+from tests.unit.intake.graph_env import (
+    ACRIS_DESCRIPTOR,
+    LAYOUT_PROPOSAL,
+    REGISTRY_FILE,
+    asks_for_values,
+    fills_down,
+    graph,
+    mixed_source,
+    routed_client,
+)
 from tests.unit.intake.model_calls_env import MODEL, choice, numbered_prompt
 from tests.unit.intake.shapes.shapes_env import FIXTURES
 
@@ -80,3 +90,28 @@ def guard_held_out_reads(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(io, "open", _open)
     monkeypatch.setattr(builtins, "open", _open)
+
+
+APPROVER = "dean"
+VALUE_SOURCE = "mixed"
+
+
+def value_source(root: Path) -> Any:
+    """Code tables beside a codebook only a fill-down view reads: the run asks for values."""
+    utils = importlib.import_module("scripts.record_intake_run_utils")
+    return utils.RecordedSource(
+        name=VALUE_SOURCE, path=mixed_source(root), descriptor=ACRIS_DESCRIPTOR
+    )
+
+
+def asking_client() -> Any:
+    return routed_client({LAYOUT_PROPOSAL: [asks_for_values, fills_down]})
+
+
+def stuck_at_values() -> Callable[..., Any]:
+    """Stands in for ``discover`` and ``approve_values``: every answer is another value ask."""
+
+    def _ask(*_args: Any, **_kwargs: Any) -> Any:
+        return graph().RunOutcome("stuck-run", "value_ask", {"requests": [{"columns": []}]})
+
+    return _ask

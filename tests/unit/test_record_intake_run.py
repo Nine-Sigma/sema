@@ -17,7 +17,7 @@ replay source", design Decision 10):
   manifest)`` calls ``sema.intake.graph.discover`` through the module with no hint and no
   decisions, stops at Review, replaces ``<recordings>/<name>/calls/`` with the run ledger's
   ``calls/*.json``, and writes ``<recordings>/<name>/recording.json`` with exactly
-  ``source, provider, model, prompt_versions, calls, tokens, cost``;
+  ``source, provider, model, prompt_versions, calls, tokens, cost, approver, value_asks``;
   ``verify_replay(source, *, recordings, workdir, config, client) -> RunOutcome`` runs a
   fresh run with ``recordings_dir`` set and raises unless it reaches Review with zero
   provider calls; ``main(argv) -> int`` with ``--source`` (repeatable), ``--recordings``,
@@ -74,7 +74,8 @@ SOURCE_PATHS = {
     "a7_csv": FIXTURES / "omop" / "OMOP_CDMv5.4_Field_Level.csv",
     "a10": FIXTURES / "acris",
 }
-MANIFEST_KEYS = {"source", "provider", "model", "prompt_versions", "calls", "tokens", "cost"}
+MANIFEST_KEYS = {"source", "provider", "model", "prompt_versions", "calls", "tokens", "cost",
+                 "approver", "value_asks"}
 FORBIDDEN_ENTRIES = ("approve", "approve_values", "reject", "resume")
 VERSION_PREFIX = "# prompt: "
 

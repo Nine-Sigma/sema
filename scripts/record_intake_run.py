@@ -10,6 +10,9 @@ run over that directory as ``recordings_dir`` must reach Review with zero provid
 
 with ``INTAKE_MODEL_PROVIDER=openrouter``, ``INTAKE_MODEL_MODEL``, ``INTAKE_MODEL_API_KEY``,
 ``INTAKE_MODEL_MAX_CALLS``, ``INTAKE_MODEL_MAX_COST``, and ``INTAKE_MODEL_PRICES`` set.
+A run that stops at a value ask is refused unless ``--approve-values --approver NAME`` is
+given; each approval is logged in the run ledger with the approver, and the replay check
+approves the same asks.
 """
 
 from __future__ import annotations
@@ -27,10 +30,13 @@ from pydantic import ValidationError
 
 from scripts.record_intake_run_utils import (
     FIXTURES,
+    MAX_VALUE_ASKS,
     RECORDINGS_DIR,
+    VALUE_APPROVAL_KIND,
     RecordedSource,
     RecordingError,
     ReplayMismatchError,
+    ValueApprovals,
     check_provider,
     prepare,
     replace_calls,
@@ -39,7 +45,8 @@ from scripts.record_intake_run_utils import (
 from sema.intake import graph as intake_graph
 from sema.intake.eligibility_utils import RunDescriptor
 from sema.intake.graph_stages import REGISTRY_FILE
-from sema.intake.graph_utils import REVIEW
+from sema.intake.graph_utils import REVIEW, VALUE_ASK
+from sema.intake.ledger import Ledger
 from sema.intake.loaders.athena import VOCABULARY_SCHEMA
 from sema.intake.model_calls import BUDGET_REASON, IntakeClient, IntakeProviderNotSetError
 from sema.intake.registry import Registry
@@ -143,6 +150,27 @@ def _discover(
     )
 
 
+def _answer_value_asks(
+    outcome: intake_graph.RunOutcome,
+    root: Path,
+    config: IntakeModelConfig,
+    client: IntakeClient | None,
+    approver: str | None,
+) -> tuple[intake_graph.RunOutcome, ValueApprovals]:
+    """Approve each value ask when an approver is named; the approval is logged first."""
+    asks = 0
+    while outcome.node == VALUE_ASK and approver is not None and asks < MAX_VALUE_ASKS:
+        requests = (outcome.payload or {}).get("requests", [])
+        payload = {"approver": approver, "requests": len(requests)}
+        Ledger(root).run(outcome.run_id).event(VALUE_ASK, VALUE_APPROVAL_KIND, payload)
+        logger.info(f"run {outcome.run_id}: {approver} approves {len(requests)} value reads")
+        outcome = intake_graph.approve_values(
+            outcome.run_id, root=root, config=config, client=client
+        )
+        asks += 1
+    return outcome, ValueApprovals(approver, asks)
+
+
 def record_source(
     source: RecordedSource,
     *,
@@ -150,11 +178,13 @@ def record_source(
     workdir: Path,
     config: IntakeModelConfig,
     client: IntakeClient | None = None,
+    approver: str | None = None,
 ) -> Recording:
     """One live run to Review; its call records replace the source's recording."""
     check_provider(config)
     live = config.model_copy(update={"recordings_dir": None})
-    outcome = _discover(source, workdir, live, client)
+    started = _discover(source, workdir, live, client)
+    outcome, values = _answer_value_asks(started, workdir, live, client, approver)
     if outcome.node != REVIEW:
         raise RecordingError(
             f"{source.name}: run {outcome.run_id} stopped at {outcome.node}, not {REVIEW}"
@@ -163,7 +193,7 @@ def record_source(
     directory = recordings / source.name
     calls = replace_calls(workdir / outcome.run_id, directory)
     row = Registry(workdir / REGISTRY_FILE).get(outcome.run_id)
-    manifest = write_manifest(directory, source.name, live, row, calls)
+    manifest = write_manifest(directory, source.name, live, row, calls, values)
     return Recording(outcome.run_id, outcome, directory, manifest)
 
 
@@ -174,12 +204,14 @@ def verify_replay(
     workdir: Path,
     config: IntakeModelConfig,
     client: IntakeClient | None = None,
+    approver: str | None = None,
 ) -> intake_graph.RunOutcome:
     """A fresh run over the recording; a zero call cap makes any miss a refused call."""
     replay = config.model_copy(
         update={"recordings_dir": recordings / source.name, "max_calls": 0}
     )
-    outcome = _discover(source, workdir, replay, client)
+    started = _discover(source, workdir, replay, client)
+    outcome, _ = _answer_value_asks(started, workdir, replay, client, approver)
     row = Registry(workdir / REGISTRY_FILE).get(outcome.run_id)
     if outcome.node != REVIEW or row.model_calls or row.reason == BUDGET_REASON:
         raise ReplayMismatchError(
@@ -208,6 +240,8 @@ def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--source", action="append", choices=names, dest="sources")
     parser.add_argument("--recordings", type=Path, default=RECORDINGS_DIR)
     parser.add_argument("--workdir", type=Path, default=None)
+    parser.add_argument("--approve-values", action="store_true")
+    parser.add_argument("--approver", default=None)
     args = parser.parse_args(argv)
     args.sources = args.sources or names
     return args
@@ -221,20 +255,36 @@ def _config() -> IntakeModelConfig:
 
 
 def _record_and_verify(
-    source: RecordedSource, recordings: Path, workdir: Path, config: IntakeModelConfig
+    source: RecordedSource,
+    recordings: Path,
+    workdir: Path,
+    config: IntakeModelConfig,
+    approver: str | None,
 ) -> None:
     recording = record_source(
-        source, recordings=recordings, workdir=workdir / f"{source.name}_record", config=config
+        source,
+        recordings=recordings,
+        workdir=workdir / f"{source.name}_record",
+        config=config,
+        approver=approver,
     )
     logger.info(f"{source.name}: recorded run {recording.run_id} into {recordings}")
     outcome = verify_replay(
-        source, recordings=recordings, workdir=workdir / f"{source.name}_replay", config=config
+        source,
+        recordings=recordings,
+        workdir=workdir / f"{source.name}_replay",
+        config=config,
+        approver=approver,
     )
     logger.info(f"{source.name}: replay run {outcome.run_id} reached {outcome.node}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse(argv)
+    if args.approve_values and not args.approver:
+        print("refused: --approve-values requires --approver NAME", file=sys.stderr)
+        return 2
+    approver = args.approver if args.approve_values else None
     try:
         config = _config()
     except (IntakeProviderNotSetError, ValueError, ValidationError) as error:
@@ -245,7 +295,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     failed: list[str] = []
     for name in args.sources:
         try:
-            _record_and_verify(by_name[name], args.recordings, workdir, config)
+            _record_and_verify(by_name[name], args.recordings, workdir, config, approver)
         except (RecordingError, ReplayMismatchError) as error:
             print(f"failed: {error}", file=sys.stderr)
             failed.append(name)

@@ -29,6 +29,8 @@ MANIFEST_FILE = "recording.json"
 RECORDING_PROVIDER = "openrouter"
 VERSION_PREFIX = "# prompt: "
 DESCRIPTOR_SUFFIX = ".run.yaml"
+VALUE_APPROVAL_KIND = "value_approval"
+MAX_VALUE_ASKS = 5
 
 
 class RecordingError(RuntimeError):
@@ -103,8 +105,21 @@ def _first_line(call: Path) -> str:
     return prompt.splitlines()[0] if prompt else ""
 
 
+@dataclass(frozen=True)
+class ValueApprovals:
+    """Who approved the run's value reads, and how many value asks were answered."""
+
+    approver: str | None
+    asks: int
+
+
 def write_manifest(
-    directory: Path, name: str, config: IntakeModelConfig, row: RunRecord, calls: list[Path]
+    directory: Path,
+    name: str,
+    config: IntakeModelConfig,
+    row: RunRecord,
+    calls: list[Path],
+    values: ValueApprovals,
 ) -> dict[str, Any]:
     manifest: dict[str, Any] = {
         "source": name,
@@ -114,6 +129,8 @@ def write_manifest(
         "calls": row.model_calls,
         "tokens": row.tokens,
         "cost": row.cost,
+        "approver": values.approver if values.asks else None,
+        "value_asks": values.asks,
     }
     text = json.dumps(manifest, indent=2, sort_keys=False) + "\n"
     (directory / MANIFEST_FILE).write_text(text, encoding="utf-8")
