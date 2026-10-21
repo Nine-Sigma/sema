@@ -79,6 +79,20 @@ class IntakeModelConfig(BaseSettings):
     request_timeout: int = 120
 
 
+class TracingConfig(BaseSettings):
+    """Where intake runs send traces; the trace store itself is MLflow's own setting."""
+
+    model_config = SettingsConfigDict(env_prefix="INTAKE_TRACING_")
+
+    backend: Literal["none", "mlflow", "langfuse"] = "none"
+
+    @model_validator(mode="after")
+    def _backend_is_available(self) -> TracingConfig:
+        if self.backend == "langfuse":
+            raise ValueError("tracing backend 'langfuse' is not available until slice S4")
+        return self
+
+
 class EmbeddingConfig(BaseSettings):
     """Embedding provider configuration.
 

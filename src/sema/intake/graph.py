@@ -10,7 +10,7 @@ recomputes its inputs from Land, with model calls replayed from the run ledger.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Hashable, Iterator
+from collections.abc import Callable, Hashable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -59,8 +59,9 @@ from sema.intake.graph_utils import (
 from sema.intake.model_calls import IntakeClient
 from sema.intake.profile import EvidenceTier
 from sema.intake.registry import Registry
+from sema.intake.tracing import Tracer, run_tracing
 from sema.intake.verify.roles import verify_roles
-from sema.models.config import IntakeModelConfig
+from sema.models.config import IntakeModelConfig, TracingConfig
 
 __all__ = ["RunOutcome", "approve", "approve_values", "discover", "reject", "resume"]
 
@@ -72,6 +73,7 @@ ROUTES = (
 )
 
 Graph = CompiledStateGraph[IngestState, None, IngestState, IngestState]
+NodeBody = Callable[[IngestState], dict[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -126,14 +128,15 @@ def discover(
     tier: EvidenceTier = "metadata_only",
     run_id: str | None = None,
     schema: str | None = None,
+    tracing: TracingConfig | None = None,
 ) -> RunOutcome:
     """Start a run from a source and run it to its first interrupt."""
     run_id = run_id or str(uuid.uuid4())
     state = initial_state(
         run_id, source, descriptor, schema=schema, tier=tier, hint=hint, enrich=enrich
     )
-    Registry(root / REGISTRY_FILE).register(run_id, source=source.name, stage=LAND)
-    with _opened(run_id, root, config, client) as run:
+    with _opened(run_id, "discover", root, config, client, tracing) as run:
+        Registry(root / REGISTRY_FILE).register(run_id, source=source.name, stage=LAND)
         return run.invoke(state)
 
 
@@ -146,9 +149,10 @@ def approve(
     client: IntakeClient | None = None,
     spec: Path | None = None,
     decisions: Path | None = None,
+    tracing: TracingConfig | None = None,
 ) -> RunOutcome:
     """Import, re-enter with an edited spec, or settle open entries with a decisions file."""
-    with _opened(run_id, root, config, client) as run:
+    with _opened(run_id, "approve", root, config, client, tracing) as run:
         state = run.waiting(REVIEW)
         answer: dict[str, Any] = {"action": APPROVE, "approver": approver}
         if decisions is not None:
@@ -170,26 +174,37 @@ def reject(
     config: IntakeModelConfig,
     approver: str,
     client: IntakeClient | None = None,
+    tracing: TracingConfig | None = None,
 ) -> RunOutcome:
-    with _opened(run_id, root, config, client) as run:
+    with _opened(run_id, "reject", root, config, client, tracing) as run:
         run.waiting(REVIEW)
         return run.invoke(Command(resume={"action": REJECT, "approver": approver}))
 
 
 def approve_values(
-    run_id: str, *, root: Path, config: IntakeModelConfig, client: IntakeClient | None = None
+    run_id: str,
+    *,
+    root: Path,
+    config: IntakeModelConfig,
+    client: IntakeClient | None = None,
+    tracing: TracingConfig | None = None,
 ) -> RunOutcome:
     """Approve every column the value interrupt requested; the requesting node re-runs."""
-    with _opened(run_id, root, config, client) as run:
+    with _opened(run_id, "approve_values", root, config, client, tracing) as run:
         run.waiting(VALUE_ASK)
         return run.invoke(Command(resume={"action": APPROVE}))
 
 
 def resume(
-    run_id: str, *, root: Path, config: IntakeModelConfig, client: IntakeClient | None = None
+    run_id: str,
+    *,
+    root: Path,
+    config: IntakeModelConfig,
+    client: IntakeClient | None = None,
+    tracing: TracingConfig | None = None,
 ) -> RunOutcome:
     """Continue a run after a process exit at the node it stopped in."""
-    with _opened(run_id, root, config, client) as run:
+    with _opened(run_id, "resume", root, config, client, tracing) as run:
         pending = run.graph.get_state(run.config).next
         if not pending:
             return run.outcome()
@@ -199,36 +214,50 @@ def resume(
 
 @contextmanager
 def _opened(
-    run_id: str, root: Path, config: IntakeModelConfig, client: IntakeClient | None
+    run_id: str,
+    entry: str,
+    root: Path,
+    config: IntakeModelConfig,
+    client: IntakeClient | None,
+    tracing: TracingConfig | None,
 ) -> Iterator[_Opened]:
-    root.mkdir(parents=True, exist_ok=True)
-    session = Session(root, config, client, Hooks(verify_roles=verify_roles, enrich=enrich))
-    nodes = Nodes(session)
-    runnable: RunnableConfig = {
-        "configurable": {"thread_id": run_id}, "recursion_limit": RECURSION_LIMIT,
-    }
-    try:
-        with SqliteSaver.from_conn_string(str(root / CHECKPOINT_FILE)) as saver:
-            graph = _graph(nodes).compile(checkpointer=saver)
-            yield _Opened(graph, runnable, nodes, run_id)
-    finally:
-        session.close()
+    """Tracing opens first, so a missing backend package fails the run before Land."""
+    with run_tracing(tracing or TracingConfig(), run_id, entry=entry) as tracer:
+        root.mkdir(parents=True, exist_ok=True)
+        hooks = Hooks(verify_roles=verify_roles, enrich=enrich)
+        session = Session(root, config, client, hooks)
+        nodes = Nodes(session)
+        runnable: RunnableConfig = {
+            "configurable": {"thread_id": run_id}, "recursion_limit": RECURSION_LIMIT,
+        }
+        try:
+            with SqliteSaver.from_conn_string(str(root / CHECKPOINT_FILE)) as saver:
+                graph = _graph(nodes, tracer).compile(checkpointer=saver)
+                yield _Opened(graph, runnable, nodes, run_id)
+        finally:
+            session.close()
 
 
-def _graph(nodes: Nodes) -> StateGraph[IngestState, None, IngestState, IngestState]:
+def _graph(
+    nodes: Nodes, tracer: Tracer
+) -> StateGraph[IngestState, None, IngestState, IngestState]:
     graph: StateGraph[IngestState, None, IngestState, IngestState] = StateGraph(IngestState)
-    graph.add_node(LAND, nodes.land)
-    graph.add_node(STRUCTURE, nodes.structure)
-    graph.add_node(RESOLVE_STRUCTURE, nodes.resolve_structure)
-    graph.add_node(PROPOSE, nodes.propose_layouts)
-    graph.add_node(VALUE_ASK, _value_ask(nodes))
-    graph.add_node(ROLES, nodes.roles)
-    graph.add_node(RESOLVE_ROLES, nodes.resolve_roles)
-    graph.add_node(ENRICH, nodes.enrich)
-    graph.add_node(DRY_RUN, nodes.dry_run)
-    graph.add_node(REVIEW, _review(nodes))
-    graph.add_node(DECIDE, nodes.decide)
-    graph.add_node(IMPORT, nodes.import_)
+    bodies: dict[str, NodeBody] = {
+        LAND: nodes.land,
+        STRUCTURE: nodes.structure,
+        RESOLVE_STRUCTURE: nodes.resolve_structure,
+        PROPOSE: nodes.propose_layouts,
+        VALUE_ASK: _value_ask(nodes),
+        ROLES: nodes.roles,
+        RESOLVE_ROLES: nodes.resolve_roles,
+        ENRICH: nodes.enrich,
+        DRY_RUN: nodes.dry_run,
+        REVIEW: _review(nodes),
+        DECIDE: nodes.decide,
+        IMPORT: nodes.import_,
+    }
+    for name, body in bodies.items():
+        graph.add_node(name, _traced(tracer, name, body))
     graph.add_edge(START, LAND)
     graph.add_edge(STRUCTURE, RESOLVE_STRUCTURE)
     graph.add_edge(VALUE_ASK, PROPOSE)
@@ -247,7 +276,15 @@ def _graph(nodes: Nodes) -> StateGraph[IngestState, None, IngestState, IngestSta
     return graph
 
 
-def _review(nodes: Nodes) -> Any:
+def _traced(tracer: Tracer, stage: str, body: NodeBody) -> Any:
+    def node(state: IngestState) -> dict[str, Any]:
+        with tracer.node(stage):
+            return body(state)
+
+    return node
+
+
+def _review(nodes: Nodes) -> NodeBody:
     def review(state: IngestState) -> dict[str, Any]:
         answer: dict[str, Any] = interrupt(nodes.review(state))
         return nodes.after_review(state, answer)
@@ -255,7 +292,7 @@ def _review(nodes: Nodes) -> Any:
     return review
 
 
-def _value_ask(nodes: Nodes) -> Any:
+def _value_ask(nodes: Nodes) -> NodeBody:
     def value_ask(state: IngestState) -> dict[str, Any]:
         payload = nodes.value_ask(state)
         interrupt(payload)

@@ -35,6 +35,9 @@ dependencies = [
     "openpyxl>=3.1",
 ]
 
+[project.optional-dependencies]
+tracing-mlflow = ["mlflow-tracing>=3.11"]
+
 [project.scripts]
 sema = "sema.cli:cli"
 

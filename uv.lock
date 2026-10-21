@@ -4187,6 +4187,11 @@ dependencies = [
     { name = "sqlglot" },
 ]
 
+[package.optional-dependencies]
+tracing-mlflow = [
+    { name = "mlflow-tracing" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "jsonschema" },
@@ -4214,6 +4219,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=1.0,<2" },
     { name = "langgraph-checkpoint-sqlite", specifier = ">=2.0" },
     { name = "loguru", specifier = ">=0.7.3" },
+    { name = "mlflow-tracing", marker = "extra == 'tracing-mlflow'", specifier = ">=3.11" },
     { name = "neo4j", specifier = ">=5.0.0" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "packaging", specifier = ">=24.0" },
@@ -4226,6 +4232,7 @@ requires-dist = [
     { name = "sentence-transformers", specifier = ">=3.0.0" },
     { name = "sqlglot", specifier = ">=25.0.0" },
 ]
+provides-extras = ["tracing-mlflow"]
 
 [package.metadata.requires-dev]
 dev = [
