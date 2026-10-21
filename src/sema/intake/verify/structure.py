@@ -3,7 +3,8 @@
 Candidates are recomputed per proposal group over the relations no human pinned and no
 ignore removed, so a code-bound binding must be one the predicates produced, survive
 precedence, and pass its template's ``verify``; a relation precedence leaves contested
-must be on the ambiguity list. Pinned bindings only re-run ``verify``.
+must be on the ambiguity list. Only claims in force (kept by precedence, or bound) take a
+relation from a single-relation binding. Pinned bindings only re-run ``verify``.
 """
 
 from __future__ import annotations
@@ -135,13 +136,10 @@ def _group_failures(
 ) -> list[Failure]:
     names = {profile.ref.name for profile in members}
     found = group_candidates(members, tools)
+    decided = apply_precedence(found)
     keys = {binding_key(binding) for binding in found}
-    claimed = {
-        name
-        for binding in [*found, *(entry.binding for entry in known)]
-        if claims(binding)
-        for name in binding.relations
-    }
+    in_force = [*decided.candidates, *(entry.binding for entry in known)]
+    claimed = {name for binding in in_force if claims(binding) for name in binding.relations}
     failures = []
     for entry in (e for e in coded if set(e.binding.relations) & names):
         binding = entry.binding
@@ -158,7 +156,7 @@ def _group_failures(
                 if name in claimed
             ]
         failures += _verified(entry, members, tools)
-    contested = [a.subject for a in apply_precedence(found).ambiguities]
+    contested = [a.subject for a in decided.ambiguities]
     failures += [
         failure(AMBIGUITY_LIST_COMPLETE, name, members=len(_over(found, name)))
         for name in contested
