@@ -58,9 +58,36 @@ def _failures(
     if group_by.distinct_ratio > DENORMALIZED_GROUP_RATIO_FLOOR:
         ratio = group_by.distinct_ratio
         return [failure("group_by_ratio", relation, group_by.name, distinct_ratio=ratio)]
-    if not any(_unique_per_group(profile, group_by, code, tools) for code in profile.columns):
+    codes = [c for c in profile.columns if _unique_per_group(profile, group_by, c, tools)]
+    if not codes:
         return [failure("code_unique_per_group", relation, group_by.name)]
+    if not _is_entity(profile, group_by, codes, tools):
+        return [failure("group_is_entity", relation, group_by.name)]
     return []
+
+
+def _is_entity(
+    profile: RelationProfile,
+    group_by: ColumnProfile,
+    codes: Sequence[ColumnProfile],
+    tools: ProfileTools,
+) -> bool:
+    """A group scopes its codes (a weak key) or carries an attribute of its own."""
+    if any(not code.is_unique for code in codes):
+        return True
+    return any(
+        determines(profile, group_by.name, column.name, tools)
+        for column in profile.columns
+        if column.name != group_by.name and column.distinct_count > 1
+    )
+
+
+def determines(profile: RelationProfile, group_by: str, column: str, tools: ProfileTools) -> bool:
+    """``group_by`` functionally determines ``column`` over the rows where it is non-null."""
+    ref = profile.ref
+    present = f"{tools.provider.quote(ref, column)} IS NOT NULL"
+    groups = tools.count_distinct(ref, [group_by], where=present)
+    return tools.count_distinct(ref, [group_by, column]) == groups
 
 
 def _unique_per_group(

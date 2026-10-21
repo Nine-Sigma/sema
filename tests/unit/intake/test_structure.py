@@ -245,9 +245,9 @@ def test_a10_lists_the_five_code_tables_with_their_members(acris: Source, a10: R
     assert set(by_subject) == {ref(acris, name) for name in CODE_TABLES}
     for name in CODE_TABLES:
         ambiguity = by_subject[ref(acris, name)]
+        # Scenario "A10 structure with one honest ambiguity" (amended 2026-10-21): the
+        # grouped code table offers the same two members as the other code tables.
         expected = {"concept_list": 1, "entity_model": 1}
-        if name == GROUPED_CODE_TABLE:
-            expected["concept_with_values_denormalized"] = 2
         assert ambiguity.stage == "structure"
         assert Counter(m.partition("(")[0] for m in ambiguity.members) == expected, name
         lone = f"entity_model(dictionary={ref(acris, name)}, layout=per_file)"

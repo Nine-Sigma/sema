@@ -52,35 +52,33 @@ def test_constant_low_cardinality_column_is_not_a_group_key(acris: Source) -> No
         assert candidates(ID, acris.group(name), acris) == [], name
 
 
-def test_grouped_code_table_has_one_binding_per_non_null_group_column(acris: Source) -> None:
-    found = candidates(ID, acris.group(DOCUMENT_CONTROL), acris)
+# Spec scenario "Grouped code table is structurally ambiguous" (amended 2026-10-21): the
+# group columns determine only the constant column and the code is global, so no group is
+# an entity.
+def test_grouped_code_table_has_no_group_by_binding(acris: Source) -> None:
+    assert candidates(ID, acris.group(DOCUMENT_CONTROL), acris) == []
 
-    assert _group_by(found) == {"CLASS CODE DESCRIPTION", "PARTY1 TYPE"}
-    assert len(found) == 2
 
-
-def test_grouped_code_table_is_a_three_member_structure_ambiguity(acris: Source) -> None:
+# Same scenario: with no denormalized member, the concept list claim is uncontested.
+def test_grouped_code_table_concept_list_is_not_contested_by_a_group(acris: Source) -> None:
     group = acris.group(DOCUMENT_CONTROL)
     ref = acris.ref(DOCUMENT_CONTROL)
     claims = candidates("concept_list", group, acris) + candidates(ID, group, acris)
 
     result = shapes().apply_precedence(claims)
 
-    (ambiguity,) = [a for a in result.ambiguities if a.subject == ref]
-    assert ambiguity.stage == "structure"
-    assert len(ambiguity.members) == 3
-    assert sum(ID in member for member in ambiguity.members) == 2
-    assert sum("concept_list" in member for member in ambiguity.members) == 1
+    assert [a for a in result.ambiguities if a.subject == ref] == []
+    assert [b.template for b in over(result.candidates, ref)] == ["concept_list"]
 
 
-def test_every_template_leaves_document_control_with_exactly_four_members(
+# Same scenario: members are concept_list and entity_model, as for the other code tables.
+def test_every_template_leaves_document_control_with_exactly_two_members(
     acris: Source,
 ) -> None:
     group = acris.group(DOCUMENT_CONTROL)
     expected = [
         *candidates("concept_list", group, acris),
         *candidates("entity_model", group, acris),
-        *candidates(ID, group, acris),
     ]
 
     result = shapes().apply_precedence(every_template_candidates(group, acris))
@@ -88,16 +86,22 @@ def test_every_template_leaves_document_control_with_exactly_four_members(
     (ambiguity,) = [a for a in result.ambiguities if a.subject == acris.ref(DOCUMENT_CONTROL)]
     member = shapes("precedence").member
     assert ambiguity.members == tuple(sorted(member(b) for b in expected))
-    assert len(ambiguity.members) == 4
+    assert len(ambiguity.members) == 2
     assert over(result.candidates, acris.ref(DOCUMENT_CONTROL)) == []
 
 
-def test_verify_passes_and_records_the_group_ratio_floor(acris: Source) -> None:
-    group = acris.group(DOCUMENT_CONTROL)
-    module = shapes(ID)
+# Scenario "Synthetic data element relation": the old loop ran over Document_Control
+# bindings, which no longer exist, so it moves to a binding that holds.
+def test_verify_passes_and_records_the_group_ratio_floor(syn: Source) -> None:
+    element = syn.ref("data_element")
+    found = [
+        b for b in over(candidates(ID, syn.profiles(), syn), element)
+        if b.slots["group_by"] == SYN_GROUP_BY
+    ]
 
-    for found in candidates(ID, group, acris):
-        verdict = verify(ID, found, group, acris)
+    assert found
+    for kept in found:
+        verdict = verify(ID, kept, syn.profiles(), syn)
         assert verdict.status == "pass"
-        floor = module.DENORMALIZED_GROUP_RATIO_FLOOR
+        floor = shapes(ID).DENORMALIZED_GROUP_RATIO_FLOOR
         assert verdict.floors["DENORMALIZED_GROUP_RATIO_FLOOR"] == floor
