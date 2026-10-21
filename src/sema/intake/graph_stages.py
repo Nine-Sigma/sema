@@ -19,6 +19,7 @@ import yaml
 from sema.binding.importer import import_concept_source
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
 from sema.binding.spec_sections import Provider
+from sema.connectors.base import Connector
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.decisions import Decision, apply_structure_decisions, stated_choices
 from sema.intake.eligibility import assemble_spec, run_roles
@@ -32,6 +33,7 @@ from sema.intake.eligibility_utils import (
 from sema.intake.landing import LandResult
 from sema.intake.ledger import Ledger
 from sema.intake.loaders.detect import NoLoaderError, land_source
+from sema.intake.loaders.warehouse import land_warehouse
 from sema.intake.model_calls import IntakeClient, model_calls_for
 from sema.intake.profile import EvidencePolicy, EvidenceTier, ProfileTools
 from sema.intake.profile_utils import NeedsValues
@@ -49,6 +51,7 @@ from sema.models.config import IntakeModelConfig
 T = TypeVar("T")
 
 PROVIDER: Provider = "staging"
+WAREHOUSE_PROVIDER: Provider = "warehouse"
 REGISTRY_FILE = "registry.sqlite"
 STAGING_FILE = "staging.duckdb"
 VALUE_TIER: EvidenceTier = "bounded_values"
@@ -58,6 +61,7 @@ LAND, STRUCTURE, RESOLVE_STRUCTURE = "land", "structure", "resolve_structure"
 PROPOSE, ROLES, RESOLVE_ROLES = "propose_layouts", "roles", "resolve_roles"
 DECIDE, DRY_RUN = "decide", "dry_run"
 FAILED, NO_LOADER = "failed", "no_loader"
+LAND_ARTIFACT = "land_result"
 
 RECOMPUTED = frozenset({PROPOSE, ROLES, RESOLVE_ROLES, RESOLVE_STRUCTURE})
 
@@ -66,13 +70,16 @@ Approvals = tuple[tuple[str, str], ...]
 
 @dataclass(frozen=True)
 class RunInputs:
+    """``catalog`` is set for a warehouse run, whose ``schema`` is then the warehouse's."""
+
     run_id: str
-    source: Path
+    source: Path | None
     descriptor: Path
     schema: str
     tier: EvidenceTier
     hint: Path | None
     enrich: bool
+    catalog: str | None = None
 
 
 @dataclass(frozen=True)
@@ -108,9 +115,12 @@ class Stages:
         config: IntakeModelConfig,
         client: IntakeClient | None,
         embedder: Embedder | None = None,
+        warehouse: Connector | None = None,
     ) -> None:
         self.inputs = inputs
         self.embedder = embedder
+        self.warehouse = warehouse
+        self.provider_name = WAREHOUSE_PROVIDER if inputs.catalog else PROVIDER
         self.registry = Registry(root / REGISTRY_FILE)
         self.ledger = Ledger(root).run(inputs.run_id)
         self.calls = model_calls_for(
@@ -128,7 +138,8 @@ class Stages:
 
     @property
     def provider(self) -> RelationProvider:
-        return RelationProvider(warehouse=None, staging=self.staging)
+        query = self.warehouse.execute_query if self.warehouse is not None else None
+        return RelationProvider(warehouse=query, staging=self.staging)
 
     def close(self) -> None:
         if self._staging is not None:
@@ -155,7 +166,7 @@ class Stages:
         )
 
     def profiles(self, stage: str) -> list[RelationProfile]:
-        return profile_relations(self.land(), self.tools(stage), PROVIDER)
+        return profile_relations(self.land(), self.tools(stage), self.provider_name)
 
     def structure(self) -> StructureResult:
         return self._once((STRUCTURE,), self._structure)
@@ -227,7 +238,9 @@ class Stages:
         tools = self.tools(DECIDE)
         base = self._base_structure(reviewed)
         land, decisions = self.land(), reviewed.decisions
-        structure = apply_structure_decisions(base, decisions, land, tools, provider=PROVIDER)
+        structure = apply_structure_decisions(
+            base, decisions, land, tools, provider=self.provider_name
+        )
         kept = (
             model_choices(self.resolved_roles(reviewed.approvals))
             if RESOLVE_ROLES in reviewed.reached
@@ -242,28 +255,42 @@ class Stages:
 
     def _land(self) -> LandResult:
         inputs = self.inputs
-        try:
-            land = land_source(inputs.source, self.staging, schema=inputs.schema)
-        except NoLoaderError:
-            self.registry.advance(inputs.run_id, LAND, FAILED, reason=NO_LOADER)
-            raise
-        self.ledger.artifact("land_result", land)
+        if inputs.source is None:
+            land = land_warehouse(
+                self._connector(), catalog=str(inputs.catalog), schema=inputs.schema,
+                ledger=self.ledger,
+            )
+        else:
+            try:
+                land = land_source(inputs.source, self.staging, schema=inputs.schema)
+            except NoLoaderError:
+                self.registry.advance(inputs.run_id, LAND, FAILED, reason=NO_LOADER)
+                raise
+        self.ledger.artifact(LAND_ARTIFACT, land)
         return land
+
+    def _connector(self) -> Connector:
+        if self.warehouse is None:
+            raise ValueError(
+                f"run {self.inputs.run_id} lands warehouse schema "
+                f"{self.inputs.catalog}.{self.inputs.schema}; pass its warehouse connector"
+            )
+        return self.warehouse
 
     def _structure(self) -> StructureResult:
         tools = self.tools(STRUCTURE)
-        return run_structure(self.land(), tools, provider=PROVIDER, hint=self.hint())
+        return run_structure(self.land(), tools, provider=self.provider_name, hint=self.hint())
 
     def _resolved(self) -> StructureResult:
         tools = self.tools(RESOLVE_STRUCTURE)
         return resolve_structure(
-            self.structure(), self.land(), tools, self.calls, provider=PROVIDER
+            self.structure(), self.land(), tools, self.calls, provider=self.provider_name
         )
 
     def _proposals(self, approvals: Approvals) -> ProposalResult:
         tools = self.tools(PROPOSE, approvals=approvals)
         return propose_layouts(
-            self.resolved(), self.land(), tools, self.calls, provider=PROVIDER
+            self.resolved(), self.land(), tools, self.calls, provider=self.provider_name
         )
 
     def _role_tools(self, approvals: Approvals) -> ProfileTools:
@@ -284,7 +311,7 @@ class Stages:
         tools = self.tools(RESOLVE_ROLES, structure, approvals)
         return resolve_roles(
             self.roles(approvals), structure, self.land(), tools, self.calls,
-            provider=PROVIDER, hint=self.hint(), embedder=self.embedder,
+            provider=self.provider_name, hint=self.hint(), embedder=self.embedder,
         )
 
     def _policy(self, approvals: Approvals) -> EvidencePolicy:

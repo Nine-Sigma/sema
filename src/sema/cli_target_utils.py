@@ -10,11 +10,20 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from sema.connectors.base import Connector
 from sema.graph.target_retrieval_loader import (
     EntityTableBinding,
     PhysicalSchemaBinding,
 )
 from sema.models.target.loaded import LoadedTarget
+
+
+def warehouse_connector() -> Connector:
+    """The warehouse connector `sema build` resolves from DATABRICKS_* settings."""
+    from sema.models.config import DatabricksConfig
+    from sema.pipeline.build import DatabricksConnectorFactory
+
+    return DatabricksConnectorFactory(DatabricksConfig()).create()
 
 
 def build_summary(loaded: LoadedTarget) -> dict[str, Any]:

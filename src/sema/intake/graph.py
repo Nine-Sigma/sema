@@ -24,6 +24,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command, interrupt
 
 from sema.binding.spec import load_concept_source_spec
+from sema.connectors.base import Connector
 from sema.intake.decisions import load_decisions, validate_decisions
 from sema.intake.eligibility_utils import Embedder
 from sema.intake.enrichment import enrich
@@ -59,6 +60,7 @@ from sema.intake.graph_utils import (
     route_review,
     route_roles,
     route_value_ask,
+    source_label,
 )
 from sema.intake.model_calls import IntakeClient
 from sema.intake.profile import EvidenceTier
@@ -127,7 +129,7 @@ class _Opened:
 
 
 def discover(
-    source: Path,
+    source: Path | None,
     *,
     root: Path,
     descriptor: Path,
@@ -140,17 +142,26 @@ def discover(
     schema: str | None = None,
     tracing: TracingConfig | None = None,
     embedder: Embedder | None = None,
+    warehouse: Connector | None = None,
+    catalog: str | None = None,
 ) -> RunOutcome:
-    """Start a run from a source and run it to its first interrupt.
+    """Start a run from a source path, or from ``warehouse`` schema ``catalog.schema``,
+    and run it to its first interrupt.
 
-    ``embedder`` ranks role columns; pass the same one to every later call on the run.
+    ``embedder`` ranks role columns and ``warehouse`` lands and profiles a warehouse run;
+    pass the same ones to every later call on the run.
     """
     run_id = run_id or str(uuid.uuid4())
+    if (source is None) == (warehouse is None):
+        raise ValueError("discover takes exactly one of a source path and a warehouse connector")
     state = initial_state(
-        run_id, source, descriptor, schema=schema, tier=tier, hint=hint, enrich=enrich
+        run_id, source, descriptor, catalog=catalog, schema=schema, tier=tier, hint=hint,
+        enrich=enrich,
     )
-    with _opened(run_id, "discover", root, config, client, tracing, embedder) as run:
-        Registry(root / REGISTRY_FILE).register(run_id, source=source.name, stage=LAND)
+    live = _Live(client, tracing, embedder, warehouse)
+    with _opened(run_id, "discover", root, config, live) as run:
+        label = source_label(source, catalog, schema)
+        Registry(root / REGISTRY_FILE).register(run_id, source=label, stage=LAND)
         return run.invoke(state)
 
 
@@ -165,9 +176,11 @@ def approve(
     decisions: Path | None = None,
     tracing: TracingConfig | None = None,
     embedder: Embedder | None = None,
+    warehouse: Connector | None = None,
 ) -> RunOutcome:
     """Import, re-enter with an edited spec, or settle open entries with a decisions file."""
-    with _opened(run_id, "approve", root, config, client, tracing, embedder) as run:
+    live = _Live(client, tracing, embedder, warehouse)
+    with _opened(run_id, "approve", root, config, live) as run:
         state = run.waiting(REVIEW)
         answer: dict[str, Any] = {"action": APPROVE, "approver": approver}
         if decisions is not None:
@@ -191,8 +204,10 @@ def reject(
     client: IntakeClient | None = None,
     tracing: TracingConfig | None = None,
     embedder: Embedder | None = None,
+    warehouse: Connector | None = None,
 ) -> RunOutcome:
-    with _opened(run_id, "reject", root, config, client, tracing, embedder) as run:
+    live = _Live(client, tracing, embedder, warehouse)
+    with _opened(run_id, "reject", root, config, live) as run:
         run.waiting(REVIEW)
         return run.answer({"action": REJECT, "approver": approver})
 
@@ -205,9 +220,11 @@ def approve_values(
     client: IntakeClient | None = None,
     tracing: TracingConfig | None = None,
     embedder: Embedder | None = None,
+    warehouse: Connector | None = None,
 ) -> RunOutcome:
     """Approve every column the value interrupt requested; the requesting node re-runs."""
-    with _opened(run_id, "approve_values", root, config, client, tracing, embedder) as run:
+    live = _Live(client, tracing, embedder, warehouse)
+    with _opened(run_id, "approve_values", root, config, live) as run:
         run.waiting(VALUE_ASK)
         return run.invoke(Command(resume={"action": APPROVE}))
 
@@ -220,9 +237,11 @@ def resume(
     client: IntakeClient | None = None,
     tracing: TracingConfig | None = None,
     embedder: Embedder | None = None,
+    warehouse: Connector | None = None,
 ) -> RunOutcome:
     """Continue a run after a process exit at the node it stopped in."""
-    with _opened(run_id, "resume", root, config, client, tracing, embedder) as run:
+    live = _Live(client, tracing, embedder, warehouse)
+    with _opened(run_id, "resume", root, config, live) as run:
         pending = run.graph.get_state(run.config).next
         if not pending:
             return run.outcome()
@@ -230,21 +249,25 @@ def resume(
         return run.invoke(None)
 
 
+@dataclass(frozen=True)
+class _Live:
+    """The live objects a call brings; a run's state holds none of them."""
+
+    client: IntakeClient | None
+    tracing: TracingConfig | None
+    embedder: Embedder | None
+    warehouse: Connector | None
+
+
 @contextmanager
 def _opened(
-    run_id: str,
-    entry: str,
-    root: Path,
-    config: IntakeModelConfig,
-    client: IntakeClient | None,
-    tracing: TracingConfig | None,
-    embedder: Embedder | None,
+    run_id: str, entry: str, root: Path, config: IntakeModelConfig, live: _Live
 ) -> Iterator[_Opened]:
     """Tracing opens first, so a missing backend package fails the run before Land."""
-    with run_tracing(tracing or TracingConfig(), run_id, entry=entry) as tracer:
+    with run_tracing(live.tracing or TracingConfig(), run_id, entry=entry) as tracer:
         root.mkdir(parents=True, exist_ok=True)
         hooks = Hooks(verify_roles=verify_roles, enrich=enrich)
-        session = Session(root, config, client, hooks, embedder)
+        session = Session(root, config, live.client, hooks, live.embedder, live.warehouse)
         nodes = Nodes(session)
         runnable: RunnableConfig = {
             "configurable": {"thread_id": run_id}, "recursion_limit": RECURSION_LIMIT,

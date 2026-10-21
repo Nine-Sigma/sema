@@ -14,7 +14,12 @@ from sema import cli_factories
 from sema.intake.decisions import load_decisions, validate_decisions
 from sema.intake.eligibility_utils import Embedder
 from sema.intake.graph_nodes import AMBIGUITY_SUFFIX, METRICS_ARTIFACT, WAITING
-from sema.intake.graph_stages import REGISTRY_FILE, ROLES, STRUCTURE
+from sema.intake.graph_stages import (
+    LAND_ARTIFACT,
+    REGISTRY_FILE,
+    ROLES,
+    STRUCTURE,
+)
 from sema.intake.graph_utils import REVIEW, VALUE_ASK, AmbiguityList
 from sema.intake.ledger import ARTIFACTS_DIR
 from sema.intake.registry import Registry, RunRecord
@@ -22,6 +27,8 @@ from sema.llm_client import LLMStageError
 from sema.models.config import EmbeddingConfig, IntakeModelConfig
 
 DEFAULT_ROOT = Path(".sema/intake")
+WAREHOUSE_FORM = "<catalog>.<schema>"
+WAREHOUSE_MEDIUM = "warehouse"
 DESCRIPTOR_GLOB = "*.run.yaml"
 OPEN_STAGES = (STRUCTURE, ROLES)
 EMBEDDING_PROVIDER_ENV = "EMBEDDING_PROVIDER"
@@ -50,6 +57,24 @@ def find_descriptor(source: Path) -> Path:
         f"{directory} must hold exactly one {DESCRIPTOR_GLOB} run descriptor"
         f" (found {len(found)}: {names}); pass --descriptor"
     )
+
+
+def warehouse_schema(
+    source: Path | None, warehouse: str | None, descriptor: Path | None, schema: str | None
+) -> tuple[str, str] | None:
+    """The warehouse ``(catalog, schema)`` to discover, or None for a SOURCE run."""
+    if (source is None) == (warehouse is None):
+        raise click.UsageError("pass exactly one of SOURCE and --warehouse")
+    if warehouse is None:
+        return None
+    catalog, _, name = warehouse.partition(".")
+    if not catalog or not name or "." in name:
+        raise click.UsageError(f"--warehouse {warehouse!r} must name {WAREHOUSE_FORM}")
+    if descriptor is None:
+        raise click.UsageError("--warehouse needs --descriptor; a schema has no directory")
+    if schema is not None:
+        raise click.UsageError("--schema names a landing schema for SOURCE, not --warehouse")
+    return catalog, name
 
 
 def intake_model_config() -> IntakeModelConfig:
@@ -117,6 +142,12 @@ def _is_open(entry: dict[str, Any]) -> bool:
     return (
         entry["stage"] in OPEN_STAGES and entry["choice"] is None and entry["source"] is None
     )
+
+
+def landed_from_warehouse(root: Path, run_id: str) -> bool:
+    """True for a run Land read from a warehouse, whose later calls need its connector."""
+    path = root / run_id / ARTIFACTS_DIR / f"{LAND_ARTIFACT}.json"
+    return path.is_file() and json.loads(path.read_text()).get("medium") == WAREHOUSE_MEDIUM
 
 
 def read_metrics(root: Path, run_id: str) -> Any:

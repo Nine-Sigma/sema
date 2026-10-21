@@ -46,6 +46,7 @@ from tests.unit.intake.graph_env import (
     discover,
     graph,
     routed_client,
+    through_values,
 )
 from tests.unit.intake.structure_env import A2_WORKBOOK
 
@@ -266,10 +267,13 @@ def test_each_graph_entry_is_one_trace_of_the_run(
     run_id = "run-entries"
     monkeypatch.setenv(BACKEND_ENV, "mlflow")
 
-    approve(discover(tmp_path, A2_WORKBOOK, A2_DESCRIPTOR, routed_client(), run_id=run_id))
+    run = discover(tmp_path, A2_WORKBOOK, A2_DESCRIPTOR, routed_client(), run_id=run_id)
+    through_values(run)
+    approve(run)
 
     traces = traces_for(run_id)
-    assert sorted(root_span(t).attributes.get(STAGE_ATTR) for t in traces) == ["approve", ENTRY]
+    entries = sorted(root_span(t).attributes.get(STAGE_ATTR) for t in traces)
+    assert entries == ["approve", "approve_values", ENTRY]
     spans = [span for trace in traces for span in trace.data.spans]
     assert {span.attributes.get(RUN_ATTR) for span in spans} == {run_id}
     assert all(span.attributes.get(STAGE_ATTR) for span in spans)

@@ -22,7 +22,12 @@ from typing import TYPE_CHECKING, Any
 import click
 
 from sema.cli_intake import approve_cmd, discover_cmd, runs_cmd
-from sema.cli_target_utils import RecordingDriver, build_summary, load_project_binding
+from sema.cli_target_utils import (
+    RecordingDriver,
+    build_summary,
+    load_project_binding,
+    warehouse_connector,
+)
 from sema.connectors.base import Connector
 from sema.graph.loader import GraphLoader
 from sema.graph.physical_catalog import DatabricksCatalogSource, PhysicalCatalogSource
@@ -223,11 +228,7 @@ def _lazy_warehouse() -> QueryFn:
 
 
 def _import_connector() -> Connector:
-    from sema.models.config import DatabricksConfig
-    from sema.pipeline.build import DatabricksConnectorFactory
-
-    # Same resolution as `sema build`: DATABRICKS_* environment settings.
-    return DatabricksConnectorFactory(DatabricksConfig()).create()
+    return warehouse_connector()
 
 
 def _build_writer(kind: str) -> GraphWriter:

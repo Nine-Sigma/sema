@@ -53,7 +53,8 @@ def merged(left: list[str], right: list[str]) -> list[str]:
 
 class IngestState(TypedDict, total=False):
     run_id: str
-    source_path: str
+    source_path: str | None
+    catalog: str | None
     descriptor: str
     hint: str | None
     schema: str
@@ -100,20 +101,23 @@ class DecisionsArtifact(BaseModel):
 
 def initial_state(
     run_id: str,
-    source: Path,
+    source: Path | None,
     descriptor: Path,
     *,
+    catalog: str | None,
     schema: str | None,
     tier: EvidenceTier,
     hint: Path | None,
     enrich: bool,
 ) -> IngestState:
+    """A path run, or a warehouse run naming ``catalog`` and ``schema``."""
     return IngestState(
         run_id=run_id,
-        source_path=str(source.resolve()),
+        source_path=str(source.resolve()) if source is not None else None,
+        catalog=catalog,
         descriptor=str(descriptor.resolve()),
         hint=str(hint.resolve()) if hint is not None else None,
-        schema=schema or schema_for(source),
+        schema=_landing_schema(source, catalog, schema),
         tier=tier,
         enrich_on=enrich,
         stage=LAND,
@@ -138,11 +142,27 @@ def schema_for(source: Path) -> str:
     return SCHEMA_PREFIX + relation_name(source.stem).lower()
 
 
+def source_label(source: Path | None, catalog: str | None, schema: str | None) -> str:
+    """The registry's source: the path's name, or ``<catalog>.<schema>``."""
+    return source.name if source is not None else f"{catalog}.{schema}"
+
+
+def _landing_schema(source: Path | None, catalog: str | None, schema: str | None) -> str:
+    if (source is None) == (catalog is None):
+        raise ValueError("a run lands either a source path or a warehouse catalog and schema")
+    if source is not None:
+        return schema or schema_for(source)
+    if not schema:
+        raise ValueError(f"a warehouse run on catalog {catalog} needs its schema")
+    return schema
+
+
 def inputs_of(state: IngestState) -> RunInputs:
-    hint = state.get("hint")
+    hint, source = state.get("hint"), state.get("source_path")
     return RunInputs(
         run_id=state["run_id"],
-        source=Path(state["source_path"]),
+        source=Path(source) if source else None,
+        catalog=state.get("catalog"),
         descriptor=Path(state["descriptor"]),
         schema=state["schema"],
         tier=_tier(state["tier"]),

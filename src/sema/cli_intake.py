@@ -9,7 +9,7 @@ imported inside the commands, so loading the CLI loads no LangGraph.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, get_args
+from typing import TYPE_CHECKING, Any, cast, get_args
 
 import click
 
@@ -22,13 +22,16 @@ from sema.cli_intake_utils import (
     error_message,
     find_descriptor,
     intake_model_config,
+    landed_from_warehouse,
     outcome_summary,
     read_metrics,
     refuse_unless_waiting,
     registry_of,
     reject_conflict,
     run_row,
+    warehouse_schema,
 )
+from sema.cli_target_utils import warehouse_connector
 from sema.intake.model_calls import IntakeClient, build_intake_client
 from sema.intake.profile import EvidenceTier
 from sema.models.config import IntakeModelConfig
@@ -51,7 +54,12 @@ def _intake_client(config: IntakeModelConfig) -> IntakeClient:
 
 
 @click.command(name="discover")
-@click.argument("source", type=click.Path(exists=True, path_type=Path))
+@click.argument("source", required=False, type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--warehouse",
+    default=None,
+    help="Warehouse schema to discover, as <catalog>.<schema>; replaces SOURCE.",
+)
 @click.option(
     "--descriptor",
     type=EXISTING_FILE,
@@ -71,7 +79,8 @@ def _intake_client(config: IntakeModelConfig) -> IntakeClient:
 @click.option("--run-id", default=None, help="Run id; a new one is generated when omitted.")
 @ROOT_OPTION
 def discover_cmd(
-    source: Path,
+    source: Path | None,
+    warehouse: str | None,
     descriptor: Path | None,
     hint: Path | None,
     schema: str | None,
@@ -80,14 +89,18 @@ def discover_cmd(
     run_id: str | None,
     root: Path,
 ) -> None:
-    """Start an ingestion run from SOURCE and stop at its first interrupt."""
+    """Start an ingestion run from SOURCE or a warehouse schema; stop at its first interrupt."""
     from sema.intake import graph
 
-    descriptor = descriptor or find_descriptor(source)
+    named = warehouse_schema(source, warehouse, descriptor, schema)
+    catalog, schema = named if named is not None else (None, schema)
+    descriptor = descriptor or find_descriptor(cast(Path, source))
     try:
         config = intake_model_config()
         outcome = graph.discover(
             source,
+            warehouse=warehouse_connector() if named is not None else None,
+            catalog=catalog,
             root=root,
             descriptor=descriptor,
             config=config,
@@ -154,6 +167,7 @@ def _answer(
         "config": config,
         "client": _intake_client(config),
         "embedder": configured_embedder(),
+        "warehouse": warehouse_connector() if landed_from_warehouse(root, run_id) else None,
     }
     if values:
         return graph.approve_values(run_id, **common)

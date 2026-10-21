@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from sema.binding.importer import import_concept_source, write_import
 from sema.binding.spec import load_concept_source_spec
+from sema.connectors.base import Connector
 from sema.intake.eligibility import assemble_spec
 from sema.intake.enrichment import apply_enrichment
 from sema.intake.graph_stages import (
@@ -81,9 +82,10 @@ class Session:
         client: IntakeClient | None,
         hooks: Hooks,
         embedder: Embedder | None = None,
+        warehouse: Connector | None = None,
     ) -> None:
         self.root, self.config, self.client, self.hooks = root, config, client, hooks
-        self.embedder = embedder
+        self.embedder, self.warehouse = embedder, warehouse
         self.answering = False
         self._stages: Stages | None = None
 
@@ -95,7 +97,8 @@ class Session:
     def stages(self, state: IngestState) -> Stages:
         if self._stages is None:
             self._stages = Stages(
-                inputs_of(state), self.root, self.config, self.client, self.embedder
+                inputs_of(state), self.root, self.config, self.client, self.embedder,
+                self.warehouse,
             )
         return self._stages
 
@@ -110,7 +113,8 @@ class Nodes:
 
     def land(self, state: IngestState) -> Update:
         stages, update = self._enter(state, LAND)
-        verdict = verify_land(stages.land(), stages.tools(LAND))
+        land, tools = stages.land(), stages.tools(LAND)
+        verdict = verify_land(land, tools, provider=stages.provider_name)
         return update | self._verdict(state, LAND, LAND, verdict)
 
     def structure(self, state: IngestState) -> Update:
@@ -122,7 +126,10 @@ class Nodes:
         stages, update = self._enter(state, RESOLVE_STRUCTURE)
         resolved = stages.resolved()
         _write(stages, update, STRUCTURE_ARTIFACT, resolved)
-        verdict = verify_structure(resolved, stages.land(), stages.tools(RESOLVE_STRUCTURE))
+        verdict = verify_structure(
+            resolved, stages.land(), stages.tools(RESOLVE_STRUCTURE),
+            provider=stages.provider_name,
+        )
         return update | self._verdict(state, RESOLVE_STRUCTURE, STRUCTURE, verdict)
 
     def propose_layouts(self, state: IngestState) -> Update:
@@ -132,7 +139,10 @@ class Nodes:
         _write(stages, update, STRUCTURE_ARTIFACT, proposal.structure)
         if asked := _asking(state, PROPOSE, stages.value_requests(PROPOSE, approvals)):
             return update | asked
-        verdict = verify_structure(proposal.structure, stages.land(), stages.tools(PROPOSE))
+        verdict = verify_structure(
+            proposal.structure, stages.land(), stages.tools(PROPOSE),
+            provider=stages.provider_name,
+        )
         return update | {"asking": None} | self._verdict(state, PROPOSE, STRUCTURE, verdict)
 
     def roles(self, state: IngestState) -> Update:
@@ -280,7 +290,10 @@ class Nodes:
     def _decided_verdicts(self, state: IngestState, stages: Stages, current: Current) -> Update:
         """Every decided binding is still verified; any failure returns the run to Review."""
         tools = stages.tools(DECIDE, current.structure)
-        found = [(STRUCTURE, verify_structure(current.structure, current.land, tools))]
+        structure = verify_structure(
+            current.structure, current.land, tools, provider=stages.provider_name
+        )
+        found = [(STRUCTURE, structure)]
         if current.roles is not None:
             verdict = self.session.hooks.verify_roles(current.roles, tools, spec=current.spec)
             found.append((ROLES, verdict))
