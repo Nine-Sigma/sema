@@ -171,22 +171,36 @@ def _docstring_nodes(tree: ast.Module) -> set[int]:
     }
 
 
-def source_texts(source: str) -> Iterator[tuple[int, str]]:
+class SourceText(NamedTuple):
+    lineno: int
+    text: str
+    is_constant: bool
+
+
+def source_texts(source: str) -> Iterator[SourceText]:
     """String constants other than docstrings, then comments, with line numbers."""
     tree = ast.parse(source)
     docstrings = _docstring_nodes(tree)
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             if id(node) not in docstrings:
-                yield node.lineno, node.value
+                yield SourceText(node.lineno, node.value, True)
     for token in tokenize.generate_tokens(io.StringIO(source).readline):
         if token.type == tokenize.COMMENT:
-            yield token.start[0], token.string.lstrip("#")
+            yield SourceText(token.start[0], token.string.lstrip("#"), False)
 
 
-def _matches(text: str, literals: Mapping[tuple[str, ...], str]) -> Iterator[str]:
-    tokens = _tokens(_collapse(text))
-    for width in {len(key) for key in literals if len(key) <= len(tokens)}:
+def _matches(text: SourceText, literals: Mapping[tuple[str, ...], str]) -> Iterator[str]:
+    """A multi-token literal hits anywhere; a single token only as a whole constant.
+
+    A lone common word ("values", "source") names a source only when code uses it as
+    an entire name; inside SQL or prose it is ordinary language.
+    """
+    tokens = _tokens(_collapse(text.text))
+    if text.is_constant and len(tokens) == 1 and (whole := literals.get(tokens)):
+        yield whole
+    widths = {len(key) for key in literals if 1 < len(key) <= len(tokens)}
+    for width in widths:
         for start in range(len(tokens) - width + 1):
             literal = literals.get(tokens[start : start + width])
             if literal is not None:
@@ -205,8 +219,8 @@ def find_hits(root: Path, literals: Mapping[tuple[str, ...], str]) -> list[Hit]:
     hits: list[Hit] = []
     for path in scanned_modules(root):
         rel = path.relative_to(root).as_posix()
-        for lineno, text in source_texts(path.read_text(encoding="utf-8")):
-            hits.extend(Hit(rel, lineno, literal) for literal in _matches(text, literals))
+        for text in source_texts(path.read_text(encoding="utf-8")):
+            hits.extend(Hit(rel, text.lineno, literal) for literal in _matches(text, literals))
     return sorted(set(hits))
 
 
@@ -241,19 +255,85 @@ def test_key_value_sheet_yields_its_keys_and_wide_sheet_its_header() -> None:
     }
 
 
-def test_planted_fixture_literal_is_flagged(tmp_path: Path) -> None:
-    literals = fixture_literals()
-    planted = max(
-        (text for text in literals.values() if re.fullmatch(r"[a-z0-9_ ]+", text)), key=len
+def _longest_plain_literal(literals: Mapping[tuple[str, ...], str], multi: bool) -> str:
+    return max(
+        (
+            text
+            for tokens, text in literals.items()
+            if re.fullmatch(r"[a-z0-9_ ]+", text) and (len(tokens) > 1) == multi
+        ),
+        key=len,
     )
+
+
+def test_planted_multi_token_fixture_literal_is_flagged(tmp_path: Path) -> None:
+    literals = fixture_literals()
+    planted = _longest_plain_literal(literals, multi=True)
     module = tmp_path / "planted.py"
     module.write_text(
-        f'"""{planted}"""\n\nRELATION = {planted!r}\n# reads {planted.upper()}\n',
+        f'"""{planted}"""\n\nRELATION = {planted!r}\n# reads {planted.upper()}\n'
+        f"NOTE = {('reads the ' + planted + ' column')!r}\n",
         encoding="utf-8",
     )
     hits = find_hits(tmp_path, literals)
-    assert {(hit.lineno, hit.literal) for hit in hits} >= {(3, planted), (4, planted)}
+    assert {(hit.lineno, hit.literal) for hit in hits} >= {
+        (3, planted), (4, planted), (5, planted)
+    }
     assert all(hit.lineno != 1 for hit in hits)
+
+
+def test_planted_single_token_fixture_literal_is_flagged_only_as_a_whole_constant(
+    tmp_path: Path,
+) -> None:
+    literals = fixture_literals()
+    planted = _longest_plain_literal(literals, multi=False)
+    module = tmp_path / "planted.py"
+    module.write_text(
+        f'"""{planted}"""\n\nRELATION = {planted.upper()!r}\n# reads {planted}\n'
+        f"QUERY = {('SELECT * FROM ' + planted)!r}\n",
+        encoding="utf-8",
+    )
+    assert find_hits(tmp_path, literals) == [Hit("planted.py", 3, planted)]
+
+
+def test_single_token_literal_as_an_entire_constant_is_a_hit(tmp_path: Path) -> None:
+    literals: dict[tuple[str, ...], str] = {("values",): "values"}
+    (tmp_path / "whole.py").write_text(
+        "A = 'Values'\nB = '  VALUES \\n'\nC = ('val' 'ues')\n", "utf-8"
+    )
+    assert find_hits(tmp_path, literals) == [
+        Hit("whole.py", 1, "values"), Hit("whole.py", 2, "values"), Hit("whole.py", 3, "values")
+    ]
+
+
+def test_single_token_literal_inside_sql_or_a_comment_is_not_a_hit(tmp_path: Path) -> None:
+    literals: dict[tuple[str, ...], str] = {("values",): "values", ("source",): "source"}
+    (tmp_path / "sql.py").write_text(
+        "INSERT = 'INSERT INTO runs (source_identity) VALUES (?)'\n"
+        "# Values\n"
+        "# the source of these values\n"
+        "LABEL = 'source identity'\n",
+        "utf-8",
+    )
+    assert find_hits(tmp_path, literals) == []
+
+
+def test_multi_token_literal_inside_a_longer_constant_or_comment_is_a_hit(
+    tmp_path: Path,
+) -> None:
+    literals: dict[tuple[str, ...], str] = {
+        ("good", "through", "date"): "good through date",
+        ("column", "info"): "column info",
+    }
+    (tmp_path / "multi.py").write_text(
+        "A = 'reads the Good Through Date field'\n"
+        "# a Column  Info sheet\n"
+        "B = 'Good Through'\n",
+        "utf-8",
+    )
+    assert find_hits(tmp_path, literals) == [
+        Hit("multi.py", 1, "good through date"), Hit("multi.py", 2, "column info")
+    ]
 
 
 def test_loader_package_is_not_scanned(tmp_path: Path) -> None:

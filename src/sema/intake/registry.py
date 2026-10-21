@@ -98,7 +98,7 @@ class Registry:
                 conn.execute(
                     "INSERT INTO runs"
                     " (run_id, source_identity, stage, status, started_at, updated_at)"
-                    " SELECT ?, ?, ?, ?, ?, ?",
+                    " VALUES (?, ?, ?, ?, ?, ?)",
                     (run_id, source, stage, INITIAL_STATUS, now, now),
                 )
         except sqlite3.IntegrityError as err:
