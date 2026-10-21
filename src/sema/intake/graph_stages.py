@@ -220,13 +220,21 @@ class Stages:
             roles = self.resolved_roles(approvals)
         elif ROLES in reached:
             roles = self.roles(approvals)
-        spec = self._spec(reviewed.spec_path, roles)
+        spec = self._spec(reviewed.spec_path, roles, decided=bool(reviewed.decisions))
         return Current(self.land(), structure, proposal, roles, spec)
 
-    def _spec(self, edited: Path | None, roles: RolesResult | None) -> ConceptSourceSpec | None:
-        if edited is not None:
-            return load_concept_source_spec(edited)
-        return assemble_spec(self.descriptor(), roles) if roles is not None else None
+    def _spec(
+        self, edited: Path | None, roles: RolesResult | None, *, decided: bool = False
+    ) -> ConceptSourceSpec | None:
+        """An edited spec wins; beside decisions, only where it sets a value."""
+        assembled = assemble_spec(self.descriptor(), roles) if roles is not None else None
+        if edited is None:
+            return assembled
+        spec = load_concept_source_spec(edited)
+        if not decided or assembled is None:
+            return spec
+        merged = overlay(_dumped(assembled), _dumped(spec))
+        return ConceptSourceSpec.model_validate(merged, context={"base_dir": edited.parent})
 
     def _base_structure(self, reviewed: Reviewed) -> StructureResult:
         if PROPOSE in reviewed.reached:
@@ -325,6 +333,22 @@ class Stages:
         if key not in self._memo:
             self._memo[key] = compute()
         return cast(T, self._memo[key])
+
+
+def overlay(base: dict[str, Any], edited: dict[str, Any]) -> dict[str, Any]:
+    """``base`` with every value ``edited`` sets; a null in ``edited`` keeps ``base``'s."""
+    merged = dict(base)
+    for key, value in edited.items():
+        below = merged.get(key)
+        if isinstance(value, dict) and isinstance(below, dict):
+            merged[key] = overlay(below, value)
+        elif value is not None:
+            merged[key] = value
+    return merged
+
+
+def _dumped(spec: ConceptSourceSpec) -> dict[str, Any]:
+    return spec.model_dump(mode="json", by_alias=True)
 
 
 def model_choices(roles: RolesResult) -> dict[str, StatedChoice]:

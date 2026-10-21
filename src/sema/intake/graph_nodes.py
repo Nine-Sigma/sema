@@ -222,11 +222,11 @@ class Nodes:
             stages.registry.set_approver(state["run_id"], approver)
         if action in (APPROVE, REJECT):
             return update
-        if answer.get("spec"):
-            _write(stages, update, SPEC_ARTIFACT, load_concept_source_spec(Path(answer["spec"])))
-            return update | {"spec_path": answer["spec"]}
-        decisions = [*state.get("decisions", []), *answer["decisions"]]
-        return update | {"decisions": decisions, "spec_path": None}
+        edited = answer.get("spec")
+        if edited:
+            _write(stages, update, SPEC_ARTIFACT, load_concept_source_spec(Path(edited)))
+        decisions = [*state.get("decisions", []), *answer.get("decisions", [])]
+        return update | {"decisions": decisions, "spec_path": edited}
 
     def decide(self, state: IngestState) -> Update:
         stages, update = self._enter(state, DECIDE)
@@ -236,7 +236,7 @@ class Nodes:
             _write(stages, update, DECISIONS_ARTIFACT, written)
         current = stages.current(reviewed)
         _write(stages, update, STRUCTURE_ARTIFACT, current.structure)
-        if current.spec is not None and reviewed.spec_path is None:
+        if current.spec is not None and (reviewed.spec_path is None or reviewed.decisions):
             _write(stages, update, SPEC_ARTIFACT, current.spec)
         self._ambiguity_lists(stages, current, update)
         self._metrics(stages, state, current, update)

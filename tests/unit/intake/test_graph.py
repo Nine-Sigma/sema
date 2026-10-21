@@ -35,7 +35,8 @@ Pinned API of ``sema.intake.graph`` (task 11.2), imported lazily through ``graph
   ``decide`` too), and ``decisions`` as ``{"decisions": [{stage, subject, choice}, ...]}``.
 - A decisions file is validated before anything re-runs (``DecisionRejectedError``
   propagates from ``approve``); ``decide`` applies it with zero model calls and presents
-  Review again, without the resolvers.
+  Review again, without the resolvers. Given beside ``spec``, both apply (design
+  Decision 11) and the spec wins where both speak: the edited spec is what is imported.
 - Verifier placement: Land after ``land``; Structure after ``resolve_structure`` and after
   ``propose_layouts``; Roles after ``resolve_roles``; Dry run after ``dry_run``. The
   code-only ``structure`` and ``roles`` nodes hand their open entries to their resolver
@@ -82,6 +83,7 @@ from tests.unit.intake.graph_env import (
     subsequence,
     through_values,
 )
+from tests.unit.intake.decisions_env import write_decisions
 from tests.unit.intake.eligibility_env import descriptor
 from tests.unit.intake.enrichment_env import manifest_property, synonym_for
 from tests.unit.intake.pipeline_env import landed_run, run_stages
@@ -274,6 +276,67 @@ def test_edited_spec_reenters_at_the_roles_verifier_with_zero_calls(tmp_path: Pa
     assert run.artifact("spec")["value_sets"]["roles"]["replaced_by"] == "successor"
     assert run.row().status == "waiting_review"
     assert not (run.ledger_dir / IMPORT_DIR).exists()
+
+
+A2_STATUS = {"column": "status", "active_values": ["active"], "retired_values": ["deprecated"]}
+
+
+def _review_inputs(root: Path, run: GraphRun) -> tuple[Path, Path, list[str]]:
+    """An edited spec stating the status role and a successor, and decisions closing both
+    status entries as ``none``: on the values relation both speak (the spec keeps the status
+    role the decision drops), on the concepts relation only the decision does."""
+    edited = run.artifact("spec")
+    roles = edited["value_sets"]["roles"]
+    assert roles["status"] == A2_STATUS and roles["replaced_by"] is None
+    assert edited["concepts"]["roles"]["status"] is None
+    roles["status"], roles["replaced_by"] = A2_STATUS, "successor"
+    spec = root / "edited.spec.yaml"
+    spec.write_text(yaml.safe_dump({"concept_source": edited}, sort_keys=False))
+    subjects = [f"{edited[s]['relation']['name']}.status" for s in ("value_sets", "concepts")]
+    rows = [("roles", subject, "none") for subject in subjects]
+    return spec, write_decisions(root / "decisions.yaml", rows), subjects
+
+
+def _decided(run: GraphRun) -> dict[str, tuple[object, object]]:
+    listed = run.artifact("roles_ambiguities")["ambiguities"]
+    return {entry["subject"]: (entry["choice"], entry["source"]) for entry in listed}
+
+
+def test_spec_beside_decisions_applies_both_and_the_spec_wins(tmp_path: Path) -> None:
+    run = _a2(tmp_path / "both")
+    spec, decisions, subjects = _review_inputs(tmp_path, run)
+    client = routed_client()
+
+    outcome = approve(run, client, spec=spec, decisions=decisions)
+
+    assert outcome.node == "review"
+    assert client.invoke.call_count == 0
+    assert len(run.artifact("decisions")["decisions"]) == 2
+    assert all(_decided(run)[subject] == ("none", "human") for subject in subjects)
+    roles = run.artifact("spec")["value_sets"]["roles"]
+    assert (roles["status"], roles["replaced_by"]) == (A2_STATUS, "successor")
+    approve(run)
+    only_spec = _a2(tmp_path / "spec")
+    approve(only_spec, spec=spec)
+    approve(only_spec)
+    assert _manifest(run) == _manifest(only_spec)
+
+
+@pytest.mark.parametrize("given", ["spec", "decisions"])
+def test_a_spec_or_decisions_alone_behave_as_before(tmp_path: Path, given: str) -> None:
+    run = _a2(tmp_path / "run")
+    spec, decisions, subjects = _review_inputs(tmp_path, run)
+
+    outcome = approve(run, **({"spec": spec} if given == "spec" else {"decisions": decisions}))
+
+    assert outcome.node == "review"
+    roles = run.artifact("spec")["value_sets"]["roles"]
+    if given == "spec":
+        assert (roles["status"], roles["replaced_by"]) == (A2_STATUS, "successor")
+        assert not run.has_artifact("decisions")
+    else:
+        assert (roles["status"], roles["replaced_by"]) == (None, None)
+        assert all(_decided(run)[subject] == ("none", "human") for subject in subjects)
 
 
 def test_run_metrics_at_review_equal_the_registry_row(tmp_path: Path) -> None:

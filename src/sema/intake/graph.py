@@ -178,7 +178,7 @@ def approve(
     embedder: Embedder | None = None,
     warehouse: Connector | None = None,
 ) -> RunOutcome:
-    """Import, re-enter with an edited spec, or settle open entries with a decisions file."""
+    """Import, or re-enter with an edited spec, a decisions file, or both."""
     live = _Live(client, tracing, embedder, warehouse)
     with _opened(run_id, "approve", root, config, live) as run:
         state = run.waiting(REVIEW)
@@ -187,10 +187,10 @@ def approve(
             checked = validate_decisions(load_decisions(decisions), run.nodes.presented(state))
             rows = [decision.model_dump(mode="json") for decision in checked]
             answer |= {"action": DECIDE, "decisions": rows}
-        elif spec is not None:
+        if spec is not None:
             load_concept_source_spec(spec)
             answer |= {"action": DECIDE, "spec": str(spec.resolve())}
-        elif not run.nodes.has_spec(state):
+        elif decisions is None and not run.nodes.has_spec(state):
             raise ValueError(f"run {run_id} has no spec to import; settle its open entries")
         return run.answer(answer)
 
