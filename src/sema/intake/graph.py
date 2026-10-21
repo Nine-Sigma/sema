@@ -2,8 +2,9 @@
 
 Nodes run Land, Structure, its resolver, layout proposals, Roles, its resolver, Enrich when
 enabled, and the dry run, with each verifier after its node; a failing verdict re-enters
-the node at most twice, then Review is reached with reason ``escalate``. Review and value
-asks are interrupts. The SQLite checkpointer only tells which node to re-enter: every node
+the node at most twice, then Review is reached with reason ``escalate``; a call the budget
+refuses sends the run to Review with reason ``budget_exceeded``. Review and value asks are
+interrupts. The SQLite checkpointer only tells which node to re-enter: every node
 recomputes its inputs from Land, with model calls replayed from the run ledger.
 """
 
@@ -24,6 +25,7 @@ from langgraph.types import Command, interrupt
 
 from sema.binding.spec import load_concept_source_spec
 from sema.intake.decisions import load_decisions, validate_decisions
+from sema.intake.eligibility_utils import Embedder
 from sema.intake.enrichment import enrich
 from sema.intake.graph_nodes import Nodes, Session
 from sema.intake.graph_stages import (
@@ -74,6 +76,7 @@ ROUTES = (
 
 Graph = CompiledStateGraph[IngestState, None, IngestState, IngestState]
 NodeBody = Callable[[IngestState], dict[str, Any]]
+INTERRUPTS = frozenset({REVIEW, VALUE_ASK})
 
 
 @dataclass(frozen=True)
@@ -98,6 +101,11 @@ class _Opened:
     def invoke(self, command: IngestState | Command[Any] | None) -> RunOutcome:
         self.graph.invoke(command, self.config, durability="sync")
         return self.outcome()
+
+    def answer(self, answer: dict[str, Any]) -> RunOutcome:
+        """Resume Review with the reviewer's answer; Review is not recomputed to take it."""
+        self.nodes.session.answering = True
+        return self.invoke(Command(resume=answer))
 
     def outcome(self) -> RunOutcome:
         for task in self.graph.get_state(self.config).tasks:
@@ -129,13 +137,17 @@ def discover(
     run_id: str | None = None,
     schema: str | None = None,
     tracing: TracingConfig | None = None,
+    embedder: Embedder | None = None,
 ) -> RunOutcome:
-    """Start a run from a source and run it to its first interrupt."""
+    """Start a run from a source and run it to its first interrupt.
+
+    ``embedder`` ranks role columns; pass the same one to every later call on the run.
+    """
     run_id = run_id or str(uuid.uuid4())
     state = initial_state(
         run_id, source, descriptor, schema=schema, tier=tier, hint=hint, enrich=enrich
     )
-    with _opened(run_id, "discover", root, config, client, tracing) as run:
+    with _opened(run_id, "discover", root, config, client, tracing, embedder) as run:
         Registry(root / REGISTRY_FILE).register(run_id, source=source.name, stage=LAND)
         return run.invoke(state)
 
@@ -150,9 +162,10 @@ def approve(
     spec: Path | None = None,
     decisions: Path | None = None,
     tracing: TracingConfig | None = None,
+    embedder: Embedder | None = None,
 ) -> RunOutcome:
     """Import, re-enter with an edited spec, or settle open entries with a decisions file."""
-    with _opened(run_id, "approve", root, config, client, tracing) as run:
+    with _opened(run_id, "approve", root, config, client, tracing, embedder) as run:
         state = run.waiting(REVIEW)
         answer: dict[str, Any] = {"action": APPROVE, "approver": approver}
         if decisions is not None:
@@ -164,7 +177,7 @@ def approve(
             answer |= {"action": DECIDE, "spec": str(spec.resolve())}
         elif not run.nodes.has_spec(state):
             raise ValueError(f"run {run_id} has no spec to import; settle its open entries")
-        return run.invoke(Command(resume=answer))
+        return run.answer(answer)
 
 
 def reject(
@@ -175,10 +188,11 @@ def reject(
     approver: str,
     client: IntakeClient | None = None,
     tracing: TracingConfig | None = None,
+    embedder: Embedder | None = None,
 ) -> RunOutcome:
-    with _opened(run_id, "reject", root, config, client, tracing) as run:
+    with _opened(run_id, "reject", root, config, client, tracing, embedder) as run:
         run.waiting(REVIEW)
-        return run.invoke(Command(resume={"action": REJECT, "approver": approver}))
+        return run.answer({"action": REJECT, "approver": approver})
 
 
 def approve_values(
@@ -188,9 +202,10 @@ def approve_values(
     config: IntakeModelConfig,
     client: IntakeClient | None = None,
     tracing: TracingConfig | None = None,
+    embedder: Embedder | None = None,
 ) -> RunOutcome:
     """Approve every column the value interrupt requested; the requesting node re-runs."""
-    with _opened(run_id, "approve_values", root, config, client, tracing) as run:
+    with _opened(run_id, "approve_values", root, config, client, tracing, embedder) as run:
         run.waiting(VALUE_ASK)
         return run.invoke(Command(resume={"action": APPROVE}))
 
@@ -202,9 +217,10 @@ def resume(
     config: IntakeModelConfig,
     client: IntakeClient | None = None,
     tracing: TracingConfig | None = None,
+    embedder: Embedder | None = None,
 ) -> RunOutcome:
     """Continue a run after a process exit at the node it stopped in."""
-    with _opened(run_id, "resume", root, config, client, tracing) as run:
+    with _opened(run_id, "resume", root, config, client, tracing, embedder) as run:
         pending = run.graph.get_state(run.config).next
         if not pending:
             return run.outcome()
@@ -220,12 +236,13 @@ def _opened(
     config: IntakeModelConfig,
     client: IntakeClient | None,
     tracing: TracingConfig | None,
+    embedder: Embedder | None,
 ) -> Iterator[_Opened]:
     """Tracing opens first, so a missing backend package fails the run before Land."""
     with run_tracing(tracing or TracingConfig(), run_id, entry=entry) as tracer:
         root.mkdir(parents=True, exist_ok=True)
         hooks = Hooks(verify_roles=verify_roles, enrich=enrich)
-        session = Session(root, config, client, hooks)
+        session = Session(root, config, client, hooks, embedder)
         nodes = Nodes(session)
         runnable: RunnableConfig = {
             "configurable": {"thread_id": run_id}, "recursion_limit": RECURSION_LIMIT,
@@ -257,7 +274,7 @@ def _graph(
         IMPORT: nodes.import_,
     }
     for name, body in bodies.items():
-        graph.add_node(name, _traced(tracer, name, body))
+        graph.add_node(name, _traced(tracer, name, body, None if name in INTERRUPTS else nodes))
     graph.add_edge(START, LAND)
     graph.add_edge(STRUCTURE, RESOLVE_STRUCTURE)
     graph.add_edge(VALUE_ASK, PROPOSE)
@@ -276,17 +293,21 @@ def _graph(
     return graph
 
 
-def _traced(tracer: Tracer, stage: str, body: NodeBody) -> Any:
+def _traced(tracer: Tracer, stage: str, body: NodeBody, budgeted: Nodes | None) -> Any:
+    """``budgeted`` stops the run at Review after a node in which the budget refused a call."""
+
     def node(state: IngestState) -> dict[str, Any]:
         with tracer.node(stage):
-            return body(state)
+            update = body(state)
+        return budgeted.budgeted(state, update) if budgeted is not None else update
 
     return node
 
 
 def _review(nodes: Nodes) -> NodeBody:
     def review(state: IngestState) -> dict[str, Any]:
-        answer: dict[str, Any] = interrupt(nodes.review(state))
+        payload = None if nodes.session.take_answer() else nodes.review(state)
+        answer: dict[str, Any] = interrupt(payload)
         return nodes.after_review(state, answer)
 
     return review

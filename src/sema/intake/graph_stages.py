@@ -23,10 +23,15 @@ from sema.ingest.duckdb_staging import Staging
 from sema.intake.decisions import Decision, apply_structure_decisions, stated_choices
 from sema.intake.eligibility import assemble_spec, run_roles
 from sema.intake.eligibility_spec_utils import RolesResult
-from sema.intake.eligibility_utils import EligibilitySource, RunDescriptor, StatedChoice
+from sema.intake.eligibility_utils import (
+    EligibilitySource,
+    Embedder,
+    RunDescriptor,
+    StatedChoice,
+)
 from sema.intake.landing import LandResult
 from sema.intake.ledger import Ledger
-from sema.intake.loaders.tabular import land_tabular
+from sema.intake.loaders.detect import NoLoaderError, land_source
 from sema.intake.model_calls import IntakeClient, model_calls_for
 from sema.intake.profile import EvidencePolicy, EvidenceTier, ProfileTools
 from sema.intake.proposal import ProposalResult, propose_layouts
@@ -51,6 +56,7 @@ MODEL_SOURCE: EligibilitySource = "model"
 LAND, STRUCTURE, RESOLVE_STRUCTURE = "land", "structure", "resolve_structure"
 PROPOSE, ROLES, RESOLVE_ROLES = "propose_layouts", "roles", "resolve_roles"
 DECIDE, DRY_RUN = "decide", "dry_run"
+FAILED, NO_LOADER = "failed", "no_loader"
 
 RECOMPUTED = frozenset({PROPOSE, ROLES, RESOLVE_ROLES, RESOLVE_STRUCTURE})
 
@@ -100,8 +106,10 @@ class Stages:
         root: Path,
         config: IntakeModelConfig,
         client: IntakeClient | None,
+        embedder: Embedder | None = None,
     ) -> None:
         self.inputs = inputs
+        self.embedder = embedder
         self.registry = Registry(root / REGISTRY_FILE)
         self.ledger = Ledger(root).run(inputs.run_id)
         self.calls = model_calls_for(
@@ -220,13 +228,17 @@ class Stages:
         choices = {**kept, **stated_choices(decisions)}
         roles = run_roles(
             structure, self.profiles(DECIDE), self.tools(DECIDE, structure),
-            hint=self.hint(), choices=choices,
+            hint=self.hint(), embedder=self.embedder, choices=choices,
         )
         return structure, roles
 
     def _land(self) -> LandResult:
         inputs = self.inputs
-        land = land_tabular(inputs.source, self.staging, schema=inputs.schema)
+        try:
+            land = land_source(inputs.source, self.staging, schema=inputs.schema)
+        except NoLoaderError:
+            self.registry.advance(inputs.run_id, LAND, FAILED, reason=NO_LOADER)
+            raise
         self.ledger.artifact("land_result", land)
         return land
 
@@ -249,14 +261,16 @@ class Stages:
     def _roles(self, approvals: Approvals) -> RolesResult:
         structure = self.proposals(approvals).structure
         tools = self.tools(ROLES, structure)
-        return run_roles(structure, self.profiles(ROLES), tools, hint=self.hint())
+        return run_roles(
+            structure, self.profiles(ROLES), tools, hint=self.hint(), embedder=self.embedder
+        )
 
     def _resolved_roles(self, approvals: Approvals) -> RolesResult:
         structure = self.proposals(approvals).structure
         tools = self.tools(RESOLVE_ROLES, structure)
         return resolve_roles(
             self.roles(approvals), structure, self.land(), tools, self.calls,
-            provider=PROVIDER, hint=self.hint(),
+            provider=PROVIDER, hint=self.hint(), embedder=self.embedder,
         )
 
     def _policy(self, approvals: Approvals) -> EvidencePolicy:

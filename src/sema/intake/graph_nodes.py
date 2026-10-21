@@ -51,7 +51,8 @@ from sema.intake.graph_utils import (
     verdict_update,
 )
 from sema.intake.metrics import RunMetrics, run_metrics
-from sema.intake.model_calls import IntakeClient
+from sema.intake.eligibility_utils import Embedder
+from sema.intake.model_calls import BUDGET_REASON, IntakeClient
 from sema.intake.verify.base import Ambiguity, Verdict
 from sema.intake.verify.land import verify_land
 from sema.intake.verify.structure import verify_structure
@@ -71,14 +72,28 @@ class Session:
     """One process's view of one run: the stages, built once from the run's state."""
 
     def __init__(
-        self, root: Path, config: IntakeModelConfig, client: IntakeClient | None, hooks: Hooks
+        self,
+        root: Path,
+        config: IntakeModelConfig,
+        client: IntakeClient | None,
+        hooks: Hooks,
+        embedder: Embedder | None = None,
     ) -> None:
         self.root, self.config, self.client, self.hooks = root, config, client, hooks
+        self.embedder = embedder
+        self.answering = False
         self._stages: Stages | None = None
+
+    def take_answer(self) -> bool:
+        """True once after a reviewer's answer resumes Review, so it is not recomputed."""
+        answering, self.answering = self.answering, False
+        return answering
 
     def stages(self, state: IngestState) -> Stages:
         if self._stages is None:
-            self._stages = Stages(inputs_of(state), self.root, self.config, self.client)
+            self._stages = Stages(
+                inputs_of(state), self.root, self.config, self.client, self.embedder
+            )
         return self._stages
 
     def close(self) -> None:
@@ -183,7 +198,9 @@ class Nodes:
     def after_review(self, state: IngestState, answer: dict[str, Any]) -> Update:
         stages = self.session.stages(state)
         action, approver = answer["action"], answer.get("approver")
-        update: Update = {"action": action, "approver": approver, "reason": None}
+        update: Update = {
+            "action": action, "approver": approver, "reason": None, "stopped": False,
+        }
         update["artifacts"] = []
         if action == REJECT:
             stages.registry.advance(state["run_id"], REVIEW, REJECTED)
@@ -237,6 +254,12 @@ class Nodes:
 
     def has_spec(self, state: IngestState) -> bool:
         return self.session.stages(state).current(reviewed_of(state)).spec is not None
+
+    def budgeted(self, state: IngestState, update: Update) -> Update:
+        """A call the budget refused in this process stops the run at Review."""
+        if not self.session.stages(state).calls.refused:
+            return update
+        return update | {"stopped": True, "reason": BUDGET_REASON}
 
     def resumed(self, state: IngestState, node: str) -> None:
         self.session.stages(state).ledger.event(node, RESUME_KIND, {})

@@ -110,20 +110,24 @@ def land_tabular(
 
 
 def source_files(source: Path) -> list[Path]:
-    """A file, the supported files of a directory, or the matches of a glob."""
+    files = supported_files(source)
+    if not files:
+        raise FileNotFoundError(f"no {', '.join(SUFFIXES)} file found at {source}")
+    return files
+
+
+def supported_files(source: Path) -> list[Path]:
+    """A file, the supported files of a directory, or the matches of a glob; maybe none."""
     if source.is_file():
         candidates = [source]
     elif source.is_dir():
         candidates = list(source.iterdir())
     else:
         candidates = [Path(match) for match in glob.glob(str(source))]
-    files = sorted(
+    return sorted(
         (p for p in candidates if p.is_file() and p.suffix.lower() in SUFFIXES),
         key=lambda p: p.name,
     )
-    if not files:
-        raise FileNotFoundError(f"no {', '.join(SUFFIXES)} file found at {source}")
-    return files
 
 
 def _plan(path: Path) -> list[_Sheet]:

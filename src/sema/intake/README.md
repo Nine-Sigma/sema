@@ -44,6 +44,8 @@ Landed relation names replace non-word characters with `_`. Column names keep th
 | Athena bundle | `loaders.athena.land_athena_bundle(bundle_dir, staging)` | `vocabulary_omop.concept`, `concept_relationship`, and the rest of the bundle | none; relation-level |
 | Warehouse schema | `loaders.warehouse.land_warehouse(connector, catalog=..., schema=..., ledger=...)` | every object the connector reports, as `<catalog>.<schema>.<object>`; nothing is copied | none; relation-level |
 
+The graph's Land node picks the loader by medium through `loaders.detect.land_source(source, staging, schema=...)`: a SQLite header lands through semsql, a directory holding every required Athena file through the Athena loader, a `.sql` file through the DDL dictionary loader, and any file the tabular loader reads through it. A source no loader reads raises `NoLoaderError` (a `ValueError`) naming it; the registry row is left at `land`, `failed`, `no_loader`. A warehouse is not a path and is never detected.
+
 The tabular loader picks the header as the first of the first 50 rows where at least 80 percent of cells are non-empty, non-numeric strings, those strings are unique ignoring case, and none recurs in its column. The width of that test is the highest column index holding a non-empty cell anywhere in the window, so trailing empty columns do not lower the score. A sheet where no row passes lands with columns `_col_1` to `_col_n`, a null header row, and its name in `LandResult.headerless`; the other sheets still land. Merged cells are not expanded. A column is typed as a number only when every text cell survives the round trip, so `1.10`, `007`, and integers beyond 64 bits stay text. A header named `_sema_locator` fails the landing.
 
 ## Identifier quoting

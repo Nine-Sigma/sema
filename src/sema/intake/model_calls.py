@@ -41,8 +41,16 @@ class IntakeProviderNotSetError(RuntimeError):
     """Intake has no provider of its own; it never falls back to the build default."""
 
 
-class BudgetExceededError(RuntimeError):
-    """The run reached its call or cost cap; the run stops at Review."""
+class BudgetExceededError(LLMStageError):
+    """The run reached its call or cost cap; the run stops at Review.
+
+    A refused call fails like an exhausted one, so every caller that tolerates a failed
+    call leaves its entries open, and a recomputation is refused the same way.
+    """
+
+    def __init__(self, run_id: str, stage: str) -> None:
+        super().__init__(run_id, stage, [])
+        self.args = (f"run {run_id} reached its model-call budget at stage {stage}",)
 
 
 def build_model_calls(
@@ -94,6 +102,7 @@ class ModelCalls:
         self._run_id = run_id
         self._config = config
         self._warned_unpriced = False
+        self.refused = False
 
     def call_key(self, prompt: str, output_model: type[BaseModel]) -> str:
         return prompt_hash(self._config.model, prompt, output_model.__name__)
@@ -132,9 +141,8 @@ class ModelCalls:
         self._registry.advance(
             self._run_id, BUDGET_STOP_STAGE, BUDGET_STOP_STATUS, reason=BUDGET_REASON
         )
-        raise BudgetExceededError(
-            f"run {self._run_id} reached its model-call budget at stage {stage}"
-        )
+        self.refused = True
+        raise BudgetExceededError(self._run_id, stage)
 
     def _invoke(self, stage: str, prompt: str, output_model: type[T]) -> T:
         model = self._config.model

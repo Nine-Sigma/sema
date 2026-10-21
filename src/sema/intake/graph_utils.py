@@ -63,6 +63,7 @@ class IngestState(TypedDict, total=False):
     attempts: dict[str, int]
     verdict: str
     reason: str | None
+    stopped: bool
     has_spec: bool
     asking: bool
     value_asks: int
@@ -119,6 +120,7 @@ def initial_state(
         attempts={},
         verdict=PASS,
         reason=None,
+        stopped=False,
         has_spec=False,
         asking=False,
         value_asks=0,
@@ -210,6 +212,9 @@ def verdict_update(
 
 
 def after_verdict(state: IngestState, node: str, passed: str) -> str:
+    """A run the budget stopped goes to Review whatever its verdict."""
+    if state.get("stopped"):
+        return REVIEW
     status = state.get("verdict", PASS)
     if status == PASS:
         return passed
@@ -225,7 +230,8 @@ def route_resolve_structure(state: IngestState) -> str:
 
 
 def route_propose(state: IngestState) -> str:
-    return VALUE_ASK if state.get("asking") else after_verdict(state, PROPOSE, ROLES)
+    asking = state.get("asking") and not state.get("stopped")
+    return VALUE_ASK if asking else after_verdict(state, PROPOSE, ROLES)
 
 
 def route_resolve_roles(state: IngestState) -> str:
@@ -247,7 +253,7 @@ def route_review(state: IngestState) -> str:
 
 
 def route_decide(state: IngestState) -> str:
-    passed = state.get("verdict") == PASS and state.get("has_spec")
+    passed = state.get("verdict") == PASS and state.get("has_spec") and not state.get("stopped")
     return DRY_RUN if passed else REVIEW
 
 

@@ -17,7 +17,7 @@ from typing import Any
 RUN_STATUSES = frozenset(
     {"running", "waiting_review", "approved", "rejected", "failed", "complete"}
 )
-RUN_REASONS = frozenset({"budget_exceeded", "escalate"})
+RUN_REASONS = frozenset({"budget_exceeded", "escalate", "no_loader"})
 INITIAL_STATUS = "running"
 FILTER_COLUMNS = ("status", "stage", "source_identity")
 RECORD_COLUMNS = (
