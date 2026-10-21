@@ -28,6 +28,7 @@ from sema.log import logger
 from sema.models.config import IntakeModelConfig, LLMConfig
 
 T = TypeVar("T", bound=BaseModel)
+IntakeClient = LLMClient
 
 CALL_KIND = "call"
 CALL_FAILED_KIND = "call_failed"
@@ -62,6 +63,19 @@ def build_model_calls(
         )
     )
     client = LLMClient(llm, use_structured_output=config.use_structured_output)
+    return ModelCalls(client, ledger, registry, run_id, config)
+
+
+def model_calls_for(
+    config: IntakeModelConfig,
+    ledger: RunLedger,
+    registry: Registry,
+    run_id: str,
+    client: IntakeClient | None,
+) -> ModelCalls:
+    """The call path over a given client, else over one built from the intake config."""
+    if client is None:
+        return build_model_calls(config, ledger, registry, run_id)
     return ModelCalls(client, ledger, registry, run_id, config)
 
 

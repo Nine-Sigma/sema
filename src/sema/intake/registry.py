@@ -129,6 +129,9 @@ class Registry:
             (stage, status, reason, self._now()),
         )
 
+    def set_approver(self, run_id: str, approver: str | None) -> None:
+        self._update(run_id, "approver = ?, updated_at = ?", (approver, self._now()))
+
     def count_call(self, run_id: str, tokens: int, cost: float) -> None:
         self._update(
             run_id,
