@@ -108,7 +108,8 @@ def _open(
     found: dict[str, list[tuple[RoleEligibility, Ambiguity]]] = {}
     for ambiguity in roles.ambiguities:
         entry = eligible.get(ambiguity.subject)
-        if ambiguity.stage != STAGE or ambiguity.choice is not None or entry is None:
+        settled = ambiguity.choice is not None or ambiguity.source is not None
+        if ambiguity.stage != STAGE or settled or entry is None:
             continue
         if len(_offered(entry, ambiguity)) >= fewest:
             found.setdefault(entry.relation, []).append((entry, ambiguity))

@@ -119,7 +119,7 @@ def _ignore_failures(
             failures.append(failure(IGNORE_REASON_KNOWN, relation, reason=claimed or ""))
             continue
         profile = by_name.get(relation)
-        if profile is None or binding.template != ignore.ID:
+        if profile is None or binding.template != ignore.ID or claimed == ignore.HUMAN:
             continue
         found = ignore.reason_for(profile, profiles, tools)
         if found == claimed:

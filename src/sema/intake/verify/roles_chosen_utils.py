@@ -62,6 +62,25 @@ def _path(target: Target, section: str | None) -> str:
     return (section or "").partition(SECTION_SEPARATOR)[0]
 
 
+def closed_required(roles: RolesResult) -> list[RoleEligibility]:
+    """Column roles a decision closed with no column although their binding requires them."""
+    required: set[tuple[str, str]] = set()
+    for entry in roles.structure.bound:
+        for target in role_targets(entry.binding):
+            required |= {
+                (target.relation, name)
+                for model in target.models
+                for name, field in model.model_fields.items()
+                if field.is_required()
+            }
+    return [
+        e
+        for e in roles.eligibilities
+        if e.subject is None and e.choice is None and e.source is not None
+        and (e.relation, e.role) in required
+    ]
+
+
 def chosen_columns(eligibilities: Iterable[RoleEligibility], relation: str) -> dict[str, str]:
     return {
         e.role: e.choice

@@ -1,8 +1,9 @@
 """ignore: relations with no structural content, decided from profiles before any template.
 
 Reasons, in precedence order: ``no_header`` (the loader landed no header row), ``no_rows``,
-and ``boilerplate`` (repeated unchanged in at least the share floor of the other files). The
-binding records which templates would otherwise have matched, so a reviewer can rebind it.
+and ``boilerplate`` (repeated unchanged in at least the share floor of the other files). A
+reviewer's ``ignore`` decision records ``human``, which no profile re-derives. The binding
+records which templates would otherwise have matched, so a reviewer can rebind it.
 """
 
 from __future__ import annotations
@@ -17,8 +18,8 @@ from sema.intake.verify.base import FloorValue, Verdict
 
 ID = "ignore"
 REASON, WOULD_MATCH = "reason", "would_match"
-NO_HEADER, NO_ROWS, BOILERPLATE = "no_header", "no_rows", "boilerplate"
-REASONS = (NO_HEADER, NO_ROWS, BOILERPLATE)
+NO_HEADER, NO_ROWS, BOILERPLATE, HUMAN = "no_header", "no_rows", "boilerplate", "human"
+REASONS = (NO_HEADER, NO_ROWS, BOILERPLATE, HUMAN)
 # Measured: the ACRIS options sheet is identical in 15 of 15 workbooks (share 1.0 of the
 # other workbooks); an ACRIS column dictionary sheet matches at most its one twin of 14 (0.07).
 BOILERPLATE_GROUP_SHARE_FLOOR = 0.8
@@ -71,6 +72,10 @@ def would_match(profile: RelationProfile, tools: ProfileTools) -> list[str]:
         for template in TEMPLATES
         if template.ID != ID and template.candidates([profile], tools)
     ]
+
+
+def decided(profile: RelationProfile, tools: ProfileTools) -> SlotBinding:
+    return _binding(profile, HUMAN, would_match(profile, tools))
 
 
 def _binding(profile: RelationProfile, reason: str, matches: Sequence[str]) -> SlotBinding:

@@ -20,9 +20,11 @@ from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import CodeListSpec, ConceptsSpec, HeaderKeys
 from sema.intake import lexicon
 from sema.intake.eligibility_utils import (
+    HUMAN,
     DeclaredJoin,
     Hint,
     RoleEligibility,
+    StatedChoice,
     contains,
     mentions,
 )
@@ -249,8 +251,10 @@ def resolve_sections(
     structure: StructureResult,
     references: Sequence[RoleEligibility],
     by_name: Mapping[str, RelationProfile],
+    choices: Mapping[str, StatedChoice] | None = None,
 ) -> tuple[StructureResult, list[Ambiguity]]:
-    """A concept list is a code list once any property's domain resolves to it."""
+    """A concept list is a code list once any property's domain resolves to it; otherwise
+    a stated choice for its ``<relation>.section`` subject settles it."""
     referenced: dict[str, list[str]] = {}
     for role in references:
         if role.role == VOCABULARY_ROLE and role.choice not in (None, lexicon.NO_REFERENCE):
@@ -269,12 +273,38 @@ def resolve_sections(
             binding = binding.model_copy(update={"section": section, "evidence": evidence})
             bound.append(entry.model_copy(update={"binding": binding}))
             continue
-        bound.append(entry)
-        open_sections.append(Ambiguity(
+        listed = Ambiguity(
             stage=STAGE, subject=f"{relation}.section", members=SECTION_MEMBERS,
             hints=(NO_REFERENCE_HINT,),
-        ))
+        )
+        stated = (choices or {}).get(listed.subject)
+        decided = _stated_section(stated, vocabulary)
+        if decided is not None:
+            binding = binding.model_copy(update={"section": decided})
+            entry = entry.model_copy(update={"binding": binding})
+        bound.append(entry)
+        open_sections.append(_with_stated_section(listed, stated))
     return structure.model_copy(update={"bound": tuple(bound)}), open_sections
+
+
+def _stated_section(stated: StatedChoice | None, vocabulary: str) -> str | None:
+    if stated is None or stated.choice not in SECTION_MEMBERS:
+        return None
+    if stated.choice == CODE_LISTS:
+        return f"{CODE_LISTS}{SECTION_SEPARATOR}{vocabulary}"
+    return stated.choice
+
+
+def _with_stated_section(listed: Ambiguity, stated: StatedChoice | None) -> Ambiguity:
+    """As ``with_stated``: a member settles the entry, a human ``none`` closes it unset."""
+    if stated is None:
+        return listed
+    fields = dict(source=stated.source, confidence=stated.confidence)
+    if stated.choice in listed.members:
+        return listed.model_copy(update=dict(fields, choice=stated.choice))
+    if stated.source == HUMAN and stated.choice == lexicon.NO_REFERENCE:
+        return listed.model_copy(update=fields)
+    return listed
 
 
 def is_dictionary_binding(binding: SlotBinding) -> bool:

@@ -148,7 +148,7 @@ def run_roles(
         for entry in reference_roles(dictionaries, list(vocabularies(structure, by_name)))
     ]
     joins, open_joins = declared_joins(dictionaries, headers)
-    resolved, open_sections = resolve_sections(structure, references, by_name)
+    resolved, open_sections = resolve_sections(structure, references, by_name, hints.choices)
     others = [e.binding for e in resolved.bound if e.binding.template != entity_model.ID]
     found += [role for b in others for role in _compute(b, by_name, hints, stated)]
     listed = [*ambiguities([*found, *references]), *open_joins, *open_sections]
@@ -273,7 +273,7 @@ def _settle(
     if isinstance(human, str):
         return base.settled(human, "human")
     stated_choice = with_stated(base, hints.choices)
-    if stated_choice.choice is not None:
+    if stated_choice.source is not None:
         return stated_choice
     if len(members) == 1 and not excluded:
         return base.settled(members[0], "code")

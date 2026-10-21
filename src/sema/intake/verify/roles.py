@@ -2,7 +2,8 @@
 
 Binding checks compare each bound column with the role's predicate set from the Roles
 stage; value checks run each role's predicate over the bound relation as counts. Without
-a spec only the stage's own sections and ambiguity list are checked.
+a spec only the stage's own sections and ambiguity list are checked. A required role a
+decision closed with no column fails ``required_roles_bound`` naming that decision's source.
 """
 
 from __future__ import annotations
@@ -24,7 +25,11 @@ from sema.intake.shapes.base_utils import JOIN_FLOOR, failure, section_of
 from sema.intake.structure import StructureResult
 from sema.intake.structure_hint_utils import section_at
 from sema.intake.verify.base import Ambiguity, Failure, FloorValue, Verdict
-from sema.intake.verify.roles_chosen_utils import chosen_sections, with_sources
+from sema.intake.verify.roles_chosen_utils import (
+    chosen_sections,
+    closed_required,
+    with_sources,
+)
 from sema.intake.verify.roles_utils import (
     GROUP_KEY_ROLES,
     VALUE_CHECKS,
@@ -71,6 +76,10 @@ def verify_roles(
     """``relations`` also re-proves each named relation's chosen roles, with no spec."""
     failures = _section_failures(roles.structure)
     failures += _ambiguity_failures(roles)
+    failures += [
+        failure(REQUIRED_ROLES_BOUND, e.relation, role=e.role, source=e.source or "")
+        for e in closed_required(roles)
+    ]
     listed: list[Ambiguity] = list(roles.ambiguities)
     sections = chosen_sections(roles, relations) if relations else []
     if spec is not None:

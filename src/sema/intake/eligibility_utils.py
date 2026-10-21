@@ -39,6 +39,7 @@ __all__ = [
 EMBEDDING_MARGIN_FLOOR: float = 0.10
 EligibilitySource = Literal["code", "memory", "lexicon", "embedding", "human", "model"]
 HintSource = Literal["memory", "lexicon", "embedding"]
+HUMAN: EligibilitySource = "human"
 # Ordinal, not calibrated: S3 calibrates confidence against the gold set.
 SOURCE_CONFIDENCE: dict[str, float] = {
     "code": 1.0,
@@ -112,10 +113,15 @@ def subject_of(entry: RoleEligibility) -> str:
 def with_stated(
     entry: RoleEligibility, choices: Mapping[str, StatedChoice]
 ) -> RoleEligibility:
+    """A human ``none`` over an entry offering no ``none`` closes it with no choice."""
     stated = choices.get(subject_of(entry))
-    if stated is None or stated.choice not in entry.members:
+    if stated is None:
         return entry
-    return entry.settled(stated.choice, stated.source, stated.confidence)
+    if stated.choice in entry.members:
+        return entry.settled(stated.choice, stated.source, stated.confidence)
+    if stated.source == HUMAN and stated.choice == lexicon.NO_REFERENCE:
+        return entry.model_copy(update=dict(source=stated.source, confidence=stated.confidence))
+    return entry
 
 
 class DeclaredJoin(BaseModel):
