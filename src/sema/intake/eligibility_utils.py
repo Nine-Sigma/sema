@@ -215,7 +215,7 @@ def status_classes(values: Sequence[Any]) -> tuple[list[str], list[str]] | None:
         found = [
             name
             for name, words in lexicon.STATUS_VALUE_WORDS.items()
-            if any(contains(text, word) for word in words.split())
+            if any(contains(text, word) for word in words)
         ]
         if len(found) != 1:
             return None

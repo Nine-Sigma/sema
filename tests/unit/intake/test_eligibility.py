@@ -19,7 +19,7 @@ from sema.intake.profile import EvidencePolicy, ProfileRefusedError, ProfileTool
 from tests.unit.intake.eligibility_env import (
     A2_GOLDEN, A2_RUN, A8_BUILDER, A8_CSV, ACRIS_RUN, COLOURS_SQL, CONCEPT_LIST,
     DECLARED_JOINS, GROUPED_CODE_TABLE, JOIN_COLUMNS, LEGALS_DESCRIPTION, MISSPELLED_PROPERTY,
-    PROMPT_KEY_START, REAL_MASTER, REFERENCE_COLUMNS_XFAIL, REFERENCES, SECTION_MEMBERS,
+    PROMPT_KEY_START, REAL_MASTER, REFERENCES, SECTION_MEMBERS,
     SPEC_TOKENS, Env, by_role, clear_embedder,
     close_embedder, concept_list_over, cosine, descriptor, eligibility, eligibility_utils,
     hint_sources, lexicon, memory_source, model_calls, normalized, per_property, run_roles,
@@ -304,7 +304,6 @@ def test_legals_join_master_on_the_columns_the_header_names(env: Env) -> None:
     assert legals.evidence == "declared"
 
 
-@REFERENCE_COLUMNS_XFAIL
 def test_eight_declared_joins_over_the_directory(env: Env) -> None:
     joins = env.a10_roles.joins
 
@@ -372,7 +371,6 @@ def test_a2_assembles_a_spec_whose_import_equals_the_golden(env: Env) -> None:
     assert model_calls(env.root / "a2" / "roles") == []
 
 
-@REFERENCE_COLUMNS_XFAIL
 def test_a10_with_the_hint_assembles_the_hand_written_spec(env: Env) -> None:
     roles = env.hinted_roles
     column_roles = {(e.relation, e.role): e for e in roles.eligibilities if e.subject is None}

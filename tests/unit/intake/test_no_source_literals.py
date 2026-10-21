@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import ast
 import csv
+import dataclasses
 import inspect
 import io
 import json
 import keyword
 import re
 import tokenize
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Collection, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import NamedTuple
 
@@ -23,6 +24,7 @@ import pytest
 from pydantic import BaseModel
 
 from sema.binding import spec_sections
+from sema.intake import lexicon
 from sema.intake.loaders.base import relation_name
 
 pytestmark = pytest.mark.unit
@@ -145,6 +147,7 @@ def excluded_names() -> set[str]:
                 names.update(alias for alias in (field.alias,) if alias)
     schema = json.loads(TABLE_SCHEMA.read_text(encoding="utf-8"))
     names.update(_table_schema_vocabulary(schema))
+    names.update(word for group in _lexicon_token_groups() for word in group)
     return {name.casefold() for name in names}
 
 
@@ -253,6 +256,38 @@ def test_key_value_sheet_yields_its_keys_and_wide_sheet_its_header() -> None:
     assert set(_grid_literals(wide)) == {
         "Name", "Kind", "Note", "see Other Thing dataset", "Other Thing"
     }
+
+
+def _lexicon_token_groups() -> list[Collection[str]]:
+    groups: list[Collection[str]] = [entry.tokens for entry in lexicon.ROLES]
+    return [*groups, *lexicon.HEADER_KEY_TOKENS.values(), *lexicon.STATUS_VALUE_WORDS.values()]
+
+
+def _lexicon_words() -> set[str]:
+    groups = _lexicon_token_groups()
+    return {w for g in groups for w in (g.split() if isinstance(g, str) else g)}
+
+
+def test_lexicon_role_tokens_are_tuples_of_single_words() -> None:
+    for group in _lexicon_token_groups():
+        assert not isinstance(group, str), f"space-joined token string {group!r}"
+        assert all(TOKEN.fullmatch(word) for word in group), group
+    for entry in lexicon.ROLES:
+        values = [getattr(entry, field.name) for field in dataclasses.fields(entry)]
+        assert " ".join(entry.tokens) not in values, f"{entry.name} spells its tokens as one string"
+
+
+def test_lexicon_single_word_role_tokens_are_excluded() -> None:
+    assert _lexicon_words() - excluded_names() == set()
+
+
+def test_multi_word_fixture_literal_of_lexicon_words_is_still_a_hit(tmp_path: Path) -> None:
+    literals = fixture_literals()
+    words = _lexicon_words()
+    phrase = min(text for key, text in literals.items() if 1 < len(key) and set(key) <= words)
+    assert set(_tokens(phrase)) <= excluded_names()
+    (tmp_path / "words.py").write_text(f"PHRASE = {phrase!r}\nWORDS = {tuple(phrase.split())!r}\n")
+    assert find_hits(tmp_path, literals) == [Hit("words.py", 1, phrase)]
 
 
 def _longest_plain_literal(literals: Mapping[tuple[str, ...], str], multi: bool) -> str:

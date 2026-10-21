@@ -7,6 +7,7 @@ structure output binds as a dictionary or header and is logged as a schema relat
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, get_args
@@ -46,6 +47,7 @@ CODE_LISTS = next(
 SECTION_MEMBERS = (CONCEPTS, CODE_LISTS)
 NO_REFERENCE_HINT = "no_reference"
 JOIN_WITHOUT_COLUMNS = "declared_join_without_columns"
+SENTENCE_BREAK = re.compile(r"[.?!]\s+|[\r\n]+")
 VOCABULARY_ROLE, ENTITY_ROLE = (
     next(name for name, kind in lexicon.REFERENCE_ROLES if kind == wanted)
     for wanted in ("vocabulary", "entity")
@@ -64,8 +66,13 @@ class HeaderReading(BaseModel):
     prose: tuple[str, ...]
 
     @property
-    def prose_text(self) -> str:
-        return " ".join(text for key in self.prose if (text := self.values.get(key)))
+    def sentences(self) -> tuple[str, ...]:
+        """Each prose key is its own text, since a key boundary is a structural break."""
+        texts = (text for key in self.prose if (text := self.values.get(key)))
+        return tuple(
+            sentence for text in texts for sentence in SENTENCE_BREAK.split(text)
+            if sentence.strip()
+        )
 
 
 @dataclass(frozen=True)
@@ -219,12 +226,12 @@ def declared_joins(
         header = headers.get(dictionary.header) if dictionary.header else None
         if header is None:
             continue
-        prose = header.prose_text
         for other in dictionaries:
-            if other.relation == dictionary.relation or not mentions(prose, other.aliases):
+            naming = [s for s in header.sentences if mentions(s, other.aliases)]
+            if other.relation == dictionary.relation or not naming:
                 continue
             shared = [p for p in dictionary.property_names if p in other.property_names]
-            named = tuple(p for p in shared if contains(prose, p))
+            named = tuple(p for p in shared if any(contains(s, p) for s in naming))
             if named:
                 joins.append(DeclaredJoin(
                     from_relation=dictionary.relation, from_entity=dictionary.entity,

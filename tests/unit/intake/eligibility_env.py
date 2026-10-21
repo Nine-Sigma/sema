@@ -37,7 +37,6 @@ from types import ModuleType
 from typing import Any, NamedTuple
 
 import duckdb
-import pytest
 import yaml
 
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
@@ -90,16 +89,6 @@ SPEC_TOKENS = {
     "status": {"status", "active", "deprecated", "retired", "invalid"},
     "parent": {"parent", "parent_id", "broader"},
 }
-REFERENCE_COLUMNS_XFAIL = pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "rule/fixture disagreement (design Decision 7): the written join rule takes every"
-        " shared column the header prose names; both References headers also name CRFN,"
-        " File Nbr (Personal) and Reel Year, Reel Nbr, Reel Page (Real) as alternate"
-        " identifiers, so those joins carry 4 and 5 columns, not (Document ID, Good"
-        " Through Date). Not special-cased; needs a scoped rule decided by Dean."
-    ),
-)
 SECTION_MEMBERS = {"concepts", "code_lists"}
 LONG_TAIL = "' written out at length for the embedding rank case'"
 # Text columns longer than any definition floor, repeating so neither is unique.

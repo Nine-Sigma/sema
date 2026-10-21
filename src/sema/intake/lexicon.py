@@ -6,7 +6,7 @@ non-alphanumerics become spaces, whitespace collapses, and a trailing plural
 
 This is the one intake module that spells role names (design Decision 5). Each role
 names its predicate kind, which is also the check id the roles verifier reports. Tokens
-are written as one space-separated word list per role and reviewed with every change.
+are written as a tuple of single words per role and reviewed with every change.
 """
 
 from __future__ import annotations
@@ -57,13 +57,9 @@ STATUS_CARDINALITY_CAP = 10
 @dataclass(frozen=True)
 class RoleEntry:
     name: str
-    words: str
+    tokens: tuple[str, ...]
     description: str
     predicate: PredicateKind
-
-    @property
-    def tokens(self) -> tuple[str, ...]:
-        return tuple(self.words.split())
 
     @property
     def check(self) -> str:
@@ -74,46 +70,60 @@ class RoleEntry:
 # and a property's description precedes the property because dictionary headers name
 # both with the same leading word.
 ROLES: tuple[RoleEntry, ...] = (
-    RoleEntry("code", "code value", "the short code that identifies a term in its list", "key"),
     RoleEntry(
-        "concept_id", "id concept_id identifier", "the stable identifier of a concept", "key"
+        "code", ("code", "value"), "the short code that identifies a term in its list", "key"
     ),
-    RoleEntry("name", "name label title", "the preferred human readable name", "text"),
-    RoleEntry("display", "display label name", "the text shown to people for a code", "text"),
+    RoleEntry(
+        "concept_id",
+        ("id", "concept_id", "identifier"),
+        "the stable identifier of a concept",
+        "key",
+    ),
+    RoleEntry("name", ("name", "label", "title"), "the preferred human readable name", "text"),
+    RoleEntry(
+        "display", ("display", "label", "name"), "the text shown to people for a code", "text"
+    ),
     RoleEntry(
         "definition",
-        "definition description desc meaning",
+        ("definition", "description", "desc", "meaning"),
         "a sentence or more explaining what something means",
         "long_text",
     ),
     RoleEntry(
         "description",
-        "description definition desc meaning",
+        ("description", "definition", "desc", "meaning"),
         "prose explaining one attribute of an entity",
         "text",
     ),
     RoleEntry(
         "property",
-        "property field column attribute variable element name",
+        ("property", "field", "column", "attribute", "variable", "element", "name"),
         "the name of one attribute an entity holds",
         "text_key",
     ),
     RoleEntry(
         "status",
-        "status active deprecated retired invalid",
+        ("status", "active", "deprecated", "retired", "invalid"),
         "whether a row is in use or withdrawn",
         "low_cardinality",
     ),
-    RoleEntry("parent", "parent parent_id broader", "the identifier of the broader item", "any"),
-    RoleEntry("valid_from", "valid_from effective start", "when a row starts to apply", "date"),
-    RoleEntry("valid_to", "valid_to expiry end", "when a row stops applying", "date"),
-    RoleEntry("synonyms", "synonyms alias", "other names for the same thing", "array"),
+    RoleEntry(
+        "parent", ("parent", "parent_id", "broader"), "the identifier of the broader item", "any"
+    ),
+    RoleEntry(
+        "valid_from", ("valid_from", "effective", "start"), "when a row starts to apply", "date"
+    ),
+    RoleEntry("valid_to", ("valid_to", "expiry", "end"), "when a row stops applying", "date"),
+    RoleEntry("synonyms", ("synonyms", "alias"), "other names for the same thing", "array"),
 )
 
 COINCIDING_ROLES: frozenset[frozenset[str]] = frozenset({frozenset({"display", "name"})})
 
 STATUS_ROLE = "status"
-STATUS_VALUE_WORDS: dict[str, str] = {"active": "active", "retired": "deprecated retired invalid"}
+STATUS_VALUE_WORDS: dict[str, tuple[str, ...]] = {
+    "active": ("active",),
+    "retired": ("deprecated", "retired", "invalid"),
+}
 ENTITY_PROPERTY_ROLE = "property"
 PROPERTY_TEXT_ROLES = ("description",)
 NOTES_ROLE = "notes"
