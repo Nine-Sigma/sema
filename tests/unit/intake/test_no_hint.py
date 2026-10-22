@@ -9,7 +9,10 @@ printed. A1 settles after its committed ignore-only decisions file and is compar
 oracle is the loader golden: the landed tables and the staged terms. A10 is never an
 expected failure; any other known-source or held-out miss is an ``xfail(strict=True)``
 carrying the spec diff, the missed metric, or the rejection, and together they are the S3
-baseline (Dean, 2026-10-22). Held-out ledger text is never printed, only counts and metrics.
+baseline (Dean, 2026-10-22). Every leg with a spec oracle is also scored per import cell kind
+(``sema.intake.scorecard``) and held at its floor in ``scorecard_env.BASELINE``, with the run's
+relation and ignored counts printed beside the table. Held-out ledger text is never printed,
+only counts and metrics.
 """
 
 from __future__ import annotations
@@ -22,7 +25,9 @@ import pytest
 import yaml
 
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
+from sema.intake.metrics import RunMetrics
 from sema.intake.model_calls import BUDGET_REASON
+from sema.intake.scorecard import render, score
 from sema.log import logger
 from tests.support.athena_bundle import export_schema
 from tests.unit.intake.no_hint_env import (
@@ -45,6 +50,7 @@ from tests.unit.intake.no_hint_env import (
     uncovered_reads,
     utils,
 )
+from tests.unit.intake.scorecard_env import BASELINE, floor_misses
 from tests.unit.intake.test_athena_golden import GOLDEN
 from tests.unit.intake.test_heldout_gate import GATE_THRESHOLDS, gate_misses
 
@@ -148,8 +154,8 @@ def _assert_imports_equal(
     diff = spec_diff(spec, written)
     print(f"\n{run.name} spec diff (written -> assembled):\n{diff}")
     with staging_copy(run, directory) as staging:
-        manifest, staged = imported(capped(spec, cap), staging)
-        expected_manifest, expected_staged = imported(capped(written, cap), staging)
+        _, manifest, staged = imported(capped(spec, cap), staging)
+        _, expected_manifest, expected_staged = imported(capped(written, cap), staging)
 
     manifest_diff = "\n".join(
         text_diff(expected_manifest, manifest).splitlines()[:MANIFEST_DIFF_LINES]
@@ -220,7 +226,7 @@ def test_athena_staged_terms_equal_the_golden_concept_rows(
     assert spec is not None
 
     with staging_copy(run, tmp_path) as staging:
-        _, staged = imported(capped(spec, 1), staging)
+        _, _, staged = imported(capped(spec, 1), staging)
     concept = csv_blocks(GOLDEN.read_text())["concept"]
     terms = csv_blocks(staged)["concept"]
 
@@ -253,16 +259,61 @@ def _a1_scoped(raw: dict[str, Any]) -> ConceptSourceSpec:
     )
 
 
+def _a1_pair(spec: ConceptSourceSpec) -> tuple[ConceptSourceSpec, ConceptSourceSpec]:
+    """The A1 assembled and written specs, both scoped to ``concepts`` and ``value_sets``."""
+    written = _a1_scoped(yaml.safe_load(A1_SPEC.read_text())["concept_source"])
+    assembled = _a1_scoped(spec.model_dump(mode="json", by_alias=True, exclude_none=True))
+    return assembled, written
+
+
 @CAPS
 def test_a1_import_equals_the_written_spec_on_concepts_and_value_sets(
     runs: Runs, cap: int | None, tmp_path: Path
 ) -> None:
     spec = spec_of(runs.decided(A1, A1_DECISIONS))
     assert spec is not None
-    written = _a1_scoped(yaml.safe_load(A1_SPEC.read_text())["concept_source"])
-    assembled = _a1_scoped(spec.model_dump(mode="json", by_alias=True, exclude_none=True))
+    assembled, written = _a1_pair(spec)
 
     _assert_imports_equal(runs.replayed(A1), assembled, written, cap, tmp_path)
+
+
+def _scored_specs(
+    runs: Runs, name: str
+) -> tuple[ConceptSourceSpec, ConceptSourceSpec, RunMetrics]:
+    """The assembled and oracle specs of a scorecard leg and the metrics of the run that
+    assembled it (A1's after its decisions)."""
+    outcome = runs.decided(A1, A1_DECISIONS) if name == A1 else runs.replayed(name).outcome
+    spec = spec_of(outcome)
+    assert spec is not None, metrics_of(outcome)
+    if name == A1:
+        return (*_a1_pair(spec), metrics_of(outcome))
+    return spec, load_concept_source_spec(WRITTEN_SPECS[name]), metrics_of(outcome)
+
+
+@pytest.mark.parametrize(
+    ("name", "cap_id"),
+    [
+        pytest.param(name, cap_id, id=f"{name}-{cap_id}")
+        for name in (*sorted(WRITTEN_SPECS), A1)
+        for cap_id in CAP_VALUES
+    ],
+)
+def test_known_source_scorecard_meets_its_floor(
+    runs: Runs, name: str, cap_id: str, tmp_path: Path
+) -> None:
+    spec, written, metrics = _scored_specs(runs, name)
+    cap, ignored = CAP_VALUES[cap_id], sum(metrics.ignored.values())
+    with staging_copy(runs.replayed(name), tmp_path) as staging:
+        manifest, _, staged = imported(capped(spec, cap), staging)
+        expected_manifest, _, expected_staged = imported(capped(written, cap), staging)
+    card = score(expected_manifest, manifest, expected_staged, staged)
+    table = render(card)
+    print(f"\n{name}-{cap_id} spec diff (written -> assembled):\n{spec_diff(spec, written)}")
+    print(f"{table}\nrelations {metrics.relations} ignored {ignored}")
+
+    floor = BASELINE.get((name, cap_id))
+    assert floor is not None, f"no scorecard floor for {name}-{cap_id}\n{table}"
+    assert floor_misses(card, ignored, floor) == (), table
 
 
 @pytest.mark.parametrize("name", HELD_OUT)

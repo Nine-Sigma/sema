@@ -181,14 +181,15 @@ def staging_copy(run: Replayed, directory: Path) -> Iterator[Staging]:
         yield staging
 
 
-def imported(spec: ConceptSourceSpec, staging: Staging) -> tuple[str, str]:
-    """The import's manifest, entities in qualified-name order, and its term staging,
-    both as text."""
+def imported(spec: ConceptSourceSpec, staging: Staging) -> tuple[dict[str, Any], str, str]:
+    """The import's manifest mapping with entities in qualified-name order, that mapping
+    as text, and the term staging export text."""
     provider = RelationProvider(warehouse=None, staging=staging)
     result = import_concept_source(spec, provider, dataset_map={}, staging=staging)
     entities = sorted(result.manifest["entities"], key=lambda e: e["qualified_name"])
-    manifest = yaml.safe_dump(result.manifest | {"entities": entities}, sort_keys=False)
-    return manifest, export_schema(staging, spec.external_namespace)
+    manifest = result.manifest | {"entities": entities}
+    text = yaml.safe_dump(manifest, sort_keys=False)
+    return manifest, text, export_schema(staging, spec.external_namespace)
 
 
 def jsonl(path: Path) -> list[dict[str, Any]]:
