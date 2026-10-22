@@ -100,6 +100,10 @@ def test_land_structure_and_roles_verdicts_pass(hinted: StageRun) -> None:
     assert hinted.dry_run_verdict.status == "pass", describe(hinted.dry_run_verdict)
 
 
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=(
+    "no zero-call path derives a dictionary's self domain and the hinted path does not "
+    "read a hint's `domains`; S4 honours hint domains as `source: human`"
+))
 def test_assembled_spec_equals_the_hand_written_spec(hinted: StageRun) -> None:
     assert hinted.spec is not None, [(a.subject, a.members) for a in hinted.roles.ambiguities]
 

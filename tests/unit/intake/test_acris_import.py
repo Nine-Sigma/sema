@@ -58,6 +58,10 @@ DOMAINS = {
     ("acris_personal_property_parties", "Country", "Country_Codes"),
     ("acris_real_property_parties", "State", "State_Codes"),
     ("acris_personal_property_parties", "State", "State_Codes"),
+    ("acris_country_codes", "COUNTRY CODE", "Country_Codes"),
+    ("acris_property_type_codes", "PROPERTY TYPE", "Property_Types_Codes"),
+    ("acris_state_codes", "State Code", "State_Codes"),
+    ("acris_ucc_collateral_codes", "UCC COLLATERAL CODE", "UCC_Collateral_Codes"),
 }
 BOROUGHS = {"1": "Manhattan", "2": "Bronx", "3": "Brooklyn", "4": "Queens"}
 LOTS = {"P": "partial", "E": "entire"}
@@ -208,7 +212,7 @@ def test_eight_declared_foreign_keys_across_the_table_schemas(imported: _Importe
     assert all(local == remote == JOIN_COLUMNS for _, _, local, remote in found)
 
 
-def test_nine_domains_across_the_table_schemas(imported: _Imported) -> None:
+def test_thirteen_domains_across_the_table_schemas(imported: _Imported) -> None:
     schemas = imported.result.table_schemas
 
     found = {

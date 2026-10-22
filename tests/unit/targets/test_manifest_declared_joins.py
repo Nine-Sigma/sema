@@ -249,7 +249,7 @@ def test_acris_import_yields_eight_entity_level_joins(imported: _Imported) -> No
     assert {join.evidence for _, _, join in found} == {"declared"}
 
 
-def test_acris_import_yields_nine_entity_level_domains(imported: _Imported) -> None:
+def test_acris_import_yields_thirteen_entity_level_domains(imported: _Imported) -> None:
     entities = _acris_entities(imported)
 
     found = [
@@ -257,7 +257,7 @@ def test_acris_import_yields_nine_entity_level_domains(imported: _Imported) -> N
         for entity in entities
         for domain in entity.domains
     ]
-    assert len(found) == 9
+    assert len(found) == 13
     assert set(found) == DOMAINS
     evidence = {domain.evidence for entity in entities for domain in entity.domains}
     assert evidence == {"declared"}
