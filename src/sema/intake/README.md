@@ -1,6 +1,6 @@
 # Intake: landing any ontology medium as relations
 
-Intake reduces every medium to relations in DuckDB staging, works out from aggregates what shape those relations have and which column plays which role, and assembles a version 2 concept source spec. The deterministic importer (`sema.binding.importer`) turns that spec into a target manifest plus an authored-evidence sidecar. Nothing in this package calls a model: where code cannot decide, it lists an ambiguity for a human (or, from S3, a model) to resolve.
+Intake reduces every medium to relations in DuckDB staging, works out from aggregates what shape those relations have and which column plays which role, and assembles a version 2 concept source spec. The deterministic importer (`sema.binding.importer`) turns that spec into a target manifest plus an authored-evidence sidecar. Land, Structure, Roles, and Dry run call no model: where code cannot decide, they list an ambiguity. The ingestion graph (see [The ingestion graph](#the-ingestion-graph)) hands those entries to a model within the members code proved, and then to a human at Review. Roles ranks members with the configured embedder, and Enrich calls the model through the same call path.
 
 The stages run in this order, each with its own verifier and each writing to one run ledger:
 
@@ -213,6 +213,131 @@ uv run sema target import \
   --evidence-out /tmp/acris.evidence.json
 ```
 
-It imports 487 terms in five vocabularies and 15 entities with 6 inline value lists. ACRIS states no primary key or required field, so no entity has an obligation and the declared foreign keys and domains reach the Table Schemas and the dry-run report but not the manifest (design Decision 15, open).
+It imports 487 terms in five vocabularies and 15 entities with 6 inline value lists. ACRIS states no primary key or required field, so no entity has an obligation. The declared foreign keys and domains reach the Table Schemas, the dry-run report, and the manifest, as each entity's `declared_joins` and `domains` with `evidence: declared`; `sema target project` turns the joins into `:JoinPath` edges.
 
 `--staging` serves staging relations and receives term staging: a version 2 value set above `term_storage.inline_cap` (default 5000) is written to the spec's external namespace (default `vocabulary_<spec id>`) in the vocabulary store shape and declared `EXTERNAL` in the manifest. A spec that reads only staging relations never constructs a warehouse connector.
+
+## The ingestion graph
+
+`graph.py` runs one ingestion as a LangGraph graph with a SQLite checkpointer. The design fixes six stages: Land, Structure, Roles, Dry run, Review, and Import. The graph runs them as these nodes, in this order:
+
+1. **Land** (`land`): lands the source through `loaders.detect.land_source`, or a warehouse schema through `land_warehouse`, then runs the Land verifier.
+2. **Structure** (`structure`, `resolve_structure`, `propose_layouts`): `run_structure` binds what code can, the resolver hands open entries to the model, and layout proposals cover relations no template reads. The Structure verifier runs after the resolver and after the proposals.
+3. **Roles** (`roles`, `resolve_roles`): `run_roles`, then the role resolver, then spec assembly and the Roles verifier. When no spec assembles, the run goes to Review.
+4. **Dry run** (`dry_run`): `report.dry_run` and the dry-run verifier. When `--enrich` is set, the `enrich` node runs first.
+5. **Review** (`review`): an interrupt. It writes the ambiguity lists and `run_metrics`, then presents the open structure entries, the settled structure entries with their source, the role entries, the layout proposals, the spec, and the dry-run report.
+6. **Import** (`import`): imports the reviewed spec and writes `import/manifest.yaml` and `import/authored_evidence.json` under the run's ledger directory. It does not load the graph; `sema target load` and `sema target project` do that.
+
+The graph has two interrupts:
+
+- `review`: approve imports, reject ends the run, and a decisions file or an edited spec routes to the `decide` node. `decide` writes the `decisions` artifact when a decisions file was given, re-runs Structure and Roles with the decisions applied, and verifies every decided binding. A passing run with a spec dry-runs and returns to Review; any other result returns to Review directly.
+- `value_ask`: a layout proposal or a Roles tool asked for values the evidence policy withholds. The payload lists each relation with its columns. Approval adds those `(relation, column)` pairs to the run's allowlist, raises a `metadata_only` run to `bounded_values` for those columns only (each still bounded by `max_distinct_values_read`), and re-enters the node that asked.
+
+A failing verdict re-enters the node it followed. The third consecutive failure sets the reason `escalate` and routes to Review. When the call budget refuses a call inside a node, the run stops at Review with the reason `budget_exceeded`, whatever the verdict; the node's fixed successor (`resolve_structure`, `resolve_roles`, or `dry_run`) still runs first, with no further call.
+
+Graph state holds scalars, names, and small records only (attempt counts, approved value pairs, decisions). A node never reads a stage object back from the ledger or a checkpoint: `graph_stages.Stages` recomputes every input from the landed staging file, and model calls inside the stages replay by key, so a recomputation reaches the provider only for a prompt the run has not recorded. The checkpointer only names the node to re-enter.
+
+A ledger root holds `registry.sqlite`, `checkpoints.sqlite` (thread id is the run id), and one `<run_id>/` directory per run with `staging.duckdb`, `events.jsonl`, `sql.jsonl`, `calls/`, and `artifacts/`. The Python entry points are `discover`, `approve`, `reject`, `approve_values`, and `resume`. Each returns `RunOutcome(run_id, node, payload)`, where `node` is the interrupt the run stopped at, or `None` once the run ended. `resume` re-enters a run after a process exit at its pending node and logs a `resume` event. Pass the same `embedder` and `warehouse` to every call on one run; the state holds neither.
+
+## Model calls
+
+Every model call goes through `model_calls.ModelCalls.call(stage, prompt, output_model)`:
+
+1. The key is `prompt_hash(model, prompt, output_model.__name__)`. Prompt versions ride inside the key: each prompt starts with a version line such as `# prompt: structure v1`, and each output model name carries a version suffix such as `StructureBatch_v1`. Prompts carry no run id, timestamp, path, or provider.
+2. The run ledger's `calls/` is checked first, then `<recordings_dir>/calls/<key>.json`. The recordings directory is read-only. A recording hit is copied into the run ledger and logged as a `replay` event, so the run stays self-contained.
+3. On a miss in both, the prompt must fit `MAX_PROMPT_TOKENS` (see [Run ledger and registry](#run-ledger-and-registry)).
+4. The registry row must hold fewer calls than `max_calls` and a cost below `max_cost`. Otherwise the call is refused with `BudgetExceededError`: the registry row moves to `review`, `waiting_review`, `budget_exceeded`, and the caller leaves its entries open. Cost is known only after a call, so one call can overshoot the cost cap by its own cost.
+5. One `invoke` is one call. Its tokens come from the client's `last_stats` and its cost from `prices[model]`, per 1,000 tokens. A model with no price counts at cost 0 and logs one warning. A failed invoke is counted once and logged as `call_failed` with its step errors; a successful one is recorded under `calls/` and logged as `call` with the client's fallback path.
+
+The Structure resolver sends open entries in batches of at most 50 (`output_models.MAX_STRUCTURE_BATCH`). The Roles resolver sends one call per relation signature for column roles, which relations with the same signature inherit with `source: memory`, and one call per relation for reference entries, in batches of at most `MAX_REFERENCE_BATCH` (62) entries. Output models enumerate only the members code proved. A choice that fails a verifier is re-asked with the failed checks at most twice, then left open with the failure as its reason.
+
+`IntakeModelConfig` reads the environment with the prefix `INTAKE_MODEL_`:
+
+- `INTAKE_MODEL_PROVIDER`: required by `build_intake_client`, which the CLI runs at start, so a replay needs it too. Intake never falls back to `LLM_PROVIDER`.
+- `INTAKE_MODEL_MODEL`: required, and part of every call key, so a replay must name the recorded model.
+- `INTAKE_MODEL_MAX_CALLS` and `INTAKE_MODEL_MAX_COST`: required caps. `0` refuses every provider call.
+- `INTAKE_MODEL_PRICES`: JSON, model id to `{"input_per_1k": ..., "output_per_1k": ...}`.
+- `INTAKE_MODEL_RECORDINGS_DIR`: the read-only recordings directory.
+- `INTAKE_MODEL_API_KEY`, `INTAKE_MODEL_BASE_URL`, `INTAKE_MODEL_USE_STRUCTURED_OUTPUT` (default `auto`), and `INTAKE_MODEL_REQUEST_TIMEOUT` (default 120 seconds).
+
+The CLI also builds SEMA's embedder whenever `EMBEDDING_PROVIDER` is non-empty, and the CLI loads `.env` first. The embedding rank changes the Roles prompt, so a run with an embedder misses recordings made without one, and it calls the embedding provider. To replay with no provider call of any kind, set `EMBEDDING_PROVIDER=` to empty.
+
+`scripts/record_intake_run.py` records one live run per committed source to `tests/fixtures/intake/recordings/<source>/`: the run's `calls/` beside `recording.json`, which holds the provider, model, prompt versions, calls, tokens, cost, and value asks. The script then replays the source with a cap of 0 and fails on any miss.
+
+`metrics.run_metrics` writes the `run_metrics` artifact before every Review and after every Decide: `relations`, `ignored` by reason, `bound`, `bound_fraction`, `open_structure`, `open_roles`, `proposals_made`, `proposals_bound`, `model_calls`, `tokens`, `cost`, and `value_asks`. `bound_fraction` divides bound relations by landed relations minus ignored ones, except that a `no_header` relation stays in the denominator, so ignoring a real table cannot raise the fraction.
+
+## Review decisions
+
+A decisions file settles open entries with no model call. It is a YAML list of `{stage, subject, choice}`:
+
+```yaml
+- stage: structure
+  subject: standard_library.data_element_mappings
+  choice: ignore
+```
+
+Each decision is checked against the ambiguity lists Review wrote (`structure_ambiguities` and `roles_ambiguities`), before the graph runs, so a refused file changes nothing. A refusal raises `DecisionRejectedError` naming the subject, the choice, and the members. The rules:
+
+- `choice` is a member of its entry, or `ignore`.
+- A structure `ignore` may name any landed relation, listed or not. The relation is ignored with reason `human`. Ignoring some but not all relations of one binding is refused.
+- A structure member binds that member's binding with `source: human` and confidence 1.0, and the entry moves from the open list to `settled`.
+- `no_template` is not a choice. Review presents a `no_template` entry with `ignore` as its member.
+- A roles decision enters Roles as a stated choice with `source: human`. `ignore` states `none`, which leaves the role unbound; a required role then fails the Roles verifier and the run stays at Review.
+
+A decision never bypasses a verifier. A model's settled role choices are kept when decisions re-run Roles. `approve --spec` passes an edited spec instead or as well: alone it replaces the assembled spec, and beside decisions it overrides only the values it sets.
+
+## Layout proposals and views
+
+`proposal.propose_layouts` makes one model call per proposal target: a `no_template` relation, or one ignored as `no_header` (`StructureResult.proposal_targets`). A proposal names one template, its relations and slots, and optionally one view. It may also abstain, which is recorded as a `layout_finding` event, or answer `needs_values` with the columns it needs, which routes to the `value_ask` interrupt. Code applies the view, runs the template's `verify`, then the Structure verifier over the relations the binding spans. A passing proposal is bound with `source: model`; a failing one is re-asked with every earlier failure at most twice, then escalated for Review.
+
+A view turns a landed relation a template cannot read into a derived staging relation it can. `views.VIEWS` is the closed set a proposal may name; adding a view is adding a module with `ID`, `verify`, and `apply` and listing it there. `fill_down` is the one view: each null in the named columns takes the last non-null value above it in landed row order. It applies to staging relations with a `_sema_locator` column only, and it refuses a column whose first landed row is null (`fill_down_anchor`). The view lands as `<schema>.<table>_fill_down_<12 hex digits of the view spec's SHA-256>`. The bound entry records the view in `BoundEntry.view`; the binding names the landed relation, never the view.
+
+## Enrichment
+
+`--enrich` adds the `enrich` node between Roles and Dry run. `enrichment.enrich` runs SEMA's semantic engine stages B and C through the intake call path, with every domain layer and the inline examples off; stage A is never called, because the bound entity and its key role supply it. It writes the `enrichment` artifact and changes no structural decision. Import recomputes it and applies it with `apply_enrichment`, which fills a property's `definition`, `synonyms`, and `decoded_values` only where the source left them empty. A stated value always wins, and a semantic type is recorded but never applied. Enrichment prompts carry their own version line (`# prompt: enrich_stage_b v1`), so they replay like any other call.
+
+## Tracing
+
+`TracingConfig` reads `INTAKE_TRACING_BACKEND`: `none` (default) or `mlflow`. `langfuse` fails validation. With `mlflow`, every entry point (`discover`, `approve`, `reject`, `approve_values`, `resume`) opens one root span named after itself, `mlflow.langchain.autolog()` traces the LangChain runnables the client invokes, and every span carries `sema.run_id` and `sema.stage`. `mlflow` is imported only when that backend is configured; a missing package raises `TracingUnavailableError` before Land, naming the `tracing-mlflow` extra.
+
+## Running an ingestion from the command line
+
+The commands print JSON. `--root` names the ledger root and defaults to `.sema/intake`; keep it outside the repository.
+
+`sema target discover SOURCE` starts a run and runs it to its first interrupt. `--descriptor` defaults to the single `*.run.yaml` beside the source. `--schema` defaults to `land_` plus the source stem as a relation name (non-word characters become `_`), lowercased; relation names appear in prompts, so a replay must use the schema its recording used. `--warehouse <catalog>.<schema>` replaces `SOURCE` and needs `--descriptor`. `--tier` (default `metadata_only`), `--hint`, `--enrich`, and `--run-id` are optional. The A2 fixture, replayed from its recording with no provider call:
+
+```bash
+export INTAKE_MODEL_PROVIDER=openrouter INTAKE_MODEL_MODEL=openai/gpt-6-luna \
+  INTAKE_MODEL_MAX_CALLS=0 INTAKE_MODEL_MAX_COST=0 EMBEDDING_PROVIDER= \
+  INTAKE_MODEL_RECORDINGS_DIR=tests/fixtures/intake/recordings/a2
+uv run sema target discover tests/fixtures/intake/tabular/codes_a2.xlsx \
+  --schema land_a2 --root /tmp/intake
+```
+
+It stops at `value_ask`, requesting `status` of `land_a2.codes_a2__Values`. The printout names the run id.
+
+`sema target approve RUN_ID --approver NAME` answers the interrupt the run waits at, and refuses a run that waits elsewhere:
+
+- `--values` approves the requested value reads. A run waiting at `value_ask` accepts nothing else.
+- With no other option, it imports. A run with no assembled spec is refused.
+- `--decisions FILE` settles open entries, and `--spec FILE` re-enters with an edited spec.
+- `--reject` ends the run; it cannot be combined with `--spec`, `--decisions`, or `--values`.
+
+The A1 fixture reaches Review with open structure entries, and its committed decisions file settles them, with the same variables pointing at `tests/fixtures/intake/recordings/a1`:
+
+```bash
+uv run sema target discover tests/fixtures/intake/partner_sl/library.duckdb --root /tmp/intake
+uv run sema target approve <run id> --approver <name> --root /tmp/intake \
+  --decisions tests/fixtures/intake/partner_sl/decisions.yaml
+uv run sema target approve <run id> --approver <name> --root /tmp/intake
+```
+
+The second command returns the run to Review with `open_entries: 0`; the third imports it.
+
+`sema target runs` lists the registry newest first, filtered by `--status`, `--stage`, or `--source`. Each row holds the run's stage, status, reason, approver, `model_calls`, `tokens`, and `cost_estimate`; the cost is an estimate from the price table. `--metrics RUN_ID` prints the run's `run_metrics`:
+
+```bash
+uv run sema target runs --status waiting_review --root /tmp/intake
+```
+
+`sema target project --manifest FILE --binding FILE` projects a manifest's entities onto physical tables and writes the retrieval projection plus one `:JoinPath` per foreign key and declared join. Declared joins carry `source: manifest_declared` and confidence `DECLARED_JOIN_CONFIDENCE` (0.8). The binding is YAML naming `catalog`, `schema`, and `entity_tables`, a map from entity qualified name to table. `--writer` is `in-memory` (default, records statements only) or `neo4j`. The command reads the physical catalog through a Databricks cursor with either writer, so it needs a workspace.
