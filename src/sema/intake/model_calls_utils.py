@@ -6,8 +6,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel
+
 from sema.intake.ledger import CALLS_DIR
 from sema.llm_client import InvocationStats, LLMStageError
+from sema.llm_client_utils import approx_tokens
 from sema.models.config import ModelPrice
 
 TOKENS_PER_PRICE_UNIT = 1000
@@ -33,6 +36,12 @@ def call_cost(stats: InvocationStats, price: ModelPrice) -> float:
         stats.prompt_tokens / TOKENS_PER_PRICE_UNIT * price.input_per_1k
         + stats.completion_tokens / TOKENS_PER_PRICE_UNIT * price.output_per_1k
     )
+
+
+def prompt_tokens(prompt: str, output_model: type[BaseModel]) -> int:
+    """What reaches the provider: the prompt and its output schema, at the client's estimate."""
+    schema = json.dumps(output_model.model_json_schema())
+    return approx_tokens(len(prompt) + len(schema))
 
 
 def call_payload(key: str, model: str, schema_name: str) -> dict[str, Any]:

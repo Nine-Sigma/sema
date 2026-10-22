@@ -18,6 +18,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 
+from pydantic import BaseModel
+
 from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import Provider
 from sema.intake.eligibility import run_roles
@@ -38,13 +40,14 @@ from sema.intake.output_models import (
 )
 from sema.intake.output_models_utils import ABSTAIN
 from sema.intake.profile import ProfileTools
+from sema.intake.resolve_budget_utils import PromptEvidence, fitted
 from sema.intake.resolve_roles_utils import (
     RoleAsk,
     chosen_notes,
     column_asks,
+    fitted_roles_prompt,
     in_force,
     reference_asks,
-    render_roles_prompt,
     spanned,
 )
 from sema.intake.resolve_utils import (
@@ -58,7 +61,6 @@ from sema.intake.resolve_utils import (
     render_prompt,
     reopened,
     retried,
-    schema_text,
     settle_choices,
 )
 from sema.intake.shapes.base import RelationProfile, profile_relations
@@ -162,8 +164,8 @@ def _settle(run: _Run, batch: Sequence[OpenEntry], max_retries: int) -> None:
 def _ask(
     run: _Run, batch: Sequence[OpenEntry], failed: Sequence[Sequence[str]]
 ) -> _Attempt:
-    prompt = _prompt(run, batch, failed)
     output_model = structure_batch_model([entry.ambiguity.members for entry in batch])
+    prompt = _prompt(run, batch, failed, output_model)
     key = run.calls.call_key(prompt, output_model)
     try:
         answer = run.calls.call(STAGE, prompt, output_model)
@@ -215,13 +217,13 @@ def _notes(batch: Sequence[OpenEntry], attempt: _Attempt) -> list[str]:
 
 
 def _prompt(
-    run: _Run, batch: Sequence[OpenEntry], failed: Sequence[Sequence[str]]
+    run: _Run, batch: Sequence[OpenEntry], failed: Sequence[Sequence[str]], model: type[BaseModel]
 ) -> str:
     names = list(dict.fromkeys(name for entry in batch for name in entry.spanned()))
     spanned = set(names)
     in_force = [e for e in run.bound if spanned & set(e.binding.relations)]
-    relations = [run.profiles[name] for name in names if name in run.profiles]
-    return render_prompt(batch, in_force, relations, schema_text(run.tools, relations), failed)
+    evidence = PromptEvidence(run.tools, [run.profiles[n] for n in names if n in run.profiles])
+    return fitted(lambda n: render_prompt(batch, in_force, evidence.render(n), failed), model)
 
 
 @dataclass
@@ -301,11 +303,11 @@ def _settle_roles(run: _RolesRun, ask: RoleAsk, max_retries: int) -> None:
     current = run.roles()
     names = spanned(current, ask.relation)
     relations = [p for p in run.profiles if p.ref.name in names]
-    texts = schema_text(run.tools, relations)
+    evidence = PromptEvidence(run.tools, relations)
     claims = in_force(current, ask.relation)
 
     def _ask(failed: Sequence[Sequence[str]]) -> _RoleAttempt:
-        return _ask_roles(run, ask, render_roles_prompt(ask, claims, relations, texts, failed))
+        return _ask_roles(run, ask, fitted_roles_prompt(ask, claims, evidence, failed))
 
     attempt, passed = retried(
         _ask,

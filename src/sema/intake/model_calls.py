@@ -3,7 +3,8 @@
 A call is keyed by `prompt_hash(model, prompt, output model name)`. The run ledger is
 checked first, then the read-only recordings directory; a recording hit is copied into
 the run ledger so the run stays self-contained. Only a miss on both reaches the provider,
-after the registry's call and cost counters are checked against the configured caps.
+after the prompt is checked against ``MAX_PROMPT_TOKENS`` and the registry's call and cost
+counters against the configured caps.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from sema.intake.ledger_utils import prompt_hash
 from sema.intake.model_calls_utils import (
     call_cost,
     call_payload,
+    prompt_tokens,
     read_recording,
     step_errors,
     total_tokens,
@@ -32,6 +34,9 @@ IntakeClient = LLMClient
 
 CALL_KIND = "call"
 CALL_FAILED_KIND = "call_failed"
+CALL_REFUSED_KIND = "call_refused"
+# Model-agnostic policy, below common context windows; never derived from a fixture.
+MAX_PROMPT_TOKENS = 100_000
 BUDGET_STOP_STAGE = "review"
 BUDGET_STOP_STATUS = "waiting_review"
 BUDGET_REASON = "budget_exceeded"
@@ -51,6 +56,19 @@ class BudgetExceededError(LLMStageError):
     def __init__(self, run_id: str, stage: str) -> None:
         super().__init__(run_id, stage, [])
         self.args = (f"run {run_id} reached its model-call budget at stage {stage}",)
+
+
+class PromptBudgetError(LLMStageError):
+    """A prompt over ``MAX_PROMPT_TOKENS`` after compaction; no provider call is made."""
+
+    def __init__(self, stage: str, tokens: int) -> None:
+        super().__init__("", stage, [])
+        message = f"the prompt of {tokens} tokens exceeds the model-call budget of"
+        self.args = (f"{message} {MAX_PROMPT_TOKENS} tokens",)
+
+
+def fits(prompt: str, output_model: type[BaseModel]) -> bool:
+    return prompt_tokens(prompt, output_model) <= MAX_PROMPT_TOKENS
 
 
 def build_model_calls(
@@ -116,6 +134,7 @@ class ModelCalls:
         recorded = self._replay(stage, prompt, schema_name)
         if recorded is not None:
             return output_model.model_validate(recorded)
+        self._check_size(stage, prompt, output_model)
         self._check_budget(stage)
         return self._invoke(stage, prompt, output_model)
 
@@ -132,6 +151,15 @@ class ModelCalls:
         self._ledger.record_call(model, prompt, schema_name, output, recording["tokens"])
         self._ledger.event(stage, REPLAY_KIND, call_payload(key, model, schema_name))
         return dict(output)
+
+    def _check_size(self, stage: str, prompt: str, output_model: type[BaseModel]) -> None:
+        tokens = prompt_tokens(prompt, output_model)
+        if tokens <= MAX_PROMPT_TOKENS:
+            return
+        key = self.call_key(prompt, output_model)
+        payload = call_payload(key, self._config.model, output_model.__name__)
+        self._ledger.event(stage, CALL_REFUSED_KIND, {**payload, "prompt_tokens": tokens})
+        raise PromptBudgetError(stage, tokens)
 
     def _check_budget(self, stage: str) -> None:
         row = self._registry.get(self._run_id)

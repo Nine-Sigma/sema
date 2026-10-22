@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib import resources
 from string import Template
@@ -192,14 +192,13 @@ def render_template(prompt: str, sections: Mapping[str, str]) -> str:
 def render_prompt(
     batch: Sequence[OpenEntry],
     in_force: Sequence[BoundEntry],
-    relations: Sequence[RelationProfile],
-    schema_text: Mapping[str, Sequence[tuple[object, ...]]],
+    relations: str,
     failed: Sequence[Sequence[str]],
 ) -> str:
     sections = {
         "in_force": bullets(f"`{member(e.binding)}` ({e.source})" for e in in_force),
         "failures": history(failed),
-        "relations": render_relations(relations, schema_text),
+        "relations": relations,
         "entries": "\n\n".join(_entry(index, entry) for index, entry in enumerate(batch)),
     }
     return render_template(STRUCTURE_PROMPT, sections)
@@ -217,9 +216,23 @@ def history(failed: Sequence[Sequence[str]]) -> str:
 
 
 def render_relations(
-    relations: Sequence[RelationProfile], schema_text: Mapping[str, Sequence[tuple[object, ...]]]
+    relations: Sequence[RelationProfile],
+    schema_text: Mapping[str, Sequence[tuple[object, ...]]],
+    *,
+    hidden: Mapping[str, int] | None = None,
+    kept: Mapping[str, Collection[str]] | None = None,
 ) -> str:
-    return "\n\n".join(_relation(p, schema_text.get(p.ref.name)) for p in relations)
+    """``hidden`` counts each relation's schema rows not shown; with ``kept``, only the
+    columns it lists for a relation keep their facts and the rest are named."""
+    return "\n\n".join(
+        _relation(
+            p,
+            schema_text.get(p.ref.name),
+            (hidden or {}).get(p.ref.name, 0),
+            None if kept is None else kept.get(p.ref.name, ()),
+        )
+        for p in relations
+    )
 
 
 def schema_text(tools: ProfileTools, relations: Sequence[RelationProfile]) -> SchemaText:
@@ -249,12 +262,28 @@ def _entry(index: int, entry: OpenEntry) -> str:
     )
 
 
-def _relation(profile: RelationProfile, schema_rows: Sequence[tuple[object, ...]] | None) -> str:
+def _relation(
+    profile: RelationProfile,
+    schema_rows: Sequence[tuple[object, ...]] | None,
+    hidden: int = 0,
+    kept: Collection[str] | None = None,
+) -> str:
     lines = [f"### {profile.ref.name}", f"rows: {profile.row_count}", "columns:"]
-    lines += [f"- {_column(column)}" for column in profile.columns]
+    keep = None if kept is None else set(kept)
+    lines += [f"- {_column(c)}" for c in profile.columns if keep is None or c.name in keep]
+    if named := [c.name for c in profile.columns if keep is not None and c.name not in keep]:
+        lines.append(
+            f"named only, {len(named)} columns no open entry offers and no claim holds:"
+            f" {', '.join(named)}"
+        )
     if schema_rows:
         lines.append("schema text:")
         lines += [f"- {' | '.join(map(str, row))}" for row in schema_rows]
+    if hidden:
+        lines.append(
+            f"{hidden} more rows not shown; the rows above come first in order of the text"
+            " columns"
+        )
     return "\n".join(lines)
 
 

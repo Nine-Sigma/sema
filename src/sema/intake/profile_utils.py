@@ -332,8 +332,13 @@ def sample_sql(relation_sql: str, column: str, limit: int) -> str:
     )
 
 
-def text_sql(relation_sql: str, quoted_columns: Sequence[str]) -> str:
-    return f"SELECT {', '.join(quoted_columns)} FROM {relation_sql}"
+def text_sql(relation_sql: str, quoted_columns: Sequence[str], limit: int | None = None) -> str:
+    """Every row in stored order, or the first ``limit`` rows in order of every column."""
+    statement = f"SELECT {', '.join(quoted_columns)} FROM {relation_sql}"
+    if limit is None:
+        return statement
+    positions = ", ".join(str(n) for n in range(1, len(quoted_columns) + 1))
+    return f"{statement} ORDER BY {positions} LIMIT {limit}"
 
 
 def _any_filled(quoted_columns: Sequence[str]) -> str:

@@ -37,13 +37,12 @@ from sema.intake.output_models import (
     role_field,
     roles_model,
 )
-from sema.intake.output_models_utils import Choice
+from sema.intake.output_models_utils import NONE, Choice
+from sema.intake.resolve_budget_utils import STATEMENTS, PromptEvidence, fitted
 from sema.intake.resolve_utils import (
     NOTHING,
-    SchemaText,
     bullets,
     history,
-    render_relations,
     render_template,
 )
 from sema.intake.shapes import concept_list
@@ -211,23 +210,44 @@ def in_force(roles: RolesResult, relation: str) -> list[RoleEligibility]:
     ]
 
 
+def fitted_roles_prompt(
+    ask: RoleAsk,
+    claims: Sequence[RoleEligibility],
+    evidence: PromptEvidence,
+    failed: Sequence[Sequence[str]],
+) -> str:
+    """The Roles prompt, compacted only as far as the budget needs."""
+    held = {e.choice for e in claims if e.choice is not None}
+    kept = {ask.relation: {m for e in ask.entries for m in e.members} | held}
+    asked = next((p for p in evidence.relations if p.ref.name == ask.relation), None)
+    columns = tuple(c.name for c in asked.columns) if asked is not None else ()
+
+    def render(level: int) -> str:
+        stated = columns if level >= STATEMENTS else None
+        return render_roles_prompt(ask, claims, evidence.render(level, kept), failed, stated)
+
+    return fitted(render, ask.output_model())
+
+
 def render_roles_prompt(
     ask: RoleAsk,
     claims: Sequence[RoleEligibility],
-    relations: Sequence[RelationProfile],
-    texts: SchemaText,
+    relations: str,
     failed: Sequence[Sequence[str]],
+    columns: Sequence[str] | None = None,
 ) -> str:
+    """With ``columns``, an entry offering each of them but its exclusions says so."""
+    entries = (_entry(i, entry, ask.relation, columns) for i, entry in enumerate(ask.entries))
     sections = {
         "in_force": bullets(f"`{e.role}`: `{e.choice}` ({e.source})" for e in claims),
         "failures": history(failed),
-        "relations": render_relations(relations, texts),
-        "entries": "\n\n".join(_entry(index, entry) for index, entry in enumerate(ask.entries)),
+        "relations": relations,
+        "entries": "\n\n".join(entries),
     }
     return render_template(ROLES_PROMPT, sections)
 
 
-def _entry(index: int, entry: OpenRole) -> str:
+def _entry(index: int, entry: OpenRole, relation: str, columns: Sequence[str] | None) -> str:
     ambiguity = entry.ambiguity
     exclusions = [f"{name}: {why}" for name, why in sorted(ambiguity.exclusions.items())]
     question = [SECTION_QUESTION] if entry.label == SECTION_SUBJECT else []
@@ -236,12 +256,20 @@ def _entry(index: int, entry: OpenRole) -> str:
             f"### entry {index}: {ambiguity.subject}",
             *question,
             f"field: `{entry.field}`",
-            "members:",
-            bullets(f"`{member}`" for member in entry.members),
+            *_members(entry, relation, columns),
             f"hints: {', '.join(ambiguity.hints) or NOTHING}",
             f"exclusions: {'; '.join(exclusions) or NOTHING}",
         ]
     )
+
+
+def _members(entry: OpenRole, relation: str, columns: Sequence[str] | None) -> list[str]:
+    offered = [member for member in entry.members if member != NONE]
+    remaining = [c for c in columns or () if c not in entry.ambiguity.exclusions]
+    if not remaining or sorted(offered) != sorted(remaining):
+        return ["members:", bullets(f"`{member}`" for member in entry.members)]
+    also = f", and `{NONE}`" if NONE in entry.members else ""
+    return [f"members: every column of `{relation}` listed above except the exclusions{also}"]
 
 
 def chosen_notes(entries: Iterable[OpenRole], choices: Mapping[str, str]) -> str:

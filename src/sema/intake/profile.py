@@ -248,7 +248,7 @@ class ProfileTools:
         return ValueSample(ref.name, column, tuple(row[0] for row in rows))
 
     def read_schema_text(
-        self, ref: RelationRef, columns: Sequence[str]
+        self, ref: RelationRef, columns: Sequence[str], limit: int | None = None
     ) -> list[tuple[Any, ...]]:
         bound = self.structure.schema_relations if self.structure is not None else ()
         if ref.name not in bound:
@@ -262,7 +262,7 @@ class ProfileTools:
                 " so their text is never read"
             )
         quoted = [self.provider.quote(ref, column) for column in columns]
-        statement = text_sql(self.provider.relation_sql(ref), quoted)
+        statement = text_sql(self.provider.relation_sql(ref), quoted, limit)
         return self._run(ref, statement, value_bearing=True, schema_relation=True)
 
     def _values_allowed(self, ref: RelationRef, column: str) -> bool:
