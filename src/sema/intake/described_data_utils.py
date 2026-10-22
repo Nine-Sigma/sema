@@ -3,18 +3,16 @@
 A relation whose column names equal, after the lexicon's name normalization, the property
 names a dictionary lists is the data that dictionary describes, so no ``entity_model``
 binding may use it as a dictionary or header. A dictionary's property names are the values
-of one of its key columns (unique, non-null text), read as schema text. A dictionary is read
-only when one of its key columns holds as many names as some target relation has columns,
-so a dictionary that cannot list any target's column names is never read.
+of one of its key columns (unique, non-null text). They are compared inside SQL, and only
+counts come back, so the comparison issues no value-bearing statement and reads no text
+before binding. A key column is compared only when it holds as many values as some target
+relation has columns.
 """
 
 from __future__ import annotations
 
 from collections.abc import Collection, Iterable, Sequence
-from dataclasses import dataclass
 
-from sema.binding.importer_utils import as_text
-from sema.binding.spec_sections import RelationRef
 from sema.intake.landing import LOADER_COLUMN_PREFIX
 from sema.intake.lexicon import normalize
 from sema.intake.profile import ProfileTools
@@ -26,13 +24,6 @@ from sema.log import logger
 SCHEMA_SLOTS = (entity_model.DICTIONARY, entity_model.HEADER, entity_model.RELATION)
 
 Names = frozenset[str]
-
-
-@dataclass(frozen=True)
-class SchemaScope:
-    """The dictionaries a read may open while the structure output is still in progress."""
-
-    schema_relations: frozenset[str]
 
 
 def per_file_dictionaries(bindings: Iterable[SlotBinding]) -> list[str]:
@@ -70,19 +61,12 @@ def described_by(
     tools: ProfileTools,
 ) -> dict[str, str]:
     """Each target whose column names a dictionary lists, mapped to the first such dictionary."""
-    columns = {target.ref.name: _column_names(target) for target in targets}
-    widths = {len(_landed_columns(target)) for target in targets}
-    readable = {d.ref.name: keys for d in dictionaries if (keys := _key_columns(d, widths))}
-    if not readable:
-        return {}
-    scoped = tools.scoped_to(SchemaScope(frozenset(readable)))
-    by_name = {dictionary.ref.name: dictionary for dictionary in dictionaries}
+    keys = [(d, key) for d in dictionaries for key in d.columns if _is_key(d, key)]
     found: dict[str, str] = {}
-    for name, keys in readable.items():
-        lists = _property_lists(scoped, by_name[name].ref, keys)
-        for target, names in columns.items():
-            if target != name and names in lists:
-                found.setdefault(target, name)
+    for target in targets:
+        by = next((d for d, key in keys if _describes(tools, d, key, target)), None)
+        if by is not None:
+            found[target.ref.name] = by.ref.name
     if found:
         logger.info("described data, not dictionaries: {}", sorted(found))
     return found
@@ -96,23 +80,17 @@ def _column_names(profile: RelationProfile) -> Names:
     return frozenset(map(normalize, _landed_columns(profile)))
 
 
-def _key_columns(profile: RelationProfile, widths: Collection[int]) -> list[ColumnProfile]:
-    return [
-        column
-        for column in profile.columns
-        if is_id(profile, column) and is_text(column) and column.distinct_count in widths
-    ]
+def _is_key(profile: RelationProfile, column: ColumnProfile) -> bool:
+    return is_id(profile, column) and is_text(column)
 
 
-def _property_lists(
-    tools: ProfileTools, ref: RelationRef, keys: Sequence[ColumnProfile]
-) -> list[Names]:
-    rows = tools.read_schema_text(ref, [column.name for column in keys])
-    return [
-        frozenset(
-            normalize(text)
-            for row in rows
-            if (text := as_text(row[index])) and not text.startswith(LOADER_COLUMN_PREFIX)
-        )
-        for index in range(len(keys))
-    ]
+def _describes(
+    tools: ProfileTools, dictionary: RelationProfile, key: ColumnProfile, target: RelationProfile
+) -> bool:
+    """Whether ``key`` lists exactly the target's column names, compared by counts only."""
+    names = _column_names(target)
+    if not names or dictionary.ref.name == target.ref.name:
+        return False
+    if key.distinct_count != len(_landed_columns(target)):
+        return False
+    return tools.count_listed_names(dictionary.ref, key.name, names).lists_exactly(len(names))

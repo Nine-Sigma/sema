@@ -166,7 +166,7 @@ _UNMODELLED_ROLES = frozenset({"parent"})
 
 _CASE_CHANGE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 _NON_ALPHANUMERIC = re.compile(r"[^0-9a-z]+")
-_MIN_PLURAL_LENGTH = 4
+MIN_PLURAL_LENGTH = 4
 
 
 def normalize(text: str) -> str:
@@ -193,7 +193,7 @@ def _check_role_names() -> None:
 
 
 def _singular(word: str) -> str:
-    plural = len(word) >= _MIN_PLURAL_LENGTH and word.endswith("s")
+    plural = len(word) >= MIN_PLURAL_LENGTH and word.endswith("s")
     return word[:-1] if plural and not word.endswith("ss") else word
 
 

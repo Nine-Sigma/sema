@@ -8,7 +8,6 @@ Every statement is written to the run ledger before it is issued.
 
 from __future__ import annotations
 
-import copy
 from collections.abc import Collection, Sequence
 from typing import Any, Protocol
 
@@ -17,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sema.binding.spec_sections import Provider, RelationRef
 from sema.intake.landing import LandedRelation, LandResult
 from sema.intake.ledger import RunLedger
+from sema.intake.name_sql_utils import NameListing, listed_names_sql
 from sema.intake.profile_utils import (
     ExternalRefCheck,
     HierarchyCheck,
@@ -55,6 +55,7 @@ __all__ = [
     "HierarchyCheck",
     "JoinCheck",
     "LevelCheck",
+    "NameListing",
     "NeedsValues",
     "PathCheck",
     "ProfileRefusedError",
@@ -266,11 +267,15 @@ class ProfileTools:
         statement = text_sql(self.provider.relation_sql(ref), quoted, limit)
         return self._run(ref, statement, value_bearing=True, schema_relation=True)
 
-    def scoped_to(self, structure: SchemaRelations) -> ProfileTools:
-        """The same tools and ledger, reading schema text only from what ``structure`` binds."""
-        scoped = copy.copy(self)
-        scoped.structure = structure
-        return scoped
+    def count_listed_names(
+        self, ref: RelationRef, column: str, names: Collection[str]
+    ) -> NameListing:
+        """How the normalized text of ``column`` compares with ``names``; counts only."""
+        statement = listed_names_sql(
+            self.provider.relation_sql(ref), self.provider.quote(ref, column), names
+        )
+        distinct, listed, uncompared = (int(value) for value in self._run(ref, statement)[0])
+        return NameListing(distinct, listed, uncompared)
 
     def _values_allowed(self, ref: RelationRef, column: str) -> bool:
         tier = self.policy.tier

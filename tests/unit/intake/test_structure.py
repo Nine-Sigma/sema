@@ -363,18 +363,13 @@ def test_a3_shape_names_semsql_for_every_section_its_loader_fills(
     shape = sorted((entry.section, entry.template) for entry in result.to_shape())
     assert shape == sorted((section, "semsql") for section in A3_SECTIONS)
 
-def test_structure_reads_values_only_from_bound_dictionaries(
-    a10: Result, acris_ledger: Path
-) -> None:
-    # The described-data rule (2026-10-21) reads the bound dictionaries' text, never the data.
-    quoted = {'"{}"."{}"'.format(*name.split(".", 1)) for name in a10().schema_relations}
+def test_structure_issues_no_value_bearing_statement(a10: Result, acris_ledger: Path) -> None:
+    a10()
     lines = sql_lines(acris_ledger)
-    read = [line["statement"] for line in lines if line["value_bearing"]]
 
+    assert lines
     assert {line["stage"] for line in lines} == {"structure"}
-    assert all(line["schema_relation"] for line in lines if line["value_bearing"])
-    assert all(any(q in statement for q in quoted) for statement in read), read
-    assert not [s for s in read for name in CODE_TABLES if f'"{name}"' in s]
+    assert [line for line in lines if line["value_bearing"]] == []
 
 
 def test_floors_are_the_union_of_every_template_and_the_base(a10: Result) -> None:
