@@ -2,7 +2,7 @@
 
 A decisions file is a YAML list of ``{stage, subject, choice}``. Each decision is checked
 against the ambiguity list Review presented; ``choice`` is a member of its entry or
-``IGNORE``. A structure decision binds the chosen member's binding, or ignores the relation
+``IGNORE``, and a structure ``IGNORE`` may name any landed relation. A structure decision binds the chosen member's binding, or ignores the relation
 with reason ``human``, and the entry moves from the open list to ``settled``. Role decisions
 enter Roles as stated choices; ``IGNORE`` states ``none``. Every decided binding is still
 verified.
@@ -35,6 +35,7 @@ __all__ = [
     "Decision",
     "DecisionRejectedError",
     "apply_structure_decisions",
+    "check_whole_bindings",
     "load_decisions",
     "stated_choices",
     "validate_decisions",
@@ -46,6 +47,7 @@ HUMAN_BINDING: BindingSource = "human"
 NOT_LISTED = "no entry Review presented has this stage and subject"
 NOT_A_MEMBER = "the choice is neither a member of the entry nor ignore"
 NO_BINDING = "the choice names no binding of an open structure entry"
+PART_OF_BINDING = "the relation is bound with others the decisions do not ignore"
 
 
 class Decision(BaseModel):
@@ -76,18 +78,44 @@ def load_decisions(path: Path) -> tuple[Decision, ...]:
 
 
 def validate_decisions(
-    decisions: Iterable[Decision], ambiguities: Sequence[Ambiguity]
+    decisions: Iterable[Decision],
+    ambiguities: Sequence[Ambiguity],
+    *,
+    landed: Iterable[str] = (),
 ) -> tuple[Decision, ...]:
-    """``ambiguities`` is the list Review presented, as the caller read it from the ledger."""
+    """``ambiguities`` is the list Review presented, as the caller read it from the ledger;
+    ``landed`` holds the qualified names of the landed relations a structure ignore may name."""
     listed = {(entry.stage, entry.subject): entry for entry in ambiguities}
+    relations = set(landed)
     checked = tuple(decisions)
     for decision in checked:
         entry = listed.get((decision.stage, decision.subject))
+        if entry is None and _ignores_landed(decision, relations):
+            continue
         if entry is None:
             raise DecisionRejectedError(decision, (), NOT_LISTED)
         if decision.choice != IGNORE and decision.choice not in entry.members:
             raise DecisionRejectedError(decision, entry.members, NOT_A_MEMBER)
     return checked
+
+
+def check_whole_bindings(
+    decisions: Iterable[Decision], bound: Iterable[BoundEntry]
+) -> tuple[BoundEntry, ...]:
+    """The bound entries no structure ``ignore`` touches; a binding holds its relations
+    together, so ignoring some but not all of them is rejected naming them."""
+    ignores = {
+        d.subject: d for d in decisions if d.stage == STRUCTURE_STAGE and d.choice == IGNORE
+    }
+    kept: list[BoundEntry] = []
+    for entry in bound:
+        relations = entry.binding.relations
+        named = [ignores[name] for name in relations if name in ignores]
+        if named and len(named) < len(relations):
+            raise DecisionRejectedError(named[0], relations, PART_OF_BINDING)
+        if not named:
+            kept.append(entry)
+    return tuple(kept)
 
 
 def apply_structure_decisions(
@@ -120,13 +148,15 @@ def apply_structure_decisions(
         binding = entry.bindings[decision.choice]
         bound.setdefault(decision.choice, _human(binding))
     dropped = {name for binding in ignored for name in binding.relations}
+    kept = check_whole_bindings(chosen.values(), structure.bound)
     logger.info(
         "structure decisions: {} bound, {} ignored as human", len(bound), len(ignored)
     )
     decided: StructureResult = structure.model_copy(update=dict(
-        bound=(*structure.bound, *bound.values()),
-        ignored=(*structure.ignored, *ignored),
+        bound=(*kept, *bound.values()),
+        ignored=(*(b for b in structure.ignored if not dropped & set(b.relations)), *ignored),
         ambiguities=tuple(_decided(a, chosen) for a in structure.ambiguities),
+        settled=tuple(_decided(a, chosen) for a in structure.settled),
         proposal_targets=tuple(t for t in structure.proposal_targets if t not in dropped),
     ))
     return decided.with_settled()
@@ -143,6 +173,14 @@ def stated_choices(decisions: Iterable[Decision]) -> dict[str, StatedChoice]:
         for d in decisions
         if d.stage == ROLES_STAGE
     }
+
+
+def _ignores_landed(decision: Decision, landed: set[str]) -> bool:
+    return (
+        decision.stage == STRUCTURE_STAGE
+        and decision.choice == IGNORE
+        and decision.subject in landed
+    )
 
 
 def _human(binding: SlotBinding) -> BoundEntry:

@@ -25,7 +25,7 @@ from langgraph.types import Command, interrupt
 
 from sema.binding.spec import load_concept_source_spec
 from sema.connectors.base import Connector
-from sema.intake.decisions import load_decisions, validate_decisions
+from sema.intake.decisions import load_decisions
 from sema.intake.eligibility_utils import Embedder
 from sema.intake.enrichment import enrich
 from sema.intake.graph_nodes import Nodes, Session
@@ -184,7 +184,7 @@ def approve(
         state = run.waiting(REVIEW)
         answer: dict[str, Any] = {"action": APPROVE, "approver": approver}
         if decisions is not None:
-            checked = validate_decisions(load_decisions(decisions), run.nodes.presented(state))
+            checked = run.nodes.checked(state, load_decisions(decisions))
             rows = [decision.model_dump(mode="json") for decision in checked]
             answer |= {"action": DECIDE, "decisions": rows}
         if spec is not None:

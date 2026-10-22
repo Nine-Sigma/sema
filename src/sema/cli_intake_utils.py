@@ -121,7 +121,9 @@ def check_decisions(root: Path, run_id: str, path: Path) -> None:
             (artifacts / f"{stage}{AMBIGUITY_SUFFIX}.json").read_text()
         ).ambiguities
     ]
-    validate_decisions(load_decisions(path), presented)
+    land = json.loads((artifacts / f"{LAND_ARTIFACT}.json").read_text())
+    landed = [f"{r['schema']}.{r['name']}" for r in land["relations"]]
+    validate_decisions(load_decisions(path), presented, landed=landed)
 
 
 def outcome_summary(

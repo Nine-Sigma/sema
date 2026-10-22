@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from sema.binding.importer import import_concept_source, write_import
 from sema.binding.spec import load_concept_source_spec
 from sema.connectors.base import Connector
+from sema.intake.decisions import Decision, check_whole_bindings, validate_decisions
 from sema.intake.eligibility import assemble_spec
 from sema.intake.enrichment import apply_enrichment
 from sema.intake.graph_stages import (
@@ -261,11 +262,17 @@ class Nodes:
         logger.info(f"Run {state['run_id']} imported to {directory}")
         return update
 
-    def presented(self, state: IngestState) -> list[Ambiguity]:
-        """The ambiguity list Review presented, recomputed to validate decisions against."""
-        current = self.session.stages(state).current(reviewed_of(state))
+    def checked(self, state: IngestState, decisions: Sequence[Decision]) -> tuple[Decision, ...]:
+        """Decisions against what Review presented, recomputed, so a refusal re-runs nothing."""
+        stages = self.session.stages(state)
+        current = stages.current(reviewed_of(state))
         roles = current.roles.ambiguities if current.roles is not None else ()
-        return [*current.structure.ambiguities, *roles]
+        landed = [f"{r.schema}.{r.name}" for r in stages.land().relations]
+        checked = validate_decisions(
+            decisions, [*current.structure.ambiguities, *roles], landed=landed
+        )
+        check_whole_bindings(checked, current.structure.bound)
+        return checked
 
     def has_spec(self, state: IngestState) -> bool:
         return self.session.stages(state).current(reviewed_of(state)).spec is not None
