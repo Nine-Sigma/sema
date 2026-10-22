@@ -20,12 +20,15 @@ from pydantic import BaseModel
 from sema.intake.model_calls import fits
 from sema.intake.profile import ProfileTools
 from sema.intake.resolve_utils import (
+    OpenEntry,
     SchemaText,
+    render_prompt,
     render_relations,
     schema_text,
     text_columns,
 )
-from sema.intake.shapes.base import RelationProfile
+from sema.intake.shapes.base import RelationProfile, SlotBinding
+from sema.intake.structure import BoundEntry
 from sema.log import logger
 
 # Policy: the rows of one schema relation a compacted prompt shows; not fixture-derived.
@@ -79,3 +82,34 @@ def fitted(render: Callable[[int], str], output_model: type[BaseModel]) -> str:
     if level:
         logger.info(f"{output_model.__name__} prompt compacted to level {level} of the budget")
     return prompt
+
+
+def fitted_structure_prompt(
+    tools: ProfileTools,
+    profiles: Mapping[str, RelationProfile],
+    bound: Sequence[BoundEntry],
+    batch: Sequence[OpenEntry],
+    failed: Sequence[Sequence[str]],
+    output_model: type[BaseModel],
+) -> str:
+    """The Structure prompt, compacted only as far as the budget needs."""
+    names = list(dict.fromkeys(name for entry in batch for name in entry.spanned()))
+    spanned = set(names)
+    in_force = [e for e in bound if spanned & set(e.binding.relations)]
+    relations = [profiles[n] for n in names if n in profiles]
+    bindings = [e.binding for e in in_force]
+    bindings += [b for entry in batch for b in entry.bindings.values()]
+    kept = {p.ref.name: _slotted(p, bindings) for p in relations}
+    evidence = PromptEvidence(tools, relations)
+
+    def render(level: int) -> str:
+        return render_prompt(batch, in_force, evidence.render(level, kept), failed)
+
+    return fitted(render, output_model)
+
+
+def _slotted(profile: RelationProfile, bindings: Sequence[SlotBinding]) -> set[str]:
+    """The columns of ``profile`` a slot of a binding spanning it holds."""
+    columns = {column.name for column in profile.columns}
+    name = profile.ref.name
+    return {v for b in bindings if name in b.relations for v in b.slots.values() if v in columns}

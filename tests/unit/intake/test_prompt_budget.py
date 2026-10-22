@@ -19,11 +19,17 @@ import inspect
 import re
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
 from sema.intake.ledger_utils import prompt_hash
 from sema.intake.output_models import ROLES_CHOICE
+from sema.intake.resolve_utils import member_bindings
+from sema.intake.shapes import concept_list, path_codes
+from sema.intake.shapes.base import profile_relations
+from sema.intake.shapes.precedence import STAGE
+from sema.intake.verify.base import Ambiguity
 from tests.unit.intake.model_calls_env import MODEL
 from tests.unit.intake.prompt_budget_env import (
     LABELS,
@@ -47,6 +53,7 @@ from tests.unit.intake.prompt_budget_env import (
     relation,
     resolve,
     resolved_roles,
+    schema_json,
     text_table,
     size,
     wide,
@@ -57,6 +64,7 @@ from tests.unit.intake.structure_env import fresh_tools, run
 pytestmark = pytest.mark.unit
 
 OPEN_ROLES = ("code", "display")
+OFFERED = (concept_list.ID, path_codes.ID)
 MEMBER_LINE = len("- `col_0000`\n")
 STATEMENT_ALLOWANCE = 400
 NAMED_ALLOWANCE = len("col_0000, ")
@@ -278,3 +286,56 @@ def test_prompt_under_the_budget_renders_as_before(name: str, tmp_path: Path) ->
 
     (prompt,) = prompts(watch.wired.client)
     assert prompt_hash(MODEL, prompt, ROLES_CHOICE) == UNDER_BUDGET_KEYS[name], prompt
+
+
+def dotted_table(numeric_width: int) -> str:
+    """A unique dotted code a ``path_codes`` slot holds, then empty numbers no slot holds;
+    empty, so no template's checks run over thousands of columns."""
+    numbers = [f"NULL::DOUBLE AS {column_name(i)}" for i in range(1, numeric_width + 1)]
+    code = f"'g' || (r % 4)::VARCHAR || '.' || r::VARCHAR AS {column_name(0)}"
+    cells = ", ".join([code, *numbers])
+    return f"CREATE TABLE {relation('wide')} AS SELECT {cells} FROM range(20) t(r)"
+
+
+def structure_ask(numeric_width: int, root: Path) -> MagicMock:
+    """One open entry on the wide relation offering a relation-only and a column-slot binding."""
+    built = Built([dotted_table(numeric_width)], root / "source", lambda: [])
+    source = built.source
+    tools = fresh_tools(source, root / "structure")
+    profiles = profile_relations(source.land, tools, source.provider)
+    found = member_bindings(built.structure, profiles, tools)
+    offered = sorted(m for m, b in found[relation("wide")].items() if b.template in OFFERED)
+    assert len(offered) == len(OFFERED), offered
+    entry = Ambiguity(stage=STAGE, subject=relation("wide"), members=tuple(offered))
+    structure = built.structure.model_copy(update={"ambiguities": (entry,)})
+    tools = fresh_tools(source, root / "resolve", stage="resolve_structure", structure=structure)
+    client = abstaining()
+    watch = Watched(root, client, "run-a")
+    try:
+        resolve().resolve_structure(structure, source.land, tools, watch.wired.calls,
+                                    provider=source.provider)
+    finally:
+        watch.stop()
+        built.close()
+    return client
+
+
+def test_structure_prompt_keeps_facts_only_for_slotted_columns(tmp_path: Path) -> None:
+    lengths = []
+    for width in (4, 8):
+        client = structure_ask(width, tmp_path / f"calibrate_{width}")
+        (prompt,), (output_model,) = prompts(client), output_models(client)
+        lengths.append(len(prompt) + len(schema_json(output_model)))
+    per_column = (lengths[1] - lengths[0]) // 4
+    numbers = width_over(lengths[0] - 4 * per_column, per_column, 1.05)
+    client = structure_ask(numbers, tmp_path / "wide")
+
+    assert client.invoke.call_count == 1
+    (prompt,), (output_model,) = prompts(client), output_models(client)
+    assert size(prompt, output_model) <= budget()
+    assert len(facts(prompt, column_name(0))) == 1, "the slotted column lost its facts"
+    for index in range(1, numbers + 1):
+        name = column_name(index)
+        assert lines_naming(prompt, name), f"{name} is not named"
+        assert not facts(prompt, name), f"{name} kept its facts"
+    assert [line for line in numbered(prompt, numbers) if "named only" in line]

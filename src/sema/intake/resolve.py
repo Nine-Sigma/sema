@@ -18,8 +18,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 
-from pydantic import BaseModel
-
 from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import Provider
 from sema.intake.eligibility import run_roles
@@ -40,7 +38,7 @@ from sema.intake.output_models import (
 )
 from sema.intake.output_models_utils import ABSTAIN
 from sema.intake.profile import ProfileTools
-from sema.intake.resolve_budget_utils import PromptEvidence, fitted
+from sema.intake.resolve_budget_utils import PromptEvidence, fitted_structure_prompt
 from sema.intake.resolve_roles_utils import (
     RoleAsk,
     chosen_notes,
@@ -58,7 +56,6 @@ from sema.intake.resolve_utils import (
     member_bindings,
     open_entries,
     open_with,
-    render_prompt,
     reopened,
     retried,
     settle_choices,
@@ -165,7 +162,9 @@ def _ask(
     run: _Run, batch: Sequence[OpenEntry], failed: Sequence[Sequence[str]]
 ) -> _Attempt:
     output_model = structure_batch_model([entry.ambiguity.members for entry in batch])
-    prompt = _prompt(run, batch, failed, output_model)
+    prompt = fitted_structure_prompt(
+        run.tools, run.profiles, run.bound, batch, failed, output_model
+    )
     key = run.calls.call_key(prompt, output_model)
     try:
         answer = run.calls.call(STAGE, prompt, output_model)
@@ -214,16 +213,6 @@ def _notes(batch: Sequence[OpenEntry], attempt: _Attempt) -> list[str]:
     if attempt.settlement is None:
         return [attempt.problem or MISALIGNED]
     return failure_notes(batch, attempt.settlement, attempt.failures)
-
-
-def _prompt(
-    run: _Run, batch: Sequence[OpenEntry], failed: Sequence[Sequence[str]], model: type[BaseModel]
-) -> str:
-    names = list(dict.fromkeys(name for entry in batch for name in entry.spanned()))
-    spanned = set(names)
-    in_force = [e for e in run.bound if spanned & set(e.binding.relations)]
-    evidence = PromptEvidence(run.tools, [run.profiles[n] for n in names if n in run.profiles])
-    return fitted(lambda n: render_prompt(batch, in_force, evidence.render(n), failed), model)
 
 
 @dataclass
