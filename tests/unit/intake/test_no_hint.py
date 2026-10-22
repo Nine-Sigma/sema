@@ -66,7 +66,7 @@ WRITTEN_SPECS = {
     "a10": FIXTURES / "acris" / "acris.spec.yaml",
 }
 NO_HINT_SOURCES = ("a2", "a3", "a7_csv", "a7_athena", "a10")
-HELD_OUT = ("heldout", "heldout2")
+HELD_OUT = ("heldout", "heldout2", "heldout3", "heldout4")
 A1, ATHENA = "a1", "a7_athena"
 A1_SPEC = FIXTURES / "partner_sl" / "standard_library.spec.yaml"
 A1_DECISIONS = FIXTURES / "partner_sl" / DECISIONS_FILE
@@ -93,6 +93,8 @@ GATE_MISSES = {
     " and open_choices 6 > 2 (Dean, 2026-10-22: recorded, carried to S4)",
     "heldout2": "PUMS misses its gate at Review: bound_fraction 0.0 < 1.0, its only"
     " relation ignored no_header and its layout proposal unbound (Dean, 2026-10-22)",
+    "heldout3": "sealed, no recording yet (S4 task 3.2)",
+    "heldout4": "sealed, no recording yet (S4 task 3.2)",
 }
 
 

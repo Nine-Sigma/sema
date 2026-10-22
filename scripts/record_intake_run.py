@@ -120,6 +120,18 @@ RECORDED_SOURCES = (
         ),
         schema="land_heldout2",
     ),
+    RecordedSource(
+        name="heldout3",
+        path=FIXTURES / "heldout3",
+        descriptor=FIXTURES / "heldout3" / "heldout3.run.yaml",
+        schema="land_heldout3",
+    ),
+    RecordedSource(
+        name="heldout4",
+        path=FIXTURES / "heldout4",
+        descriptor=FIXTURES / "heldout4" / "heldout4.run.yaml",
+        schema="land_heldout4",
+    ),
 )
 
 

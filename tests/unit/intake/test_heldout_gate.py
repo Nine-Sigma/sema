@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+import yaml
 
 from sema.intake.eligibility_utils import RunDescriptor
 from sema.intake.metrics import RunMetrics, run_metrics
@@ -35,6 +36,8 @@ pytestmark = pytest.mark.unit
 AUDITED_STAGES = frozenset({"land", "structure", "roles", FINAL_STAGE})
 METRICS_ARTIFACT = "run_metrics"
 HELDOUT2 = HELDOUT.parent / "heldout2"
+HELDOUT3 = HELDOUT.parent / "heldout3"
+HELDOUT4 = HELDOUT.parent / "heldout4"
 
 
 @dataclass(frozen=True)
@@ -101,6 +104,10 @@ class GateMiss:
 GATE_THRESHOLDS = {
     "heldout": GateThreshold(min_bound_fraction=0.75, max_open_choices=2),
     "heldout2": GateThreshold(min_bound_fraction=1.0, max_open_choices=3),
+    # Decided by Dean 2026-10-22 (S4 task 3.1), committed before any model-backed run over
+    # either source.
+    "heldout3": GateThreshold(min_bound_fraction=1.0, max_open_choices=2),
+    "heldout4": GateThreshold(min_bound_fraction=1.0, max_open_choices=3),
 }
 
 
@@ -123,6 +130,11 @@ class HeldOut:
     descriptor: RunDescriptor
 
 
+def _run_descriptor(directory: Path) -> RunDescriptor:
+    path = directory / f"{directory.name}.run.yaml"
+    return RunDescriptor.model_validate(yaml.safe_load(path.read_text()))
+
+
 SOURCES = {
     "heldout": HeldOut(
         HELDOUT,
@@ -134,6 +146,8 @@ SOURCES = {
         "land_heldout2",
         RunDescriptor(id="heldout2", identity_system="heldout2", release="2026-10-21"),
     ),
+    "heldout3": HeldOut(HELDOUT3, "land_heldout3", _run_descriptor(HELDOUT3)),
+    "heldout4": HeldOut(HELDOUT4, "land_heldout4", _run_descriptor(HELDOUT4)),
 }
 
 
@@ -269,12 +283,18 @@ def _synthetic(bound_fraction: float, open_structure: int, open_roles: int) -> R
     )
 
 
-def test_the_thresholds_are_committed_for_both_held_out_sources() -> None:
+def test_the_thresholds_are_committed_for_every_held_out_source() -> None:
     assert GATE_THRESHOLDS.keys() == SOURCES.keys()
     assert GATE_THRESHOLDS["heldout"] == GateThreshold(
         min_bound_fraction=0.75, max_open_choices=2
     )
     assert GATE_THRESHOLDS["heldout2"] == GateThreshold(
+        min_bound_fraction=1.0, max_open_choices=3
+    )
+    assert GATE_THRESHOLDS["heldout3"] == GateThreshold(
+        min_bound_fraction=1.0, max_open_choices=2
+    )
+    assert GATE_THRESHOLDS["heldout4"] == GateThreshold(
         min_bound_fraction=1.0, max_open_choices=3
     )
 
