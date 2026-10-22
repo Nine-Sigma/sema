@@ -91,6 +91,7 @@ pytestmark = pytest.mark.unit
 
 STRUCTURE, ROLES, HUMAN = "structure", "roles", "human"
 ACRIS_SCHEMA = "land_acris"
+SECTION, CODE_LISTS = "section", "code_lists"
 
 
 @pytest.fixture
@@ -192,8 +193,16 @@ def test_approve_with_an_edited_spec_presents_review_again_with_zero_calls(
     assert not (run.ledger_dir / "import").exists()
 
 
+def _reviewed(entry: Any, stated: dict[str, dict[str, str]]) -> str | None:
+    """The reviewer's choice; a code list the hand-written spec lists feeds its section."""
+    relation, _, role = entry.subject.rpartition(".")
+    if role == SECTION and relation in stated and CODE_LISTS in entry.members:
+        return CODE_LISTS
+    return reviewer_choice(entry, stated)
+
+
 def test_decisions_settle_open_entries_and_a_later_approve_imports(cli: Cli) -> None:
-    run = cli.discover(ACRIS, ACRIS_DESCRIPTOR, "--schema", ACRIS_SCHEMA)
+    run = cli.discover(code_tables(cli.root.parent), ACRIS_DESCRIPTOR, "--schema", ACRIS_SCHEMA)
     structure = open_listed(run, STRUCTURE)
     assert structure
     before = run.counters()
@@ -207,7 +216,7 @@ def test_decisions_settle_open_entries_and_a_later_approve_imports(cli: Cli) -> 
     bound = [entry["source"] for entry in run.artifact("structure")["bound"]]
     assert bound.count(HUMAN) == len(structure)
     stated = hand_written_roles()
-    chosen = [(entry.subject, reviewer_choice(entry, stated)) for entry in open_listed(run, ROLES)]
+    chosen = [(entry.subject, _reviewed(entry, stated)) for entry in open_listed(run, ROLES)]
     rows = [(ROLES, subject, choice) for subject, choice in chosen if choice is not None]
     assert rows
     second = decide(cli, run, rows, "roles.decisions.yaml")
