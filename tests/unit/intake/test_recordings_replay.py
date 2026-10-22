@@ -1,10 +1,7 @@
-"""Guard: the committed recordings of sources the role-entry fixes must not touch replay.
+"""Guard: committed recordings of known sources replay to Review with zero provider calls.
 
-F1 (one field per repeated role), F2 (claims in force never offered), and F4 (section
-entries asked) change a prompt or an output model only for a relation with a repeated
-role, an offered claimed column, or an open section. The diagnosis measured none in the
-recorded a2, a7_csv, or a10 runs, so each replays to Review with zero provider calls.
-A1 holds all three and is re-recorded after the fix, so it is not listed.
+Each listed source was re-recorded after the generic intake fixes; a prompt or output
+model change that alters a recorded call key makes its replay refuse a call and fail.
 """
 
 from __future__ import annotations
@@ -22,8 +19,7 @@ from tests.unit.intake.model_calls_env import intake_config
 
 pytestmark = pytest.mark.unit
 
-# a10 is re-recorded after the described-data rule, which removes its structure call.
-UNTOUCHED = ("a2", "a7_csv")
+UNTOUCHED = ("a1", "a2", "a7_csv", "a10")
 
 
 def script() -> ModuleType:

@@ -7,8 +7,8 @@
     "structure v1"
   ],
   "calls": 2,
-  "tokens": 36744,
-  "cost": 0.003950400000000001,
+  "tokens": 36832,
+  "cost": 0.0039944,
   "approver": null,
   "value_asks": 0
 }

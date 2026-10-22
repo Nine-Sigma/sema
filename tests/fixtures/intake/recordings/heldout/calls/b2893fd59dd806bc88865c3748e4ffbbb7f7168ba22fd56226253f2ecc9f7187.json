@@ -1,0 +1,15 @@
+{
+  "model": "openai/gpt-6-luna",
+  "output": {
+    "confidences": [
+      0.8
+    ],
+    "reasons": [
+      "The README relation contains descriptive text rather than apparent code-list values."
+    ],
+    "role_section": "concepts"
+  },
+  "prompt": "# prompt: roles v1\n\nYou choose what the columns and properties of one relation landed from a source stand for.\nCode has profiled the relation and proved, for each entry below, the members its predicates\naccept. Code could not decide between them, so each entry asks you to choose one.\n\n## How to answer\n\n- Answer the field named under each entry with exactly one member listed there, or `abstain`\n  when the evidence below does not separate the members.\n- Fill `confidences` and `reasons` with one item per entry, in entry order from entry 0. A list\n  of any other length fails the whole answer.\n- A reason is one short sentence naming the evidence that decided the choice, or why the\n  evidence could not decide it.\n- A role entry names a role and offers the columns eligible for it; a column another role\n  already holds and may not share is listed under exclusions and not offered. Never choose\n  one column for two roles in one answer. An optional role also offers `none`, which means\n  the relation has no column for that role.\n- A reference entry names a property and offers the code lists or entities its text may refer\n  to; `none` means the property refers to nothing landed.\n- Use only the evidence given here. Names, types, comments, aggregates, and the text of\n  relations that describe the schema are shown; data values are not.\n\n## Claims in force\n\n- `code`: `COLLEGE SCORECARD` (code)\n- `definition`: `none` (code)\n- `status`: `none` (code)\n- `valid_from`: `none` (code)\n- `valid_to`: `none` (code)\n- `synonyms`: `none` (code)\n- `title`: `none` (code)\n- `vocabulary_id`: `none` (code)\n- `concept_code`: `none` (code)\n\n## Failed checks from previous answers\n\nnone\n\n## Relations\n\n### land_heldout.CollegeScorecardDataDictionary__README\nrows: 20\ncolumns:\n- COLLEGE SCORECARD: type VARCHAR, distinct 20, distinct ratio 1, null rate 0, mean length 77.9, unique\n\n## Entries\n\n### entry 0: land_heldout.CollegeScorecardDataDictionary__README.section\nasks: the spec section this relation's concept list feeds\nfield: `role_section`\nmembers:\n- `concepts`\n- `code_lists`\nhints: no_reference\nexclusions: none\n",
+  "schema_name": "RolesChoice_v1",
+  "tokens": 887
+}

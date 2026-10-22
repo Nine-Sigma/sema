@@ -6,9 +6,9 @@
     "roles v1",
     "structure v1"
   ],
-  "calls": 4,
-  "tokens": 11787,
-  "cost": 0.0028367,
+  "calls": 3,
+  "tokens": 9364,
+  "cost": 0.0019960000000000004,
   "approver": null,
   "value_asks": 0
 }

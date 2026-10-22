@@ -6,8 +6,8 @@
     "roles v1"
   ],
   "calls": 1,
-  "tokens": 992,
-  "cost": 0.00013280000000000003,
+  "tokens": 1142,
+  "cost": 0.0002078,
   "approver": "dean",
   "value_asks": 1
 }
