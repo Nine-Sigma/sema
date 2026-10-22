@@ -50,6 +50,7 @@ from sema.intake.resolve_roles_utils import (
 from sema.intake.resolve_utils import (
     OpenEntry,
     Settlement,
+    entry_reason,
     failure_notes,
     member_bindings,
     open_entries,
@@ -74,6 +75,7 @@ __all__ = ["DEFAULT_MAX_RETRIES", "resolve_roles", "resolve_structure"]
 
 DEFAULT_MAX_RETRIES = 2
 MISALIGNED = "the answer's confidences or reasons do not list one item per entry"
+CALL_FAILED = "the model call failed"
 MODEL: EligibilitySource = "model"
 
 
@@ -109,6 +111,7 @@ class _Attempt:
     settlement: Settlement | None
     failures: tuple[Failure, ...]
     problem: str | None = None
+    error: str | None = None
 
 
 def resolve_structure(
@@ -145,7 +148,10 @@ def resolve_structure(
 
 def _settle(run: _Run, batch: Sequence[OpenEntry], max_retries: int) -> None:
     attempt, passed = retried(
-        lambda failed: _ask(run, batch, failed), lambda found: _notes(batch, found), max_retries
+        lambda failed: _ask(run, batch, failed),
+        lambda found: _notes(batch, found),
+        max_retries,
+        ended=lambda found: found.error is not None,
     )
     if passed and attempt.settlement is not None:
         run.apply(attempt.settlement)
@@ -163,7 +169,7 @@ def _ask(
         answer = run.calls.call(STAGE, prompt, output_model)
     except LLMStageError as error:
         logger.warning(f"Structure batch call {key} failed: {error}")
-        return _Attempt(None, (), f"the model call failed: {error}")
+        return _Attempt(None, (), CALL_FAILED, str(error))
     choices = entry_choices(answer, len(batch))
     if choices is None:
         return _Attempt(None, (), MISALIGNED)
@@ -184,7 +190,7 @@ def _failures(run: _Run, settlement: Settlement) -> tuple[Failure, ...]:
 def _leave_open(run: _Run, batch: Sequence[OpenEntry], attempt: _Attempt) -> None:
     settlement = attempt.settlement
     if settlement is None:
-        problem = attempt.problem or MISALIGNED
+        problem = entry_reason(attempt.problem or MISALIGNED, attempt.error)
         run.apply(
             Settlement("", {e.position: open_with(e.ambiguity, problem) for e in batch}, {})
         )
@@ -257,6 +263,7 @@ class _RoleAttempt:
     key: str
     failures: tuple[Failure, ...] = ()
     problem: str | None = None
+    error: str | None = None
 
 
 def resolve_roles(
@@ -300,7 +307,12 @@ def _settle_roles(run: _RolesRun, ask: RoleAsk, max_retries: int) -> None:
     def _ask(failed: Sequence[Sequence[str]]) -> _RoleAttempt:
         return _ask_roles(run, ask, render_roles_prompt(ask, claims, relations, texts, failed))
 
-    attempt, passed = retried(_ask, lambda found: _role_notes(ask, found), max_retries)
+    attempt, passed = retried(
+        _ask,
+        lambda found: _role_notes(ask, found),
+        max_retries,
+        ended=lambda found: found.error is not None,
+    )
     if passed:
         run.accept(attempt, attempt.stated)
         return
@@ -314,7 +326,7 @@ def _ask_roles(run: _RolesRun, ask: RoleAsk, prompt: str) -> _RoleAttempt:
         answer = run.calls.call(ROLES_STAGE, prompt, output_model)
     except LLMStageError as error:
         logger.warning(f"Roles call {key} for {ask.relation} failed: {error}")
-        return _RoleAttempt({}, {}, key, problem=f"the model call failed: {error}")
+        return _RoleAttempt({}, {}, key, problem=CALL_FAILED, error=str(error))
     choices = ask.choices(answer)
     if choices is None:
         return _RoleAttempt({}, {}, key, problem=MISALIGNED)
@@ -358,7 +370,8 @@ def _role_notes(ask: RoleAsk, attempt: _RoleAttempt) -> list[str]:
 def _leave_roles_open(run: _RolesRun, ask: RoleAsk, attempt: _RoleAttempt) -> None:
     """Drop every choice a failure names until the rest pass, then accept the rest."""
     if attempt.problem is not None:
-        run.left.update({entry.subject: attempt.problem for entry in ask.entries})
+        reason = entry_reason(attempt.problem, attempt.error)
+        run.left.update({entry.subject: reason for entry in ask.entries})
         return
     stated, failures = dict(attempt.stated), attempt.failures
     while failures:

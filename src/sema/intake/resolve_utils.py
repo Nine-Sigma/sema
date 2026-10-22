@@ -134,6 +134,12 @@ def open_with(ambiguity: Ambiguity, reason: str) -> Ambiguity:
     return ambiguity.model_copy(update=fields)
 
 
+def entry_reason(problem: str, error: str | None) -> str:
+    """A failed call's error text is kept in the reason and the ledger, never in a prompt,
+    where it would make the next key differ between runs."""
+    return problem if error is None else f"{problem}: {error}"
+
+
 def failure_notes(
     batch: Sequence[OpenEntry], settlement: Settlement, failures: Sequence[Failure]
 ) -> list[str]:
@@ -156,18 +162,26 @@ def retried(
     ask: Callable[[Sequence[Sequence[str]]], Attempt],
     notes: Callable[[Attempt], list[str]],
     max_retries: int,
+    *,
+    ended: Callable[[Attempt], bool],
 ) -> tuple[Attempt, bool]:
     """Ask, then re-ask with every earlier attempt's notes until one has none; the last
-    attempt and whether it passed. An attempt passes when ``notes`` returns nothing."""
+    attempt and whether it passed. An attempt passes when ``notes`` returns nothing.
+
+    An ``ended`` attempt (a failed or refused call, not a choice that failed a check) is
+    not re-asked: a second call cannot answer what the first could not, and a refused
+    one would be refused again."""
     failed: list[list[str]] = []
     for _ in range(max_retries):
         attempt = ask(failed)
+        if ended(attempt):
+            return attempt, False
         found = notes(attempt)
         if not found:
             return attempt, True
         failed.append(found)
     attempt = ask(failed)
-    return attempt, not notes(attempt)
+    return attempt, not ended(attempt) and not notes(attempt)
 
 
 def render_template(prompt: str, sections: Mapping[str, str]) -> str:

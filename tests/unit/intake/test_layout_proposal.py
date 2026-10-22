@@ -29,13 +29,14 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from sema.intake.loaders.tabular import land_tabular
 from sema.intake.profile_utils import NeedsValues
 from sema.intake.shapes import TEMPLATES
 from sema.intake.verify.structure import verify_structure
 from sema.intake.views import VIEWS, ViewSpec
+from sema.llm_client import LLMStageError
 from tests.unit.intake.layout_proposal_env import (
     CODEBOOK,
     CODEBOOK_COLUMNS,
@@ -288,6 +289,22 @@ def test_three_failures_escalate_with_every_attempt(codebook: Landed, tmp_path: 
     assert result.escalated == (relation,)
     assert bound_over(result.structure, relation) == []
     assert open_over(result.structure, relation) != []
+
+
+def _failed_call(model: type[BaseModel]) -> BaseModel:
+    raise LLMStageError("", "intake", [("plain_invoke", ValueError("Error code: 400"))])
+
+
+def test_failed_call_escalates_without_another_call(codebook: Landed, tmp_path: Path) -> None:
+    relation = codebook.name(CODEBOOK)
+
+    result, client, _ = _propose(codebook, {CODEBOOK_COLUMNS: [_failed_call] * 3}, tmp_path)
+
+    assert len(invokes_for(client, CODEBOOK_COLUMNS)) == 1
+    (attempt,) = result.attempts[relation]
+    assert attempt.proposal is None
+    assert result.escalated == (relation,)
+    assert bound_over(result.structure, relation) == []
 
 
 def test_inexpressible_layout_records_a_layout_finding(book: Landed, tmp_path: Path) -> None:

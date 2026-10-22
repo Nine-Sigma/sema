@@ -150,7 +150,12 @@ def _propose(run: _Run, relation: str, max_retries: int) -> None:
         made.append(outcome.attempt)
         return outcome
 
-    outcome, passed = retried(ask, lambda o: _notes(o.attempt.failures), max_retries)
+    outcome, passed = retried(
+        ask,
+        lambda o: _notes(o.attempt.failures),
+        max_retries,
+        ended=lambda o: o.attempt.proposal is None,
+    )
     run.attempts[relation] = tuple(made)
     if not passed:
         run.escalated.append(relation)
