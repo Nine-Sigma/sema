@@ -39,11 +39,13 @@ from sema.intake.eligibility_text_utils import (
 from sema.intake.eligibility_utils import (
     EMBEDDING_MARGIN_FLOOR,
     Embedder,
+    Held,
     Hint,
     RoleEligibility,
     RoleMemory,
     RunDescriptor,
     StatedChoice,
+    claimed_columns,
     eligible,
     embedding_rank,
     lexicon_hits,
@@ -183,6 +185,22 @@ def _relation_roles(
 ) -> list[RoleEligibility]:
     key = memory_key(target, profile)
     remembered = hints.memory.recall(key) if hints.memory is not None else None
+    plain = _side_roles(profile, target, Hints(None, None, None, {}), {}, Held({}))
+    held = Held(claimed_columns(plain))
+    found = _side_roles(profile, target, hints, stated, held, remembered)
+    if hints.memory is not None and remembered is None:
+        hints.memory.remember(key, {e.role: e.choice for e in found if e.choice is not None})
+    return found
+
+
+def _side_roles(
+    profile: RelationProfile,
+    target: Target,
+    hints: Hints,
+    stated: Mapping[str, Any],
+    held: Held,
+    remembered: Mapping[str, str] | None = None,
+) -> list[RoleEligibility]:
     fields = {name for model in target.models for name in model.model_fields}
     required = {
         name
@@ -190,34 +208,30 @@ def _relation_roles(
         for name, field in model.model_fields.items()
         if field.is_required()
     }
-    taken: dict[str, str] = {}
     found = []
     for role, column in target.slotted.items():
-        taken[column] = role
         slotted = RoleEligibility(
             relation=profile.ref.name, section=target.section, role=role, members=(column,)
         )
         found.append(slotted.settled(column, "code"))
+        held.taken[column] = role
     for entry in lexicon.ROLES:
         if entry.name not in fields or entry.name in target.slotted:
             continue
         optional = entry.name not in required
         human = stated.get(entry.name)
         settled = _settle(
-            entry, profile, taken, remembered, hints, human, optional, target.section
+            entry, profile, held, remembered, hints, human, optional, target.section
         )
         found.append(settled)
-        if settled.column is not None:
-            taken.setdefault(settled.column, entry.name)
-    if hints.memory is not None and remembered is None:
-        hints.memory.remember(key, {e.role: e.choice for e in found if e.choice is not None})
+        held.take(settled)
     return found
 
 
 def _settle(
     entry: lexicon.RoleEntry,
     profile: RelationProfile,
-    taken: Mapping[str, str],
+    held: Held,
     remembered: Mapping[str, str] | None,
     hints: Hints,
     stated: Any,
@@ -227,11 +241,7 @@ def _settle(
     """An optional role offers ``none`` as its last member, so "no column" is answerable."""
     members = eligible(entry, profile.columns, profile.row_count)
     members = (*members, lexicon.NO_REFERENCE) if optional else members
-    excluded = {
-        column: role
-        for column, role in taken.items()
-        if column in members and not lexicon.coincide(role, entry.name)
-    }
+    excluded = held.excluded(members, entry.name)
     base = RoleEligibility(
         relation=profile.ref.name,
         section=section,

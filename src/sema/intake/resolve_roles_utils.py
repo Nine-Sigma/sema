@@ -17,7 +17,14 @@ from pydantic import BaseModel
 from sema.intake.eligibility import role_targets
 from sema.intake.eligibility_spec_utils import RolesResult
 from sema.intake.eligibility_text_utils import STAGE
-from sema.intake.eligibility_utils import MemoryKey, RoleEligibility, subject_of
+from sema.intake import lexicon
+from sema.intake.eligibility_utils import (
+    MemoryKey,
+    RoleEligibility,
+    claimed_columns,
+    scope_of,
+    subject_of,
+)
 from sema.intake.output_models import (
     MAX_REFERENCE_BATCH,
     reference_choices,
@@ -79,6 +86,7 @@ class RoleAsk:
 def column_asks(roles: RolesResult, by_name: Mapping[str, RelationProfile]) -> list[RoleAsk]:
     """The first relation of each signature with open column roles; later ones are kin."""
     found = _open(roles, per_property=False)
+    claims = _claims(roles)
     keys = _signature_keys(roles, by_name)
     asks: dict[MemoryKey | str, RoleAsk] = {}
     for relation, entries in found.items():
@@ -87,7 +95,7 @@ def column_asks(roles: RolesResult, by_name: Mapping[str, RelationProfile]) -> l
             ask = asks[key]
             asks[key] = RoleAsk(ask.relation, ask.entries, False, (*ask.kin, relation))
             continue
-        asks[key] = RoleAsk(relation, _columns(entries), False)
+        asks[key] = RoleAsk(relation, _columns(entries, claims), False)
     return list(asks.values())
 
 
@@ -125,10 +133,40 @@ def _offered(entry: RoleEligibility, ambiguity: Ambiguity) -> tuple[str, ...]:
     return tuple(member for member in entry.members if member not in ambiguity.exclusions)
 
 
-def _columns(entries: Sequence[tuple[RoleEligibility, Ambiguity]]) -> tuple[OpenRole, ...]:
+def _claims(roles: RolesResult) -> dict[str, dict[str, str]]:
+    """Columns code or the lexicon settled, by role, per side of each relation."""
+    sides: dict[str, list[RoleEligibility]] = {}
+    for entry in roles.eligibilities:
+        if entry.subject is None:
+            sides.setdefault(scope_of(entry.relation, entry.section), []).append(entry)
+    return {side: claimed_columns(entries) for side, entries in sides.items()}
+
+
+def _unclaimed(
+    entry: RoleEligibility, ambiguity: Ambiguity, claims: Mapping[str, Mapping[str, str]]
+) -> Ambiguity:
+    """The entry with every column another role on its side claims listed as excluded."""
+    side = claims.get(scope_of(entry.relation, entry.section), {})
+    claimed = {
+        column: role
+        for column, role in side.items()
+        if column in entry.members and column not in ambiguity.exclusions
+        and role != entry.role and not lexicon.coincide(role, entry.role)
+    }
+    if not claimed:
+        return ambiguity
+    return ambiguity.model_copy(update={"exclusions": {**ambiguity.exclusions, **claimed}})
+
+
+def _columns(
+    entries: Sequence[tuple[RoleEligibility, Ambiguity]],
+    claims: Mapping[str, Mapping[str, str]],
+) -> tuple[OpenRole, ...]:
     """A role open on both sides of one relation names each side's field apart."""
     counts = Counter(entry.role for entry, _ in entries)
-    return tuple(_column(e, a, repeated=counts[e.role] > 1) for e, a in entries)
+    return tuple(
+        _column(e, _unclaimed(e, a, claims), repeated=counts[e.role] > 1) for e, a in entries
+    )
 
 
 def _column(entry: RoleEligibility, ambiguity: Ambiguity, *, repeated: bool) -> OpenRole:

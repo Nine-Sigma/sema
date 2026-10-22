@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,11 +21,14 @@ from sema.intake.shapes.base import RelationSignature, is_text
 from sema.intake.profile_utils import ColumnProfile
 
 __all__ = [
+    "DETERMINISTIC_SOURCES",
     "EMBEDDING_MARGIN_FLOOR",
     "DeclaredJoin",
     "Embedder",
+    "Held",
     "Hint",
     "RoleEligibility",
+    "claimed_columns",
     "RoleMemory",
     "RunDescriptor",
     "StatedChoice",
@@ -40,6 +44,8 @@ EMBEDDING_MARGIN_FLOOR: float = 0.10
 EligibilitySource = Literal["code", "memory", "lexicon", "embedding", "human", "model"]
 HintSource = Literal["memory", "lexicon", "embedding"]
 HUMAN: EligibilitySource = "human"
+DETERMINISTIC_SOURCES: tuple[EligibilitySource, ...] = ("code", "lexicon")
+STATED_SOURCES: tuple[EligibilitySource, ...] = ("human", "model")
 # Ordinal, not calibrated: S3 calibrates confidence against the gold set.
 SOURCE_CONFIDENCE: dict[str, float] = {
     "code": 1.0,
@@ -181,6 +187,44 @@ class RoleMemory:
 
     def remember(self, key: MemoryKey, choices: dict[str, str]) -> None:
         self._maps.setdefault(key, choices)
+
+
+def claimed_columns(entries: Iterable[RoleEligibility]) -> dict[str, str]:
+    """Columns code or the lexicon settled, each mapped to the first role settled on it."""
+    claims: dict[str, str] = {}
+    for entry in entries:
+        if entry.source in DETERMINISTIC_SOURCES and entry.column is not None:
+            claims.setdefault(entry.column, entry.role)
+    return claims
+
+
+@dataclass(frozen=True)
+class Held:
+    """Columns roles took on one side of a relation, in settle order. ``claims`` are the
+    columns code or the lexicon settle with no stated choice; a stated choice that takes
+    one leaves it to its claimant too, so the verifier sees both roles on it."""
+
+    claims: Mapping[str, str]
+    taken: dict[str, str] = field(default_factory=dict)
+    stated: set[str] = field(default_factory=set)
+
+    def take(self, entry: RoleEligibility) -> None:
+        column = entry.column
+        if column is None or column in self.taken:
+            return
+        self.taken[column] = entry.role
+        if entry.source in STATED_SOURCES:
+            self.stated.add(column)
+
+    def excluded(self, members: Sequence[str], role: str) -> dict[str, str]:
+        """Each member another role took, mapped to that role, unless the two coincide."""
+        return {
+            column: holder
+            for column, holder in self.taken.items()
+            if column in members
+            and not lexicon.coincide(holder, role)
+            and not (column in self.stated and self.claims.get(column) == role)
+        }
 
 
 def _key(column: ColumnProfile, row_count: int) -> bool:
