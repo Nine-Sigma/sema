@@ -260,7 +260,7 @@ The Structure resolver sends open entries in batches of at most 50 (`output_mode
 - `INTAKE_MODEL_RECORDINGS_DIR`: the read-only recordings directory.
 - `INTAKE_MODEL_API_KEY`, `INTAKE_MODEL_BASE_URL`, `INTAKE_MODEL_USE_STRUCTURED_OUTPUT` (default `auto`), and `INTAKE_MODEL_REQUEST_TIMEOUT` (default 120 seconds).
 
-The CLI also builds SEMA's embedder whenever `EMBEDDING_PROVIDER` is non-empty, and the CLI loads `.env` first. The embedding rank changes the Roles prompt, so a run with an embedder misses recordings made without one, and it calls the embedding provider. To replay with no provider call of any kind, set `EMBEDDING_PROVIDER=` to empty.
+The CLI also builds SEMA's embedder whenever `EMBEDDING_PROVIDER` is non-empty, and the CLI loads `.env` first. The embedding rank changes the Roles prompt, so a run with an embedder misses recordings made without one, and it calls the embedding provider. Under `INTAKE_MODEL_MAX_CALLS=0` with `INTAKE_MODEL_RECORDINGS_DIR` set, the CLI builds no embedder whatever `EMBEDDING_PROVIDER` says and logs that once. A live run with an embedder and a cap above zero still narrows roles by embedding (`EMBEDDING_MARGIN_FLOOR` 0.10) on a path no committed recording has exercised, because every recording was made without an embedder. To replay with no provider call of any kind, set `EMBEDDING_PROVIDER=` to empty.
 
 `scripts/record_intake_run.py` records one live run per committed source to `tests/fixtures/intake/recordings/<source>/`: the run's `calls/` beside `recording.json`, which holds the provider, model, prompt versions, calls, tokens, cost, and value asks. The script then replays the source with a cap of 0 and fails on any miss.
 

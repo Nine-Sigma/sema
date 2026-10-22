@@ -12,6 +12,7 @@ import hashlib
 import json
 import shutil
 from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -24,6 +25,7 @@ from click.testing import CliRunner, Result
 from sema.intake.ledger import Ledger
 from sema.intake.metrics import RunMetrics
 from sema.intake.registry import Registry
+from sema.log import logger
 from tests.unit.intake.decisions_env import open_entries, presented, write_decisions
 from tests.unit.intake.graph_env import (
     ACRIS_DESCRIPTOR,
@@ -232,3 +234,29 @@ def spy_discover(
 
     monkeypatch.setattr(module, "discover", _spy)
     return seen
+
+
+def zero_cap_replay(monkeypatch: pytest.MonkeyPatch, recordings: Path, max_calls: int) -> None:
+    """The replay variables: a call cap and an existing recordings directory."""
+    recordings.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("INTAKE_MODEL_MAX_CALLS", str(max_calls))
+    monkeypatch.setenv("INTAKE_MODEL_RECORDINGS_DIR", str(recordings))
+
+
+@contextmanager
+def captured_logs(level: str = "INFO") -> Iterator[list[str]]:
+    """Every ``sema.log.logger`` message at ``level`` or above while the block runs."""
+    messages: list[str] = []
+    sink_id = logger.add(lambda message: messages.append(message.record["message"]), level=level)
+    try:
+        yield messages
+    finally:
+        logger.remove(sink_id)
+
+
+def ok_or_raise(result: Result) -> Any:
+    """A command's printed JSON; an exception the command raised is re-raised as is."""
+    if result.exception is not None and not isinstance(result.exception, SystemExit):
+        raise result.exception
+    assert result.exit_code == 0, result.output
+    return json.loads(result.stdout)

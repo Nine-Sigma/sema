@@ -110,7 +110,7 @@ def discover_cmd(
             tier=tier,
             run_id=run_id,
             schema=schema,
-            embedder=configured_embedder(),
+            embedder=configured_embedder(config),
         )
     except INTAKE_ERRORS as exc:
         raise click.ClickException(error_message(exc)) from exc
@@ -166,7 +166,7 @@ def _answer(
         "root": root,
         "config": config,
         "client": _intake_client(config),
-        "embedder": configured_embedder(),
+        "embedder": configured_embedder(config),
         "warehouse": warehouse_connector() if landed_from_warehouse(root, run_id) else None,
     }
     if values:
