@@ -14,7 +14,8 @@ from typing import Literal
 
 from sema.ingest.duckdb_staging_utils import escape_sql_literal
 
-LOCATOR_COLUMN = "_sema_locator"
+LOADER_COLUMN_PREFIX = "_sema_"
+LOCATOR_COLUMN = f"{LOADER_COLUMN_PREFIX}locator"
 LOCATOR_ROW_SEPARATOR = "!"
 SHEET_SEPARATOR = "__"
 

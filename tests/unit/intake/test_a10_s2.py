@@ -134,17 +134,25 @@ def test_registry_reaches_dry_run_with_zero_model_calls(hinted: StageRun) -> Non
     assert (landed.ledger.directory / "artifacts" / "dry_run_report.json").is_file()
 
 
-def test_without_the_hint_the_five_code_tables_are_ambiguous(
+def test_without_the_hint_the_five_code_tables_bind_concept_list_by_code(
     acris: Landed, tmp_path: Path
 ) -> None:
+    # Amended 2026-10-21: each code table's columns equal the properties its bound
+    # dictionary lists, so no hint is needed to settle them.
     ledger = Ledger(tmp_path).run("unhinted")
     tools = ProfileTools(
         acris.provider, EvidencePolicy(tier=TIER), ledger, stage="structure"
     )
     result = run_structure(acris.land, tools, provider=PROVIDER, hint=None)
 
-    subjects = [a.subject for a in result.ambiguities]
-    assert sorted(subjects) == sorted(acris.qualified(name) for name in CODE_TABLES)
+    code_bound = {
+        name
+        for entry in result.bound
+        if (entry.binding.template, entry.source) == ("concept_list", "code")
+        for name in entry.binding.relations
+    }
+    assert result.ambiguities == ()
+    assert code_bound == {acris.qualified(name) for name in CODE_TABLES}
     assert result.proposal_targets == ()
 
 

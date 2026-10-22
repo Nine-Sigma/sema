@@ -14,6 +14,11 @@ from collections import Counter
 from collections.abc import Sequence
 
 from sema.binding.spec_sections import Provider
+from sema.intake.described_data_utils import (
+    described_by,
+    per_file_dictionaries,
+    uses_described,
+)
 from sema.intake.landing import LandResult
 from sema.intake.profile import ProfileTools
 from sema.intake.shapes import TEMPLATES, apply_precedence, ignore
@@ -70,6 +75,8 @@ def verify_structure(
     stated = [e for e in known if e.source == HUMAN or _proposed(e, targets)]
     for entry in stated:
         failures += _verified(entry, profiles, tools)
+    described = _described(proposal, by_name, tools)
+    failures += _described_failures(stated, described)
     failures += _shared_claim_failures(known)
     removed = {name for e in proposal.bound if e.source == HUMAN for name in e.binding.relations}
     removed |= {name for e in stated for name in e.binding.relations}
@@ -78,7 +85,7 @@ def verify_structure(
     coded = [e for e in known if e.source != HUMAN and e not in stated]
     for group in proposal.groups:
         members = [by_name[name] for name in group if name in by_name and name not in removed]
-        failures += _group_failures(members, coded, known, listed, tools)
+        failures += _group_failures(members, coded, known, listed, tools, described)
     return Verdict.of(
         failures=failures, ambiguities=proposal.ambiguities, floors=stage_floors()
     )
@@ -138,9 +145,10 @@ def _group_failures(
     known: Sequence[BoundEntry],
     listed: set[str],
     tools: ProfileTools,
+    described: dict[str, str],
 ) -> list[Failure]:
     names = {profile.ref.name for profile in members}
-    found = group_candidates(members, tools)
+    found = [b for b in group_candidates(members, tools) if not uses_described(b, described)]
     decided = apply_precedence(found)
     keys = {binding_key(binding) for binding in found}
     in_force = [*decided.candidates, *(entry.binding for entry in known)]
@@ -185,6 +193,34 @@ def _shared_claim_failures(known: Sequence[BoundEntry]) -> list[Failure]:
         for entry in claiming
         for name in dict.fromkeys(entry.binding.relations)
         if counts[name] > 1
+    ]
+
+
+def _described(
+    proposal: StructureResult, by_name: dict[str, RelationProfile], tools: ProfileTools
+) -> dict[str, str]:
+    """Relations a bound dictionary describes, over the whole namespace."""
+    names = per_file_dictionaries(entry.binding for entry in proposal.bound)
+    dictionaries = [by_name[name] for name in names if name in by_name]
+    return described_by(dictionaries, list(by_name.values()), tools)
+
+
+def _described_failures(
+    stated: Sequence[BoundEntry], described: dict[str, str]
+) -> list[Failure]:
+    """A pinned or proposed binding that reads described data as a dictionary or header."""
+    return [
+        failure(
+            IN_ELIGIBILITY_SET,
+            name,
+            template=entry.binding.template,
+            source=entry.source,
+            described_by=described[name],
+        )
+        for entry in stated
+        if uses_described(entry.binding, described)
+        for name in dict.fromkeys(entry.binding.relations)
+        if name in described
     ]
 
 

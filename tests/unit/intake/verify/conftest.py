@@ -1,4 +1,5 @@
-"""Session fixtures for the verifier tests: A2, A3, and A10 landed once, with their structure."""
+"""Session fixtures for the verifier tests: A2, A3, A7 CSV, and A10 landed once, with their
+structure."""
 
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ from sema.binding.spec import load_concept_source_spec
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.loaders.semsql import land_semsql
 from sema.intake.loaders.tabular import land_tabular
-from tests.unit.intake.shapes.shapes_env import Source
+from tests.unit.intake.shapes.shapes_env import OMOP_CSV, Source
 from tests.unit.intake.structure_env import (
     A2_WORKBOOK,
     A3_DB,
@@ -60,6 +61,18 @@ def acris(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Landed]:
     landed = _landed(tmp_path_factory, "acris", land_tabular, ACRIS)
     yield landed
     landed.staging.close()
+
+
+@pytest.fixture(scope="session")
+def omop(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Landed]:
+    landed = _landed(tmp_path_factory, "omop", land_tabular, OMOP_CSV)
+    yield landed
+    landed.staging.close()
+
+
+@pytest.fixture(scope="session")
+def omop_structure(omop: Landed) -> Any:
+    return omop.structure("omop_structure")
 
 
 @pytest.fixture(scope="session")

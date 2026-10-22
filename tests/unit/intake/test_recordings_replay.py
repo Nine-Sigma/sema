@@ -22,7 +22,8 @@ from tests.unit.intake.model_calls_env import intake_config
 
 pytestmark = pytest.mark.unit
 
-UNTOUCHED = ("a2", "a7_csv", "a10")
+# a10 is re-recorded after the described-data rule, which removes its structure call.
+UNTOUCHED = ("a2", "a7_csv")
 
 
 def script() -> ModuleType:

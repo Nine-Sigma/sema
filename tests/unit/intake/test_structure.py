@@ -233,25 +233,23 @@ def test_a10_binds_fifteen_per_file_entity_models_with_the_key_value_header(
         assert entry.binding.slots["header"] == f"{stem}__Dataset_Info"
 
 
-def test_a10_binds_only_the_fifteen_entity_models(a10: Result) -> None:
-    assert {entry.binding.template for entry in a10().bound} == {"entity_model"}
-    assert len(a10().bound) == 15
+def test_a10_binds_the_fifteen_entity_models_and_the_five_code_lists(a10: Result) -> None:
+    templates = Counter(entry.binding.template for entry in a10().bound)
+
+    assert templates == {"entity_model": 15, "concept_list": len(CODE_TABLES)}
 
 
-def test_a10_lists_the_five_code_tables_with_their_members(acris: Source, a10: Result) -> None:
-    by_subject = {ambiguity.subject: ambiguity for ambiguity in a10().ambiguities}
-
-    assert len(a10().ambiguities) == len(CODE_TABLES)
-    assert set(by_subject) == {ref(acris, name) for name in CODE_TABLES}
+def test_a10_binds_the_five_code_tables_as_concept_lists_by_code(
+    acris: Source, a10: Result
+) -> None:
+    # Scenario "A10 structure with one honest ambiguity" (amended 2026-10-21): each code
+    # table's columns equal the properties its dictionary describes, so the ambiguity list
+    # is empty.
+    assert a10().ambiguities == (), [(a.subject, a.members) for a in a10().ambiguities]
     for name in CODE_TABLES:
-        ambiguity = by_subject[ref(acris, name)]
-        # Scenario "A10 structure with one honest ambiguity" (amended 2026-10-21): the
-        # grouped code table offers the same two members as the other code tables.
-        expected = {"concept_list": 1, "entity_model": 1}
-        assert ambiguity.stage == "structure"
-        assert Counter(m.partition("(")[0] for m in ambiguity.members) == expected, name
-        lone = f"entity_model(dictionary={ref(acris, name)}, layout=per_file)"
-        assert lone in ambiguity.members, name
+        entry = entry_over(a10(), ref(acris, name))
+        assert entry.binding.template == "concept_list", name
+        assert (entry.source, entry.confidence) == ("code", 1.0), name
 
 
 def test_code_bound_entries_carry_confidence_one(a10: Result) -> None:
@@ -365,13 +363,18 @@ def test_a3_shape_names_semsql_for_every_section_its_loader_fills(
     shape = sorted((entry.section, entry.template) for entry in result.to_shape())
     assert shape == sorted((section, "semsql") for section in A3_SECTIONS)
 
-def test_structure_issues_no_value_bearing_statement(a10: Result, acris_ledger: Path) -> None:
-    a10()
+def test_structure_reads_values_only_from_bound_dictionaries(
+    a10: Result, acris_ledger: Path
+) -> None:
+    # The described-data rule (2026-10-21) reads the bound dictionaries' text, never the data.
+    quoted = {'"{}"."{}"'.format(*name.split(".", 1)) for name in a10().schema_relations}
     lines = sql_lines(acris_ledger)
+    read = [line["statement"] for line in lines if line["value_bearing"]]
 
-    assert lines
     assert {line["stage"] for line in lines} == {"structure"}
-    assert [line for line in lines if line["value_bearing"]] == []
+    assert all(line["schema_relation"] for line in lines if line["value_bearing"])
+    assert all(any(q in statement for q in quoted) for statement in read), read
+    assert not [s for s in read for name in CODE_TABLES if f'"{name}"' in s]
 
 
 def test_floors_are_the_union_of_every_template_and_the_base(a10: Result) -> None:

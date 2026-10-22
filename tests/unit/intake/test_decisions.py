@@ -315,7 +315,8 @@ def dropped(tmp_module: Path) -> Iterator[Decided]:
 
 def test_role_decision_enters_run_roles_as_a_stated_human_choice(a10: Decided) -> None:
     subject = f"{a10.landed.qualified('Property_Types_Codes')}.code"
-    assert subject not in {a.subject for a in a10.first_roles.ambiguities}
+    (before,) = [a for a in a10.first_roles.ambiguities if a.subject == subject]
+    assert (before.choice, before.source) == (None, None)
     (made,) = [d for d in a10.rounds[1] if d.subject == subject]
 
     (entry,) = [a for a in a10.roles.ambiguities if a.subject == subject]
@@ -328,7 +329,16 @@ def test_role_decision_enters_run_roles_as_a_stated_human_choice(a10: Decided) -
 def test_a10_no_hint_run_assembles_after_decisions_with_zero_model_calls(a10: Decided) -> None:
     first, second = a10.rounds
     code_tables = {a10.landed.qualified(name) for name in CODE_TABLES}
-    assert {(d.stage, d.subject) for d in first} == {(STRUCTURE, t) for t in code_tables}
+    # Since the described-data rule (2026-10-21) code binds the code tables, so the
+    # structure round has nothing to decide.
+    assert first == ()
+    code_bound = {
+        name
+        for entry in a10.structure.bound
+        if (entry.binding.template, entry.source) == ("concept_list", "code")
+        for name in entry.binding.relations
+    }
+    assert code_bound == code_tables
     assert second and {d.stage for d in second} == {ROLES}
 
     still_open = [(a.subject, a.members) for a in open_entries(a10.roles.ambiguities, ROLES)]

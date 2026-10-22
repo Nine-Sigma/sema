@@ -14,6 +14,7 @@ from typing import Any
 import duckdb
 import pytest
 
+from sema.intake.loaders.tabular import land_tabular
 from sema.intake.resolve import resolve_structure
 from sema.intake.shapes.base import SlotBinding, profile_relations
 from sema.intake.shapes.precedence import member
@@ -22,9 +23,15 @@ from sema.intake.structure_utils import group_candidates
 from sema.intake.verify.structure import verify_structure
 from tests.unit.intake.model_calls_env import wired_run
 from tests.unit.intake.shapes.shapes_env import Source, warehouse_source
-from tests.unit.intake.structure_env import GROUPED_CODE_TABLE, fresh_tools, ref, run
+from tests.unit.intake.structure_env import (
+    GROUPED_CODE_TABLE,
+    copy_code_tables,
+    fresh_tools,
+    land,
+    ref,
+    run,
+)
 from tests.unit.intake.test_resolve_structure import FLAT_LIST, answering, starting
-from tests.unit.intake.verify.conftest import Landed
 
 pytestmark = pytest.mark.unit
 
@@ -125,19 +132,28 @@ def test_single_member_beside_a_bound_claim_still_fails_precedence(
     assert [(f.relation, f.evidence["template"]) for f in failing] == [(LONE, "concept_list")]
 
 
-def test_a10_code_table_resolved_to_a_flat_list_passes_on_the_first_call(
-    acris: Landed, acris_structure: Any, tmp_path: Path
+@pytest.fixture(scope="module")
+def codes(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Source]:
+    """The A10 code tables without their dictionaries, so each one stays ambiguous."""
+    root = tmp_path_factory.mktemp("in_force_codes")
+    staging, source = land(root, "codes", land_tabular, copy_code_tables(root / "csv"))
+    yield source
+    staging.close()
+
+
+def test_code_table_resolved_to_a_flat_list_passes_on_the_first_call(
+    codes: Source, tmp_path: Path
 ) -> None:
-    subject = ref(acris.source, GROUPED_CODE_TABLE)
+    subject = ref(codes, GROUPED_CODE_TABLE)
+    found = run(codes, fresh_tools(codes, tmp_path / "ledger" / "structure"))
+    assert subject in {a.subject for a in found.ambiguities}
     client = answering(starting(FLAT_LIST))
     wired = wired_run(tmp_path / "calls", client)
-    tools = fresh_tools(acris.source, tmp_path / "ledger" / "resolve")
+    tools = fresh_tools(codes, tmp_path / "ledger" / "resolve")
 
-    result = resolve_structure(
-        acris_structure, acris.source.land, tools, wired.calls, provider=acris.source.provider
-    )
+    result = resolve_structure(found, codes.land, tools, wired.calls, provider=codes.provider)
 
     assert client.invoke.call_count == 1
     (entry,) = [e for e in result.bound if subject in e.binding.relations]
     assert (entry.binding.template, entry.source) == ("concept_list", "model")
-    assert _verify(result, acris.source).status == "pass"
+    assert _verify(result, codes).status == "pass"

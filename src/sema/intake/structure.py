@@ -10,13 +10,20 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import Provider, ShapeEntry
+from sema.intake.described_data_utils import (
+    SCHEMA_SLOTS,
+    described_by,
+    per_file_dictionaries,
+    schema_slot_relations,
+    uses_described,
+)
 from sema.intake.landing import LandResult
 from sema.intake.profile import ProfileTools
 from sema.intake.shapes import TEMPLATES, entity_model, filled_sections, ignore
@@ -57,7 +64,6 @@ __all__ = [
 STEPS = ("stem_groups", "profiles", "ignore", "candidates", "join_graph", "binding")
 CODE_BOUND_CONFIDENCE = 1.0
 HINT_OVERLAP = "hint_overlap"
-SCHEMA_SLOTS = (entity_model.DICTIONARY, entity_model.HEADER, entity_model.RELATION)
 
 BindingSource = Literal["code", "human", "model"]
 
@@ -170,7 +176,7 @@ def run_structure(
     found = [group_candidates(group, tools) for group in open_groups]
     claimed = _claimed([*pinned, *(binding for group in found for binding in group)])
     graph = _join_graph(named, open_groups, found, claimed, tools)
-    bound, ambiguities = _bind(pinned, graph)
+    bound, ambiguities = _bind_described(pinned, graph, by_name, tools)
     logger.info(
         "structure over {} relations: {} bound, {} ignored, {} ambiguous, {} groups",
         len(profiles), len(bound), len(ignored), len(ambiguities), len(graph.groups),
@@ -246,6 +252,31 @@ def _join_graph(
         single = len(members) == 1
         graph.candidates.append(found[members[0]] if single else group_candidates(group, tools))
     return graph
+
+
+def _bind_described(
+    pinned: Sequence[SlotBinding],
+    graph: _Graph,
+    by_name: dict[str, RelationProfile],
+    tools: ProfileTools,
+) -> tuple[list[BoundEntry], list[Ambiguity]]:
+    """Bind with described data out of every dictionary and header slot.
+
+    Only a dictionary that ends up bound may describe a relation, so a describing dictionary
+    left unbound returns what it described to the candidates and the groups bind again.
+    """
+    found = [binding for group in graph.candidates for binding in group]
+    dictionaries = [by_name[name] for name in per_file_dictionaries([*pinned, *found])]
+    targets = [by_name[name] for name in schema_slot_relations(found)]
+    described = described_by(dictionaries, targets, tools)
+    while True:
+        candidates = [[b for b in g if not uses_described(b, described)] for g in graph.candidates]
+        bound, ambiguities = _bind(pinned, replace(graph, candidates=candidates))
+        in_force = set(per_file_dictionaries(entry.binding for entry in bound))
+        kept = {name: by for name, by in described.items() if by in in_force}
+        if kept == described:
+            return bound, ambiguities
+        described = kept
 
 
 def _bind(

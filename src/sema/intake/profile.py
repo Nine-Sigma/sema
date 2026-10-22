@@ -8,6 +8,7 @@ Every statement is written to the run ledger before it is issued.
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Collection, Sequence
 from typing import Any, Protocol
 
@@ -264,6 +265,12 @@ class ProfileTools:
         quoted = [self.provider.quote(ref, column) for column in columns]
         statement = text_sql(self.provider.relation_sql(ref), quoted, limit)
         return self._run(ref, statement, value_bearing=True, schema_relation=True)
+
+    def scoped_to(self, structure: SchemaRelations) -> ProfileTools:
+        """The same tools and ledger, reading schema text only from what ``structure`` binds."""
+        scoped = copy.copy(self)
+        scoped.structure = structure
+        return scoped
 
     def _values_allowed(self, ref: RelationRef, column: str) -> bool:
         tier = self.policy.tier

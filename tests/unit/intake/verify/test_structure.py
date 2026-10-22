@@ -12,10 +12,12 @@ from sema.ingest.duckdb_staging import Staging
 from sema.intake.loaders.tabular import land_tabular
 from sema.intake.shapes import concept_list
 from sema.intake.shapes.base import SlotBinding, profile_relations
+from sema.intake.shapes.precedence import member
+from sema.intake.structure import BoundEntry
+from sema.intake.structure_utils import group_candidates
 from tests.unit.intake.shapes.shapes_env import Source, staging_source, write_workbook
 from tests.unit.intake.structure_env import (
     CODE_TABLES,
-    GROUPED_CODE_TABLE,
     fresh_tools,
     ref,
     run,
@@ -101,40 +103,60 @@ def test_hinted_acris_structure_output_passes(
     assert_passes(verdict, STRUCTURE_CHECKS)
 
 
-def test_unhinted_acris_output_with_its_five_ambiguities_passes(
+def test_unhinted_acris_output_with_no_ambiguity_passes(
     acris: Landed, acris_structure: Any, tmp_path: Path
 ) -> None:
-    code_tables = sorted(ref(acris.source, name) for name in CODE_TABLES)
+    # Scenario "A10 structure with one honest ambiguity" (amended 2026-10-21): the five code
+    # tables bind concept_list by code, so the list is empty and the verifier agrees.
     verdict = _verify(acris_structure, acris.source, tmp_path / "ledger" / "verify")
 
-    assert sorted(a.subject for a in acris_structure.ambiguities) == code_tables
+    assert acris_structure.ambiguities == ()
+    for name in CODE_TABLES:
+        entry = _entry(acris_structure, ref(acris.source, name))
+        assert (entry.binding.template, entry.source) == ("concept_list", "code"), name
     assert_passes(verdict, STRUCTURE_CHECKS)
 
 
+def _omop_code_chosen(omop: Landed, omop_structure: Any, ledger: Path) -> tuple[str, Any]:
+    """The A7 CSV output with its one contested relation bound by code to one member."""
+    (ambiguity,) = omop_structure.ambiguities
+    tools = fresh_tools(omop.source, ledger)
+    profiles = profile_relations(omop.source.land, tools, provider=omop.source.provider)
+    chosen = next(
+        binding
+        for binding in group_candidates(profiles, tools)
+        if member(binding) == ambiguity.members[0]
+    )
+    entry = BoundEntry(binding=chosen, source="code")
+    return ambiguity.subject, omop_structure.model_copy(
+        update={"bound": (entry,), "ambiguities": ()}
+    )
+
+
 def test_code_chosen_binding_omitted_from_the_ambiguity_list_fails(
-    acris: Landed, acris_hinted: Any, tmp_path: Path
+    omop: Landed, omop_structure: Any, tmp_path: Path
 ) -> None:
-    grouped = ref(acris.source, GROUPED_CODE_TABLE)
-    pinned = _entry(acris_hinted, grouped)
-    proposal = _replace_entry(acris_hinted, pinned, pinned.model_copy(update={"source": "code"}))
-    verdict = _verify(proposal, acris.source, tmp_path / "ledger" / "verify")
+    contested, proposal = _omop_code_chosen(omop, omop_structure, tmp_path / "ledger" / "c")
+    verdict = _verify(proposal, omop.source, tmp_path / "ledger" / "verify")
 
     (found,) = failures(verdict, "ambiguity_list_complete")
-    assert found.relation == grouped
+    assert found.relation == contested
     assert_named(verdict, STRUCTURE_CHECKS)
 
 
 def test_dropped_ambiguity_fails_the_partition_and_the_ambiguity_list(
-    acris: Landed, acris_structure: Any, tmp_path: Path
+    omop: Landed, omop_structure: Any, tmp_path: Path
 ) -> None:
-    code_tables = sorted(ref(acris.source, name) for name in CODE_TABLES)
-    proposal = acris_structure.model_copy(update={"ambiguities": ()})
-    verdict = _verify(proposal, acris.source, tmp_path / "ledger" / "verify")
+    # The A10 list is empty since the described-data rule, so the A7 CSV's one honest
+    # ambiguity carries this scenario.
+    (ambiguity,) = omop_structure.ambiguities
+    proposal = omop_structure.model_copy(update={"ambiguities": ()})
+    verdict = _verify(proposal, omop.source, tmp_path / "ledger" / "verify")
 
     partition = failures(verdict, "partition_complete")
     listed = failures(verdict, "ambiguity_list_complete")
-    assert sorted(f.relation for f in partition) == code_tables
-    assert sorted(f.relation for f in listed) == code_tables
+    assert [f.relation for f in partition] == [ambiguity.subject]
+    assert [f.relation for f in listed] == [ambiguity.subject]
     assert_named(verdict, STRUCTURE_CHECKS)
 
 
