@@ -7,6 +7,8 @@ relation, so they go out one call per relation and are never inherited.
 
 from __future__ import annotations
 
+import re
+from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
@@ -38,17 +40,20 @@ from sema.intake.shapes.base import RelationProfile
 from sema.intake.verify.base import Ambiguity
 
 ROLES_PROMPT = "prompts/roles_v1.md"
+NOT_IN_NAME = re.compile(r"\W+")
 
 
 @dataclass(frozen=True)
 class OpenRole:
-    """``label`` is the role of a column entry or the subject of a reference entry."""
+    """``label`` is the role of a column entry or the subject of a reference entry;
+    ``name`` keys the entry's output field, qualified by section when a role repeats."""
 
     subject: str
     label: str
     field: str
     members: tuple[str, ...]
     ambiguity: Ambiguity
+    name: str
 
 
 @dataclass(frozen=True)
@@ -63,12 +68,12 @@ class RoleAsk:
     def output_model(self) -> type[BaseModel]:
         if self.references:
             return references_model([entry.members for entry in self.entries])
-        return roles_model({entry.label: entry.members for entry in self.entries})
+        return roles_model({entry.name: entry.members for entry in self.entries})
 
     def choices(self, answer: BaseModel) -> list[Choice] | None:
         if self.references:
             return reference_choices(answer, len(self.entries))
-        return role_choices(answer, [entry.label for entry in self.entries])
+        return role_choices(answer, [entry.name for entry in self.entries])
 
 
 def column_asks(roles: RolesResult, by_name: Mapping[str, RelationProfile]) -> list[RoleAsk]:
@@ -82,7 +87,7 @@ def column_asks(roles: RolesResult, by_name: Mapping[str, RelationProfile]) -> l
             ask = asks[key]
             asks[key] = RoleAsk(ask.relation, ask.entries, False, (*ask.kin, relation))
             continue
-        asks[key] = RoleAsk(relation, tuple(_column(e, a) for e, a in entries), False)
+        asks[key] = RoleAsk(relation, _columns(entries), False)
     return list(asks.values())
 
 
@@ -120,14 +125,23 @@ def _offered(entry: RoleEligibility, ambiguity: Ambiguity) -> tuple[str, ...]:
     return tuple(member for member in entry.members if member not in ambiguity.exclusions)
 
 
-def _column(entry: RoleEligibility, ambiguity: Ambiguity) -> OpenRole:
+def _columns(entries: Sequence[tuple[RoleEligibility, Ambiguity]]) -> tuple[OpenRole, ...]:
+    """A role open on both sides of one relation names each side's field apart."""
+    counts = Counter(entry.role for entry, _ in entries)
+    return tuple(_column(e, a, repeated=counts[e.role] > 1) for e, a in entries)
+
+
+def _column(entry: RoleEligibility, ambiguity: Ambiguity, *, repeated: bool) -> OpenRole:
     offered = _offered(entry, ambiguity)
-    return OpenRole(ambiguity.subject, entry.role, role_field(entry.role), offered, ambiguity)
+    name = entry.role
+    if repeated and entry.section is not None:
+        name = f"{NOT_IN_NAME.sub('_', entry.section)}_{entry.role}"
+    return OpenRole(ambiguity.subject, entry.role, role_field(name), offered, ambiguity, name)
 
 
 def _reference(index: int, entry: RoleEligibility, ambiguity: Ambiguity) -> OpenRole:
     field = reference_field(index)
-    return OpenRole(ambiguity.subject, ambiguity.subject, field, entry.members, ambiguity)
+    return OpenRole(ambiguity.subject, ambiguity.subject, field, entry.members, ambiguity, field)
 
 
 def _signature_keys(
