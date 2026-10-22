@@ -21,6 +21,7 @@ from sema.binding.spec_sections import CodeListSpec, ConceptsSpec, HeaderKeys
 from sema.intake import lexicon
 from sema.intake.eligibility_utils import (
     HUMAN,
+    SOURCE_CONFIDENCE,
     DeclaredJoin,
     Hint,
     RoleEligibility,
@@ -32,7 +33,7 @@ from sema.intake.landing import LOCATOR_COLUMN
 from sema.intake.loaders.tabular_utils import EMPTY_COLUMN_PREFIX
 from sema.intake.profile import ProfileTools
 from sema.intake.shapes import concept_list, entity_model
-from sema.intake.shapes.base import RelationProfile, SlotBinding, is_text
+from sema.intake.shapes.base import RelationProfile, RelationSignature, SlotBinding, is_text
 from sema.intake.shapes.base_utils import section_of
 from sema.intake.structure import StructureResult
 from sema.intake.structure_hint_utils import SECTION_SEPARATOR
@@ -47,6 +48,7 @@ CODE_LISTS = next(
     if list[CodeListSpec] in get_args(field.annotation)
 )
 SECTION_MEMBERS = (CONCEPTS, CODE_LISTS)
+SECTION_SUBJECT = "section"
 NO_REFERENCE_HINT = "no_reference"
 JOIN_WITHOUT_COLUMNS = "declared_join_without_columns"
 SENTENCE_BREAK = re.compile(r"[.?!]\s+|[\r\n]+")
@@ -247,6 +249,10 @@ def declared_joins(
     return joins, open_joins
 
 
+def section_subject(relation: str) -> str:
+    return f"{relation}.{SECTION_SUBJECT}"
+
+
 def resolve_sections(
     structure: StructureResult,
     references: Sequence[RoleEligibility],
@@ -254,11 +260,13 @@ def resolve_sections(
     choices: Mapping[str, StatedChoice] | None = None,
 ) -> tuple[StructureResult, list[Ambiguity]]:
     """A concept list is a code list once any property's domain resolves to it; otherwise
-    a stated choice for its ``<relation>.section`` subject settles it."""
+    a stated choice for its ``<relation>.section`` subject settles it, and a later concept
+    list with the same signature inherits that choice with ``source: memory``."""
     referenced: dict[str, list[str]] = {}
     for role in references:
         if role.role == VOCABULARY_ROLE and role.choice not in (None, lexicon.NO_REFERENCE):
             referenced.setdefault(str(role.choice), []).append(f"{role.relation}.{role.subject}")
+    remembered: dict[RelationSignature, StatedChoice] = {}
     bound, open_sections = [], []
     for entry in structure.bound:
         binding = entry.binding
@@ -274,17 +282,25 @@ def resolve_sections(
             bound.append(entry.model_copy(update={"binding": binding}))
             continue
         listed = Ambiguity(
-            stage=STAGE, subject=f"{relation}.section", members=SECTION_MEMBERS,
+            stage=STAGE, subject=section_subject(relation), members=SECTION_MEMBERS,
             hints=(NO_REFERENCE_HINT,),
         )
-        stated = (choices or {}).get(listed.subject)
+        signature = by_name[relation].signature
+        stated = (choices or {}).get(listed.subject) or remembered.get(signature)
         decided = _stated_section(stated, vocabulary)
-        if decided is not None:
+        if stated is not None and decided is not None:
+            remembered.setdefault(signature, _recalled(stated))
             binding = binding.model_copy(update={"section": decided})
             entry = entry.model_copy(update={"binding": binding})
         bound.append(entry)
         open_sections.append(_with_stated_section(listed, stated))
     return structure.model_copy(update={"bound": tuple(bound)}), open_sections
+
+
+def _recalled(stated: StatedChoice) -> StatedChoice:
+    return StatedChoice(
+        choice=stated.choice, source="memory", confidence=SOURCE_CONFIDENCE["memory"]
+    )
 
 
 def _stated_section(stated: StatedChoice | None, vocabulary: str) -> str | None:

@@ -52,6 +52,7 @@ from sema.intake.eligibility_utils import (
     scope_of,
     status_classes,
     subject_of,
+    with_claims,
     with_stated,
 )
 from sema.intake.profile import SAMPLE_CAP, ProfileRefusedError, ProfileTools, ValueSample
@@ -188,6 +189,8 @@ def _relation_roles(
     plain = _side_roles(profile, target, Hints(None, None, None, {}), {}, Held({}))
     held = Held(claimed_columns(plain))
     found = _side_roles(profile, target, hints, stated, held, remembered)
+    in_force = claimed_columns(found)
+    found = [with_claims(entry, in_force) for entry in found]
     if hints.memory is not None and remembered is None:
         hints.memory.remember(key, {e.role: e.choice for e in found if e.choice is not None})
     return found

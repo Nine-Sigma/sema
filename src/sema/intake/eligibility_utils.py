@@ -28,13 +28,14 @@ __all__ = [
     "Held",
     "Hint",
     "RoleEligibility",
-    "claimed_columns",
     "RoleMemory",
     "RunDescriptor",
     "StatedChoice",
+    "claimed_columns",
     "lexicon_hits",
     "mentions",
     "normalize",
+    "with_claims",
 ]
 
 # Measured 2026-10-21 by scripts/measure_embedding_margin.py over A2, A3, A8, ACRIS (38 role
@@ -196,6 +197,22 @@ def claimed_columns(entries: Iterable[RoleEligibility]) -> dict[str, str]:
         if entry.source in DETERMINISTIC_SOURCES and entry.column is not None:
             claims.setdefault(entry.column, entry.role)
     return claims
+
+
+def with_claims(entry: RoleEligibility, claims: Mapping[str, str]) -> RoleEligibility:
+    """An open role lists each column another role claims as excluded, so it is never
+    offered; the claim does not narrow the role, which stays open for a choice."""
+    if entry.choice is not None or entry.source is not None or entry.subject is not None:
+        return entry
+    claimed = {
+        column: role
+        for column, role in claims.items()
+        if column in entry.members and column not in entry.exclusions
+        and role != entry.role and not lexicon.coincide(role, entry.role)
+    }
+    if not claimed:
+        return entry
+    return entry.model_copy(update={"exclusions": {**entry.exclusions, **claimed}})
 
 
 @dataclass(frozen=True)

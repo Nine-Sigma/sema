@@ -344,8 +344,8 @@ def _role_failures(
     run: _RolesRun, ask: RoleAsk, stated: Mapping[str, StatedChoice]
 ) -> tuple[Failure, ...]:
     """The verifier's role-check failures on a chosen column of the asked relation or kin."""
-    columns = {choice.choice for choice in stated.values()}
-    if ask.references or not columns:
+    columns = ask.columns(stated)
+    if not columns:
         return ()
     relations = (ask.relation, *ask.kin)
     verdict = verify_roles(run.roles(stated), run.tools, spec=None, relations=relations)

@@ -16,13 +16,16 @@ from pydantic import BaseModel
 
 from sema.intake.eligibility import role_targets
 from sema.intake.eligibility_spec_utils import RolesResult
-from sema.intake.eligibility_text_utils import STAGE
-from sema.intake import lexicon
+from sema.intake.eligibility_text_utils import (
+    SECTION_MEMBERS,
+    SECTION_SUBJECT,
+    STAGE,
+    section_subject,
+)
 from sema.intake.eligibility_utils import (
     MemoryKey,
     RoleEligibility,
-    claimed_columns,
-    scope_of,
+    StatedChoice,
     subject_of,
 )
 from sema.intake.output_models import (
@@ -43,10 +46,12 @@ from sema.intake.resolve_utils import (
     render_relations,
     render_template,
 )
+from sema.intake.shapes import concept_list
 from sema.intake.shapes.base import RelationProfile
 from sema.intake.verify.base import Ambiguity
 
 ROLES_PROMPT = "prompts/roles_v1.md"
+SECTION_QUESTION = "asks: the spec section this relation's concept list feeds"
 NOT_IN_NAME = re.compile(r"\W+")
 
 
@@ -82,11 +87,20 @@ class RoleAsk:
             return reference_choices(answer, len(self.entries))
         return role_choices(answer, [entry.name for entry in self.entries])
 
+    def columns(self, stated: Mapping[str, StatedChoice]) -> set[str]:
+        """The columns a stated answer binds; a section choice binds none."""
+        if self.references:
+            return set()
+        return {
+            stated[entry.subject].choice
+            for entry in self.entries
+            if entry.subject in stated and entry.label != SECTION_SUBJECT
+        }
+
 
 def column_asks(roles: RolesResult, by_name: Mapping[str, RelationProfile]) -> list[RoleAsk]:
     """The first relation of each signature with open column roles; later ones are kin."""
     found = _open(roles, per_property=False)
-    claims = _claims(roles)
     keys = _signature_keys(roles, by_name)
     asks: dict[MemoryKey | str, RoleAsk] = {}
     for relation, entries in found.items():
@@ -95,7 +109,7 @@ def column_asks(roles: RolesResult, by_name: Mapping[str, RelationProfile]) -> l
             ask = asks[key]
             asks[key] = RoleAsk(ask.relation, ask.entries, False, (*ask.kin, relation))
             continue
-        asks[key] = RoleAsk(relation, _columns(entries, claims), False)
+        asks[key] = RoleAsk(relation, _columns(entries), False)
     return list(asks.values())
 
 
@@ -116,6 +130,8 @@ def _open(
     eligible = {
         subject_of(e): e for e in roles.eligibilities if (e.subject is not None) == per_property
     }
+    if not per_property:
+        eligible |= _open_sections(roles)
     # A reference entry always offers `none`, so one member leaves nothing to choose.
     fewest = 2 if per_property else 1
     found: dict[str, list[tuple[RoleEligibility, Ambiguity]]] = {}
@@ -129,44 +145,29 @@ def _open(
     return found
 
 
+def _open_sections(roles: RolesResult) -> dict[str, RoleEligibility]:
+    """A concept list with no section yet is asked its section with its column roles."""
+    relations = [
+        entry.binding.relations[0]
+        for entry in roles.structure.bound
+        if entry.binding.template == concept_list.ID and entry.binding.section is None
+    ]
+    return {
+        section_subject(relation): RoleEligibility(
+            relation=relation, role=SECTION_SUBJECT, members=SECTION_MEMBERS
+        )
+        for relation in relations
+    }
+
+
 def _offered(entry: RoleEligibility, ambiguity: Ambiguity) -> tuple[str, ...]:
     return tuple(member for member in entry.members if member not in ambiguity.exclusions)
 
 
-def _claims(roles: RolesResult) -> dict[str, dict[str, str]]:
-    """Columns code or the lexicon settled, by role, per side of each relation."""
-    sides: dict[str, list[RoleEligibility]] = {}
-    for entry in roles.eligibilities:
-        if entry.subject is None:
-            sides.setdefault(scope_of(entry.relation, entry.section), []).append(entry)
-    return {side: claimed_columns(entries) for side, entries in sides.items()}
-
-
-def _unclaimed(
-    entry: RoleEligibility, ambiguity: Ambiguity, claims: Mapping[str, Mapping[str, str]]
-) -> Ambiguity:
-    """The entry with every column another role on its side claims listed as excluded."""
-    side = claims.get(scope_of(entry.relation, entry.section), {})
-    claimed = {
-        column: role
-        for column, role in side.items()
-        if column in entry.members and column not in ambiguity.exclusions
-        and role != entry.role and not lexicon.coincide(role, entry.role)
-    }
-    if not claimed:
-        return ambiguity
-    return ambiguity.model_copy(update={"exclusions": {**ambiguity.exclusions, **claimed}})
-
-
-def _columns(
-    entries: Sequence[tuple[RoleEligibility, Ambiguity]],
-    claims: Mapping[str, Mapping[str, str]],
-) -> tuple[OpenRole, ...]:
+def _columns(entries: Sequence[tuple[RoleEligibility, Ambiguity]]) -> tuple[OpenRole, ...]:
     """A role open on both sides of one relation names each side's field apart."""
     counts = Counter(entry.role for entry, _ in entries)
-    return tuple(
-        _column(e, _unclaimed(e, a, claims), repeated=counts[e.role] > 1) for e, a in entries
-    )
+    return tuple(_column(e, a, repeated=counts[e.role] > 1) for e, a in entries)
 
 
 def _column(entry: RoleEligibility, ambiguity: Ambiguity, *, repeated: bool) -> OpenRole:
@@ -229,9 +230,11 @@ def render_roles_prompt(
 def _entry(index: int, entry: OpenRole) -> str:
     ambiguity = entry.ambiguity
     exclusions = [f"{name}: {why}" for name, why in sorted(ambiguity.exclusions.items())]
+    question = [SECTION_QUESTION] if entry.label == SECTION_SUBJECT else []
     return "\n".join(
         [
             f"### entry {index}: {ambiguity.subject}",
+            *question,
             f"field: `{entry.field}`",
             "members:",
             bullets(f"`{member}`" for member in entry.members),
