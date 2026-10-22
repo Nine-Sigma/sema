@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any, get_args
 
 from sema.binding.spec import ConceptSourceSpec
+from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import (
     ID_DISTINCT_RATIO_FLOOR,
@@ -22,6 +24,15 @@ SIGNATURE_FLOORS: dict[str, FloorValue] = {
     **ID_FLOOR,
     "LABEL_MEAN_LENGTH_BOUNDS": LABEL_MEAN_LENGTH_BOUNDS,
 }
+# Numeric and temporal types order the same way on every provider. Text is left out: its
+# order follows a column's collation, which may differ between two columns of one type.
+ORDERED_TYPE_WORDS = frozenset({
+    "TINYINT", "SMALLINT", "INT", "INTEGER", "BIGINT", "HUGEINT", "UTINYINT", "USMALLINT",
+    "UINTEGER", "UBIGINT", "BYTE", "SHORT", "LONG", "FLOAT", "DOUBLE", "REAL", "DECIMAL",
+    "NUMERIC", "DATE", "TIMESTAMP", "TIMESTAMPTZ",
+})
+TYPE_WORD = re.compile(r"[A-Z]+")
+ColumnPair = tuple[ColumnProfile, ColumnProfile]
 IN_GROUP = "in_group"
 COLUMN_EXISTS = "column_exists"
 
@@ -89,6 +100,32 @@ def may_resolve(column: ColumnProfile, target: ColumnProfile) -> bool:
         and column.distinct_count > 0
         and column.distinct_count * JOIN_RESOLVE_FLOOR <= target.distinct_count
     )
+
+
+def ranges_overlapping(
+    profile: RelationProfile, pairs: Sequence[ColumnPair], tools: ProfileTools
+) -> list[ColumnPair]:
+    """``pairs`` less those of an ordered type whose value ranges do not overlap.
+
+    A column resolves into another at the join floor only if they share a value, and a
+    shared value lies inside both ranges, so a disjoint pair cannot resolve.
+    """
+    groups: dict[str, list[str]] = {}
+    for column in dict.fromkeys(c for pair in pairs if _ordered(pair[0]) for c in pair):
+        groups.setdefault(column.type, []).append(column.name)
+    if not groups:
+        return list(pairs)
+    overlapping = tools.overlapping_ranges(profile.ref, list(groups.values()))
+    return [
+        pair
+        for pair in pairs
+        if not _ordered(pair[0]) or frozenset((pair[0].name, pair[1].name)) in overlapping
+    ]
+
+
+def _ordered(column: ColumnProfile) -> bool:
+    word = TYPE_WORD.match(column.type.upper())
+    return word is not None and word.group() in ORDERED_TYPE_WORDS
 
 
 def nonnull_rows(profile: RelationProfile, column: ColumnProfile) -> int:

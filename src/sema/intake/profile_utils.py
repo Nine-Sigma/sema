@@ -210,6 +210,31 @@ def join_check(row: Sequence[Any]) -> JoinCheck:
     )
 
 
+def overlap_sql(relation_sql: str, typed_groups: Sequence[Sequence[str]]) -> str:
+    """Index pairs, numbered across the groups, of same-type columns whose ranges overlap.
+
+    One scan computes every range; the pairs are compared inside the statement, so only
+    column indexes come back, never a value.
+    """
+    aggregates: list[str] = []
+    ranges: list[str] = []
+    index = 0
+    for group in typed_groups:
+        rows = []
+        for column in group:
+            aggregates.append(f"MIN({column}) AS lo{index}, MAX({column}) AS hi{index}")
+            rows.append(f"SELECT {index} AS i, lo{index} AS lo, hi{index} AS hi FROM s")
+            index += 1
+        ranges.append(f"r{len(ranges)} AS ({' UNION ALL '.join(rows)})")
+    pairs = " UNION ALL ".join(
+        f"SELECT a.i, b.i FROM r{n} a JOIN r{n} b"
+        " ON a.i < b.i AND a.lo <= b.hi AND b.lo <= a.hi"
+        for n in range(len(ranges))
+    )
+    scan = f"s AS (SELECT {', '.join(aggregates)} FROM {relation_sql})"
+    return f"WITH {', '.join([scan, *ranges])} {pairs}"
+
+
 def hierarchy_sql(relation_sql: str, id_col: str, parent_col: str) -> str:
     """Cyclic nodes are their own ancestor; depth is walked over the acyclic part only.
 

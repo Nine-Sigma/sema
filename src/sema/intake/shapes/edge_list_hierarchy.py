@@ -21,8 +21,10 @@ from sema.intake.shapes.base import (
 )
 from sema.intake.shapes.base_utils import (
     JOIN_FLOOR,
+    ColumnPair,
     failure,
     may_resolve,
+    ranges_overlapping,
     section_of,
     slot_columns,
     slot_relations,
@@ -49,8 +51,11 @@ Checked = tuple[list[Failure], dict[str, float | str]]
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
     found = []
     for concepts in group:
-        for key in (column for column in concepts.columns if is_id(concepts, column)):
-            found += _parent_bindings(concepts, key, tools)
+        keys = [column for column in concepts.columns if is_id(concepts, column)]
+        pairs = ranges_overlapping(concepts, _parent_pairs(concepts, keys), tools)
+        for key in keys:
+            parents = [parent for parent, paired in pairs if paired is key]
+            found += _parent_bindings(concepts, key, parents, tools)
             for edges in (p for p in group if p.ref.name != concepts.ref.name):
                 found += _edge_bindings(concepts, key, edges, tools)
     return found
@@ -80,13 +85,25 @@ def verify(
     return verdict(failures, JOIN_FLOOR)
 
 
+def _parent_pairs(
+    concepts: RelationProfile, keys: Sequence[ColumnProfile]
+) -> list[ColumnPair]:
+    return [
+        (parent, key)
+        for key in keys
+        for parent in concepts.columns
+        if parent.name != key.name and may_resolve(parent, key)
+    ]
+
+
 def _parent_bindings(
-    concepts: RelationProfile, key: ColumnProfile, tools: ProfileTools
+    concepts: RelationProfile,
+    key: ColumnProfile,
+    parents: Sequence[ColumnProfile],
+    tools: ProfileTools,
 ) -> list[SlotBinding]:
     found = []
-    for parent in (column for column in concepts.columns if may_resolve(column, key)):
-        if parent.name == key.name:
-            continue
+    for parent in parents:
         failures, evidence = _parent_check(concepts, key, parent, tools)
         if not failures:
             slots = {CONCEPT_RELATION: concepts.ref.name, IDENTIFIER: key.name}

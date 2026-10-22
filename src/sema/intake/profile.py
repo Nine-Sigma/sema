@@ -37,6 +37,7 @@ from sema.intake.profile_utils import (
     join_check,
     join_sql,
     levels_sql,
+    overlap_sql,
     paths_sql,
     sample_sql,
     staging_columns_sql,
@@ -162,6 +163,18 @@ class ProfileTools:
             self.provider.quote(b, b_col),
         )
         return join_check(self._run(a, statement)[0])
+
+    def overlapping_ranges(
+        self, ref: RelationRef, typed_groups: Sequence[Sequence[str]]
+    ) -> set[frozenset[str]]:
+        """Pairs of columns, each group of one type, whose value ranges overlap."""
+        paired = [group for group in typed_groups if len(group) > 1]
+        if not paired:
+            return set()
+        names = [column for group in paired for column in group]
+        quoted = [[self.provider.quote(ref, column) for column in group] for group in paired]
+        rows = self._run(ref, overlap_sql(self.provider.relation_sql(ref), quoted))
+        return {frozenset((names[int(a)], names[int(b)])) for a, b in rows}
 
     def check_hierarchy(self, ref: RelationRef, id_col: str, parent_col: str) -> HierarchyCheck:
         statement = hierarchy_sql(
