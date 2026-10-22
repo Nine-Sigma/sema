@@ -80,14 +80,22 @@ concept_source:
           - {columns: [Document ID, Good Through Date], entity: 'ACRIS - Personal Property Master', reference_columns: [Document ID, Good Through Date]}
       - relation: land_acris.ACRIS___Country_Codes_Data_Dictionary__Column_Info
         header: land_acris.ACRIS___Country_Codes_Data_Dictionary__Dataset_Info
+        domains:
+          COUNTRY CODE: Country_Codes
       - relation: land_acris.ACRIS___Document_Control_Codes_Data_Dictionary__Column_Info
         header: land_acris.ACRIS___Document_Control_Codes_Data_Dictionary__Dataset_Info
       - relation: land_acris.ACRIS___Property_Types_Codes_Data_Dictionary__Column_Info
         header: land_acris.ACRIS___Property_Types_Codes_Data_Dictionary__Dataset_Info
+        domains:
+          PROPERTY TYPE: Property_Types_Codes
       - relation: land_acris.ACRIS___State_Codes_Data_Dictionary__Column_Info
         header: land_acris.ACRIS___State_Codes_Data_Dictionary__Dataset_Info
+        domains:
+          State Code: State_Codes
       - relation: land_acris.ACRIS___UCC_Collateral_Codes_Data_Dictionary__Column_Info
         header: land_acris.ACRIS___UCC_Collateral_Codes_Data_Dictionary__Dataset_Info
+        domains:
+          UCC COLLATERAL CODE: UCC_Collateral_Codes
   code_lists:
     - vocabulary_id: Country_Codes
       relation: land_acris.Country_Codes
