@@ -2,7 +2,9 @@
 
 A decisions file is a YAML list of ``{stage, subject, choice}``. Each decision is checked
 against the ambiguity list Review presented; ``choice`` is a member of its entry or
-``IGNORE``, and a structure ``IGNORE`` may name any landed relation. A structure decision binds the chosen member's binding, or ignores the relation
+``IGNORE``, and a structure ``IGNORE`` may name any landed relation. ``no_template`` marks a
+relation no template fits; Review offers ``IGNORE`` in its place and a decision naming it is
+rejected. A structure decision binds the chosen member's binding, or ignores the relation
 with reason ``human``, and the entry moves from the open list to ``settled``. Role decisions
 enter Roles as stated choices; ``IGNORE`` states ``none``. Every decided binding is still
 verified.
@@ -27,6 +29,7 @@ from sema.intake.shapes import ignore
 from sema.intake.shapes.base import SlotBinding, profile_relations
 from sema.intake.shapes.precedence import STAGE as STRUCTURE_STAGE
 from sema.intake.structure import BindingSource, BoundEntry, StructureResult
+from sema.intake.structure_utils import NO_TEMPLATE
 from sema.intake.verify.base import Ambiguity
 from sema.log import logger
 
@@ -37,6 +40,7 @@ __all__ = [
     "apply_structure_decisions",
     "check_whole_bindings",
     "load_decisions",
+    "offered",
     "stated_choices",
     "validate_decisions",
 ]
@@ -48,6 +52,9 @@ NOT_LISTED = "no entry Review presented has this stage and subject"
 NOT_A_MEMBER = "the choice is neither a member of the entry nor ignore"
 NO_BINDING = "the choice names no binding of an open structure entry"
 PART_OF_BINDING = "the relation is bound with others the decisions do not ignore"
+NOT_A_CHOICE = (
+    f"{NO_TEMPLATE} says no template fits the relation and binds nothing; choose {IGNORE}"
+)
 
 
 class Decision(BaseModel):
@@ -94,9 +101,18 @@ def validate_decisions(
             continue
         if entry is None:
             raise DecisionRejectedError(decision, (), NOT_LISTED)
+        if decision.choice == NO_TEMPLATE:
+            raise DecisionRejectedError(decision, offered(entry).members, NOT_A_CHOICE)
         if decision.choice != IGNORE and decision.choice not in entry.members:
             raise DecisionRejectedError(decision, entry.members, NOT_A_MEMBER)
     return checked
+
+
+def offered(ambiguity: Ambiguity) -> Ambiguity:
+    """The entry as Review presents it: a ``no_template`` entry offers ``IGNORE`` instead."""
+    if ambiguity.members != (NO_TEMPLATE,):
+        return ambiguity
+    return ambiguity.model_copy(update={"members": (IGNORE,)})
 
 
 def check_whole_bindings(

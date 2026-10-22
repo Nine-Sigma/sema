@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sema.binding.importer import import_concept_source, write_import
 from sema.binding.spec import load_concept_source_spec
 from sema.connectors.base import Connector
-from sema.intake.decisions import Decision, check_whole_bindings, validate_decisions
+from sema.intake.decisions import Decision, check_whole_bindings, offered, validate_decisions
 from sema.intake.eligibility import assemble_spec
 from sema.intake.enrichment import apply_enrichment
 from sema.intake.graph_stages import (
@@ -327,11 +327,12 @@ class Nodes:
         self, stages: Stages, current: Current, update: Update
     ) -> list[Ambiguity]:
         roles = current.roles.ambiguities if current.roles is not None else ()
-        for stage, listed in ((STRUCTURE, current.structure.ambiguities), (ROLES, roles)):
+        structure = current.structure
+        opened = tuple(offered(entry) for entry in structure.ambiguities)
+        for stage, listed in ((STRUCTURE, opened), (ROLES, roles)):
             entry = AmbiguityList(stage=stage, count=len(listed), ambiguities=tuple(listed))
             _write(stages, update, stage + AMBIGUITY_SUFFIX, entry)
-        structure = current.structure
-        return [*structure.ambiguities, *structure.settled, *roles]
+        return [*opened, *(offered(entry) for entry in structure.settled), *roles]
 
     def _metrics(
         self, stages: Stages, state: IngestState, current: Current, update: Update
