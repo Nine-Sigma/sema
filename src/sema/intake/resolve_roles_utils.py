@@ -52,6 +52,9 @@ from sema.intake.verify.base import Ambiguity
 ROLES_PROMPT = "prompts/roles_v1.md"
 SECTION_QUESTION = "asks: the spec section this relation's concept list feeds"
 NOT_IN_NAME = re.compile(r"\W+")
+UNASKED_CLAIMED = "not asked: every member is claimed ({})"
+UNASKED_KIN = "not asked: it shares the signature of {}, whose call left it open"
+UNASKED_SECTION = "not asked: the section choice on {} opened it after its ask; left for Review"
 
 
 @dataclass(frozen=True)
@@ -110,6 +113,24 @@ def column_asks(roles: RolesResult, by_name: Mapping[str, RelationProfile]) -> l
             continue
         asks[key] = RoleAsk(relation, _columns(entries), False)
     return list(asks.values())
+
+
+def unasked_reason(
+    ambiguity: Ambiguity, asks: Sequence[RoleAsk], accepted: Mapping[str, StatedChoice]
+) -> str | None:
+    """Why an open entry no call offered stays open; ``None`` when no path explains it."""
+    members = ambiguity.members
+    if members and all(member in ambiguity.exclusions for member in members):
+        claims = ", ".join(f"{m} by {ambiguity.exclusions[m]}" for m in members)
+        return UNASKED_CLAIMED.format(claims)
+    subject = ambiguity.subject
+    for ask in asks:
+        if any(subject.startswith(f"{kin}.") for kin in ask.kin):
+            return UNASKED_KIN.format(ask.relation)
+        sectioned = section_subject(ask.relation) in accepted
+        if sectioned and subject.startswith(f"{ask.relation}."):
+            return UNASKED_SECTION.format(ask.relation)
+    return None
 
 
 def reference_asks(roles: RolesResult) -> list[RoleAsk]:

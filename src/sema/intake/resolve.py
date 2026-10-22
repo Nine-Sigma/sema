@@ -47,6 +47,7 @@ from sema.intake.resolve_roles_utils import (
     in_force,
     reference_asks,
     spanned,
+    unasked_reason,
 )
 from sema.intake.resolve_utils import (
     OpenEntry,
@@ -285,7 +286,9 @@ def resolve_roles(
         "resolve roles: {} column calls and {} reference calls, {} choices settled, {} left open",
         len(asks), len(references), len(run.recorded), len(run.left),
     )
-    return replace(result, ambiguities=tuple(_recorded(run, a) for a in result.ambiguities))
+    asked = (*asks, *references)
+    recorded = tuple(_recorded(run, a, asked) for a in result.ambiguities)
+    return replace(result, ambiguities=recorded)
 
 
 def _settle_roles(run: _RolesRun, ask: RoleAsk, max_retries: int) -> None:
@@ -379,10 +382,13 @@ def _leave_roles_open(run: _RolesRun, ask: RoleAsk, attempt: _RoleAttempt) -> No
     run.accept(attempt, stated)
 
 
-def _recorded(run: _RolesRun, ambiguity: Ambiguity) -> Ambiguity:
+def _recorded(run: _RolesRun, ambiguity: Ambiguity, asks: Sequence[RoleAsk]) -> Ambiguity:
     if ambiguity.source == MODEL and ambiguity.subject in run.recorded:
         key, reason = run.recorded[ambiguity.subject]
         return ambiguity.model_copy(update={"call_key": key, "reason": reason})
     if ambiguity.choice is None and ambiguity.subject in run.left:
         return ambiguity.model_copy(update={"reason": run.left[ambiguity.subject]})
-    return ambiguity
+    if ambiguity.choice is not None or ambiguity.source is not None or ambiguity.reason:
+        return ambiguity
+    unasked = unasked_reason(ambiguity, asks, run.accepted)
+    return ambiguity if unasked is None else ambiguity.model_copy(update={"reason": unasked})
