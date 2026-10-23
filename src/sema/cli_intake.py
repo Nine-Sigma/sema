@@ -1,9 +1,10 @@
-"""CLI: `sema target discover`, `sema target approve`, and `sema target runs`.
+"""CLI: `sema target discover`, `approve`, `runs`, and `review`.
 
 `discover` starts an ingestion run from a source and runs it to its first interrupt;
 `approve` answers the interrupt a run waits at (import, edited spec, decisions, reject, or
-value reads); `runs` lists the run registry. Each prints JSON. The ingestion graph is
-imported inside the commands, so loading the CLI loads no LangGraph.
+value reads); `runs` lists the run registry. Each prints JSON. `review` prints a run's open
+entries as text and makes no provider call. The ingestion graph is imported inside the
+commands, so loading the CLI loads no LangGraph.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from sema.cli_intake_utils import (
     read_metrics,
     refuse_unless_waiting,
     registry_of,
+    review_lines,
     reject_conflict,
     run_row,
     warehouse_schema,
@@ -209,6 +211,15 @@ def runs_cmd(
     echo_json([run_row(record) for record in records])
 
 
+@click.command(name="review")
+@click.argument("run_id")
+@ROOT_OPTION
+def review_cmd(run_id: str, root: Path) -> None:
+    """Print RUN_ID's open entries one per line, or its spec path when none is open."""
+    for line in review_lines(root, run_id):
+        click.echo(line)
+
+
 def _echo_outcome(root: Path, outcome: RunOutcome, out: Path | None) -> None:
     run_id, node, payload = outcome.run_id, outcome.node, outcome.payload
     status = written_status(root, run_id, node, payload)
@@ -216,4 +227,4 @@ def _echo_outcome(root: Path, outcome: RunOutcome, out: Path | None) -> None:
     echo_json(outcome_summary(root, run_id, node, payload, written))
 
 
-__all__ = ["approve_cmd", "discover_cmd", "runs_cmd"]
+__all__ = ["approve_cmd", "discover_cmd", "review_cmd", "runs_cmd"]

@@ -1,4 +1,5 @@
-"""Helpers for `sema target discover|approve|runs`: refusals, descriptors, and printed rows."""
+"""Helpers for `sema target discover|approve|runs|review`: refusals, descriptors, and printed
+rows."""
 
 from __future__ import annotations
 
@@ -43,6 +44,7 @@ DESCRIPTOR_GLOB = "*.run.yaml"
 OPEN_STAGES = (STRUCTURE, ROLES)
 EMBEDDING_PROVIDER_ENV = "EMBEDDING_PROVIDER"
 INTAKE_ERRORS = (ValueError, KeyError, OSError, RuntimeError, LLMStageError, yaml.YAMLError)
+AGREEMENT_KEY, FINDINGS_KEY, CAUSE_KEY = "agreement", "findings", "cause"
 
 
 def error_message(exc: BaseException) -> str:
@@ -238,3 +240,49 @@ def run_row(record: RunRecord) -> dict[str, Any]:
 
 def echo_json(value: Any) -> None:
     click.echo(json.dumps(value, indent=2, default=str))
+
+
+def review_lines(root: Path, run_id: str) -> list[str]:
+    """One line per open entry, structure then roles in ledger order, the entries naming a
+    no-spec cause last; a run with none open prints its spec path when it assembled one."""
+    opened = [entry for entry in _listed_entries(root, run_id) if _is_open(entry)]
+    lines = [_entry_line(entry) for entry in opened if CAUSE_KEY not in entry]
+    lines += [_cause_line(entry) for entry in opened if CAUSE_KEY in entry]
+    if lines:
+        return lines
+    spec = root / run_id / ARTIFACTS_DIR / f"{SPEC_ARTIFACT}.json"
+    return [str(spec)] if spec.is_file() else []
+
+
+def _listed_entries(root: Path, run_id: str) -> list[dict[str, Any]]:
+    """Plain JSON, not ``AmbiguityList``, so keys the model does not declare survive."""
+    artifacts = root / run_id / ARTIFACTS_DIR
+    paths = [artifacts / f"{stage}{AMBIGUITY_SUFFIX}.json" for stage in OPEN_STAGES]
+    missing = [path.stem for path in paths if not path.is_file()]
+    if missing:
+        raise click.ClickException(f"run {run_id} has no {' or '.join(missing)} artifact")
+    return [entry for path in paths for entry in json.loads(path.read_text())["ambiguities"]]
+
+
+def _entry_line(entry: dict[str, Any]) -> str:
+    members = " > ".join(_member_text(entry, member) for member in entry["members"])
+    parts = [
+        f"{entry['stage']} {entry['subject']}",
+        f"members: {members}",
+        f"hints: {'; '.join(entry['hints'])}",
+    ]
+    if AGREEMENT_KEY in entry:
+        parts.append(f"agreement: {entry[AGREEMENT_KEY]}")
+    if entry["reason"] is not None:
+        parts.append(f"reason: {entry['reason']}")
+    return " | ".join(parts)
+
+
+def _member_text(entry: dict[str, Any], member: str) -> str:
+    fact = entry["exclusions"].get(member)
+    notes = [*([fact] if fact is not None else []), *entry.get(FINDINGS_KEY, {}).get(member, [])]
+    return f"{member} [{'; '.join(notes)}]" if notes else member
+
+
+def _cause_line(entry: dict[str, Any]) -> str:
+    return f"{entry['stage']} {entry['subject']} | cause: {entry[CAUSE_KEY]}"

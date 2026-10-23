@@ -1,7 +1,7 @@
 """CLI: `sema target load`, `sema target import`, and `sema target project`.
 
-The intake commands `discover`, `approve`, and `runs` live in `sema.cli_intake` and are
-registered on this group.
+The intake commands `discover`, `approve`, `runs`, and `review` live in `sema.cli_intake`
+and are registered on this group.
 
 `load` connects any user-supplied ontology manifest to the target loader and
 prints a `LoadedTarget` summary as JSON. Defaults to the in-memory
@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 import click
 
-from sema.cli_intake import approve_cmd, discover_cmd, runs_cmd
+from sema.cli_intake import approve_cmd, discover_cmd, review_cmd, runs_cmd
 from sema.cli_target_utils import (
     RecordingDriver,
     build_summary,
@@ -253,5 +253,6 @@ def _neo4j_writer_from_env() -> GraphWriter:
 target_group.add_command(discover_cmd)
 target_group.add_command(approve_cmd)
 target_group.add_command(runs_cmd)
+target_group.add_command(review_cmd)
 
 __all__ = ["target_group", "load_cmd", "import_cmd", "project_cmd"]
