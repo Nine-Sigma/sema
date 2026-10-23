@@ -5,8 +5,9 @@ instead of failing collection.
 
 The contract the tests pin (dry-run-report spec, design Decision 13):
 
-- ``report.dry_run(spec, provider, staging, ledger) -> DryRunReport``: ``ledger`` is the
-  run's ``RunLedger``; the run id is its directory name. Term staging goes to
+- ``report.dry_run(spec, provider, staging, ledger) -> DryRun``, whose ``report`` is the
+  ``DryRunReport``: ``ledger`` is the run's ``RunLedger``; the run id is its directory
+  name. Term staging goes to
   ``f"{spec.external_namespace}__dryrun_{run_id[:8]}"``, dropped in ``finally``. The report
   is written to the ledger as one artifact.
 - ``report.REPORT_SEED``: the int seed of the rendered sample.
@@ -81,7 +82,7 @@ class Landed:
 
     def dry_run(self, spec: ConceptSourceSpec, run_id: str) -> Any:
         ledger = Ledger(self.root / "ledger").run(run_id)
-        return report().dry_run(spec, self.provider, self.staging, ledger)
+        return report().dry_run(spec, self.provider, self.staging, ledger).report
 
 
 def _land(root: Path, lander: Lander, path: Path, schema: str) -> Landed:
@@ -347,7 +348,9 @@ def test_artifacts_after_a_dry_run(tmp_path: Path) -> None:
     run_dir = tmp_path / "ledger" / "a2-stages"
     landed = _land(tmp_path, land_tabular, A2_WORKBOOK, "land_a2")
     written = a2_stages_into(landed.provider, landed.land, run_dir)
-    found = report().dry_run(written.spec, landed.provider, landed.staging, written.ledger)
+    found = report().dry_run(
+        written.spec, landed.provider, landed.staging, written.ledger
+    ).report
     written.verify_dry_run()
     landed.staging.close()
 

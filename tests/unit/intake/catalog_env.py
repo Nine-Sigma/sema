@@ -111,10 +111,11 @@ def write_catalog(
     return source, write_descriptor(directory)
 
 
-def write_descriptor(directory: Path) -> Path:
+def write_descriptor(directory: Path, **fields: Any) -> Path:
+    """The catalog's run descriptor, with ``fields`` stated beside its own."""
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{STEM}.run.yaml"
-    path.write_text(yaml.safe_dump(DESCRIPTOR, sort_keys=False), encoding="utf-8")
+    path.write_text(yaml.safe_dump(DESCRIPTOR | fields, sort_keys=False), encoding="utf-8")
     return path
 
 

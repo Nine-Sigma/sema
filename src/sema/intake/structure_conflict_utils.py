@@ -7,8 +7,6 @@ bound to open instead, offering its own binding, so a reviewer keeps one and ign
 
 from __future__ import annotations
 
-from collections import Counter
-
 from sema.intake.eligibility_spec_utils import JOINT_TEMPLATES, MERGED_SECTIONS
 from sema.intake.shapes import filled_sections
 from sema.intake.shapes.precedence import STAGE, member
@@ -22,37 +20,41 @@ def _sections(entry: BoundEntry) -> set[str]:
     return heads - MERGED_SECTIONS
 
 
-def _conflicts(bound: tuple[BoundEntry, ...]) -> dict[int, str]:
-    """The index of every entry sharing a single-valued section, with that section."""
+def _conflicts(bound: tuple[BoundEntry, ...]) -> dict[str, list[int]]:
+    """Every single-valued section two or more entries fill, with their indices."""
     filling: dict[str, list[int]] = {}
     for index, entry in enumerate(bound):
         if entry.binding.template in JOINT_TEMPLATES:
             continue
-        for section in _sections(entry):
+        for section in sorted(_sections(entry)):
             filling.setdefault(section, []).append(index)
-    return {
-        index: section
-        for section, indices in sorted(filling.items())
-        if len(indices) > 1
-        for index in indices
-    }
+    return {section: indices for section, indices in filling.items() if len(indices) > 1}
+
+
+def _reasons(conflicts: dict[str, list[int]]) -> dict[int, str]:
+    """Each conflicting entry's reason, naming every section it competes for."""
+    found: dict[int, list[str]] = {}
+    for section, indices in sorted(conflicts.items()):
+        for index in indices:
+            found.setdefault(index, []).append(f"{len(indices)} bindings fill section {section}")
+    return {index: "; ".join(parts) for index, parts in found.items()}
 
 
 def open_section_conflicts(structure: StructureResult) -> StructureResult:
-    conflicts = _conflicts(structure.bound)
-    if not conflicts:
+    """Assembly takes one binding per section, so competing bindings go back to Review."""
+    reasons = _reasons(_conflicts(structure.bound))
+    if not reasons:
         return structure
-    counts = Counter(conflicts.values())
     reopened = [
         Ambiguity(
             stage=STAGE,
             subject=relation,
             members=(member(structure.bound[index].binding),),
-            reason=f"{counts[section]} bindings fill section {section}",
+            reason=reason,
         )
-        for index, section in sorted(conflicts.items())
+        for index, reason in sorted(reasons.items())
         for relation in structure.bound[index].binding.relations
     ]
-    kept = tuple(e for i, e in enumerate(structure.bound) if i not in conflicts)
+    kept = tuple(e for i, e in enumerate(structure.bound) if i not in reasons)
     update = {"bound": kept, "ambiguities": (*structure.ambiguities, *reopened)}
     return structure.model_copy(update=update)

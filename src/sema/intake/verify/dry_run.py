@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sema.binding.importer import ConceptImport
 from sema.binding.spec import ConceptSourceSpec
@@ -21,6 +21,9 @@ from sema.models.target.refs import VocabularySource
 from sema.targets.adapters.manifest_exceptions import ManifestError
 from sema.targets.adapters.manifest_models import ParsedManifest
 from sema.targets.adapters.manifest_parser import parse_manifest_raw
+
+if TYPE_CHECKING:
+    from sema.intake.report_utils import TermEntry
 
 IMPORT_COMPLETED = "import_completed"
 COUNTS_IN_RANGE = "counts_in_range"
@@ -39,6 +42,7 @@ CHECKS = (
 TERM_KIND = "term"
 
 Pair = tuple[str, str]
+Retired = tuple[str, str, str, str | None]
 
 
 def verify_dry_run(
@@ -47,15 +51,21 @@ def verify_dry_run(
     *,
     structure: StructureResult,
     tools: ProfileTools,
+    staged: Sequence[TermEntry] = (),
 ) -> Verdict:
+    """``staged`` holds the terms of vocabularies above the inline cap, which the manifest
+    names but does not list."""
     parsed, failures = _parsed(imported.manifest)
     if parsed is None:
         return Verdict.of(failures=failures, ambiguities=[], floors={})
     active = [(term.vocabulary, term.code) for term in parsed.terms]
+    active += [(term.vocabulary, term.code) for term in staged if not term.retired]
+    retired = _retired(imported, staged)
     failures += _duplicates(active, spec)
     failures += _over_cap(parsed, spec)
-    failures += _retirements(imported, spec, set(active), _active_concepts(parsed))
-    failures += _counts(spec, structure, tools, len(active) + _retired_terms(imported))
+    failures += _retirements(retired, spec, set(active), _active_concepts(parsed))
+    terms = len(active) + sum(kind == TERM_KIND for kind, *_ in retired)
+    failures += _counts(spec, structure, tools, terms)
     return Verdict.of(failures=failures, ambiguities=[], floors={})
 
 
@@ -113,28 +123,32 @@ def _active_concepts(parsed: ParsedManifest) -> set[str]:
     }
 
 
-def _retired_terms(imported: ConceptImport) -> int:
-    return sum(r.kind == TERM_KIND for r in imported.authored.retirements)
+def _retired(imported: ConceptImport, staged: Sequence[TermEntry]) -> list[Retired]:
+    """Every retirement as (kind, vocabulary, code, replaced_by): sidecar, then staged."""
+    found: list[Retired] = [
+        (r.kind, r.vocabulary or "", r.code, r.replaced_by) for r in imported.authored.retirements
+    ]
+    found += [(TERM_KIND, t.vocabulary, t.code, t.replaced_by) for t in staged if t.retired]
+    return found
 
 
 def _retirements(
-    imported: ConceptImport, spec: ConceptSourceSpec, active: set[Pair], concepts: set[str]
+    retired: Sequence[Retired], spec: ConceptSourceSpec, active: set[Pair], concepts: set[str]
 ) -> list[Failure]:
     concept_relation = spec.concepts.relation.name if spec.concepts is not None else ""
     failures = []
-    for retired in imported.authored.retirements:
-        if retired.replaced_by is None:
+    for kind, vocabulary, code, replaced_by in retired:
+        if replaced_by is None:
             continue
-        vocabulary = retired.vocabulary or ""
-        if retired.kind == TERM_KIND:
-            found = (vocabulary, retired.replaced_by) in active
+        if kind == TERM_KIND:
+            found = (vocabulary, replaced_by) in active
             relation = _vocabulary_relation(spec, vocabulary)
         else:
-            found, relation = retired.replaced_by in concepts, concept_relation
+            found, relation = replaced_by in concepts, concept_relation
         if not found:
             failures.append(failure(
-                REPLACED_BY_ACTIVE, relation, kind=retired.kind, vocabulary=vocabulary,
-                code=retired.code, replaced_by=retired.replaced_by,
+                REPLACED_BY_ACTIVE, relation, kind=kind, vocabulary=vocabulary,
+                code=code, replaced_by=replaced_by,
             ))
     return failures
 

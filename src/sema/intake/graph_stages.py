@@ -16,7 +16,6 @@ from typing import Any, TypeVar, cast
 
 import yaml
 
-from sema.binding.importer import import_concept_source
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
 from sema.binding.spec_sections import Provider
 from sema.connectors.base import Connector
@@ -203,12 +202,13 @@ class Stages:
         current = self.current(reviewed)
         if current.spec is None:
             return None
-        spec, provider = current.spec, self.provider
-        imported = import_concept_source(spec, provider, dataset_map={})
+        spec = current.spec
+        ran = dry_run(spec, self.provider, self.staging, self.ledger)
         structure = current.roles.structure if current.roles else current.structure
-        tools = self.tools(DRY_RUN)
-        verdict = verify_dry_run(spec, imported, structure=structure, tools=tools)
-        return verdict, dry_run(spec, provider, self.staging, self.ledger)
+        verdict = verify_dry_run(
+            spec, ran.imported, structure=structure, tools=self.tools(DRY_RUN), staged=ran.staged
+        )
+        return verdict, ran.report
 
     def _current(self, reviewed: Reviewed) -> Current:
         reached, approvals = reviewed.reached, reviewed.approvals

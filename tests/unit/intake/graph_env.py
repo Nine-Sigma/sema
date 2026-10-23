@@ -20,6 +20,7 @@ from unittest.mock import MagicMock
 
 from pydantic import BaseModel
 
+from sema.ingest.duckdb_staging import Staging
 from sema.intake.registry import Registry, RunRecord
 from sema.models.stages import StageBBatchResult, StageBColumnResult, StageCBatchResult
 from tests.unit.intake.enrichment_env import (
@@ -277,3 +278,18 @@ def approve(run: GraphRun, client: MagicMock | None = None, **options: Any) -> A
 def subsequence(found: Sequence[Any], wanted: Sequence[Any]) -> bool:
     remaining = iter(found)
     return all(any(item == step for step in remaining) for item in wanted)
+
+
+def staged_namespaces(path: Path, namespace: str) -> tuple[list[str], int]:
+    """The staging file's schemas named after ``namespace``, and its concept rows there."""
+    with Staging(str(path), schemas=()) as staging:
+        named = [s for s in staging.list_all_schemas() if s.startswith(namespace)]
+        tables = staging.execute(
+            "SELECT table_name FROM information_schema.tables"
+            " WHERE table_schema = ? AND table_name = 'concept'",
+            [namespace],
+        ).fetchall()
+        if not tables:
+            return named, 0
+        row = staging.execute(f'SELECT count(*) FROM "{namespace}".concept').fetchone()
+    return named, int(row[0]) if row else 0

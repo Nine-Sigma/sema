@@ -11,6 +11,7 @@ import pytest
 
 from sema.binding.importer import import_concept_source
 from sema.binding.spec import load_concept_source_spec
+from sema.intake.report_utils import TermEntry
 from tests.unit.intake.structure_env import A2_SPEC
 from tests.unit.intake.verify.conftest import Landed
 from tests.unit.intake.verify.verify_env import (
@@ -26,6 +27,8 @@ pytestmark = pytest.mark.unit
 
 DUPLICATED = ("VS_COLOR", "BLUE")
 RETIRED_CODE = "TEAL"
+STAGED_ONLY = (DUPLICATED[0], "STAGED_ONLY")
+STAGED_RETIRED, ABSENT_CODE = "STAGED_OLD", "NO_SUCH_CODE"
 
 
 @pytest.fixture(scope="module")
@@ -36,10 +39,13 @@ def a2_import(a2: Landed) -> Any:
     )
 
 
-def _verify(imported: Any, a2: Landed, structure: Any, ledger: Path) -> Any:
+def _verify(imported: Any, a2: Landed, structure: Any, ledger: Path, **staged: Any) -> Any:
+    """``staged`` passes the terms of vocabularies above the inline cap, when a test has them."""
     spec = load_concept_source_spec(A2_SPEC)
     tools = tools_for(a2.source, ledger, stage="dry_run", structure=structure)
-    return verifier("dry_run").verify_dry_run(spec, imported, structure=structure, tools=tools)
+    return verifier("dry_run").verify_dry_run(
+        spec, imported, structure=structure, tools=tools, **staged
+    )
 
 
 def _with_manifest(imported: Any, edit: Any) -> Any:
@@ -114,5 +120,35 @@ def test_retired_term_whose_replacement_is_not_active_fails(
     assert (found.evidence["code"], found.evidence["replaced_by"]) == (
         RETIRED_CODE,
         DUPLICATED[1],
+    )
+    assert_named(verdict, DRY_RUN_CHECKS)
+
+
+def test_two_staged_active_terms_sharing_vocabulary_and_code_fail(
+    a2: Landed, a2_structure: Any, a2_import: Any, tmp_path: Path
+) -> None:
+    vocabulary, code = STAGED_ONLY
+    twins = tuple(TermEntry(vocabulary, code, display, False, None) for display in ("A", "B"))
+
+    verdict = _verify(a2_import, a2, a2_structure, tmp_path / "ledger" / "verify", staged=twins)
+
+    (found,) = failures(verdict, "unique_active_code")
+    assert (found.evidence["vocabulary"], found.evidence["code"]) == STAGED_ONLY
+    assert_named(verdict, DRY_RUN_CHECKS)
+
+
+def test_staged_retirement_whose_replacement_is_not_active_fails(
+    a2: Landed, a2_structure: Any, a2_import: Any, tmp_path: Path
+) -> None:
+    retired = TermEntry(DUPLICATED[0], STAGED_RETIRED, None, True, ABSENT_CODE)
+
+    verdict = _verify(
+        a2_import, a2, a2_structure, tmp_path / "ledger" / "verify", staged=(retired,)
+    )
+
+    (found,) = failures(verdict, "replaced_by_active")
+    assert (found.evidence["code"], found.evidence["replaced_by"]) == (
+        STAGED_RETIRED,
+        ABSENT_CODE,
     )
     assert_named(verdict, DRY_RUN_CHECKS)

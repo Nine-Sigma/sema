@@ -8,6 +8,7 @@ so two runs of one spec serialize the same.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal
@@ -104,20 +105,30 @@ class DryRunReport(_Report):
     without_obligation: dict[str, str]
 
 
+@dataclass(frozen=True)
+class DryRun:
+    """The report with the scratch import and staged terms it counted, for the verifier."""
+
+    report: DryRunReport
+    imported: ConceptImport
+    staged: tuple[TermEntry, ...]
+
+
 def scratch_namespace(spec: ConceptSourceSpec, run_id: str) -> str:
     return f"{spec.external_namespace}{SCRATCH_MARK}{run_id[:RUN_ID_CHARS]}"
 
 
 def dry_run(
     spec: ConceptSourceSpec, provider: RelationProvider, staging: Staging, ledger: RunLedger
-) -> DryRunReport:
+) -> DryRun:
     scratch = scratch_namespace(spec, ledger.directory.name)
     storage = spec.term_storage.model_copy(update={"external_namespace": scratch})
     try:
         scratch_spec = spec.model_copy(update={"term_storage": storage})
-        report = _report(scratch_spec, provider, staging, ledger)
+        ran = _report(scratch_spec, provider, staging, ledger)
     finally:
         staging.execute(f"DROP SCHEMA IF EXISTS {quote_ident(scratch)} CASCADE")
+    report = ran.report
     ledger.artifact(REPORT_ARTIFACT, report)
     logger.info(
         "Dry run of {}: {} vocabularies, {} terms, {} entities; scratch namespace {} dropped",
@@ -127,16 +138,17 @@ def dry_run(
         len(report.entities),
         scratch,
     )
-    return report
+    return ran
 
 
 def _report(
     spec: ConceptSourceSpec, provider: RelationProvider, staging: Staging, ledger: RunLedger
-) -> DryRunReport:
+) -> DryRun:
     imported = import_concept_source(spec, provider, dataset_map={}, staging=staging)
     _write_scratch_files(imported)
     parsed = parse_manifest_raw(imported.manifest)
-    terms = import_terms(parsed, imported) + staged_terms(staging, spec.external_namespace)
+    staged = tuple(staged_terms(staging, spec.external_namespace))
+    terms = import_terms(parsed, imported) + list(staged)
     tools = ProfileTools(
         RelationProvider(warehouse=None, staging=staging),
         EvidencePolicy(tier="metadata_only"),
@@ -147,7 +159,7 @@ def _report(
     nulls = null_required_rows(spec, provider, ledger, STAGE, vocabulary_of_concepts(parsed))
     active, retired, replaced = lifecycle_counts(terms)
     schemas = imported.table_schemas
-    return DryRunReport(
+    report = DryRunReport(
         concept_count=concept_count(parsed),
         vocabulary_count=len(parsed.vocabularies),
         vocabularies={
@@ -164,6 +176,7 @@ def _report(
         entities={name: _entity(*entity_counts(schema)) for name, schema in schemas.items()},
         without_obligation=without_obligation(parsed, schemas),
     )
+    return DryRun(report, imported, staged)
 
 
 def _write_scratch_files(imported: ConceptImport) -> None:
