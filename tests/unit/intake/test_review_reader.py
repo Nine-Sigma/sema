@@ -96,7 +96,8 @@ def test_each_open_entry_prints_one_line_structure_first_settled_absent(root: Pa
 
 def test_agreement_prints_on_its_entry_and_its_absence_does_not_fail(root: Path) -> None:
     agreed = {**alpha_structure(), "agreement": AGREEMENT}
-    write_run(root, [agreed], [gamma_role()])
+    single = {**gamma_role(), "agreement": None}
+    write_run(root, [agreed], [single])
 
     result = invoke(root)
 
@@ -105,6 +106,7 @@ def test_agreement_prints_on_its_entry_and_its_absence_does_not_fail(root: Path)
     assert len(lines) == 2, lines
     assert AGREEMENT in line_naming(lines, agreed["subject"])
     assert_line_shows(line_naming(lines, gamma_role()["subject"]), gamma_role())
+    assert "agreement" not in line_naming(lines, gamma_role()["subject"])
 
 
 def test_a_finding_prints_after_the_member_it_belongs_to(root: Path) -> None:
