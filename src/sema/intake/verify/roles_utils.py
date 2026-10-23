@@ -8,7 +8,7 @@ the spec role models.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from pydantic import BaseModel
@@ -17,15 +17,21 @@ from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import RelationRef, StatusRole
 from sema.intake import lexicon
 from sema.intake.eligibility_spec_utils import VALUE_SETS
-from sema.intake.eligibility_text_utils import CODE_LISTS, CONCEPTS
-from sema.intake.eligibility_utils import ARRAY_TYPE_MARKERS, DISPLAY_NULL_RATE
+from sema.intake.eligibility_text_utils import CODE_LISTS, CONCEPTS, STAGE
+from sema.intake.eligibility_utils import (
+    ARRAY_TYPE_MARKERS,
+    DISPLAY_NULL_RATE,
+    RoleEligibility,
+    scope_of,
+    subject_of,
+)
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import TEXT_TYPE, RelationProfile, sql_string
 from sema.intake.shapes import entity_model
 from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR, is_text
 from sema.intake.shapes.base_utils import failure
 from sema.intake.structure_hint_utils import KEY_ROLE, SECTION_SEPARATOR
-from sema.intake.verify.base import Failure, Finding
+from sema.intake.verify.base import Ambiguity, Failure, Finding
 
 IDENTITY_UNIQUE = f"{KEY_ROLE}_unique"
 CODE_UNIQUE = "code_unique"
@@ -34,6 +40,8 @@ STATUS_VALUES = "status_values"
 VALID_DATES = "valid_dates"
 REPLACED_BY_RESOLVES = "replaced_by_resolves"
 LANG_TAGS = "lang_tags"
+UNVERIFIABLE = "unverifiable"
+UNVERIFIABLE_STATUS = "status values are unverifiable: {}"
 VALUE_CHECKS = (
     IDENTITY_UNIQUE,
     CODE_UNIQUE,
@@ -282,3 +290,38 @@ def _synonyms_shape(
     if is_text(column) or any(marker in kind for marker in ARRAY_TYPE_MARKERS):
         return []
     return [failure(SYNONYMS_SHAPE, section.relation.name, column.name, type=column.type)]
+
+
+def marked_unverifiable(
+    listed: Sequence[Ambiguity],
+    eligibilities: Iterable[RoleEligibility],
+    unread: Mapping[str, str],
+) -> list[Ambiguity]:
+    """Each bound status whose values the policy kept unread carries the mark and the reason
+    on its entry, settled; code settled it with no entry, so one is added. Idempotent."""
+    marks = {
+        subject_of(e): (e, UNVERIFIABLE_STATUS.format(unread[scope_of(e.relation, e.section)]))
+        for e in eligibilities
+        if e.role == lexicon.STATUS_ROLE and e.subject is None and e.column is not None
+        and scope_of(e.relation, e.section) in unread
+    }
+    found = [_marked(a, marks[a.subject][1]) if a.subject in marks else a for a in listed]
+    present = {a.subject for a in listed}
+    found += [
+        Ambiguity(
+            stage=STAGE, subject=subject, members=(str(e.column),), hints=(UNVERIFIABLE,),
+            choice=e.column, confidence=e.confidence, source=e.source or "code", reason=reason,
+        )
+        for subject, (e, reason) in marks.items()
+        if subject not in present
+    ]
+    return found
+
+
+def _marked(entry: Ambiguity, reason: str) -> Ambiguity:
+    hints = entry.hints if UNVERIFIABLE in entry.hints else (*entry.hints, UNVERIFIABLE)
+    if entry.reason is None or reason in entry.reason:
+        joined = entry.reason or reason
+    else:
+        joined = f"{entry.reason}; {reason}"
+    return entry.model_copy(update={"hints": hints, "reason": joined})

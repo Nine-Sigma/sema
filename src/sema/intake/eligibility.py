@@ -67,6 +67,7 @@ from sema.intake.shapes import entity_model
 from sema.intake.shapes.base import RelationProfile, SlotBinding
 from sema.intake.structure import StructureResult
 from sema.intake.verify.base import Ambiguity
+from sema.intake.verify.roles_utils import marked_unverifiable
 from sema.log import logger
 
 __all__ = [
@@ -167,7 +168,7 @@ def run_roles(
     statuses, unverifiable = _statuses(found, by_name, tools, stated)
     return RolesResult(
         eligibilities=(*found, *references),
-        ambiguities=tuple(listed),
+        ambiguities=tuple(marked_unverifiable(listed, found, unverifiable)),
         joins=tuple(joins),
         headers=headers,
         structure=resolved,

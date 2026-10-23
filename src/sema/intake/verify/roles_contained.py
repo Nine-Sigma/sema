@@ -3,8 +3,7 @@
 ``fk_entity`` must be contained in the entity column and ``fk_property`` in the property
 column (``lexicon.CONTAINED_IN``). Each check is a count over the relation, so no value is
 read and the check runs under ``metadata_only``. Values compare trimmed and case-folded,
-because identifier case varies between a dictionary's own columns. ``contained_columns``
-comes from the S4 work-in-progress patch (S5 decision 2), where it was a member gate.
+because identifier case varies between a dictionary's own columns.
 """
 
 from __future__ import annotations
@@ -15,7 +14,6 @@ from sema.binding.spec_sections import RelationRef
 from sema.intake import lexicon
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import TEXT_TYPE
-from sema.intake.shapes.base import RelationProfile
 from sema.intake.shapes.base_utils import failure
 from sema.intake.verify.base import Failure
 
@@ -41,18 +39,6 @@ def containment_failures(
                 failure(CONTAINED, ref.name, column, role=role, into=target, outside=outside)
             )
     return failures
-
-
-def contained_columns(
-    tools: ProfileTools, profile: RelationProfile, target: str
-) -> tuple[str, ...]:
-    """Filled columns other than ``target`` with no value outside ``target``'s values."""
-    candidates = [
-        column.name for column in profile.columns
-        if column.name != target and column.distinct_count > 0
-    ]
-    counts = outside_counts(tools, profile.ref, target, candidates)
-    return tuple(name for name, count in zip(candidates, counts, strict=True) if count == 0)
 
 
 def outside_counts(

@@ -74,6 +74,7 @@ from sema.intake.structure import BoundEntry, StructureResult
 from sema.intake.structure_utils import describe_failure
 from sema.intake.verify.base import Ambiguity, Failure
 from sema.intake.verify.roles import COLUMN_EXISTS, ROLE_CHECKS, verify_roles
+from sema.intake.verify.roles_utils import marked_unverifiable
 from sema.intake.verify.structure import verify_structure
 from sema.llm_client import LLMStageError
 from sema.log import logger
@@ -251,8 +252,9 @@ def resolve_roles(
         len(asks), len(references), len(run.recorded), len(run.left), len(run.contested),
     )
     asked = (*asks, *references)
-    entries = tuple(recorded_entry(run, a, asked) for a in result.ambiguities)
-    return replace(result, ambiguities=entries, disagreements=run.disagreements)
+    entries = [recorded_entry(run, a, asked) for a in result.ambiguities]
+    marked = marked_unverifiable(entries, result.eligibilities, result.unverifiable)
+    return replace(result, ambiguities=tuple(marked), disagreements=run.disagreements)
 
 
 def _settle_roles(run: RolesRun, ask: RoleAsk, max_retries: int) -> None:

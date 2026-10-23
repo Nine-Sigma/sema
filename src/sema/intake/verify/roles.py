@@ -21,7 +21,7 @@ from sema.intake import lexicon
 from sema.intake.eligibility import ambiguities
 from sema.intake.eligibility_spec_utils import RolesResult
 from sema.intake.eligibility_text_utils import STAGE, VOCABULARY_ROLE
-from sema.intake.eligibility_utils import RoleEligibility, fact_of, scope_of, subject_of
+from sema.intake.eligibility_utils import RoleEligibility, fact_of
 from sema.intake.profile import SAMPLE_CAP, ProfileTools, ValueSample
 from sema.intake.shapes import filled_sections
 from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR
@@ -37,10 +37,12 @@ from sema.intake.verify.roles_chosen_utils import (
 from sema.intake.verify.roles_contained import CONTAINED, containment_failures
 from sema.intake.verify.roles_utils import (
     GROUP_KEY_ROLES,
+    UNVERIFIABLE,
     VALUE_CHECKS,
     BoundSection,
     bound_sections,
     constant_group_key,
+    marked_unverifiable,
     role_columns,
     value_failures,
     value_findings,
@@ -71,8 +73,6 @@ FLOORS: dict[str, FloorValue] = {
 ROLE_CHECKS = (
     COLUMN_EXISTS, IN_ELIGIBILITY_SET, ONE_ROLE_PER_COLUMN, CONTAINED, *VALUE_CHECKS
 )
-UNVERIFIABLE = "unverifiable"
-UNVERIFIABLE_STATUS = "status values are unverifiable: {}"
 MAPPINGS = section_of(MappingsSpec)
 
 
@@ -90,7 +90,7 @@ def verify_roles(
         failure(REQUIRED_ROLES_BOUND, e.relation, role=e.role, source=e.source or "")
         for e in closed_required(roles)
     ]
-    listed: list[Ambiguity] = [*roles.ambiguities, *_unverifiable_statuses(roles)]
+    listed = marked_unverifiable(roles.ambiguities, roles.eligibilities, roles.unverifiable)
     sections = chosen_sections(roles, relations) if relations else []
     if spec is not None:
         failures += _required_failures(roles.structure, spec)
@@ -120,20 +120,6 @@ def _section_role_failures(
     return failures + value_failures(section, profile, tools), value_findings(
         section, profile, tools
     )
-
-
-def _unverifiable_statuses(roles: RolesResult) -> list[Ambiguity]:
-    """Each bound status whose values the policy kept unread, listed for Review."""
-    return [
-        Ambiguity(
-            stage=STAGE, subject=subject_of(e), members=(str(e.column),),
-            hints=(UNVERIFIABLE,),
-            reason=UNVERIFIABLE_STATUS.format(roles.unverifiable[scope_of(e.relation, e.section)]),
-        )
-        for e in roles.eligibilities
-        if e.role == lexicon.STATUS_ROLE and e.subject is None and e.column is not None
-        and scope_of(e.relation, e.section) in roles.unverifiable
-    ]
 
 
 def _section_failures(structure: StructureResult) -> list[Failure]:
