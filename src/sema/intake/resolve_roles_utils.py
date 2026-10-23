@@ -304,8 +304,11 @@ def fitted_roles_prompt(
     roles: RolesResult,
     evidence: RoleEvidence,
     failed: Sequence[Sequence[str]],
+    *,
+    shuffled: bool = False,
 ) -> str:
-    """The Roles prompt, compacted only as far as the budget needs."""
+    """The Roles prompt, compacted only as far as the budget needs; ``shuffled`` is the
+    second ask of an agreement pair."""
     claims = claim_lines(in_force(roles, ask.relation))
     if ask.references:
         fields = "\n\n".join(_entry(index, entry) for index, entry in enumerate(ask.entries))
@@ -314,7 +317,7 @@ def fitted_roles_prompt(
         fields = _map_lines(ask, map_entries(roles, ask.relation), width)
     return fitted(
         lambda compaction: render_roles_prompt(
-            ask.relation, claims, evidence.render(compaction), fields, failed
+            ask.relation, claims, evidence.render(compaction, shuffled=shuffled), fields, failed
         ),
         ask.output_model(),
     )
@@ -374,5 +377,5 @@ def map_roles(ask: RoleAsk) -> dict[str, str]:
     return {found.subject: found.role for found in ask.fields()}
 
 
-def ranked_first(members: Iterable[str], first: str) -> tuple[str, ...]:
-    return (first, *(member for member in members if member != first))
+def ranked_first(members: Iterable[str], first: Sequence[str]) -> tuple[str, ...]:
+    return (*first, *(member for member in members if member not in first))

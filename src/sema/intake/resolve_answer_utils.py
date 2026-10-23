@@ -3,7 +3,8 @@
 ``RolesRun`` holds the choices accepted so far and why each other entry stays open. A role
 map answer states a choice for each open role; a lexicon claim answered with another
 column is contested and opens with both answers (S5 decision 18c); a claim code, memory,
-or a decision settled is kept whatever the map says.
+or a decision settled is kept whatever the map says. Under agreement two answers merge
+per subject first (``resolve_agreement_utils``).
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from sema.intake.eligibility_utils import (
 from sema.intake.model_calls import ModelCalls
 from sema.intake.output_models_utils import ABSTAIN, NONE, Choice
 from sema.intake.profile import ProfileTools
+from sema.intake.resolve_agreement_utils import AGREED, Agreement, Reading
 from sema.intake.resolve_roles_utils import RoleAsk, ranked_first, unasked_reason
 from sema.intake.shapes.base import RelationProfile
 from sema.intake.structure import StructureResult
@@ -36,8 +38,9 @@ CONTESTED = "contested: the lexicon claims `{}`; the model names `{}` ({})"
 @dataclass
 class RolesRun:
     """Choices accepted so far by subject, with each one's call key, reason, and findings;
-    the reason every entry the model left open stays open, the model's choice ranked first
-    on each it failed, and each contested lexicon claim."""
+    the reason every entry the model left open stays open, the answers ranked first on
+    each it failed or the two asks disagreed on, each contested lexicon claim, the subjects
+    two asks agreed on, and each relation's disagreement count."""
 
     structure: StructureResult
     profiles: list[RelationProfile]
@@ -48,9 +51,11 @@ class RolesRun:
     accepted: dict[str, StatedChoice] = field(default_factory=dict)
     recorded: dict[str, tuple[str, str]] = field(default_factory=dict)
     left: dict[str, str] = field(default_factory=dict)
-    ranked: dict[str, str] = field(default_factory=dict)
+    ranked: dict[str, tuple[str, ...]] = field(default_factory=dict)
     findings: dict[str, tuple[str, ...]] = field(default_factory=dict)
     contested: dict[str, str] = field(default_factory=dict)
+    agreed: set[str] = field(default_factory=set)
+    disagreements: dict[str, int] = field(default_factory=dict)
 
     def roles(
         self,
@@ -66,12 +71,19 @@ class RolesRun:
     def accept(self, attempt: RoleAttempt, stated: Mapping[str, StatedChoice]) -> None:
         self.accepted.update(stated)
         self.contested.update(attempt.contested)
+        self.agreed.update(attempt.agreed & stated.keys())
+        self.ranked.update(attempt.disagreed)
         for subject, reason in attempt.reasons.items():
             if subject in stated:
                 self.recorded[subject] = (attempt.key, reason)
                 self.findings[subject] = attempt.findings.get(subject, ())
             elif subject not in attempt.stated:
                 self.left[subject] = reason
+
+    def disagree(self, relation: str, attempt: RoleAttempt) -> None:
+        if self.calls.agreement:
+            count = self.disagreements.get(relation, 0)
+            self.disagreements[relation] = count + len(attempt.disagreed)
 
 
 @dataclass(frozen=True)
@@ -84,6 +96,30 @@ class RoleAttempt:
     contested: dict[str, str] = field(default_factory=dict)
     problem: str | None = None
     error: str | None = None
+    agreed: frozenset[str] = frozenset()
+    disagreed: dict[str, tuple[str, ...]] = field(default_factory=dict)
+
+    @classmethod
+    def merged(
+        cls,
+        agreement: Agreement,
+        key: str,
+        failures: tuple[Failure, ...],
+        findings: dict[str, tuple[str, ...]],
+    ) -> RoleAttempt:
+        found = agreement.reading
+        return cls(
+            found.stated, found.reasons, key, failures, findings, found.contested,
+            agreed=agreement.agreed, disagreed=agreement.disagreed,
+        )
+
+
+def read_answer(
+    ask: RoleAsk, entries: Mapping[str, RoleEligibility], choices: Sequence[Choice]
+) -> Reading:
+    if ask.references:
+        return Reading(*read_references(ask, choices))
+    return Reading(*read_map(ask, entries, choices))
 
 
 def read_references(
@@ -131,7 +167,10 @@ def recorded_entry(run: RolesRun, ambiguity: Ambiguity, asks: Sequence[RoleAsk])
     if ambiguity.source == MODEL and subject in run.recorded:
         key, reason = run.recorded[subject]
         hints = (*ambiguity.hints, *run.findings.get(subject, ()))
-        return ambiguity.model_copy(update={"call_key": key, "reason": reason, "hints": hints})
+        agreement = AGREED if subject in run.agreed else None
+        return ambiguity.model_copy(
+            update={"call_key": key, "reason": reason, "hints": hints, "agreement": agreement}
+        )
     if ambiguity.choice is None and subject in run.left:
         update: dict[str, object] = {"reason": run.left[subject]}
         if subject in run.ranked:

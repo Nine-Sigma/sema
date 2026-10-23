@@ -138,7 +138,8 @@ def wired_run(
     ledger = Ledger(root / "runs").run(run_id)
     registry = Registry(root / "registry.sqlite")
     registry.register(run_id, source="source-under-test", stage=STAGE)
-    calls = ModelCalls(client, ledger, registry, run_id, config or intake_config())
+    # Mocked answers are scripted one per ask; only the agreement tests turn the pair on.
+    calls = ModelCalls(client, ledger, registry, run_id, config or intake_config(agreement=False))
     return WiredRun(calls, client, ledger, registry, run_id)
 
 

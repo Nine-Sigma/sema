@@ -19,13 +19,14 @@ import yaml
 from sema.intake.eligibility_utils import RunDescriptor
 from sema.intake.ledger import CALLS_DIR
 from sema.intake.model_calls import IntakeProviderNotSetError
+from sema.intake.model_calls_utils import RECORDING_MANIFEST as MANIFEST_FILE
+from sema.intake.model_calls_utils import recorded_agreement
 from sema.intake.registry import RunRecord
 from sema.models.config import IntakeModelConfig
 
 REPO_ROOT = Path(__file__).parents[1]
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "intake"
 RECORDINGS_DIR = FIXTURES / "recordings"
-MANIFEST_FILE = "recording.json"
 RECORDING_PROVIDER = "openrouter"
 VERSION_PREFIX = "# prompt: "
 DESCRIPTOR_SUFFIX = ".run.yaml"
@@ -64,6 +65,17 @@ def check_provider(config: IntakeModelConfig) -> None:
     if config.provider != RECORDING_PROVIDER:
         raise ProviderRefusedError(
             f"recordings use provider {RECORDING_PROVIDER} only, not {config.provider}"
+        )
+
+
+def check_agreement(config: IntakeModelConfig, directory: Path) -> None:
+    """A replay makes the asks its recording made, so a flag the environment sets must
+    match the manifest; a flag left at its default follows the manifest."""
+    recorded = recorded_agreement(directory)
+    if "agreement" in config.model_fields_set and config.agreement != recorded:
+        raise ReplayMismatchError(
+            f"{directory.name}: the environment sets agreement {config.agreement}, the"
+            f" recording was made with agreement {recorded}"
         )
 
 
@@ -131,6 +143,7 @@ def write_manifest(
         "cost": row.cost,
         "approver": values.approver if values.asks else None,
         "value_asks": values.asks,
+        "agreement": config.agreement,
     }
     text = json.dumps(manifest, indent=2, sort_keys=False) + "\n"
     (directory / MANIFEST_FILE).write_text(text, encoding="utf-8")

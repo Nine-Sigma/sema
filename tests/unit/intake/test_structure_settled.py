@@ -191,7 +191,7 @@ def test_graph_run_with_a_model_settled_structure_reaches_review_with_a_spec(
     calls = client.invoke.call_count
 
     outcome = graph().approve(
-        run.run_id, root=tmp_path, config=intake_config(max_calls=WIDE_CAP),
+        run.run_id, root=tmp_path, config=intake_config(max_calls=WIDE_CAP, agreement=False),
         approver=APPROVER, client=client, decisions=path,
     )
 

@@ -214,7 +214,9 @@ class Watched:
     """A wired run whose every requested call key is kept."""
 
     def __init__(self, root: Path, client: MagicMock, run_id: str, **config: Any) -> None:
-        self.wired: WiredRun = wired_run(root / "calls", client, intake_config(**config), run_id)
+        # Mocked answers are scripted one per ask; only the agreement tests turn the pair on.
+        settings = intake_config(**{"agreement": False, **config})
+        self.wired: WiredRun = wired_run(root / "calls", client, settings, run_id)
         calls = self.wired.calls
         self._call = patch.object(calls, "call", wraps=calls.call)
         self.call = self._call.start()

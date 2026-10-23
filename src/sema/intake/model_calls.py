@@ -21,6 +21,7 @@ from sema.intake.model_calls_utils import (
     call_payload,
     prompt_tokens,
     read_recording,
+    recorded_agreement,
     step_errors,
     total_tokens,
 )
@@ -125,6 +126,11 @@ class ModelCalls:
         self._config = config
         self._warned_unpriced = False
         self.refused = False
+        # A replay follows its recording, whatever the environment says (S5 decision 17).
+        recordings = config.recordings_dir
+        self.agreement = (
+            config.agreement if recordings is None else recorded_agreement(recordings)
+        )
 
     def call_key(self, prompt: str, output_model: type[BaseModel]) -> str:
         return prompt_hash(self._config.model, prompt, output_model.__name__)

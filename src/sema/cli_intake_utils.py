@@ -311,7 +311,7 @@ def _entry_line(
 ) -> str:
     members = " > ".join(_member_text(entry, member) for member in ranked)
     parts = [head, f"members: {members}", f"hints: {'; '.join(entry['hints']) or NO_HINTS}"]
-    if AGREEMENT_KEY in entry:
+    if entry.get(AGREEMENT_KEY) is not None:
         parts.append(f"agreement: {entry[AGREEMENT_KEY]}")
     parts.extend(scores)
     if entry["reason"] is not None:

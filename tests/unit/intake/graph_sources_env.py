@@ -109,7 +109,8 @@ def discover_with(
         source,
         root=root,
         descriptor=descriptor,
-        config=intake_config(**(config or {})),
+        # Mocked answers are scripted one per ask; only the agreement tests turn the pair on.
+        config=intake_config(**{"agreement": False, **(config or {})}),
         client=client,
         **options,
     )

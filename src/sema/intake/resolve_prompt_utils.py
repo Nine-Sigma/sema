@@ -11,6 +11,9 @@ sample is rendered yet, so that step of the delta's order has nothing to drop.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import random
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
@@ -84,14 +87,15 @@ class RoleEvidence:
     def width(self, relation: str) -> int:
         return next((len(p.columns) for p in self.relations if p.ref.name == relation), 0)
 
-    def render(self, compaction: Compaction) -> str:
-        return "\n\n".join(self._relation(p, compaction) for p in self.relations)
+    def render(self, compaction: Compaction, *, shuffled: bool = False) -> str:
+        """``shuffled`` lists each relation's columns in its seeded order (S5 decision 4)."""
+        return "\n\n".join(self._relation(p, compaction, shuffled) for p in self.relations)
 
-    def _relation(self, profile: RelationProfile, compaction: Compaction) -> str:
+    def _relation(self, profile: RelationProfile, compaction: Compaction, shuffled: bool) -> str:
         lines = [f"### {profile.ref.name}", f"rows: {profile.row_count}", "columns:"]
         roles = self._roles() if profile.ref.name == self.asked else ()
         ranks = _ranks(self.entries) if roles else {}
-        for column in profile.columns:
+        for column in seeded_order(profile) if shuffled else profile.columns:
             facts = _facts(column, compaction)
             if roles and compaction.full_facts:
                 facts += _role_facts(column, roles, ranks.get(column.name, ()))
@@ -109,6 +113,17 @@ class RoleEvidence:
         known = {entry.name for entry in lexicon.ROLES}
         asked = {e.role for e in self.entries if e.relation == self.asked and e.subject is None}
         return tuple(name for name in (e.name for e in lexicon.ROLES) if name in asked & known)
+
+
+def seeded_order(profile: RelationProfile) -> tuple[ColumnProfile, ...]:
+    """The columns permuted by a seed from the relation signature's digest, so a relation
+    gets the same order on every run; a permutation that leaves the order as listed is
+    reversed, because the second ask must differ from the first to be a second reading."""
+    digest = hashlib.sha256(json.dumps(profile.signature).encode()).digest()
+    columns = list(profile.columns)
+    random.Random(int.from_bytes(digest, "big")).shuffle(columns)
+    ordered = tuple(columns)
+    return ordered[::-1] if ordered == profile.columns else ordered
 
 
 def _facts(column: ColumnProfile, compaction: Compaction) -> list[str]:

@@ -77,6 +77,7 @@ class IntakeModelConfig(BaseSettings):
     base_url: str | None = None
     use_structured_output: str = "auto"
     request_timeout: int = 120
+    agreement: bool = True
 
 
 class TracingConfig(BaseSettings):

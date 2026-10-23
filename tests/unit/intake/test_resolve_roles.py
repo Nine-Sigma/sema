@@ -247,7 +247,8 @@ def acris_run(env: Env, tmp_module: Path) -> AcrisRun:
     oracle_map = by_role(roles.eligibilities, first)
     client = answering(distinct({role: str(oracle_map[role].choice) for role in ENTITY_ROLES}))
     root = tmp_module / "acris_resolve"
-    wired = wired_run(root / "calls", client, intake_config(max_calls=ACRIS_CALL_BUDGET))
+    config = intake_config(max_calls=ACRIS_CALL_BUDGET, agreement=False)
+    wired = wired_run(root / "calls", client, config)
     tools = fresh_tools(source, root / "ledger", stage="roles", structure=env.a10)
     result = resolve().resolve_roles(
         opened(roles, set(dictionaries)), env.a10, source.land, tools, wired.calls

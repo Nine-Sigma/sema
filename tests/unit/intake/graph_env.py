@@ -194,7 +194,8 @@ def mixed_source(root: Path) -> Path:
 
 
 def settings(root: Path) -> dict[str, Any]:
-    return {"root": root, "config": intake_config(max_calls=MAX_CALLS)}
+    # Mocked answers are scripted one per ask; only the agreement tests turn the pair on.
+    return {"root": root, "config": intake_config(max_calls=MAX_CALLS, agreement=False)}
 
 
 @dataclass

@@ -162,7 +162,8 @@ def enrich_run(source: Path, root: Path, schema: str, stem: str) -> Iterator[Enr
         stages = run_stages(landed, descriptor, hint=hint)
         assert stages.spec is not None, "Roles assembled no spec from the hint"
         client = fake_engine_client()
-        config = intake_config(max_calls=MAX_CALLS)
+        # Mocked answers are scripted one per ask; only the agreement tests turn the pair on.
+        config = intake_config(max_calls=MAX_CALLS, agreement=False)
         calls = ModelCalls(client, landed.ledger, landed.registry, landed.run_id, config)
         yield EnrichRun(stages, descriptor, calls, client)
 

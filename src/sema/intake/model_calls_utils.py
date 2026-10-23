@@ -14,6 +14,8 @@ from sema.llm_client_utils import approx_tokens
 from sema.models.config import ModelPrice
 
 TOKENS_PER_PRICE_UNIT = 1000
+RECORDING_MANIFEST = "recording.json"
+AGREEMENT_FIELD = "agreement"
 
 
 def read_recording(recordings_dir: Path | None, key: str) -> dict[str, Any] | None:
@@ -25,6 +27,16 @@ def read_recording(recordings_dir: Path | None, key: str) -> dict[str, Any] | No
         return None
     record: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     return record
+
+
+def recorded_agreement(recordings_dir: Path) -> bool:
+    """The agreement flag a recording was made with; a manifest without it, or no
+    manifest, predates agreement and replays with one ask."""
+    path = recordings_dir / RECORDING_MANIFEST
+    if not path.is_file():
+        return False
+    manifest: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return bool(manifest.get(AGREEMENT_FIELD, False))
 
 
 def total_tokens(stats: InvocationStats) -> int:

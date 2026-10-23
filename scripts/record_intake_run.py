@@ -37,6 +37,7 @@ from scripts.record_intake_run_utils import (
     RecordingError,
     ReplayMismatchError,
     ValueApprovals,
+    check_agreement,
     check_provider,
     prepare,
     replace_calls,
@@ -225,6 +226,7 @@ def verify_replay(
     approver: str | None = None,
 ) -> intake_graph.RunOutcome:
     """A fresh run over the recording; a zero call cap makes any miss a refused call."""
+    check_agreement(config, recordings / source.name)
     replay = config.model_copy(
         update={"recordings_dir": recordings / source.name, "max_calls": 0}
     )

@@ -147,7 +147,7 @@ def test_a_run_stopped_by_the_budget_can_be_rejected_at_review(tmp_path: Path) -
 
 def _settle(run: GraphRun, cap: int, **options: object) -> object:
     return graph().approve(
-        run.run_id, root=run.root, config=intake_config(max_calls=cap),
+        run.run_id, root=run.root, config=intake_config(max_calls=cap, agreement=False),
         approver=APPROVER, client=run.client, **options,
     )
 
@@ -214,7 +214,7 @@ def _a2_settled(root: Path, cap: int) -> tuple[GraphRun, int]:
     run = discover_with(
         root, A2_WORKBOOK, A2_DESCRIPTOR, routed_client(), config={"max_calls": cap}
     )
-    through_values(run, config=intake_config(max_calls=cap))
+    through_values(run, config=intake_config(max_calls=cap, agreement=False))
     payload = run.outcome.payload
     opened = [e for e in payload["ambiguities"] if e["choice"] is None and e["source"] is None]
     assert opened and payload["spec"] is not None

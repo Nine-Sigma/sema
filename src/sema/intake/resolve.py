@@ -14,7 +14,9 @@ data fact is re-asked once with every failure listed, and then the failing roles
 open with the model's choice ranked first. A finding never fails a choice; it is recorded
 on the entry. A lexicon claim the model contests opens with both answers (decision 18c).
 Choices re-enter Roles as stated choices, so a relation sharing a signature inherits them
-with ``source: memory``. One retry serves every stage.
+with ``source: memory``. One retry serves every stage. With agreement on, each role ask
+is made twice, the second over the columns in the relation's seeded order; the two
+answers merge per role before the verifier runs (decisions 4 and 16).
 """
 
 from __future__ import annotations
@@ -36,11 +38,11 @@ from sema.intake.output_models import (
 )
 from sema.intake.profile import ProfileTools
 from sema.intake.resolve_budget_utils import fitted_structure_prompt
+from sema.intake.resolve_agreement_utils import Reading, agree
 from sema.intake.resolve_answer_utils import (
     RoleAttempt,
     RolesRun,
-    read_map,
-    read_references,
+    read_answer,
     recorded_entry,
 )
 from sema.intake.resolve_prompt_utils import RoleEvidence
@@ -250,7 +252,7 @@ def resolve_roles(
     )
     asked = (*asks, *references)
     entries = tuple(recorded_entry(run, a, asked) for a in result.ambiguities)
-    return replace(result, ambiguities=entries)
+    return replace(result, ambiguities=entries, disagreements=run.disagreements)
 
 
 def _settle_roles(run: RolesRun, ask: RoleAsk, max_retries: int) -> None:
@@ -261,8 +263,12 @@ def _settle_roles(run: RolesRun, ask: RoleAsk, max_retries: int) -> None:
     evidence = RoleEvidence(run.tools, relations, ask.relation, list(entries.values()))
 
     def _ask(failed: Sequence[Sequence[str]]) -> RoleAttempt:
-        prompt = fitted_roles_prompt(ask, current, evidence, failed)
-        return _ask_roles(run, ask, entries, prompt)
+        orders = (False, True) if run.calls.agreement else (False,)
+        prompts = [
+            fitted_roles_prompt(ask, current, evidence, failed, shuffled=shuffled)
+            for shuffled in orders
+        ]
+        return _ask_roles(run, ask, entries, prompts)
 
     attempt, passed = retried(
         _ask,
@@ -270,6 +276,7 @@ def _settle_roles(run: RolesRun, ask: RoleAsk, max_retries: int) -> None:
         max_retries,
         ended=lambda found: found.error is not None,
     )
+    run.disagree(ask.relation, attempt)
     if passed:
         run.accept(attempt, attempt.stated)
         return
@@ -277,24 +284,27 @@ def _settle_roles(run: RolesRun, ask: RoleAsk, max_retries: int) -> None:
 
 
 def _ask_roles(
-    run: RolesRun, ask: RoleAsk, entries: Mapping[str, RoleEligibility], prompt: str
+    run: RolesRun, ask: RoleAsk, entries: Mapping[str, RoleEligibility], prompts: Sequence[str]
 ) -> RoleAttempt:
+    """One answer per prompt, merged; the entry records the first ask's call key."""
     output_model = ask.output_model()
-    key = run.calls.call_key(prompt, output_model)
-    try:
-        answer = run.calls.call(ROLES_STAGE, prompt, output_model)
-    except LLMStageError as error:
-        logger.warning(f"Roles call {key} for {ask.relation} failed: {error}")
-        return RoleAttempt({}, {}, key, problem=CALL_FAILED, error=str(error))
-    choices = ask.choices(answer)
-    if choices is None:
-        return RoleAttempt({}, {}, key, problem=MISALIGNED)
-    if ask.references:
-        stated, reasons, contested = read_references(ask, choices)
-    else:
-        stated, reasons, contested = read_map(ask, entries, choices)
-    failures, findings = _verified(run, ask, stated, contested)
-    return RoleAttempt(stated, reasons, key, failures, findings, contested)
+    key = run.calls.call_key(prompts[0], output_model)
+    readings: list[Reading] = []
+    for prompt in prompts:
+        try:
+            answer = run.calls.call(ROLES_STAGE, prompt, output_model)
+        except LLMStageError as error:
+            logger.warning(f"Roles call {key} for {ask.relation} failed: {error}")
+            return RoleAttempt({}, {}, key, problem=CALL_FAILED, error=str(error))
+        choices = ask.choices(answer)
+        if choices is None:
+            return RoleAttempt({}, {}, key, problem=MISALIGNED)
+        readings.append(read_answer(ask, entries, choices))
+    members = {entry.subject: entry.ambiguity.members for entry in ask.entries}
+    agreement = agree(readings, members)
+    found = agreement.reading
+    failures, findings = _verified(run, ask, found.stated, found.contested)
+    return RoleAttempt.merged(agreement, key, failures, findings)
 
 
 def _verified(
@@ -354,7 +364,7 @@ def _leave_roles_open(run: RolesRun, ask: RoleAsk, attempt: RoleAttempt) -> None
                 continue
             run.left[subject] = "; ".join(dict.fromkeys(map(describe_failure, failing)))
             if any(f.check != COLUMN_EXISTS for f in failing):
-                run.ranked[subject] = choice.choice
+                run.ranked[subject] = (choice.choice,)
             del stated[subject]
         failures, _ = _verified(run, ask, stated, attempt.contested)
     logger.info(

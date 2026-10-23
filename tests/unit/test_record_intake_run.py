@@ -78,7 +78,7 @@ SOURCE_PATHS = {
     "a10": FIXTURES / "acris",
 }
 MANIFEST_KEYS = {"source", "provider", "model", "prompt_versions", "calls", "tokens", "cost",
-                 "approver", "value_asks"}
+                 "approver", "value_asks", "agreement"}
 FORBIDDEN_ENTRIES = ("approve", "approve_values", "reject", "resume")
 VERSION_PREFIX = "# prompt: "
 
@@ -226,7 +226,7 @@ def test_manifest_states_the_model_provider_versions_and_spend(
 
     assert set(manifest) == MANIFEST_KEYS and manifest == rec.manifest
     assert (manifest["source"], manifest["provider"]) == ("code_tables", "openrouter")
-    assert manifest["model"] == MODEL
+    assert (manifest["model"], manifest["agreement"]) == (MODEL, True)
     assert manifest["prompt_versions"] == sorted({p.removeprefix(VERSION_PREFIX) for p in prompts})
     assert "structure v1" in manifest["prompt_versions"]
     assert manifest["calls"] == len(prompts) == row.model_calls

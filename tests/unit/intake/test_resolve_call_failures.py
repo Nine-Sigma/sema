@@ -132,7 +132,8 @@ class Watched:
 def watched(
     root: Path, client: MagicMock, *, config: Any | None = None, run_id: str = "run-a"
 ) -> Watched:
-    return Watched(root, client, config or intake_config(), run_id)
+    # Mocked answers are scripted one per ask; only the agreement tests turn the pair on.
+    return Watched(root, client, config or intake_config(agreement=False), run_id)
 
 
 @pytest.fixture(scope="module")
