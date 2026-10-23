@@ -71,6 +71,7 @@ from tests.unit.cli_intake_env import (
 )
 from tests.unit.intake.decisions_env import (
     flat_list,
+    hand_written_domains,
     hand_written_roles,
     reviewer_choice,
     write_decisions,
@@ -193,12 +194,14 @@ def test_approve_with_an_edited_spec_presents_review_again_with_zero_calls(
     assert not (run.ledger_dir / "import").exists()
 
 
-def _reviewed(entry: Any, stated: dict[str, dict[str, str]]) -> str | None:
+def _reviewed(
+    entry: Any, stated: dict[str, dict[str, str]], domains: dict[str, str]
+) -> str | None:
     """The reviewer's choice; a code list the hand-written spec lists feeds its section."""
     relation, _, role = entry.subject.rpartition(".")
     if role == SECTION and relation in stated and CODE_LISTS in entry.members:
         return CODE_LISTS
-    return reviewer_choice(entry, stated)
+    return reviewer_choice(entry, stated, domains)
 
 
 def test_decisions_settle_open_entries_and_a_later_approve_imports(cli: Cli) -> None:
@@ -215,8 +218,10 @@ def test_decisions_settle_open_entries_and_a_later_approve_imports(cli: Cli) -> 
     assert open_listed(run, STRUCTURE) == []
     bound = [entry["source"] for entry in run.artifact("structure")["bound"]]
     assert bound.count(HUMAN) == len(structure)
-    stated = hand_written_roles()
-    chosen = [(entry.subject, _reviewed(entry, stated)) for entry in open_listed(run, ROLES)]
+    stated, domains = hand_written_roles(), hand_written_domains()
+    chosen = [
+        (entry.subject, _reviewed(entry, stated, domains)) for entry in open_listed(run, ROLES)
+    ]
     rows = [(ROLES, subject, choice) for subject, choice in chosen if choice is not None]
     assert rows
     second = decide(cli, run, rows, "roles.decisions.yaml")

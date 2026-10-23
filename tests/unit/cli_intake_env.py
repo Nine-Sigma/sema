@@ -15,13 +15,16 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from itertools import takewhile
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+import yaml
 from click.testing import CliRunner, Result
 
+from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
 from sema.intake.ledger import Ledger
 from sema.intake.metrics import RunMetrics
 from sema.intake.registry import Registry
@@ -260,3 +263,44 @@ def ok_or_raise(result: Result) -> Any:
         raise result.exception
     assert result.exit_code == 0, result.output
     return json.loads(result.stdout)
+
+
+SPEC_FILE = "spec.yaml"
+SPEC_PATH_KEY = "spec_path"
+DEFAULT_SPECS_DIR = "specs"
+
+
+def descriptor_id(descriptor: Path) -> str:
+    return str(yaml.safe_load(descriptor.read_text())["id"])
+
+
+def default_specs_dir(cli: Cli) -> Path:
+    """The default spec output folder: ``specs`` beside the ledger root ``.sema/intake``."""
+    return cli.root.parent / DEFAULT_SPECS_DIR
+
+
+def spec_file(out: Path, descriptor: Path) -> Path:
+    return out / descriptor_id(descriptor) / SPEC_FILE
+
+
+def files_under(directory: Path) -> list[Path]:
+    return sorted(path for path in directory.rglob("*") if path.is_file())
+
+
+def header_of(path: Path) -> str:
+    """The comment lines the written spec opens with."""
+    lines = path.read_text().splitlines()
+    header = list(takewhile(lambda line: line.startswith("#"), lines))
+    assert header, f"{path} opens with no header comment"
+    return "\n".join(header)
+
+
+def printed_path(printed: dict[str, Any]) -> Path:
+    return Path(printed[SPEC_PATH_KEY]).resolve()
+
+
+def same_spec(written: Path, artifact: Any) -> bool:
+    """The written file loads, with the project's loader, to the ledger's ``spec`` artifact."""
+    loaded = load_concept_source_spec(written)
+    held = ConceptSourceSpec.model_validate(artifact, context={"base_dir": written.parent})
+    return bool(loaded.model_dump(mode="json") == held.model_dump(mode="json"))

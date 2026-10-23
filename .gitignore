@@ -57,3 +57,4 @@ graphify-out/
 .agents/
 .impeccable/
 skills-lock.json
+.sema/intake/

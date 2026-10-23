@@ -11,9 +11,16 @@ import click
 import yaml
 
 from sema import cli_factories
+from sema.binding.spec import ConceptSourceSpec
 from sema.intake.decisions import load_decisions, validate_decisions
 from sema.intake.eligibility_utils import Embedder
-from sema.intake.graph_nodes import AMBIGUITY_SUFFIX, METRICS_ARTIFACT, WAITING
+from sema.intake.graph_nodes import (
+    AMBIGUITY_SUFFIX,
+    APPROVED,
+    METRICS_ARTIFACT,
+    SPEC_ARTIFACT,
+    WAITING,
+)
 from sema.intake.graph_stages import (
     LAND_ARTIFACT,
     REGISTRY_FILE,
@@ -28,6 +35,8 @@ from sema.log import logger
 from sema.models.config import EmbeddingConfig, IntakeModelConfig
 
 DEFAULT_ROOT = Path(".sema/intake")
+SPECS_DIR, SPEC_FILE, SPEC_PATH_KEY = "specs", "spec.yaml", "spec_path"
+IMPORTED = "imported"
 WAREHOUSE_FORM = "<catalog>.<schema>"
 WAREHOUSE_MEDIUM = "warehouse"
 DESCRIPTOR_GLOB = "*.run.yaml"
@@ -134,11 +143,21 @@ def check_decisions(root: Path, run_id: str, path: Path) -> None:
 
 
 def outcome_summary(
-    root: Path, run_id: str, node: str | None, payload: dict[str, Any] | None
+    root: Path,
+    run_id: str,
+    node: str | None,
+    payload: dict[str, Any] | None,
+    spec_path: Path | None = None,
 ) -> dict[str, Any]:
-    """What discover and approve print: where the run stopped and what waits there."""
+    """What discover and approve print: where the run stopped, what waits there, and the
+    spec file written, or null when the run holds no assembled spec."""
     record = registry_of(root).get(run_id)
-    printed: dict[str, Any] = {"run_id": run_id, "stopped_at": node, "status": record.status}
+    printed: dict[str, Any] = {
+        "run_id": run_id,
+        "stopped_at": node,
+        "status": record.status,
+        SPEC_PATH_KEY: None if spec_path is None else str(spec_path),
+    }
     if node == REVIEW and payload is not None:
         printed["open_entries"] = sum(1 for entry in payload["ambiguities"] if _is_open(entry))
         printed["run_metrics"] = read_metrics(root, run_id)
@@ -151,6 +170,36 @@ def _is_open(entry: dict[str, Any]) -> bool:
     return (
         entry["stage"] in OPEN_STAGES and entry["choice"] is None and entry["source"] is None
     )
+
+
+def written_status(
+    root: Path, run_id: str, node: str | None, payload: dict[str, Any] | None
+) -> str | None:
+    """The status a spec file is written with: Review holding a spec, or an import."""
+    status = registry_of(root).get(run_id).status
+    if node == REVIEW and payload is not None and payload.get("spec") is not None:
+        return status
+    if node is None and status == APPROVED:
+        return IMPORTED
+    return None
+
+
+def write_spec(root: Path, run_id: str, status: str, out: Path | None) -> Path:
+    """The run's ``spec`` artifact as ``<out>/<spec id>/spec.yaml``, after a header naming
+    the run, ``status``, and the source; the assembled spec's id is the descriptor id."""
+    artifact = root / run_id / ARTIFACTS_DIR / f"{SPEC_ARTIFACT}.json"
+    spec = ConceptSourceSpec.model_validate_json(artifact.read_text())
+    path = (out or root.parent / SPECS_DIR) / spec.id / SPEC_FILE
+    header = (
+        f"# run_id: {run_id}",
+        f"# status: {status}",
+        f"# source: {registry_of(root).get(run_id).source}",
+    )
+    body = {"concept_source": spec.model_dump(mode="json", by_alias=True, exclude_none=True)}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(header) + "\n" + yaml.safe_dump(body, sort_keys=False))
+    logger.info(f"Wrote the {status} spec of run {run_id} to {path}")
+    return path
 
 
 def landed_from_warehouse(root: Path, run_id: str) -> bool:

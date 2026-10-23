@@ -323,6 +323,8 @@ It stops at `value_ask`, requesting `status` of `land_a2.codes_a2__Values`. The 
 - `--decisions FILE` settles open entries, and `--spec FILE` re-enters with an edited spec.
 - `--reject` ends the run; it cannot be combined with `--spec`, `--decisions`, or `--values`.
 
+Both commands write the run's spec as YAML to `<out>/<descriptor id>/spec.yaml`: `discover`, or an `approve` that returns the run to Review, writes the spec it assembled, and an `approve` that imports writes the spec it imported. `--out DIR` names the folder; it defaults to `specs` beside the ledger root, so `.sema/specs` for the default root `.sema/intake`. The file opens with `#` comment lines naming the run id, the run's status at the write (`waiting_review` or `imported`), and the source; the YAML below them loads with `load_concept_source_spec`, so you can edit it and pass it back with `--spec`. A later run of the same descriptor replaces the file, and the run ledger keeps its `spec` artifact. The printed JSON carries `spec_path`, the written file, or null when the run holds no assembled spec, in which case nothing is written. `.sema/intake/` is ignored by git; `.sema/specs/` is not, so a reviewed spec can be committed.
+
 The A1 fixture reaches Review with open structure entries, and its committed decisions file settles them, with the same variables pointing at `tests/fixtures/intake/recordings/a1`:
 
 ```bash
@@ -332,7 +334,7 @@ uv run sema target approve <run id> --approver <name> --root /tmp/intake \
 uv run sema target approve <run id> --approver <name> --root /tmp/intake
 ```
 
-The second command returns the run to Review with `open_entries: 0`; the third imports it.
+The second command returns the run to Review with `open_entries: 0`; the third imports it. After the final approve, `.sema/specs/<descriptor id>/spec.yaml` holds the imported spec: `/tmp/specs/partner-standard-library/spec.yaml` here, since the ledger root is `/tmp/intake`.
 
 `sema target runs` lists the registry newest first, filtered by `--status`, `--stage`, or `--source`. Each row holds the run's stage, status, reason, approver, `model_calls`, `tokens`, and `cost_estimate`; the cost is an estimate from the price table. `--metrics RUN_ID` prints the run's `run_metrics`:
 
