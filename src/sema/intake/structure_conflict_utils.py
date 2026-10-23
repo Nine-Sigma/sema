@@ -2,7 +2,9 @@
 
 Assembly takes one binding per section, so two bindings filling the same section would
 leave a run with no open entry and no spec. Every relation of every such binding moves from
-bound to open instead, offering its own binding, so a reviewer keeps one and ignores the rest.
+bound to open instead, so a reviewer keeps one and ignores the rest. A relation an ask settled
+offers every member that ask offered, the settled choice first (decision 21), so a reviewer
+can choose a member the model rejected; one bound by code offers its own binding.
 """
 
 from __future__ import annotations
@@ -40,21 +42,33 @@ def _reasons(conflicts: dict[str, list[int]]) -> dict[int, str]:
     return {index: "; ".join(parts) for index, parts in found.items()}
 
 
+def _reopened(relation: str, bound: str, settled: Ambiguity | None, reason: str) -> Ambiguity:
+    """The settled entry, open again with its members ranked from the binding it settled on."""
+    if settled is None or bound not in settled.members:
+        return Ambiguity(stage=STAGE, subject=relation, members=(bound,), reason=reason)
+    others = tuple(m for m in settled.members if m != bound)
+    return settled.model_copy(update=dict(
+        members=(bound, *others), choice=None, confidence=None, source=None, call_key=None,
+        reason=reason,
+    ))
+
+
 def open_section_conflicts(structure: StructureResult) -> StructureResult:
     """Assembly takes one binding per section, so competing bindings go back to Review."""
     reasons = _reasons(_conflicts(structure.bound))
     if not reasons:
         return structure
+    settled = {entry.subject: entry for entry in structure.settled if entry.stage == STAGE}
     reopened = [
-        Ambiguity(
-            stage=STAGE,
-            subject=relation,
-            members=(member(structure.bound[index].binding),),
-            reason=reason,
-        )
+        _reopened(relation, member(entry.binding), settled.get(relation), reason)
         for index, reason in sorted(reasons.items())
-        for relation in structure.bound[index].binding.relations
+        for entry in (structure.bound[index],)
+        for relation in entry.binding.relations
     ]
-    kept = tuple(e for i, e in enumerate(structure.bound) if i not in reasons)
-    update = {"bound": kept, "ambiguities": (*structure.ambiguities, *reopened)}
+    moved = {entry.subject for entry in reopened}
+    update = {
+        "bound": tuple(e for i, e in enumerate(structure.bound) if i not in reasons),
+        "ambiguities": (*structure.ambiguities, *reopened),
+        "settled": tuple(e for e in structure.settled if e.subject not in moved),
+    }
     return structure.model_copy(update=update)

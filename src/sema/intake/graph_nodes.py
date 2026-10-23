@@ -17,6 +17,7 @@ from sema.connectors.base import Connector
 from sema.intake.decisions import Decision, check_whole_bindings, offered, validate_decisions
 from sema.intake.eligibility import assemble_spec
 from sema.intake.enrichment import apply_enrichment
+from sema.intake.graph_review_utils import with_causes
 from sema.intake.graph_stages import (
     DECIDE,
     DRY_RUN,
@@ -195,7 +196,7 @@ class Nodes:
         """Writes what Review presents and returns its payload: open structure entries, then
         settled ones with their source, then role entries."""
         stages, update = self._enter(state, REVIEW)
-        current = stages.current(reviewed_of(state))
+        current = _presented(stages.current(reviewed_of(state)))
         listed = self._ambiguity_lists(stages, current, update)
         metrics = self._metrics(stages, state, current, update)
         ran = stages.dry_run(reviewed_of(state)) if DRY_RUN in state.get("reached", []) else None
@@ -239,8 +240,8 @@ class Nodes:
         _write(stages, update, STRUCTURE_ARTIFACT, current.structure)
         if current.spec is not None and (reviewed.spec_path is None or reviewed.decisions):
             _write(stages, update, SPEC_ARTIFACT, current.spec)
-        self._ambiguity_lists(stages, current, update)
-        self._metrics(stages, state, current, update)
+        self._ambiguity_lists(stages, _presented(current), update)
+        self._metrics(stages, state, _presented(current), update)
         update |= self._decided_verdicts(state, stages, current)
         return update | {"has_spec": current.spec is not None}
 
@@ -347,6 +348,13 @@ class Nodes:
         )
         _write(stages, update, METRICS_ARTIFACT, metrics)
         return metrics
+
+
+def _presented(current: Current) -> Current:
+    """With no spec, the entries naming each cause are open, so the metrics count them."""
+    if current.spec is not None or current.roles is None:
+        return current
+    return dataclasses.replace(current, roles=with_causes(current.roles))
 
 
 def _asking(state: IngestState, node: str, requests: Sequence[NeedsValues]) -> Update:

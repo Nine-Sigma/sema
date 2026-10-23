@@ -68,4 +68,5 @@ def run_metrics(
 
 
 def _open(ambiguities: Iterable[Ambiguity]) -> int:
-    return sum(1 for entry in ambiguities if entry.choice is None)
+    """Open as the reader counts it: a human ``none`` has no choice but a source."""
+    return sum(1 for entry in ambiguities if entry.choice is None and entry.source is None)

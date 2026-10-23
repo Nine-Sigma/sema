@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, TypedDict, cast, get_args
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, SerializeAsAny
 
 from sema.intake.decisions import Decision
 from sema.intake.enrichment import Enrichment
@@ -90,7 +90,8 @@ class AmbiguityList(BaseModel):
 
     stage: str
     count: int
-    ambiguities: tuple[Ambiguity, ...]
+    # A cause entry's ``cause`` key reaches the ledger, where the reader prints it.
+    ambiguities: tuple[SerializeAsAny[Ambiguity], ...]
 
 
 class DecisionsArtifact(BaseModel):

@@ -4,7 +4,8 @@ Pinned contract, read through what Review presents:
 
 - When two or more bound entries carry the same single-valued section (``concepts`` here),
   every relation of every such entry moves from bound to open: one structure entry per
-  relation, its members the binding's member alone, no choice and no source, and a reason
+  relation, its members the binding's member first (then every other member the ask that
+  settled it offered, decision 21), no choice and no source, and a reason
   naming the section and how many bindings fill it. ``run_metrics.open_structure`` counts
   them and no spec is presented.
 - Decisions that keep both bindings reopen them the same way; decisions that keep one by
@@ -145,7 +146,7 @@ def _open_structure(outcome: Any) -> list[dict[str, Any]]:
 def _assert_reopened(outcome: Any, expected: Listed, bindings: int) -> None:
     listed = _open_structure(outcome)
     assert outcome.node == "review"
-    assert {(a["subject"], tuple(a["members"])) for a in listed} == expected, listed
+    assert {(a["subject"], tuple(a["members"][:1])) for a in listed} == expected, listed
     for entry in listed:
         reason = str(entry["reason"])
         assert SECTION in reason and str(bindings) in reason, reason
