@@ -28,7 +28,7 @@ definitions CSV), so the fixture is the two files above.
 
 Fetched blind: no agent has opened these files (rule 13).
 
-added at commit: <filled at task 1.5 from git log>
+Commit: 3acf744 (test(intake): seal a fresh held-out source). It precedes every S5 commit that edits a rule, floor, lexicon entry, predicate, prompt, or view (S5 task 1.5, verified 2026-10-23: the five heldout5 no-hint legs fail with FileNotFoundError on the missing recording, the seven gate legs pass).
 
 Chosen on 2026-10-23 (S5 design decision 24,
 `docs/architecture/s5/heldout-candidates.md`). Axes on which it differs from
