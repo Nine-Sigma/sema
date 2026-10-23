@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import csv
 import glob
+import tempfile
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -42,12 +43,14 @@ from sema.intake.loaders.base import (
 )
 from sema.intake.loaders.tabular_utils import (
     HEADER_TESTS,
+    UTF8_CODEC,
     cell_text,
     choose_delimiter,
     column_names,
     column_type,
     convert,
     detect_header,
+    detect_text_encoding,
     occupied_width,
     positional_names,
 )
@@ -174,9 +177,12 @@ def _xlsx_rows(sheet: _Sheet) -> list[list[Any]]:
 
 def _csv_rows(path: Path) -> list[list[Any]]:
     """Row ``n`` starts on physical line ``n``: continuation lines become empty rows."""
-    delimiter, quote = _csv_dialect(path)
+    codec = detect_text_encoding(path)
+    if codec != UTF8_CODEC:
+        logger.info(f"{path.name}: decoding as {codec}")
+    delimiter, quote = _csv_dialect(path, codec)
     rows: list[list[Any]] = []
-    with path.open(newline="", encoding="utf-8-sig") as handle:
+    with path.open(newline="", encoding=codec) as handle:
         reader = csv.reader(handle, delimiter=delimiter, quotechar=quote)
         start = 1
         for record in reader:
@@ -186,21 +192,19 @@ def _csv_rows(path: Path) -> list[list[Any]]:
     return rows
 
 
-def _csv_dialect(path: Path) -> tuple[str, str]:
+def _csv_dialect(path: Path, codec: str | None = None) -> tuple[str, str]:
     """The sniffed dialect, unless its delimiter splits no row.
 
     ``sniff_csv`` can return a delimiter absent from every row when rows differ
     in width; a replacement must split most rows, so a one-column file whose few
     values hold a delimiter character stays one column.
     """
-    with duckdb.connect(":memory:") as con:
-        sniffed = con.execute(
-            "SELECT Delimiter, Quote FROM sniff_csv(?)", [str(path)]
-        ).fetchone()
+    codec = codec or detect_text_encoding(path)
+    sniffed = _sniff(path, codec)
     delimiter, quote = (str(sniffed[0]), str(sniffed[1])) if sniffed else (",", '"')
     delimiter = delimiter if len(delimiter) == 1 else ","
     quote = quote if len(quote) == 1 else '"'
-    with path.open(newline="", encoding="utf-8-sig") as handle:
+    with path.open(newline="", encoding=codec) as handle:
         lines = handle.readlines()
     chosen = choose_delimiter(lines, delimiter, CSV_DELIMITERS, quote)
     if chosen != delimiter:
@@ -208,6 +212,26 @@ def _csv_dialect(path: Path) -> tuple[str, str]:
             f"{path.name}: sniffed delimiter {delimiter!r} splits no row; using {chosen!r}"
         )
     return chosen, quote
+
+
+def _sniff(path: Path, codec: str) -> tuple[Any, ...] | None:
+    """DuckDB's sniff of ``path``, through a UTF-8 transcode when ``codec`` is not UTF-8.
+
+    DuckDB's Latin-1 rejects bytes 0x80-0x9F, so it is given no encoding name.
+    """
+    if codec == UTF8_CODEC:
+        return _sniff_utf8(path)
+    with tempfile.TemporaryDirectory() as directory:
+        transcoded = Path(directory) / path.name
+        transcoded.write_bytes(path.read_bytes().decode(codec).encode("utf-8"))
+        return _sniff_utf8(transcoded)
+
+
+def _sniff_utf8(path: Path) -> tuple[Any, ...] | None:
+    with duckdb.connect(":memory:") as con:
+        return con.execute(
+            "SELECT Delimiter, Quote FROM sniff_csv(?)", [str(path)]
+        ).fetchone()
 
 
 def _rows_data(rows: list[list[Any]], label: str) -> _SheetData:

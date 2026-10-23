@@ -1,4 +1,4 @@
-"""Pure helpers for the tabular loader: header detection and column typing.
+"""Helpers for the tabular loader: text encoding, header detection, column typing.
 
 A header is the first row, within the first ``HEADER_SCAN_ROWS``, where at least
 ``HEADER_MIN_STRING_RATIO`` of the cells are non-empty strings (trailing columns
@@ -9,16 +9,22 @@ as text.
 
 A column is numeric only when every text cell survives the round trip: ``1.10``
 and ``007`` stay text, because a code column must keep each code's identity.
+
+A text file's encoding comes from its bytes alone: a byte order mark wins, then
+the first strict decode among UTF-8 and Windows-1252, then Latin-1, which decodes
+every byte.
 """
 
 from __future__ import annotations
 
+import codecs
 import csv
 import math
 import re
 from collections import Counter
 from collections.abc import Sequence
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 HEADER_MIN_STRING_RATIO = 0.8
@@ -30,10 +36,33 @@ HEADER_TESTS = (
 )
 EMPTY_COLUMN_PREFIX = "_empty_"
 POSITIONAL_COLUMN_PREFIX = "_col_"
+UTF8_CODEC = "utf-8-sig"
+FALLBACK_CODEC = "latin-1"
 
 _INTEGER_TEXT = re.compile(r"^-?(0|[1-9]\d*)$")
 _BIGINT_RANGE = range(-(2**63), 2**63)
 _BOOL_TEXT = {"true": True, "false": False}
+_BYTE_ORDER_MARKS = (
+    (codecs.BOM_UTF8, UTF8_CODEC),
+    (codecs.BOM_UTF16_LE, "utf-16"),
+    (codecs.BOM_UTF16_BE, "utf-16"),
+)
+_STRICT_CODECS = (UTF8_CODEC, "cp1252")
+
+
+def detect_text_encoding(path: Path) -> str:
+    """The codec that decodes ``path``: BOM, strict UTF-8, strict cp1252, else Latin-1."""
+    data = path.read_bytes()
+    for mark, codec in _BYTE_ORDER_MARKS:
+        if data.startswith(mark):
+            return codec
+    for codec in _STRICT_CODECS:
+        try:
+            data.decode(codec)
+        except UnicodeDecodeError:
+            continue
+        return codec
+    return FALLBACK_CODEC
 
 
 def detect_header(rows: list[list[Any]]) -> int | None:

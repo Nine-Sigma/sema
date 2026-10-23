@@ -1,14 +1,19 @@
-"""Tabular loader: a sniffed CSV delimiter is kept only when it splits a row."""
+"""Tabular loader: a sniffed CSV delimiter is kept only when it splits a row.
+
+A CSV is decoded by the encoding its bytes declare or admit, not assumed UTF-8.
+"""
 
 from __future__ import annotations
 
 import csv
+from collections.abc import Sequence
 from pathlib import Path
 
 import duckdb
 import pytest
 
 from sema.ingest.duckdb_staging import Staging
+from sema.intake.loaders import tabular_utils
 
 pytestmark = pytest.mark.unit
 
@@ -239,3 +244,88 @@ def test_a_one_column_file_whose_minority_of_values_hold_a_delimiter_lands_one_c
     (column, _) = _column_names(result, "labels")
     assert column == "label" or not header
     assert (f"beta{separator} two",) in _rows(staging, "labels", [column])
+
+
+CRLF = "\r\n"
+UNDEFINED_IN_CP1252 = chr(0x81)
+WINDOWS_ROWS = [
+    ("code", "city", "price"),
+    ("Q1", "Québec", "€ 12"),
+    ("M2", "Montréal, centre", "€ 7"),
+    ("T3", "Trois-Rivières", "€ 3"),
+]
+LATIN_ROWS = [
+    ("code", "label"),
+    ("A1", f"mark{UNDEFINED_IN_CP1252}one"),
+    ("B2", "café, noir"),
+    ("C3", "crème"),
+]
+
+
+def _csv_text(rows: Sequence[tuple[str, ...]], newline: str = "\n") -> str:
+    def cell(value: str) -> str:
+        return f'"{value}"' if "," in value else value
+
+    return "".join(",".join(cell(value) for value in row) + newline for row in rows)
+
+
+def _write_bytes(tmp_path: Path, name: str, data: bytes) -> Path:
+    path = tmp_path / name
+    path.write_bytes(data)
+    return path
+
+
+@pytest.mark.parametrize(
+    ("data", "codec"),
+    [
+        (b"\xef\xbb\xbfcode,label\n", "utf-8-sig"),
+        ("code,label\n".encode("utf-16"), "utf-16"),
+        ("année,prix\n".encode("utf-8"), "utf-8-sig"),
+        ("price\n€ 12\n".encode("cp1252"), "cp1252"),
+        (f"label\nmark{UNDEFINED_IN_CP1252}one\n".encode("latin-1"), "latin-1"),
+    ],
+    ids=["utf8-bom", "utf16-bom", "utf8-plain", "cp1252", "latin1-fallback"],
+)
+def test_detect_text_encoding_follows_the_ladder(
+    tmp_path: Path, data: bytes, codec: str
+) -> None:
+    path = _write_bytes(tmp_path, "sample.csv", data)
+
+    assert tabular_utils.detect_text_encoding(path) == codec
+
+
+def _assert_lands_decoded(
+    path: Path, staging: Staging, rows: Sequence[tuple[str, ...]]
+) -> None:
+    header, *data = rows
+    relation = path.stem
+
+    result = _land(path, staging)
+
+    assert _column_names(result, relation) == [*header, "_sema_locator"]
+    assert result.relation(relation).header_row == 1
+    assert _rows(staging, relation, list(header)) == data
+
+
+def test_windows_1252_csv_lands_decoded(tmp_path: Path, staging: Staging) -> None:
+    data = _csv_text(WINDOWS_ROWS, CRLF).encode("cp1252")
+    assert b"\x80" in data and not data.startswith(b"\xef\xbb\xbf")
+    path = _write_bytes(tmp_path, "windows.csv", data)
+
+    _assert_lands_decoded(path, staging, WINDOWS_ROWS)
+
+
+def test_latin_1_csv_lands_through_the_fallback(tmp_path: Path, staging: Staging) -> None:
+    data = _csv_text(LATIN_ROWS, CRLF).encode("latin-1")
+    assert b"\x81" in data
+    path = _write_bytes(tmp_path, "latin.csv", data)
+
+    _assert_lands_decoded(path, staging, LATIN_ROWS)
+
+
+@pytest.mark.parametrize("codec", ["utf-8-sig", "utf-8"], ids=["bom", "plain"])
+def test_utf8_csvs_land_unchanged(tmp_path: Path, staging: Staging, codec: str) -> None:
+    rows = [("année", "label"), ("A1", "Québec"), ("B2", "€ 12, net"), ("C3", "Zürich")]
+    path = _write_bytes(tmp_path, "unicode.csv", _csv_text(rows).encode(codec))
+
+    _assert_lands_decoded(path, staging, rows)
