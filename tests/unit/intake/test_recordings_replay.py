@@ -16,6 +16,7 @@ import pytest
 
 from sema.models.config import ModelPrice
 from tests.unit.intake.model_calls_env import intake_config
+from tests.unit.intake.no_hint_env import KEYS_MOVED, keyed_param
 
 pytestmark = pytest.mark.unit
 
@@ -36,7 +37,7 @@ def _offline_client() -> MagicMock:
     return client
 
 
-@pytest.mark.parametrize("name", UNTOUCHED)
+@pytest.mark.parametrize("name", [keyed_param(name, KEYS_MOVED) for name in UNTOUCHED])
 def test_committed_recording_replays_with_zero_provider_calls(name: str, tmp_path: Path) -> None:
     recordings: Path = utils().RECORDINGS_DIR
     manifest = json.loads((recordings / name / "recording.json").read_text())
