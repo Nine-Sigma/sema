@@ -3,19 +3,16 @@
 Pinned contract (known-source misses F1, F2, F4, team lead 2026-10-21):
 
 - F1. Two open entries for the same role on one relation (a denormalized relation's
-  concept-side and value-set-side ``status``) each get their own enum field over their own
-  members, and each entry reads its own answer. A call with no repeated role renders the
-  same prompt under the same call key as before, so committed recordings still replay.
-- F2. No open role offers a column a deterministic claim (``code`` or ``lexicon``) holds on
-  the same relation, whatever the order the roles settle in; a model choice of such a
-  column fails ``one_role_per_column`` and the claim stays in force.
-- F4. An open ``<relation>.section`` entry is asked in its relation's roles call with its
-  members as the enum, also when it is the relation's only open entry; a stated model
-  choice settles the section through ``resolve_sections``; an abstention leaves it open
-  with the model's reason.
+  concept-side and value-set-side ``status``) each get their own role-map field, the
+  repeat qualified by section, and each entry reads its own answer (S5 decision 1).
+- F2. Every claim in force (``code`` or ``lexicon``) is stated in the prompt; a model
+  choice of a claimed column fails ``one_role_per_column`` and the claim stays in force.
+- F4. An open ``<relation>.section`` entry is asked in its relation's role map, also when
+  it is the relation's only open entry; a stated model choice settles the section through
+  ``resolve_sections``; an abstention leaves it open with the model's reason.
 
-The mocked model answers every enum field of the output model it is handed, so these tests
-read members and answers, never field names.
+The mocked model answers every field of the output model it is handed over the members
+its prompt states, keeping each claim in force.
 """
 
 from __future__ import annotations
@@ -27,16 +24,16 @@ from typing import Any
 import pytest
 
 from sema.intake.eligibility_utils import StatedChoice
-from sema.intake.ledger_utils import prompt_hash
-from sema.intake.output_models import ROLES_CHOICE
+from sema.intake.output_models import role_field
 from sema.intake.output_models_utils import ABSTAIN
 from sema.intake.verify.roles import ONE_ROLE_PER_COLUMN, verify_roles
-from tests.unit.intake.model_calls_env import MODEL
 from tests.unit.intake.resolve_roles_env import (
     MEMORY_TABLES,
     VALUE_TABLES,
     Synthetic,
+    asked_columns,
     distinct,
+    lines_with,
 )
 from tests.unit.intake.resolve_roles_env import answering as answering_roles
 from tests.unit.intake.resolve_roles_env import prompts as sent_prompts
@@ -63,8 +60,6 @@ from tests.unit.intake.role_entries_env import (
     denormalized,
     eligibility,
     entry,
-    enum_fields,
-    field_lines,
     offered,
     output_models,
     pinned,
@@ -80,12 +75,8 @@ pytestmark = pytest.mark.unit
 CONCEPTS, CODE_LISTS = "concepts", "code_lists"
 SECTION_MEMBERS = frozenset({CONCEPTS, CODE_LISTS})
 CONCEPT_STATUS, VALUE_STATUS = f"{CATALOG}.status", f"{CATALOG}.value_sets.status"
-# Call keys the synthetic sources below produced at 7b48f3d, before any of these fixes.
-MEMORY_KEYS = {
-    "35302b5dbe3b52fea9d3e061f2e9c5b0583ba7dfc4d138ced5b4e9a2eb077a9d",
-    "6ae566d7d831ec7b6dfaf9adb15c06b657b08c2833073901019b325b254a53c7",
-}
-VALUE_FIRST_KEY = "e666c60ccc16149a3046877a8b032e9bda008073ce4b791b7d9ec60d976e0092"
+STATUS_FIELDS = (role_field("status"), role_field("value_sets_status"))
+SECTION_FIELD = role_field("section")
 
 
 @pytest.fixture
@@ -130,17 +121,17 @@ def test_catalog_has_two_open_status_entries_with_different_members(
 ) -> None:
     """The fixture holds the collision: one role, two open entries, two member sets."""
     _, _, roles = catalog
+    concept = set(offered(entry(roles, CONCEPT_STATUS)))
+    value = set(offered(entry(roles, VALUE_STATUS)))
 
-    assert set(offered(entry(roles, CONCEPT_STATUS))) == {GROUP_BAND, NONE}
-    assert set(offered(entry(roles, VALUE_STATUS))) == {ITEM_BAND, NONE}
+    assert GROUP_BAND in concept and ITEM_BAND not in concept and NONE in concept
+    assert ITEM_BAND in value and GROUP_BAND not in value and NONE in value
     assert entry(roles, CONCEPT_STATUS).choice is None
     assert entry(roles, VALUE_STATUS).choice is None
 
 
 def _bands(field: str, members: tuple[str, ...]) -> str:
-    if GROUP_BAND in members:
-        return GROUP_BAND
-    return NONE if ITEM_BAND in members else ABSTAIN
+    return {STATUS_FIELDS[0]: GROUP_BAND, STATUS_FIELDS[1]: NONE}.get(field, ABSTAIN)
 
 
 def test_repeated_role_gets_one_field_per_entry_over_its_own_members(
@@ -152,11 +143,9 @@ def test_repeated_role_gets_one_field_per_entry_over_its_own_members(
     resolved(source, structure, roles, client, tmp_path)
 
     first = output_models(client)[0]
-    enums = sorted(sorted(members) for members in enum_fields(first).values())
-    assert enums == [sorted({GROUP_BAND, NONE}), sorted({ITEM_BAND, NONE})]
-    lines = field_lines(prompts(client)[0])
-    assert len(lines) == 2
-    assert len(set(lines)) == 2, lines
+    assert set(STATUS_FIELDS) <= set(first.model_fields)
+    lines = [lines_with(prompts(client)[0], f"`{field}`") for field in STATUS_FIELDS]
+    assert all(len(found) == 1 for found in lines), lines
 
 
 def test_each_repeated_role_entry_settles_from_its_own_answer(
@@ -176,18 +165,23 @@ def test_each_repeated_role_entry_settles_from_its_own_answer(
     assert client.invoke.call_count == 1
 
 
-def test_calls_without_a_repeated_role_keep_their_prompts_and_keys(tmp_path: Path) -> None:
-    """Guard: the recorded replay keys of a non-repeating call do not move."""
-    keys = {}
+def test_calls_without_a_repeated_role_settle_from_their_answers(tmp_path: Path) -> None:
+    """A non-repeating call asks one map per signature and each answer settles its role."""
+    asked = {}
     for name, tables in (("memory", MEMORY_TABLES), ("values", VALUE_TABLES)):
         built = Synthetic(tables, tmp_path / name)
         client = answering_roles(distinct({"display": "wim"}))
-        resolved(built.source, built.structure, built.roles, client, tmp_path / f"{name}_r")
-        keys[name] = [prompt_hash(MODEL, p, ROLES_CHOICE) for p in sent_prompts(client)]
+        result, _ = resolved(
+            built.source, built.structure, built.roles, client, tmp_path / f"{name}_r"
+        )
+        asked[name] = [asked_columns(p) for p in sent_prompts(client)], result
         built.close()
 
-    assert set(keys["memory"]) == MEMORY_KEYS
-    assert keys["values"][0] == VALUE_FIRST_KEY
+    memory, values = asked["memory"], asked["values"]
+    assert sorted(memory[0]) == [("tarn", "vell", "mox"), ("zorb", "quax")]
+    assert values[0] == [("kelt", "wim", "rusk")]
+    display = eligibility(values[1], "tq.eta", None, "display")
+    assert (display.choice, display.source) == ("wim", "model")
 
 
 # --- F2: claims in force are never offered ----------------------------------------------
@@ -203,13 +197,18 @@ def test_code_list_open_role_offers_no_column_a_deterministic_claim_holds(
 
     resolved(source, structure, roles, client, tmp_path)
 
-    for model in output_models(client):
-        for field, members in enum_fields(model).items():
-            assert not held & set(members), (field, members)
+    (prompt,) = prompts(client)
+    claimed = prompt.partition("## Claims in force")[2].partition("## ")[0]
+    for column in held:
+        assert f"`{column}`" in claimed, column
 
 
 def _claimed_first(held: set[str]) -> Any:
+    """A required role takes a claimed column; an optional one answers ``none``."""
+
     def _pick(field: str, members: tuple[str, ...]) -> str:
+        if NONE in members:
+            return NONE
         return next((m for m in members if m in held), ABSTAIN)
 
     return _pick
@@ -258,7 +257,7 @@ def _section_or_abstain(choice: str) -> Any:
 
 
 def _section_fields(model: Any) -> list[str]:
-    return [f for f, members in enum_fields(model).items() if set(members) == SECTION_MEMBERS]
+    return [f for f in model.model_fields if f == SECTION_FIELD]
 
 
 def test_open_section_entries_are_listed(unsectioned: tuple[Any, Any, Any]) -> None:
@@ -278,7 +277,10 @@ def test_open_section_is_asked_with_its_relations_open_roles(
 
     resolved(source, structure, roles, client, tmp_path)
 
-    loose_calls = [m for m in output_models(client) if len(enum_fields(m)) > 1]
+    loose_calls = [
+        m for m, p in zip(output_models(client), prompts(client), strict=True)
+        if "quax" in asked_columns(p)
+    ]
     assert loose_calls, "the relation's open column roles were not asked"
     assert len(_section_fields(loose_calls[0])) == 1
 
@@ -296,8 +298,11 @@ def test_open_section_alone_is_still_asked(
 
     resolved(source, structure, roles, client, tmp_path)
 
-    sections_only = [m for m in output_models(client) if list(enum_fields(m)) == _section_fields(m)]
-    assert len(sections_only) == 1
+    plain_calls = [
+        m for m, p in zip(output_models(client), prompts(client), strict=True)
+        if "plain_code" in asked_columns(p)
+    ]
+    assert len(plain_calls) == 1 and _section_fields(plain_calls[0])
 
 
 def test_stated_section_choice_settles_the_binding(

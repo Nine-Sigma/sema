@@ -6,13 +6,14 @@ Pinned rules:
   (``FieldInfo.is_required()``); a relation whose section is still open targets both
   concept and code-list roles, so a role either requires stays required.
 - Eligibility adds ``lexicon.NO_REFERENCE`` (``none``) as the last member of every optional
-  column role, never of a required one. The roles output model enumerates members plus
-  ``abstain``, so ``none`` becomes answerable.
-- ``none`` counts as a member. One candidate column plus ``none`` is two members, so the
-  one-member rule (``source: code``) does not apply and, with no hint, the role is an
-  open ambiguity entry; a lexicon hit still settles it (hints run in the fixed order). An
-  optional role with no candidate column has the one member ``none`` and settles on it
-  with ``source: code``, listing no entry.
+  column role, never of a required one. Every column is a member (S5 decision 3). The
+  role-map prompt states each role optional or required, so ``none`` is answerable for an
+  optional role only.
+- No role settles by member count. Free columns plus ``none`` are, with no hint, an open
+  ambiguity entry; a lexicon hit still settles it (hints run in the fixed order). An
+  optional role whose every column another role holds settles ``none`` with
+  ``source: code`` (``test_identity_roles``). A text column is a date and an array
+  candidate: whether it parses is a value check of the verifier.
 - A ``none`` choice (model or human) closes the entry, leaves the role unbound in the
   assembled spec, and passes the Roles verifier.
 """
@@ -30,7 +31,6 @@ import pytest
 from sema.intake.eligibility_text_utils import CONCEPTS
 from sema.intake.lexicon import NO_REFERENCE
 from sema.intake.output_models import role_field
-from sema.intake.output_models_utils import ABSTAIN
 from sema.intake.shapes.base import SlotBinding
 from sema.intake.verify.roles import verify_roles
 from tests.unit.intake.decisions_env import HUMAN, ROLES, decision, decisions
@@ -43,8 +43,8 @@ from tests.unit.intake.resolve_roles_env import (
     answering,
     distinct,
     entry,
-    enum_of,
-    output_models,
+    lines_with,
+    prompts,
     relation,
 )
 from tests.unit.intake.structure_env import fresh_tools
@@ -69,6 +69,7 @@ NAMED_TABLES: Tables = {
 }
 CHOSEN = {"code": "kelt", "display": "wim"}
 UNCANDIDATED = ("valid_from", "valid_to", "synonyms")
+LONE_COLUMNS = ("kelt", "wim", "pell")
 
 
 def resolve() -> Any:
@@ -131,7 +132,7 @@ def test_optional_code_list_roles_offer_none_and_required_roles_do_not(
 ) -> None:
     roles = by_role(lone.roles.eligibilities, relation(LONE))
 
-    assert roles["status"].members == ("pell", NONE)
+    assert roles["status"].members == (*LONE_COLUMNS, NONE)
     for name in UNCANDIDATED:
         assert NONE in roles[name].members, name
     for name in ("code", "display"):
@@ -151,13 +152,13 @@ def test_optional_concept_roles_offer_none_and_required_roles_do_not(lone: Synth
         assert NONE not in roles[name].members, name
 
 
-def test_one_candidate_column_plus_none_is_an_open_ambiguity(lone: Synthetic) -> None:
+def test_free_columns_plus_none_are_an_open_ambiguity(lone: Synthetic) -> None:
     subject = f"{relation(LONE)}.status"
     status = by_role(lone.roles.eligibilities, relation(LONE))["status"]
 
     assert (status.choice, status.source) == (None, None)
     (listed,) = [a for a in lone.roles.ambiguities if a.subject == subject]
-    assert listed.members == ("pell", NONE)
+    assert listed.members == (*LONE_COLUMNS, NONE)
     assert (listed.choice, listed.source) == (None, None)
 
 
@@ -165,35 +166,35 @@ def test_a_lexicon_hit_still_settles_an_optional_role(named: Synthetic) -> None:
     subject = f"{relation(NAMED)}.status"
     status = by_role(named.roles.eligibilities, relation(NAMED))["status"]
 
-    assert status.members == ("row_status", NONE)
+    assert status.members == ("kelt", "wim", "row_status", NONE)
     assert (status.choice, status.source) == ("row_status", "lexicon")
     (listed,) = [a for a in named.roles.ambiguities if a.subject == subject]
     assert (listed.choice, listed.source) == ("row_status", "lexicon")
 
 
-def test_an_optional_role_with_no_candidate_settles_none_by_code(lone: Synthetic) -> None:
+def test_a_free_text_column_keeps_date_and_array_roles_open(lone: Synthetic) -> None:
     roles = by_role(lone.roles.eligibilities, relation(LONE))
     listed = {a.subject for a in lone.roles.ambiguities}
 
     for name in UNCANDIDATED:
-        assert roles[name].members == (NONE,), name
-        assert (roles[name].choice, roles[name].source) == (NONE, "code"), name
-        assert f"{relation(LONE)}.{name}" not in listed, name
+        assert roles[name].members == (*LONE_COLUMNS, NONE), name
+        assert (roles[name].choice, roles[name].source) == (None, None), name
+        assert f"{relation(LONE)}.{name}" in listed, name
 
 
-def test_the_roles_output_model_offers_none_for_an_optional_role_only(
+def test_the_role_map_states_none_answerable_for_an_optional_role_only(
     lone: Synthetic, tmp_path: Path
 ) -> None:
     client = answering(distinct({**CHOSEN, "status": NONE}))
 
     _resolved(lone, client, tmp_path)
 
-    (model,) = output_models(client)
-    assert set(enum_of(model, role_field("status"))) == {"pell", NONE}
-    schema = model.model_json_schema()["properties"]
-    assert ABSTAIN in schema[role_field("status")]["enum"]
+    (prompt,) = prompts(client)
+    (status,) = lines_with(prompt, f"`{role_field('status')}`:")
+    assert "; optional" in status, status
     for name in ("code", "display"):
-        assert NONE not in enum_of(model, role_field(name)), name
+        (line,) = lines_with(prompt, f"`{role_field(name)}`:")
+        assert "; required" in line, line
 
 
 def test_a_model_none_closes_the_entry_and_the_spec_assembles(

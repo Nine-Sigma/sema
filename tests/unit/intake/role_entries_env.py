@@ -25,6 +25,7 @@ from sema.intake.structure import BoundEntry
 from tests.unit.intake.eligibility_env import memory_source
 from tests.unit.intake.eligibility_env import run_roles as roles_over
 from tests.unit.intake.model_calls_env import WiredRun, stats, wired_run
+from tests.unit.intake.resolve_roles_env import map_claims, map_members
 from tests.unit.intake.shapes.shapes_env import Source
 from tests.unit.intake.structure_env import fresh_tools, run
 
@@ -146,7 +147,9 @@ def enum_fields(output_model: type[BaseModel]) -> dict[str, EnumSet]:
 
 
 def answering(pick: Pick) -> MagicMock:
-    """A mocked `LLMClient` answering every enum field with ``pick(field, members)``."""
+    """A mocked `LLMClient` answering every enum field with ``pick(field, members)``; a
+    role-map field is answered over the columns its prompt lists, keeping a claim in
+    force."""
     client = MagicMock()
     client.last_stats = stats()
     client.last_path = None
@@ -156,6 +159,9 @@ def answering(pick: Pick) -> MagicMock:
         client.last_path = "structured_output"
         fields = enum_fields(output_model)
         chosen = {field: pick(field, members) for field, members in fields.items()}
+        claims = map_claims(prompt)
+        for field, members in map_members(prompt).items() if not fields else ():
+            chosen[field] = claims.get(field) or pick(field, members)
         client.answers.append(chosen)
         count = len(chosen)
         return output_model(**chosen, confidences=[CONFIDENCE] * count, reasons=[REASON] * count)

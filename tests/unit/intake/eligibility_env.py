@@ -5,8 +5,8 @@ module fails each test on its own instead of failing collection.
 
 The contract the tests pin (design Decisions 5, 6, 7, 20):
 
-- ``eligibility.compute(binding, profiles, *, memory=None, embedder=None,
-  margin_floor=None)`` returns one ``RoleEligibility`` per role of the binding's template.
+- ``eligibility.compute(binding, profiles, *, memory=None, embedder=None)`` returns one
+  ``RoleEligibility`` per role of the binding's template.
 - ``RoleEligibility``: ``relation``, ``role``, ``subject`` (the property of a per-property
   role such as ``domain``, else ``None``), ``members`` (the predicate set, before any
   narrowing), ``hints`` (``Hint`` with ``source``, ``matches``, ``rank`` as ``(column,
@@ -16,7 +16,7 @@ The contract the tests pin (design Decisions 5, 6, 7, 20):
   subject starts with the relation name and names the property of a per-property role;
   a reference phrase naming nothing landed carries the hint ``unresolved_reference``.
 - ``eligibility.run_roles(structure, profiles, tools, *, hint=None, embedder=None,
-  margin_floor=None)`` returns ``eligibilities``, ``ambiguities``, ``joins``
+  choices=None)`` returns ``eligibilities``, ``ambiguities``, ``joins``
   (``DeclaredJoin``), ``headers`` (by header relation: ``name``, ``description``,
   ``values`` keyed by the landed key text, ``prose`` keys) and ``structure`` (the input
   with every section Roles resolved set on its bindings).
@@ -251,6 +251,30 @@ def run_roles(source: Source, structure: Any, ledger_dir: Path, **kwargs: Any) -
     return eligibility().run_roles(structure, source.profiles(), tools, **kwargs)
 
 
+# The ACRIS oracle's dictionary role map: what a role-map answer states for the first
+# Column Info relation; every other open role answers `none` (S5 decision 1).
+DICTIONARY_MAP = {"property": "Column Name", "description": "Column Description"}
+
+
+def mapped_roles(source: Source, structure: Any, ledger_dir: Path) -> Any:
+    """Roles as resolve leaves them once the first dictionary's role map is answered with
+    the oracle's columns; the dictionaries sharing its signature inherit it by memory."""
+    plain = run_roles(source, structure, ledger_dir / "plain")
+    first = next(
+        e.binding.relations[0] for e in structure.bound
+        if e.binding.template == "entity_model" and e.binding.slots.get("layout") == "per_file"
+    )
+    utils = eligibility_utils()
+    choices = {
+        utils.subject_of(e): utils.StatedChoice(
+            choice=DICTIONARY_MAP.get(e.role, "none"), source="model", confidence=0.9
+        )
+        for e in plain.eligibilities
+        if e.relation == first and e.subject is None and e.choice is None
+    }
+    return run_roles(source, structure, ledger_dir, choices=choices)
+
+
 def descriptor(path: Path) -> Any:
     return eligibility_utils().RunDescriptor.model_validate(yaml.safe_load(path.read_text()))
 
@@ -309,13 +333,13 @@ class Env:
 
     @cached_property
     def a10_roles(self) -> Any:
-        return run_roles(self.acris.source, self.a10, self.root / "a10" / "roles")
+        return mapped_roles(self.acris.source, self.a10, self.root / "a10" / "roles")
 
     @cached_property
     def pinned_roles(self) -> Any:
         hint = code_tables_hint(self.root / "pinned")
         structured = self.structured(self.acris, "pinned", hint)
-        return run_roles(self.acris.source, structured, self.root / "pinned" / "roles")
+        return mapped_roles(self.acris.source, structured, self.root / "pinned" / "roles")
 
     @cached_property
     def hinted_roles(self) -> Any:
@@ -327,4 +351,4 @@ class Env:
     @cached_property
     def dropped_roles(self) -> Any:
         structured = self.structured(self.dropped, "nodcc")
-        return run_roles(self.dropped.source, structured, self.root / "nodcc" / "roles")
+        return mapped_roles(self.dropped.source, structured, self.root / "nodcc" / "roles")

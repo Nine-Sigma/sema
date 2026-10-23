@@ -1,19 +1,21 @@
-"""Role resolution helpers: open entries grouped into calls, their output models, the prompt.
+"""Role resolution helpers: the asks, their output models and prompts, and their answers.
 
-Column roles go out one call per relation signature, so a relation sharing the signature
-inherits the verified answer through memory. Per-property reference entries differ per
-relation, so they go out one call per relation and are never inherited.
+Column roles go out as one role map per relation signature (S5 decision 1): one field per
+role of every role model the relation's bindings use, each naming any column or ``none``.
+A relation sharing the signature inherits the verified map through memory. Per-property
+reference entries differ per relation, so they go out one call per relation, over the
+members code proved, and are never inherited.
 """
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
 
+from sema.intake import lexicon
 from sema.intake.eligibility import role_targets
 from sema.intake.eligibility_spec_utils import RolesResult
 from sema.intake.eligibility_text_utils import (
@@ -26,32 +28,38 @@ from sema.intake.eligibility_utils import (
     MemoryKey,
     RoleEligibility,
     StatedChoice,
+    fact_of,
+    scope_of,
     subject_of,
 )
 from sema.intake.output_models import (
     MAX_REFERENCE_BATCH,
+    NOT_IN_NAME,
     reference_choices,
     reference_field,
     references_model,
-    role_choices,
     role_field,
-    roles_model,
+    role_map_choices,
+    role_map_fields,
+    role_map_model,
 )
 from sema.intake.output_models_utils import NONE, Choice
-from sema.intake.resolve_budget_utils import STATEMENTS, PromptEvidence, fitted
-from sema.intake.resolve_utils import (
-    NOTHING,
-    bullets,
-    history,
-    render_template,
+from sema.intake.resolve_prompt_utils import (
+    SCHEMA_TEXT_SAMPLE_ROWS as SCHEMA_TEXT_SAMPLE_ROWS,
 )
+from sema.intake.resolve_prompt_utils import (
+    RoleEvidence,
+    claim_lines,
+    field_lines,
+    fitted,
+    render_roles_prompt,
+)
+from sema.intake.resolve_utils import NOTHING, bullets
 from sema.intake.shapes import concept_list
 from sema.intake.shapes.base import RelationProfile
 from sema.intake.verify.base import Ambiguity
 
-ROLES_PROMPT = "prompts/roles_v1.md"
-SECTION_QUESTION = "asks: the spec section this relation's concept list feeds"
-NOT_IN_NAME = re.compile(r"\W+")
+SECTION_QUESTION = "the spec section this relation's concept list feeds: {}"
 UNASKED_CLAIMED = "not asked: every member is claimed ({})"
 UNASKED_KIN = "not asked: it shares the signature of {}, whose call left it open"
 UNASKED_SECTION = "not asked: the section choice on {} opened it after its ask; left for Review"
@@ -71,33 +79,57 @@ class OpenRole:
 
 
 @dataclass(frozen=True)
+class MapSection:
+    """One role model of a role map; ``key`` qualifies a repeated role's field and
+    ``section`` qualifies its subject."""
+
+    key: str
+    section: str | None
+    model: type[BaseModel]
+
+
+@dataclass(frozen=True)
+class MapField:
+    field: str
+    role: str
+    subject: str
+
+
+@dataclass(frozen=True)
 class RoleAsk:
-    """One call: open entries of ``relation``; ``kin`` share its signature and inherit."""
+    """One call: open entries of ``relation``; ``kin`` share its signature and inherit.
+    A column ask carries its role map's ``sections``."""
 
     relation: str
     entries: tuple[OpenRole, ...]
     references: bool
     kin: tuple[str, ...] = ()
+    sections: tuple[MapSection, ...] = ()
 
     def output_model(self) -> type[BaseModel]:
         if self.references:
             return references_model([entry.members for entry in self.entries])
-        return roles_model({entry.name: entry.members for entry in self.entries})
+        return role_map_model({section.key: section.model for section in self.sections})
+
+    def fields(self) -> list[MapField]:
+        sections = {section.key: section.section for section in self.sections}
+        models = {section.key: section.model for section in self.sections}
+        return [
+            MapField(name, role, f"{scope_of(self.relation, sections[key])}.{role}")
+            for name, key, role in role_map_fields(models)
+        ]
 
     def choices(self, answer: BaseModel) -> list[Choice] | None:
         if self.references:
             return reference_choices(answer, len(self.entries))
-        return role_choices(answer, [entry.name for entry in self.entries])
+        return role_map_choices(answer, [found.field for found in self.fields()])
 
     def columns(self, stated: Mapping[str, StatedChoice]) -> set[str]:
         """The columns a stated answer binds; a section choice binds none."""
         if self.references:
             return set()
-        return {
-            stated[entry.subject].choice
-            for entry in self.entries
-            if entry.subject in stated and entry.label != SECTION_SUBJECT
-        }
+        section = section_subject(self.relation)
+        return {choice.choice for subject, choice in stated.items() if subject != section}
 
 
 def column_asks(roles: RolesResult, by_name: Mapping[str, RelationProfile]) -> list[RoleAsk]:
@@ -109,10 +141,35 @@ def column_asks(roles: RolesResult, by_name: Mapping[str, RelationProfile]) -> l
         key = keys.get(relation, relation)
         if key in asks:
             ask = asks[key]
-            asks[key] = RoleAsk(ask.relation, ask.entries, False, (*ask.kin, relation))
+            asks[key] = RoleAsk(
+                ask.relation, ask.entries, False, (*ask.kin, relation), ask.sections
+            )
             continue
-        asks[key] = RoleAsk(relation, _columns(entries), False)
+        asks[key] = RoleAsk(relation, _columns(entries), False, (), _map_sections(roles, relation))
     return list(asks.values())
+
+
+def _map_sections(roles: RolesResult, relation: str) -> tuple[MapSection, ...]:
+    found: dict[str, MapSection] = {}
+    for entry in roles.structure.bound:
+        for target in role_targets(entry.binding):
+            if target.relation != relation:
+                continue
+            model = target.models[0] if len(target.models) == 1 else _joined(target.models)
+            key = target.section or entry.binding.section or model.__name__
+            found.setdefault(key, MapSection(key, target.section, model))
+    return tuple(found.values())
+
+
+def _joined(models: Sequence[type[BaseModel]]) -> type[BaseModel]:
+    """The fields of every model a section-less concept list may take, and its section."""
+    names = dict.fromkeys(name for model in models for name in model.model_fields)
+    fields: dict[str, object] = {name: (str | None, None) for name in names}
+    fields[SECTION_SUBJECT] = (str | None, None)
+    joined: type[BaseModel] = create_model(
+        "".join(model.__name__ for model in models), **fields  # type: ignore[call-overload]
+    )
+    return joined
 
 
 def unasked_reason(
@@ -151,7 +208,7 @@ def _open(
         subject_of(e): e for e in roles.eligibilities if (e.subject is not None) == per_property
     }
     if not per_property:
-        eligible |= _open_sections(roles)
+        eligible |= open_sections(roles)
     # A reference entry always offers `none`, so one member leaves nothing to choose.
     fewest = 2 if per_property else 1
     found: dict[str, list[tuple[RoleEligibility, Ambiguity]]] = {}
@@ -165,7 +222,7 @@ def _open(
     return found
 
 
-def _open_sections(roles: RolesResult) -> dict[str, RoleEligibility]:
+def open_sections(roles: RolesResult) -> dict[str, RoleEligibility]:
     """A concept list with no section yet is asked its section with its column roles."""
     relations = [
         entry.binding.relations[0]
@@ -231,71 +288,91 @@ def in_force(roles: RolesResult, relation: str) -> list[RoleEligibility]:
     ]
 
 
+def map_entries(roles: RolesResult, relation: str) -> dict[str, RoleEligibility]:
+    """The column-role and open section entries of ``relation`` by subject."""
+    found = {
+        subject_of(e): e
+        for e in roles.eligibilities
+        if e.relation == relation and e.subject is None
+    }
+    sections = open_sections(roles)
+    return found | {s: e for s, e in sections.items() if e.relation == relation}
+
+
 def fitted_roles_prompt(
     ask: RoleAsk,
-    claims: Sequence[RoleEligibility],
-    evidence: PromptEvidence,
+    roles: RolesResult,
+    evidence: RoleEvidence,
     failed: Sequence[Sequence[str]],
 ) -> str:
     """The Roles prompt, compacted only as far as the budget needs."""
-    held = {e.choice for e in claims if e.choice is not None}
-    kept = {ask.relation: {m for e in ask.entries for m in e.members} | held}
-    asked = next((p for p in evidence.relations if p.ref.name == ask.relation), None)
-    columns = tuple(c.name for c in asked.columns) if asked is not None else ()
+    claims = claim_lines(in_force(roles, ask.relation))
+    if ask.references:
+        fields = "\n\n".join(_entry(index, entry) for index, entry in enumerate(ask.entries))
+    else:
+        width = evidence.width(ask.relation)
+        fields = _map_lines(ask, map_entries(roles, ask.relation), width)
+    return fitted(
+        lambda compaction: render_roles_prompt(
+            ask.relation, claims, evidence.render(compaction), fields, failed
+        ),
+        ask.output_model(),
+    )
 
-    def render(level: int) -> str:
-        stated = columns if level >= STATEMENTS else None
-        return render_roles_prompt(ask, claims, evidence.render(level, kept), failed, stated)
 
-    return fitted(render, ask.output_model())
-
-
-def render_roles_prompt(
-    ask: RoleAsk,
-    claims: Sequence[RoleEligibility],
-    relations: str,
-    failed: Sequence[Sequence[str]],
-    columns: Sequence[str] | None = None,
-) -> str:
-    """With ``columns``, an entry offering each of them but its exclusions says so."""
-    entries = (_entry(i, entry, ask.relation, columns) for i, entry in enumerate(ask.entries))
-    sections = {
-        "in_force": bullets(f"`{e.role}`: `{e.choice}` ({e.source})" for e in claims),
-        "failures": history(failed),
-        "relations": relations,
-        "entries": "\n\n".join(entries),
+def _map_lines(ask: RoleAsk, entries: Mapping[str, RoleEligibility], width: int) -> str:
+    described = {
+        found.field: _described(found, entries.get(found.subject), width)
+        for found in ask.fields()
     }
-    return render_template(ROLES_PROMPT, sections)
+    return field_lines(described)
 
 
-def _entry(index: int, entry: OpenRole, relation: str, columns: Sequence[str] | None) -> str:
+def _described(found: MapField, entry: RoleEligibility | None, width: int) -> str:
+    """``width`` is the relation's column count: a fact every column meets lists none."""
+    if found.role == SECTION_SUBJECT:
+        return SECTION_QUESTION.format(", ".join(f"`{m}`" for m in SECTION_MEMBERS))
+    known = next((e for e in lexicon.ROLES if e.name == found.role), None)
+    parts = [known.description if known else found.role]
+    if entry is None:
+        return "; ".join(parts)
+    parts.append("optional" if lexicon.NO_REFERENCE in entry.members else "required")
+    if (fact := fact_of(found.role)) is not None:
+        columns = [m for m in entry.members if m != NONE]
+        met = ", ".join(f"`{m}`" for m in columns) or NOTHING
+        parts.append(f"data fact {fact}" + (f", met by {met}" if len(columns) < width else ""))
+    if entry.choice is not None:
+        parts.append(f"claim in force: `{entry.choice}` ({entry.source})")
+    return "; ".join(parts)
+
+
+def _entry(index: int, entry: OpenRole) -> str:
     ambiguity = entry.ambiguity
     exclusions = [f"{name}: {why}" for name, why in sorted(ambiguity.exclusions.items())]
-    question = [SECTION_QUESTION] if entry.label == SECTION_SUBJECT else []
     return "\n".join(
         [
             f"### entry {index}: {ambiguity.subject}",
-            *question,
             f"field: `{entry.field}`",
-            *_members(entry, relation, columns),
+            "members:",
+            bullets(f"`{member}`" for member in entry.members),
             f"hints: {', '.join(ambiguity.hints) or NOTHING}",
             f"exclusions: {'; '.join(exclusions) or NOTHING}",
         ]
     )
 
 
-def _members(entry: OpenRole, relation: str, columns: Sequence[str] | None) -> list[str]:
-    offered = [member for member in entry.members if member != NONE]
-    remaining = [c for c in columns or () if c not in entry.ambiguity.exclusions]
-    if not remaining or sorted(offered) != sorted(remaining):
-        return ["members:", bullets(f"`{member}`" for member in entry.members)]
-    also = f", and `{NONE}`" if NONE in entry.members else ""
-    return [f"members: every column of `{relation}` listed above except the exclusions{also}"]
-
-
-def chosen_notes(entries: Iterable[OpenRole], choices: Mapping[str, str]) -> str:
+def chosen_notes(roles: Mapping[str, str], choices: Mapping[str, str]) -> str:
+    """``roles`` names each subject's role; ``choices`` the columns chosen for them."""
     return ", ".join(
-        f"`{entry.label}` chose `{choices[entry.subject]}`"
-        for entry in entries
-        if entry.subject in choices
+        f"`{roles.get(subject, subject)}` chose `{column}`" for subject, column in choices.items()
     )
+
+
+def map_roles(ask: RoleAsk) -> dict[str, str]:
+    if ask.references:
+        return {entry.subject: entry.label for entry in ask.entries}
+    return {found.subject: found.role for found in ask.fields()}
+
+
+def ranked_first(members: Iterable[str], first: str) -> tuple[str, ...]:
+    return (first, *(member for member in members if member != first))

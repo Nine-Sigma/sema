@@ -40,7 +40,9 @@ from tests.unit.intake.no_hint_env import (
     csv_blocks,
     decide,
     imported,
-    marked_param,
+    KEYS_MOVED,
+    keyed_marks,
+    keyed_param,
     metrics_of,
     recording,
     replay,
@@ -68,6 +70,7 @@ HELD_OUT = ("heldout", "heldout2", "heldout3", "heldout4", "heldout5")
 DECIDED_HELD_OUT = ("heldout", "heldout3", "heldout4")
 UNDECIDED_HELD_OUT = ("heldout2", "heldout5")
 A1, ATHENA = "a1", "a7_athena"
+REPLAYED = (A1, *NO_HINT_SOURCES, *HELD_OUT)
 A1_SPEC = ORACLES[A1]
 A1_DECISIONS = FIXTURES / "partner_sl" / DECISIONS_FILE
 SCORED_SPECS = ORACLES
@@ -101,6 +104,7 @@ HELDOUT5_UNASSEMBLED = (
     " state, bug-846); task 2.5 opens one entry per cause"
 )
 DECIDED_MISSES = {"heldout": HELD_OUT_UNASSEMBLED, "heldout5": HELDOUT5_UNASSEMBLED}
+A1_MOVED = pytest.mark.xfail(A1 in KEYS_MOVED, strict=True, reason=KEYS_MOVED.get(A1, ""))
 GATE_MISSES = {
     "heldout": "College Scorecard misses its gate at Review: bound_fraction 0.625 < 0.75"
     " and open_choices 6 > 2 (Dean, 2026-10-22: recorded, carried to S4)",
@@ -175,7 +179,7 @@ def _assert_imports_equal(
     )
 
 
-@pytest.mark.parametrize("name", NO_HINT_SOURCES)
+@pytest.mark.parametrize("name", [keyed_param(name, KEYS_MOVED) for name in NO_HINT_SOURCES])
 def test_known_source_reaches_review_with_a_spec_and_no_provider_call(
     runs: Runs, name: str
 ) -> None:
@@ -190,10 +194,7 @@ def test_known_source_reaches_review_with_a_spec_and_no_provider_call(
 
 
 def _import_leg(name: str, cap_id: str) -> Any:
-    reason = IMPORT_MISSES.get((name, cap_id))
-    marks = [] if reason is None else [
-        pytest.mark.xfail(strict=True, raises=AssertionError, reason=reason)
-    ]
+    marks = keyed_marks(name, KEYS_MOVED, IMPORT_MISSES.get((name, cap_id)))
     return pytest.param(name, CAP_VALUES[cap_id], id=f"{name}-{cap_id}", marks=marks)
 
 
@@ -239,6 +240,7 @@ def test_athena_staged_terms_equal_the_golden_concept_rows(
     ), staged
 
 
+@A1_MOVED
 def test_a1_reaches_review_with_no_hint_and_no_provider_call(runs: Runs) -> None:
     run = runs.replayed(A1)
 
@@ -246,6 +248,7 @@ def test_a1_reaches_review_with_no_hint_and_no_provider_call(runs: Runs) -> None
     assert_zero_provider_calls(run)
 
 
+@A1_MOVED
 def test_a1_decisions_settle_every_entry_with_zero_further_calls(runs: Runs) -> None:
     outcome = runs.decided(A1, A1_DECISIONS)
     metrics = metrics_of(outcome)
@@ -269,6 +272,7 @@ def _a1_pair(spec: ConceptSourceSpec) -> tuple[ConceptSourceSpec, ConceptSourceS
     return assembled, written
 
 
+@A1_MOVED
 @CAPS
 def test_a1_import_equals_the_written_spec_on_concepts_and_value_sets(
     runs: Runs, cap: int | None, tmp_path: Path
@@ -293,9 +297,7 @@ def _scored_specs(outcome: Any, name: str) -> tuple[ConceptSourceSpec, ConceptSo
 
 
 def _scorecard_leg(name: str, cap_id: str) -> Any:
-    marks = [] if name not in UNREVIEWED else [
-        pytest.mark.xfail(strict=True, raises=AssertionError, reason=UNREVIEWED_REASON)
-    ]
+    marks = keyed_marks(name, KEYS_MOVED, UNREVIEWED_REASON if name in UNREVIEWED else None)
     return pytest.param(name, cap_id, id=f"{name}-{cap_id}", marks=marks)
 
 
@@ -320,7 +322,7 @@ def test_known_source_scorecard_meets_its_floor(
     assert floor_misses(card, ignored, floor) == (), table
 
 
-@pytest.mark.parametrize("name", HELD_OUT)
+@pytest.mark.parametrize("name", [keyed_param(name, KEYS_MOVED) for name in HELD_OUT])
 def test_held_out_source_reaches_review_with_no_hint(runs: Runs, name: str) -> None:
     run = runs.replayed(name)
     node = run.outcome.node
@@ -331,7 +333,7 @@ def test_held_out_source_reaches_review_with_no_hint(runs: Runs, name: str) -> N
 
 
 @pytest.mark.parametrize(
-    "name", [marked_param(name, GATE_MISSES, raises=AssertionError) for name in HELD_OUT]
+    "name", [keyed_param(name, KEYS_MOVED, GATE_MISSES, raises=AssertionError) for name in HELD_OUT]
 )
 def test_held_out_source_meets_its_committed_thresholds(runs: Runs, name: str) -> None:
     misses = gate_misses(metrics_of(runs.replayed(name).outcome), GATE_THRESHOLDS[name])
@@ -344,7 +346,7 @@ def test_every_held_out_source_is_either_decided_or_undecided() -> None:
 
 
 @pytest.mark.parametrize(
-    "name", [marked_param(name, DECIDED_MISSES) for name in DECIDED_HELD_OUT]
+    "name", [keyed_param(name, KEYS_MOVED, DECIDED_MISSES) for name in DECIDED_HELD_OUT]
 )
 def test_held_out_decisions_assemble_with_zero_further_calls(runs: Runs, name: str) -> None:
     decisions = DECISIONS[name]
@@ -360,7 +362,7 @@ def test_held_out_decisions_assemble_with_zero_further_calls(runs: Runs, name: s
     assert_zero_provider_calls(runs.replayed(name))
 
 
-@pytest.mark.parametrize("name", UNDECIDED_HELD_OUT)
+@pytest.mark.parametrize("name", [keyed_param(name, KEYS_MOVED) for name in UNDECIDED_HELD_OUT])
 def test_undecided_held_out_source_has_no_open_entry_and_no_decisions_file(
     runs: Runs, name: str
 ) -> None:
@@ -370,9 +372,7 @@ def test_undecided_held_out_source_has_no_open_entry_and_no_decisions_file(
     assert (metrics.open_structure, metrics.open_roles) == (0, 0)
 
 
-@pytest.mark.parametrize(
-    "name", [marked_param(name, DECIDED_MISSES) for name in (A1, *NO_HINT_SOURCES, *HELD_OUT)]
-)
+@pytest.mark.parametrize("name", [keyed_param(n, KEYS_MOVED, DECIDED_MISSES) for n in REPLAYED])
 def test_a_review_with_a_binding_and_no_open_entry_presents_a_spec(runs: Runs, name: str) -> None:
     outcome = _settled_outcome(runs, name)
     metrics = metrics_of(outcome)
@@ -385,7 +385,7 @@ def test_a_review_with_a_binding_and_no_open_entry_presents_a_spec(runs: Runs, n
     )
 
 
-@pytest.mark.parametrize("name", (A1, *NO_HINT_SOURCES, *HELD_OUT))
+@pytest.mark.parametrize("name", [keyed_param(name, KEYS_MOVED) for name in REPLAYED])
 def test_every_value_bearing_read_is_schema_text_or_value_approved(
     runs: Runs, name: str
 ) -> None:

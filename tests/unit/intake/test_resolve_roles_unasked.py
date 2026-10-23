@@ -4,20 +4,19 @@ Defect (14.3 second re-record, A1 ``<concept relation>.name``): an open role ent
 Review with no choice, no source, no call key, and no reason. Three generic paths leave
 one so, each pinned below on a synthetic source:
 
-- Section: ``column_asks`` is built once, before any answer. A stated ``section`` choice
-  re-derives the relation's role set, and a role that code settled under the unsectioned
-  set (its only unclaimed member) opens under the chosen section's set. Nothing asks it.
-  Pinned (S3 scope freeze, reason only): no extra call is made; the entry carries a code
-  reason saying the section choice opened it after the ask and it is left for Review.
-  Follow-up asks are S4.
-- Claimed: an entry whose every member a claim excludes offers nothing to choose, so
-  ``_open`` skips it. Pinned: it is not asked, and its reason names the claimed members.
+- Section: an unsectioned relation's role map asks the section and the roles of both role
+  models in one call (S5 decision 1), and no role settles by member count (decision 3),
+  so a section choice opens no role the call did not ask. Pinned: one call, and every
+  entry left open carries the model's reason.
+- Claimed: an entry whose every member a lexicon claim holds is still a field of the map;
+  the claims are stated in the prompt and the model may contest them (decision 18c).
 - Kin: a later relation of a signature inherits only a verified role map. When the
   signature's one call leaves entries open, the kin entries are not asked again (one call
   per signature) and each carries a reason naming the relation that was asked.
 
 Reasons are written after the calls, so no prompt and no call key changes: every committed
-known-source recording still replays with zero calls (guard below, A1 included).
+known-source recording still replays with zero calls (guard below, A1 included), except the
+sources whose Roles keys the roles prompt v2 moved (``no_hint_env.KEYS_MOVED``, decision 26).
 
 The mocked model answers every enum field it is handed (``role_entries_env.answering``).
 """
@@ -34,7 +33,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sema.intake.eligibility_utils import StatedChoice
 from sema.intake.output_models_utils import ABSTAIN
 from sema.models.config import ModelPrice
 from tests.unit.intake.graph_env import (
@@ -46,6 +44,8 @@ from tests.unit.intake.graph_env import (
 )
 from tests.unit.intake.graph_sources_env import discover_with
 from tests.unit.intake.model_calls_env import intake_config
+from tests.unit.intake.no_hint_env import KEYS_MOVED, keyed_param
+from tests.unit.intake.resolve_roles_env import map_claims, map_members
 from tests.unit.intake.role_entries_env import (
     KIN,
     KIN_SQL,
@@ -67,8 +67,7 @@ ROLES, CONCEPTS, SECTION_WORD = "roles", "concepts", "section"
 WIDE_CAP = 200
 
 # Under the unsectioned role set `code` and `concept_id` claim `entry_code` and
-# `entry_key_id`, so `name` keeps one unclaimed member and settles by code. The `concepts`
-# set has no `code` role, so `entry_code` is free again and `name` opens with two members.
+# `entry_key_id`; `name` is asked with every column in the one role map.
 SECTIONED = "sx.entries"
 SECTIONED_SQL = (
     "CREATE SCHEMA sx",
@@ -79,12 +78,14 @@ SECTIONED_SQL = (
 )
 SECTION_SUBJECT = f"{SECTIONED}.section"
 
-# Two columns: `code` and `concept_id` claim both, so `name` and `display` offer nothing.
+# Two columns: the lexicon claims both for `code` and `concept_id`, so `name` and `display`
+# have no free member.
 CLAIMED = "zz.tags"
+CLAIMED_COLUMNS = ("tag_code", "tag_id")
 CLAIMED_SQL = (
     "CREATE SCHEMA zz",
     f"CREATE TABLE {CLAIMED} AS SELECT 'C' || lpad(CAST(i AS VARCHAR), 2, '0') AS tag_code,"
-    " 'Tag text ' || CAST(i AS VARCHAR) AS tag_text FROM range(1, 31) r(i)",
+    " 'Tag text ' || CAST(i AS VARCHAR) AS tag_id FROM range(1, 31) r(i)",
 )
 
 SOURCES = {
@@ -135,24 +136,20 @@ def test_every_open_role_entry_says_why_it_is_open(built: Built, tmp_path: Path)
     assert silent == [], silent
 
 
-def test_the_section_fixture_opens_roles_only_once_the_section_is_chosen(
+def test_the_section_fixture_opens_name_beside_the_section_before_any_answer(
     tmp_path: Path,
 ) -> None:
-    """The fixture still holds the A1 path: before any answer only the section is open."""
+    """No role settles by member count: ``name`` is open with the section and offers the
+    column the unsectioned claims leave free."""
     (source, structure, roles) = next(_built("section", tmp_path))
-    stated = {SECTION_SUBJECT: StatedChoice(choice=CONCEPTS, source="model", confidence=0.9)}
 
-    chosen = roles_of(source, structure, tmp_path / "chosen", choices=stated)
+    opened = {a.subject: a for a in _open(roles)}
 
-    assert [a.subject for a in _open(roles)] == [SECTION_SUBJECT]
-    opened = {a.subject for a in _open(chosen)}
-    assert f"{SECTIONED}.name" in opened
-    assert len(offered(next(a for a in _open(chosen) if a.subject.endswith(".name")))) >= 2
+    assert {SECTION_SUBJECT, f"{SECTIONED}.name"} <= set(opened)
+    assert offered(opened[f"{SECTIONED}.name"])
 
 
-def test_entries_a_section_choice_opens_carry_a_reason_and_no_extra_call(
-    tmp_path: Path,
-) -> None:
+def test_a_section_and_its_roles_are_asked_in_one_map_call(tmp_path: Path) -> None:
     (source, structure, roles) = next(_built("section", tmp_path))
     client = answering(_concepts_section)
 
@@ -161,15 +158,17 @@ def test_entries_a_section_choice_opens_carry_a_reason_and_no_extra_call(
     (section,) = [a for a in result.ambiguities if a.subject == SECTION_SUBJECT]
     assert (section.choice, section.source) == (CONCEPTS, "model")
     assert client.invoke.call_count == 1
-    sent = prompts(client)
+    (prompt,) = prompts(client)
+    fields = map_members(prompt)
+    assert any(SECTION_WORD in field for field in fields)
+    assert any(field.endswith("_name") for field in fields)
     left = _open(result)
-    assert {f"{SECTIONED}.name", f"{SECTIONED}.status"} <= {a.subject for a in left}
+    assert f"{SECTIONED}.name" in {a.subject for a in left}
     for entry in left:
-        assert not _asked(sent, entry.subject), entry.subject
-        assert entry.reason and SECTION_WORD in entry.reason, (entry.subject, entry.reason)
+        assert entry.reason, entry.subject
 
 
-def test_an_entry_whose_members_are_all_claimed_says_so_without_a_call(
+def test_an_entry_whose_members_are_all_claimed_is_still_a_map_field(
     tmp_path: Path,
 ) -> None:
     (source, structure, roles) = next(_built("claimed", tmp_path))
@@ -179,14 +178,14 @@ def test_an_entry_whose_members_are_all_claimed_says_so_without_a_call(
 
     result, _ = resolved(source, structure, roles, client, tmp_path / "resolve")
 
-    sent = prompts(client)
+    (prompt,) = prompts(client)
+    assert set(CLAIMED_COLUMNS) <= set(map_claims(prompt).values())
+    fields = map_members(prompt)
     for listed in unaskable:
+        role = listed.subject.rpartition(".")[2]
+        assert any(field.endswith(f"_{role}") for field in fields), role
         (entry,) = [a for a in result.ambiguities if a.subject == listed.subject]
-        assert not _asked(sent, entry.subject), entry.subject
         assert entry.reason, entry.subject
-        for column in entry.members:
-            role = entry.exclusions[column]
-            assert column in entry.reason and role in entry.reason, (column, entry.reason)
 
 
 def test_kin_left_open_by_their_signatures_call_name_the_relation_asked(
@@ -245,7 +244,7 @@ def _replayed(name: str, root: Path) -> Any:
     )
 
 
-@pytest.mark.parametrize("name", RECORDED)
+@pytest.mark.parametrize("name", [keyed_param(name, KEYS_MOVED) for name in RECORDED])
 def test_recordings_replay_with_zero_calls_and_no_silent_open_role(
     name: str, tmp_path: Path
 ) -> None:

@@ -1,16 +1,19 @@
-"""Role eligibility: predicate sets, ordered hints, cross-role exclusion (design Decision 6).
+"""Role eligibility: data-fact sets, ordered claims, cross-role exclusion (S5 decisions 1-3, 18).
 
-Per role, predicates give the members; one member settles with ``source: code``; else a
-human statement, the run's signature memory, the lexicon, and the embedding rank are
-tried in that order, and otherwise the role stays open. Roles settle in the lexicon's
-order and a settled column leaves later roles' sets unless the pair may coincide. Role
-names come from the spec role models, so this module spells none of them.
+Per role, its data fact gives the members (every column for a role with none). A human
+statement, a stated choice, the run's signature memory, and a unique lexicon match are
+tried in that order; an optional role with no candidate left settles ``none`` by code, and
+otherwise the role stays open for the role map. No role settles by member count or by the
+embedding rank, which is only a fact. A lexicon claim the model contested stays open with
+both answers. Roles settle in the lexicon's order and a settled column is excluded from
+later roles unless the pair may coincide. Role names come from the spec role models, so
+this module spells none of them.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Collection, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any
 
 from sema.binding.spec import ConceptSourceSpec
@@ -42,7 +45,6 @@ from sema.intake.eligibility_text_utils import (
     vocabularies,
 )
 from sema.intake.eligibility_utils import (
-    EMBEDDING_MARGIN_FLOOR,
     Embedder,
     Held,
     Hint,
@@ -72,15 +74,18 @@ __all__ = [
 ]
 
 UNRESOLVED_REFERENCE = "unresolved_reference"
+WITHHELD_STATUS = "the evidence policy withholds its values until a value ask is approved"
 
 
 @dataclass(frozen=True)
 class Hints:
+    """``contested`` are subjects whose lexicon claim the model's role map contested."""
+
     memory: RoleMemory | None
     embedder: Embedder | None
-    margin_floor: float | None
     choices: Mapping[str, StatedChoice]
     tools: ProfileTools | None = None
+    contested: frozenset[str] = field(default_factory=frozenset)
 
 
 def compute(
@@ -89,21 +94,24 @@ def compute(
     *,
     memory: RoleMemory | None = None,
     embedder: Embedder | None = None,
-    margin_floor: float | None = EMBEDDING_MARGIN_FLOOR,
     stated: Mapping[str, Mapping[str, Any]] | None = None,
     tools: ProfileTools | None = None,
 ) -> list[RoleEligibility]:
     by_name = {profile.ref.name: profile for profile in profiles}
-    hints = Hints(memory, embedder, margin_floor, {}, tools)
+    hints = Hints(memory, embedder, {}, tools)
     return _compute(binding, by_name, hints, stated or {})
 
 
 def ambiguities(eligibilities: Iterable[RoleEligibility]) -> list[Ambiguity]:
-    """Every role that had more than one member, settled or not, and every open reference."""
+    """Every open role, every role with more than one member that code did not settle, and
+    every open reference. A code settle had no alternative: a slotted column or ``none``
+    when no member is free."""
     found = []
     for entry in eligibilities:
         unresolved = [phrase for hint in entry.hints for phrase in hint.unresolved]
-        if len(entry.members) < 2 and not unresolved:
+        unsettled = entry.choice is None and entry.source is None
+        single = len(entry.members) < 2 or entry.source == "code"
+        if single and not unresolved and not unsettled:
             continue
         members = entry.members
         if entry.choice is not None and entry.choice not in members:
@@ -128,15 +136,17 @@ def run_roles(
     *,
     hint: ConceptSourceSpec | None = None,
     embedder: Embedder | None = None,
-    margin_floor: float | None = EMBEDDING_MARGIN_FLOOR,
     choices: Mapping[str, StatedChoice] | None = None,
+    contested: Collection[str] = (),
 ) -> RolesResult:
     """``choices`` are stated choices by ambiguity subject (model answers, decisions); the
-    hint's ``domains`` join them, and a choice in ``choices`` wins on the same subject."""
+    hint's ``domains`` join them, and a choice in ``choices`` wins on the same subject.
+    ``contested`` subjects keep no lexicon claim."""
     by_name = {profile.ref.name: profile for profile in profiles}
     stated = stated_roles(hint, structure) if hint is not None else {}
     domains = stated_domains(hint, structure) if hint is not None else {}
-    hints = Hints(RoleMemory(), embedder, margin_floor, {**domains, **(choices or {})}, tools)
+    merged = {**domains, **(choices or {})}
+    hints = Hints(RoleMemory(), embedder, merged, tools, frozenset(contested))
     keys = hint.entity_model.header_keys if hint is not None and hint.entity_model else None
     models = [e.binding for e in structure.bound if e.binding.template == entity_model.ID]
     found = [role for b in models for role in _compute(b, by_name, hints, stated)]
@@ -154,6 +164,7 @@ def run_roles(
         "roles over {} bindings: {} eligibilities, {} references, {} joins, {} ambiguities",
         len(structure.bound), len(found), len(references), len(joins), len(listed),
     )
+    statuses, unverifiable = _statuses(found, by_name, tools, stated)
     return RolesResult(
         eligibilities=(*found, *references),
         ambiguities=tuple(listed),
@@ -161,10 +172,11 @@ def run_roles(
         headers=headers,
         structure=resolved,
         refs={name: profile.ref for name, profile in by_name.items()},
-        statuses=_statuses(found, by_name, tools, stated),
+        statuses=statuses,
         stated=stated,
         notes=notes,
         header_keys=keys,
+        unverifiable=unverifiable,
     )
 
 
@@ -193,7 +205,7 @@ def _relation_roles(
 ) -> list[RoleEligibility]:
     key = memory_key(target, profile)
     remembered = hints.memory.recall(key) if hints.memory is not None else None
-    plain = _side_roles(profile, target, Hints(None, None, None, {}), {}, Held({}))
+    plain = _side_roles(profile, target, Hints(None, None, {}), {}, Held({}))
     held = Held(claimed_columns(plain))
     found = _side_roles(profile, target, hints, stated, held, remembered)
     in_force = claimed_columns(found)
@@ -266,15 +278,13 @@ def _settle(
     stated_choice = with_stated(base, hints.choices)
     if stated_choice.source is not None:
         return stated_choice
-    if len(members) == 1 and not excluded:
-        return base.settled(members[0], "code")
     recalled = (remembered or {}).get(entry.name)
-    if len(members) > 1 and recalled in members:
+    if recalled in members:
         return base.hinted(Hint(source="memory", matches=(str(recalled),))).settled(
             str(recalled), "memory"
         )
     remaining = [member for member in members if member not in excluded]
-    return _narrow(base, entry, profile, remaining, hints) if remaining else base
+    return _narrow(base, entry, profile, remaining, hints)
 
 
 def _narrow(
@@ -284,23 +294,21 @@ def _narrow(
     remaining: Sequence[str],
     hints: Hints,
 ) -> RoleEligibility:
-    hits = lexicon_hits(entry.name, [m for m in remaining if m != lexicon.NO_REFERENCE])
+    """A unique lexicon match among the members is a claim unless another role holds it;
+    the embedding rank is stated, never settled on."""
+    hits = lexicon_hits(entry.name, [m for m in base.members if m != lexicon.NO_REFERENCE])
     if hits:
         base = base.hinted(Hint(source="lexicon", matches=hits))
-    if len(hits) == 1:
-        return base.settled(hits[0], "lexicon")
-    if len(remaining) == 1:
-        return base.settled(remaining[0], "code")
+    if subject_of(base) not in hints.contested:
+        if len(hits) == 1 and hits[0] in remaining:
+            return base.settled(hits[0], "lexicon")
+        if list(remaining) == [lexicon.NO_REFERENCE]:
+            return base.settled(lexicon.NO_REFERENCE, "code")
     columns = [column for column in profile.columns if column.name in remaining]
-    # An embedding margin ranks columns against each other; one column has no rival.
+    # A rank orders columns against each other; one column has no rival.
     if hints.embedder is None or len(columns) < 2:
         return base
-    ranked = embedding_rank(hints.embedder, entry, columns)
-    base = base.hinted(ranked)
-    floor, margin = hints.margin_floor, ranked.margin
-    if floor is not None and margin is not None and margin >= floor:
-        return base.settled(ranked.rank[0][0], "embedding")
-    return base
+    return base.hinted(embedding_rank(hints.embedder, entry, columns))
 
 
 def _read_dictionaries(
@@ -335,13 +343,15 @@ def _statuses(
     by_name: Mapping[str, RelationProfile],
     tools: ProfileTools,
     stated: Mapping[str, Mapping[str, Any]],
-) -> dict[str, StatusRole]:
-    """Value lists for settled status columns, read only when the policy permits.
+) -> tuple[dict[str, StatusRole], dict[str, str]]:
+    """Value lists for settled status columns, read only when the policy permits, and the
+    reason each status the policy withheld stays ``unverifiable``.
 
     ``SAMPLE_CAP`` (20) exceeds ``STATUS_CARDINALITY_CAP`` (10), so a sample holds every
-    value of an eligible column.
+    value of a column within the cap.
     """
     statuses: dict[str, StatusRole] = {}
+    unverifiable: dict[str, str] = {}
     for entry in found:
         column = entry.column
         if entry.role != lexicon.STATUS_ROLE or column is None or entry.source == "human":
@@ -353,14 +363,18 @@ def _statuses(
             sample = tools.sample_values(by_name[entry.relation].ref, column, SAMPLE_CAP)
         except ProfileRefusedError as error:
             logger.info("status values of {} are not read: {}", entry.relation, error)
+            unverifiable[scope] = f"its values cannot be read: {error}"
             continue
-        classes = status_classes(sample.values) if isinstance(sample, ValueSample) else None
+        if not isinstance(sample, ValueSample):
+            unverifiable[scope] = WITHHELD_STATUS
+            continue
+        classes = status_classes(sample.values)
         if classes is not None:
             active, retired = classes
             statuses[scope] = StatusRole(
                 column=column, active_values=active, retired_values=retired
             )
-    return statuses
+    return statuses, unverifiable
 
 
 def _hint_texts(entry: RoleEligibility, unresolved: Sequence[str]) -> tuple[str, ...]:

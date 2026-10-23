@@ -20,7 +20,7 @@ from tests.unit.intake.graph_env import (
     ASKED_COLUMNS,
     CODEBOOK,
     LAYOUT_PROPOSAL,
-    ROLES_CHOICE,
+    ROLE_MAP,
     STAGE_NODES,
     STRUCTURE_BATCH,
     GraphRun,
@@ -138,7 +138,7 @@ def test_decision_outside_the_members_is_rejected_before_anything_reruns(
 
 def test_resume_after_exit_reexecutes_from_land_and_continues(tmp_path: Path) -> None:
     source = code_tables(tmp_path)
-    dying = routed_client({STRUCTURE_BATCH: [choose_flat_lists]}, exit_on=ROLES_CHOICE)
+    dying = routed_client({STRUCTURE_BATCH: [choose_flat_lists]}, exit_on=ROLE_MAP)
     with pytest.raises(ProcessExit):
         graph().discover(
             source, descriptor=ACRIS_DESCRIPTOR, client=dying, run_id=EXIT_RUN_ID,

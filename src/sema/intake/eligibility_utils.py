@@ -1,8 +1,10 @@
 """Role eligibility shapes and the pure rules under them (design Decisions 6, 7, 20).
 
-Predicates read column aggregates only. Lexicon and mention matching compare whole
-normalized token sequences. The embedding rank is optional and settles a role only when
-its margin reaches ``EMBEDDING_MARGIN_FLOOR``.
+A role's members are the columns its data fact admits (S5 decisions 2, 3, 18): a key is
+unique and non-null, a date or array role takes a date, array, or text column, and every
+other role admits every column. Fixture-measured readings are findings on a column, never
+removals. Lexicon and mention matching compare whole normalized token sequences. The
+embedding rank is a fact only; it settles no role (S5 decision 18b).
 """
 
 from __future__ import annotations
@@ -22,7 +24,6 @@ from sema.intake.profile_utils import ColumnProfile
 
 __all__ = [
     "DETERMINISTIC_SOURCES",
-    "EMBEDDING_MARGIN_FLOOR",
     "DeclaredJoin",
     "Embedder",
     "Held",
@@ -38,13 +39,16 @@ __all__ = [
     "with_claims",
 ]
 
-# Measured 2026-10-21 by scripts/measure_embedding_margin.py over A2, A3, A8, ACRIS (38 role
-# entries): one wrong top choice at 0.0893 (A2 display); correct margins 0.0274 to 0.0785.
-# Floor = ceil to 0.01 of the widest wrong margin, plus 0.01.
-EMBEDDING_MARGIN_FLOOR: float = 0.10
-EligibilitySource = Literal["code", "memory", "lexicon", "embedding", "human", "model"]
+EligibilitySource = Literal["code", "memory", "lexicon", "human", "model"]
 HintSource = Literal["memory", "lexicon", "embedding"]
 HUMAN: EligibilitySource = "human"
+KEY_UNIQUE_NON_NULL = "key_unique_non_null"
+DATE_SHAPE = "date_shape"
+ARRAY_SHAPE = "array_shape"
+CONSTANT = "constant"
+DISPLAY_NULL_RATE = "display_null_rate"
+DEFINITION_MEAN_LENGTH = "definition_mean_length"
+STATUS_CARDINALITY = "status_cardinality"
 DETERMINISTIC_SOURCES: tuple[EligibilitySource, ...] = ("code", "lexicon")
 STATED_SOURCES: tuple[EligibilitySource, ...] = ("human", "model")
 # Ordinal, not calibrated: S3 calibrates confidence against the gold set.
@@ -53,7 +57,6 @@ SOURCE_CONFIDENCE: dict[str, float] = {
     "human": 1.0,
     "memory": 0.95,
     "lexicon": 0.9,
-    "embedding": 0.8,
 }
 DATE_TYPE_PREFIXES = ("DATE", "TIMESTAMP")
 ARRAY_TYPE_MARKERS = ("[]", "ARRAY", "LIST")
@@ -73,8 +76,8 @@ class Hint(BaseModel):
 
 
 class RoleEligibility(BaseModel):
-    """``members`` is the predicate set before narrowing; ``exclusions`` maps a removed
-    column to the earlier role that took it."""
+    """``members`` is the data-fact set; ``exclusions`` maps a member another role took to
+    that role. A model or human choice may lie outside the members, for the verifier."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -132,16 +135,19 @@ def with_stated(
     entry: RoleEligibility, choices: Mapping[str, StatedChoice]
 ) -> RoleEligibility:
     """A human ``none`` over an entry offering no ``none`` closes it with no choice; any
-    other human choice settles the entry even outside its members, for the verifier to judge.
-    A model or rule choice outside the members is dropped."""
+    other human or model choice settles the entry even outside its members, for the
+    verifier to judge. A model ``none`` the entry does not offer, or a rule choice outside
+    the members, is dropped."""
     stated = choices.get(subject_of(entry))
     if stated is None:
         return entry
     if stated.choice in entry.members:
         return entry.settled(stated.choice, stated.source, stated.confidence)
-    if stated.source == HUMAN and stated.choice == lexicon.NO_REFERENCE:
+    if stated.choice == lexicon.NO_REFERENCE:
+        if stated.source != HUMAN:
+            return entry
         return entry.model_copy(update=dict(source=stated.source, confidence=stated.confidence))
-    if stated.source == HUMAN:
+    if stated.source in STATED_SOURCES:
         return entry.settled(stated.choice, stated.source, stated.confidence)
     return entry
 
@@ -256,51 +262,49 @@ def _key(column: ColumnProfile, row_count: int) -> bool:
     return row_count > 0 and column.null_rate == 0.0 and column.is_unique
 
 
-def _text(column: ColumnProfile, row_count: int) -> bool:
-    filled = column.null_rate < lexicon.DISPLAY_NULL_RATE_FLOOR
-    return row_count > 0 and is_text(column) and filled and not column.is_constant
-
-
-def _long_text(column: ColumnProfile, row_count: int) -> bool:
-    mean = column.mean_length
-    long_enough = mean is not None and mean >= lexicon.DEFINITION_MEAN_LENGTH_FLOOR
-    return is_text(column) and long_enough and not column.is_constant
-
-
-def _low_cardinality(column: ColumnProfile, row_count: int) -> bool:
-    return 0 < column.distinct_count <= lexicon.STATUS_CARDINALITY_CAP
-
-
 def _date(column: ColumnProfile, row_count: int) -> bool:
-    return column.type.upper().startswith(DATE_TYPE_PREFIXES)
+    return column.type.upper().startswith(DATE_TYPE_PREFIXES) or is_text(column)
 
 
 def _array(column: ColumnProfile, row_count: int) -> bool:
     kind = column.type.upper()
-    return any(marker in kind for marker in ARRAY_TYPE_MARKERS)
+    return any(marker in kind for marker in ARRAY_TYPE_MARKERS) or is_text(column)
 
 
-def _any(column: ColumnProfile, row_count: int) -> bool:
-    return not column.is_constant
-
-
-PREDICATES: dict[str, Callable[[ColumnProfile, int], bool]] = {
-    "key": _key,
-    "text_key": lambda column, rows: _key(column, rows) and is_text(column),
-    "text": _text,
-    "long_text": _long_text,
-    "low_cardinality": _low_cardinality,
-    "date": _date,
-    "array": _array,
-    "any": _any,
-    "filled": lambda column, rows: column.null_rate < 1.0,
+# The data facts a role's members must satisfy, by predicate kind, with the check each one
+# names; every other kind admits every column and its readings are findings.
+FACTS: dict[str, tuple[str, Callable[[ColumnProfile, int], bool]]] = {
+    "key": (KEY_UNIQUE_NON_NULL, _key),
+    "date": (DATE_SHAPE, _date),
+    "array": (ARRAY_SHAPE, _array),
 }
 
 
+def fact_of(role: str) -> str | None:
+    """The data fact ``role``'s members satisfy, or ``None`` when every column is one."""
+    entry = next((e for e in lexicon.ROLES if e.name == role), None)
+    found = FACTS.get(entry.predicate) if entry is not None else None
+    return None if found is None else found[0]
+
+
 def eligible(entry: RoleEntry, columns: Iterable[ColumnProfile], row_count: int) -> tuple[str, ...]:
-    test = PREDICATES[entry.predicate]
-    passing = tuple(column.name for column in columns if test(column, row_count))
-    return lexicon_hits(entry.name, passing) if entry.name_gated else passing
+    fact = FACTS.get(entry.predicate)
+    return tuple(c.name for c in columns if fact is None or fact[1](c, row_count))
+
+
+def column_findings(column: ColumnProfile) -> tuple[tuple[str, float | None], ...]:
+    """The fixture-measured readings a column fails, each with its value (S5 decision 18)."""
+    found: list[tuple[str, float | None]] = []
+    if column.is_constant:
+        found.append((CONSTANT, None))
+    if column.null_rate >= lexicon.DISPLAY_NULL_RATE_FLOOR:
+        found.append((DISPLAY_NULL_RATE, column.null_rate))
+    mean = column.mean_length
+    if is_text(column) and mean is not None and mean < lexicon.DEFINITION_MEAN_LENGTH_FLOOR:
+        found.append((DEFINITION_MEAN_LENGTH, mean))
+    if column.distinct_count > lexicon.STATUS_CARDINALITY_CAP:
+        found.append((STATUS_CARDINALITY, float(column.distinct_count)))
+    return tuple(found)
 
 
 def _padded(text: str) -> str:

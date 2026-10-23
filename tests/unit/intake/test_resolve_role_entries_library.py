@@ -4,13 +4,12 @@ The structure is stated as the recorded A1 run's model settled it (run 12bca208)
 element relation as a denormalized concept list grouped by the written spec's key, the
 concept and mapping relations as concept lists with no section, the other two ignored.
 Roles then lists two open ``status`` entries on the data element relation (one per side)
-and an open ``.section`` entry for each concept list. The mocked model answers every enum
-field it is handed, so nothing here depends on how a field is named.
+and an open ``.section`` entry for each concept list. The mocked model answers every field
+it is handed, so nothing here depends on how a field is named beyond its role suffix.
 """
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -20,6 +19,7 @@ import yaml
 
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.loaders.database import land_database
+from sema.intake.output_models import ROLE_MAP_PREFIX
 from sema.intake.output_models_utils import ABSTAIN
 from tests.unit.intake.role_entries_env import (
     REASON,
@@ -31,14 +31,15 @@ from tests.unit.intake.role_entries_env import (
     denormalized,
     eligibility,
     entry,
-    enum_counter,
     member_of,
     offered,
     open_column_entries,
     output_models,
     resolved,
+    prompts,
     roles_of,
 )
+from tests.unit.intake.resolve_roles_env import map_members
 from tests.unit.intake.shapes.shapes_env import FIXTURES, Source, staging_source
 from tests.unit.intake.structure_env import fresh_tools, run
 
@@ -98,7 +99,7 @@ def test_library_lists_the_colliding_and_section_entries(library: Library) -> No
         assert f"{relation}.section" in {a.subject for a in grouped[relation]}
 
 
-def test_library_open_entries_each_get_a_field_over_their_own_members(
+def test_library_open_entries_each_get_a_map_field_offering_their_own_members(
     library: Library, tmp_path: Path
 ) -> None:
     source, structure, roles = library
@@ -106,10 +107,18 @@ def test_library_open_entries_each_get_a_field_over_their_own_members(
 
     resolved(source, structure, roles, client, tmp_path)
 
-    sent = [enum_counter(model) for model in output_models(client)]
+    sent = [
+        map_members(prompt)
+        for prompt, model in zip(prompts(client), output_models(client), strict=True)
+        if model.__name__.startswith(ROLE_MAP_PREFIX)
+    ]
     for relation, entries in _by_relation(roles, structure).items():
-        wanted = Counter(frozenset(offered(a)) for a in entries)
-        assert any(not wanted - got for got in sent), (relation, wanted, sent)
+        for listed in entries:
+            role = listed.subject.rpartition(".")[2]
+            assert any(
+                field.endswith(f"_{role}") and set(offered(listed)) <= set(members)
+                for fields in sent for field, members in fields.items()
+            ), (relation, role, offered(listed))
 
 
 def test_library_abstained_entries_stay_open_with_the_models_reason(

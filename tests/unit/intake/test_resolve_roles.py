@@ -1,11 +1,12 @@
 """Role ambiguities settled by a mocked model: one call per relation, memory, verify, retry.
 
 Pinned API: ``sema.intake.resolve.resolve_roles(roles, structure, land, tools, calls, *,
-provider="staging", max_retries=2) -> RolesResult``. Open entries are read from the input
+provider="staging", max_retries=1) -> RolesResult``. Open entries are read from the input
 ``roles.ambiguities`` (an entry with no choice is open), as ``resolve_structure`` reads
-its structure. Each relation with open roles is one call whose output model is
-``RolesChoice_v1`` over that relation's open roles. A choice is written onto its entry
-(``choice``, ``confidence``, ``source: model``, ``call_key``) and its eligibility settles
+its structure. Each relation with open roles is one call whose output model is the role
+map ``RoleMap..._v1`` over every role of the relation's role models (S5 decision 1). A
+choice is written onto its entry (``choice``, ``confidence``, ``source: model``,
+``call_key``) and its eligibility settles
 with ``source: model``; the settled choices are fed back to Roles as stated choices, so a
 relation sharing the signature inherits them with ``source: memory`` and makes no call.
 The Roles verifier re-runs on each answer; a failing answer is re-asked with every earlier
@@ -13,9 +14,8 @@ failure, at most ``max_retries`` times, then the failing entries are left open w
 failure as their reason. ``sema.intake.resolve`` is imported lazily so a missing function
 fails each test on its own.
 
-``code_unique`` cannot fail for a member column today (the ``key`` predicate already
-requires whole-relation uniqueness), so the value-check case uses ``display_null_rate``
-over a column of empty strings.
+A display column's empty-string rate is a finding (S5 decision 18): the choice stands
+and the finding is recorded on its entry.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from sema.intake.ledger_utils import prompt_hash
-from sema.intake.output_models import REFERENCE_CHOICE, ROLES_CHOICE, role_field
+from sema.intake.output_models import REFERENCE_CHOICE, ROLE_MAP_PREFIX, role_field
 from sema.intake.output_models_utils import ABSTAIN
 from sema.intake.verify.roles import verify_roles
 from tests.unit.intake.eligibility_env import Env, by_role
@@ -44,6 +44,7 @@ from tests.unit.intake.resolve_roles_env import (
     Synthetic,
     Tables,
     answering,
+    asked_columns,
     code_table_values,
     distinct,
     entry,
@@ -61,7 +62,7 @@ from tests.unit.intake.structure_env import fresh_tools, sheet, sql_lines
 
 pytestmark = pytest.mark.unit
 
-PROMPT_VERSION = "# prompt: roles v1"
+PROMPT_VERSION = "# prompt: roles v2"
 COLUMN_INFO = "Column_Info"
 # Column-role calls plus one reference call per relation with open reference entries.
 ACRIS_CALL_BUDGET = 40
@@ -128,27 +129,27 @@ def test_one_call_per_relation_signature_over_its_open_roles(
 
     models = output_models(client)
     assert len(models) == 2
-    assert all(model.__name__ == ROLES_CHOICE for model in models)
+    assert all(model.__name__.startswith(ROLE_MAP_PREFIX) for model in models)
     expected = {role_field("code"), role_field("display")}
-    assert all(set(role_fields(model)) == expected for model in models)
-    columns = [set(columns) for columns, _ in MEMORY_TABLES.values()]
-    for model in models:
-        offered = {c for field in role_fields(model) for c in enum_of(model, field)}
-        assert any(offered <= own for own in columns), offered
+    assert all(expected <= set(role_fields(model)) for model in models)
+    columns = [tuple(columns) for columns, _ in MEMORY_TABLES.values()]
+    for prompt in prompts(client):
+        assert asked_columns(prompt) in columns, asked_columns(prompt)
 
 
-def test_output_model_enumerates_only_each_roles_eligible_columns(
+def test_prompt_states_each_roles_data_fact_members(
     memory: Synthetic, tmp_path: Path
 ) -> None:
     client = answering(distinct())
 
     _resolved(memory, client, tmp_path)
 
-    (model,) = [m for m in output_models(client) if "mox" in enum_of(m, role_field("display"))]
-    assert set(enum_of(model, role_field("code"))) == {"tarn", "vell"}
-    assert set(enum_of(model, role_field("display"))) == {"tarn", "vell", "mox"}
-    schema = model.model_json_schema()["properties"]
-    assert all(ABSTAIN in schema[field]["enum"] for field in role_fields(model))
+    (prompt,) = [p for p in prompts(client) if "mox" in asked_columns(p)]
+    (code,) = lines_with(prompt, f"`{role_field('code')}`")
+    assert "key_unique_non_null" in code and "`tarn`" in code and "`vell`" in code
+    assert "mox" not in code
+    (display,) = lines_with(prompt, f"`{role_field('display')}`")
+    assert "data fact" not in display
 
 
 def test_model_choice_is_recorded_and_inherited_by_memory(
@@ -158,10 +159,12 @@ def test_model_choice_is_recorded_and_inherited_by_memory(
 
     result, wired = _resolved(memory, client, tmp_path)
 
-    keys = {prompt_hash(MODEL, prompt, ROLES_CHOICE) for prompt in prompts(client)}
+    sent = zip(prompts(client), output_models(client), strict=True)
+    keys = {prompt_hash(MODEL, prompt, model.__name__) for prompt, model in sent}
     first = relation("alpha")
     settled = by_role(result.eligibilities, first)
-    (answer,) = [a for a in client.answers if set(a.values()) <= {"zorb", "quax"}]
+    pair = (role_field("code"), role_field("display"))
+    (answer,) = [a for a in client.answers if {a[f] for f in pair} <= {"zorb", "quax"}]
     for role in ("code", "display"):
         chosen = entry(result, first, role)
         assert chosen.choice == answer[role_field(role)]
@@ -180,7 +183,7 @@ def test_model_choice_is_recorded_and_inherited_by_memory(
     assert verdict.status == "pass", verdict.failures
 
 
-def test_two_roles_on_one_column_are_retried_twice_then_left_open(
+def test_two_roles_on_one_column_are_retried_once_then_left_open(
     conflict: Synthetic, tmp_path: Path
 ) -> None:
     zeta = relation("zeta")
@@ -189,8 +192,8 @@ def test_two_roles_on_one_column_are_retried_twice_then_left_open(
     result, _ = _resolved(conflict, client, tmp_path)
 
     sent = prompts(client)
-    assert len(sent) == 3
-    assert len(set(sent)) == 3
+    assert len(sent) == 2
+    assert len(set(sent)) == 2
     for retry in sent[1:]:
         assert lines_with(retry, "one_role_per_column", "model"), retry
         assert lines_with(retry, "one_role_per_column", "zorb")
@@ -201,7 +204,7 @@ def test_two_roles_on_one_column_are_retried_twice_then_left_open(
         left = entry(result, zeta, role)
         assert (left.choice, left.source, left.call_key) == (None, None, None)
         assert left.reason is not None and "one_role_per_column" in left.reason
-    assert not [e for e in result.eligibilities if e.source == "model"]
+    assert not [e for e in result.eligibilities if e.source == "model" and e.column]
     assert by_role(result.eligibilities, zeta)["status"].choice == CONFLICT_STATUS
 
 
@@ -213,7 +216,7 @@ def test_retries_stop_at_max_retries(conflict: Synthetic, tmp_path: Path) -> Non
     assert client.invoke.call_count == 1
 
 
-def test_choice_failing_a_value_check_is_retried_twice_then_left_open(
+def test_a_display_over_blanks_stands_with_its_finding(
     blanks: Synthetic, tmp_path: Path
 ) -> None:
     eta = relation("eta")
@@ -222,20 +225,13 @@ def test_choice_failing_a_value_check_is_retried_twice_then_left_open(
     result, _ = _resolved(blanks, client, tmp_path)
 
     sent = prompts(client)
-    model = output_models(client)[0]
-    assert role_fields(model) == [role_field("display")]
-    offered = set(enum_of(model, role_field("display")))
-    assert {"wim", "rusk"} <= offered <= {"kelt", "wim", "rusk"}
-    assert len(sent) == 3
-    assert len(set(sent)) == 3
-    for retry in sent[1:]:
-        assert lines_with(retry, "display_null_rate", "wim"), retry
-    for prompt in sent:
-        assert lines_with(prompt, "kelt", "code"), "the exclusion in force is not stated"
-    left = entry(result, eta, "display")
-    assert (left.choice, left.source) == (None, None)
-    assert left.reason is not None and "display_null_rate" in left.reason
-    assert by_role(result.eligibilities, eta)["display"].source is None
+    assert asked_columns(sent[0]) == ("kelt", "wim", "rusk")
+    assert len(sent) == 1
+    assert lines_with(sent[0], "kelt", "code"), "the code's data fact is not stated"
+    chosen = entry(result, eta, "display")
+    assert (chosen.choice, chosen.source) == ("wim", "model")
+    assert [hint for hint in chosen.hints if "display_null_rate" in hint and "wim" in hint]
+    assert by_role(result.eligibilities, eta)["display"].source == "model"
     assert by_role(result.eligibilities, eta)["code"].choice == "kelt"
 
 
@@ -246,10 +242,10 @@ def acris_run(env: Env, tmp_module: Path) -> AcrisRun:
     dictionaries = sheet(source, COLUMN_INFO)
     assert len(dictionaries) == 15
     (first,) = [
-        d for d in dictionaries if by_role(roles.eligibilities, d)["property"].source == "lexicon"
+        d for d in dictionaries if by_role(roles.eligibilities, d)["property"].source == "model"
     ]
-    lexicon_map = by_role(roles.eligibilities, first)
-    client = answering(distinct({role: str(lexicon_map[role].choice) for role in ENTITY_ROLES}))
+    oracle_map = by_role(roles.eligibilities, first)
+    client = answering(distinct({role: str(oracle_map[role].choice) for role in ENTITY_ROLES}))
     root = tmp_module / "acris_resolve"
     wired = wired_run(root / "calls", client, intake_config(max_calls=ACRIS_CALL_BUDGET))
     tools = fresh_tools(source, root / "ledger", stage="roles", structure=env.a10)

@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 from langchain_core.utils.function_calling import convert_to_openai_function
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, create_model
 
 from sema.intake.output_models import (
     MAX_STRUCTURE_BATCH,
@@ -16,8 +16,9 @@ from sema.intake.output_models import (
     choice_model,
     entry_choices,
     layout_model,
-    role_choices,
-    roles_model,
+    role_field,
+    role_map_choices,
+    role_map_model,
     structure_batch_model,
 )
 from sema.intake.shapes import TEMPLATES
@@ -27,6 +28,8 @@ pytestmark = pytest.mark.unit
 KEY_CAP = 64
 BANNED_KEYWORDS = frozenset({"anyOf", "oneOf", "allOf", "$ref", "pattern", "default"})
 FREE_TEXT_FIELDS = frozenset({"reason", "reasons"})
+# A role map names any column of its relation as text; code verifies it (S5 decision 1).
+FREE_TEXT_PREFIX = "role_"
 VERSIONED_NAME = re.compile(r"_v\d+$")
 TEMPLATE_IDS = [template.ID for template in TEMPLATES]
 
@@ -82,7 +85,7 @@ def _portability_violations(schema: dict[str, Any]) -> list[str]:
 def _choice_violations(properties: dict[str, Any]) -> list[str]:
     violations: list[str] = []
     for name, prop in properties.items():
-        if name in FREE_TEXT_FIELDS:
+        if name in FREE_TEXT_FIELDS or name.startswith(FREE_TEXT_PREFIX):
             continue
         target = prop.get("items", {}) if prop.get("type") == "array" else prop
         if target.get("type") == "string" and "enum" not in target:
@@ -199,17 +202,19 @@ def test_structure_batch_rejects_a_missing_entry() -> None:
 
 
 ROLES = {"code": ["key_col", "label_col"], "display": ["label_col", "notes_col"]}
+ROLE_MODEL = create_model("TermRoles", code=(str, ...), display=(str, ...))
 
 
-def test_roles_model_enumerates_each_roles_eligible_columns() -> None:
-    model = roles_model(ROLES)
-    assert model.__name__ == "RolesChoice_v1"
-    assert _enum(model, "role_code") == ["key_col", "label_col", "abstain"]
-    assert _enum(model, "role_display") == ["label_col", "notes_col", "abstain"]
+def test_role_map_model_has_one_string_field_per_role() -> None:
+    model = role_map_model({"code_lists": ROLE_MODEL})
+    assert model.__name__ == "RoleMapTermRoles_v1"
+    properties = model.model_json_schema()["properties"]
+    for field in ("role_code", "role_display"):
+        assert properties[field]["type"] == "string" and "enum" not in properties[field]
 
 
-def test_roles_model_rejects_a_column_not_eligible_for_the_role() -> None:
-    model = roles_model(ROLES)
+def test_role_map_model_takes_any_column_and_requires_every_field() -> None:
+    model = role_map_model({"code_lists": ROLE_MODEL})
     valid = {
         "role_code": "key_col",
         "role_display": "label_col",
@@ -217,8 +222,7 @@ def test_roles_model_rejects_a_column_not_eligible_for_the_role() -> None:
         "reasons": ["unique", "text"],
     }
     model.model_validate(valid)
-    with pytest.raises(ValidationError):
-        model.model_validate({**valid, "role_code": "notes_col"})
+    model.model_validate({**valid, "role_code": "notes_col"})
     with pytest.raises(ValidationError):
         model.model_validate({k: v for k, v in valid.items() if k != "role_display"})
 
@@ -312,7 +316,7 @@ def test_layout_model_rejects_a_missing_field() -> None:
 
 def test_registry_covers_every_intake_output_model() -> None:
     names = [model.__name__ for model in _registered_models()]
-    assert {"StructureBatch_v1", "RolesChoice_v1", "LayoutProposal_v1"} <= set(names)
+    assert {"StructureBatch_v1", "RoleMapSampleRoles_v1", "LayoutProposal_v1"} <= set(names)
     assert len(names) == len(set(names))
     assert all(VERSIONED_NAME.search(name) for name in names)
 
@@ -357,14 +361,13 @@ def test_portability_check_catches_a_nested_optional_model() -> None:
     [
         lambda: choice_model("SectionChoice_v1", ["label", "abstain"]),
         lambda: structure_batch_model([["member_a"], ["member_b", "abstain"]]),
-        lambda: roles_model({"code": ["key_col", "abstain"]}),
         lambda: layout_model(TEMPLATE_IDS, ["fill_down"], ["_col_0", "none"],
                              GROUP_RELATIONS, SLOTS),
         lambda: layout_model([*TEMPLATE_IDS, "none"], ["fill_down"], COLUMNS,
                              GROUP_RELATIONS, SLOTS),
         lambda: layout_model(TEMPLATE_IDS, ["none"], COLUMNS, GROUP_RELATIONS, SLOTS),
     ],
-    ids=["choice", "batch", "roles", "layout_column", "layout_template", "layout_view"],
+    ids=["choice", "batch", "layout_column", "layout_template", "layout_view"],
 )
 def test_a_member_equal_to_a_sentinel_is_refused(build: Callable[[], Any]) -> None:
     with pytest.raises(ValueError, match="'(abstain|none)'"):
@@ -374,7 +377,7 @@ def test_a_member_equal_to_a_sentinel_is_refused(build: Callable[[], Any]) -> No
 @pytest.mark.parametrize(
     "build",
     [
-        lambda: roles_model({"code key": ["key_col"]}),
+        lambda: role_field("code key"),
         lambda: layout_model(TEMPLATE_IDS, ["fill_down"], COLUMNS, GROUP_RELATIONS,
                              ["parent-id"]),
     ],
@@ -430,21 +433,23 @@ def test_entry_choices_is_none_when_the_lists_do_not_match_the_entries(
     assert entry_choices(answer, 2) is None
 
 
-def test_role_choices_reads_each_role_in_order() -> None:
-    model = roles_model(ROLES)
+def test_role_map_choices_reads_each_role_in_order() -> None:
+    model = role_map_model({"code_lists": ROLE_MODEL})
     answer = model.model_validate(
-        {"role_code": "key_col", "role_display": "abstain",
+        {"role_code": "key_col", "role_display": "none",
          "confidences": [0.9, 0.2], "reasons": ["unique", "no text column"]},
     )
-    assert role_choices(answer, list(ROLES)) == [
+    fields = [role_field(role) for role in ROLES]
+    assert role_map_choices(answer, fields) == [
         ("key_col", 0.9, "unique"),
-        ("abstain", 0.2, "no text column"),
+        ("none", 0.2, "no text column"),
     ]
     short = model.model_validate({**answer.model_dump(), "reasons": ["unique"]})
-    assert role_choices(short, list(ROLES)) is None
+    assert role_map_choices(short, fields) is None
 
 
 def test_a_model_over_the_key_cap_is_refused() -> None:
-    roles = {f"role_{index}": ["key_col"] for index in range(KEY_CAP)}
+    roles = {f"role_{index}": (str, ...) for index in range(KEY_CAP)}
+    wide = create_model("WideRoles", **roles)  # type: ignore[call-overload]
     with pytest.raises(ValueError, match="key"):
-        roles_model(roles)
+        role_map_model({"wide": wide})

@@ -5,8 +5,10 @@ non-alphanumerics become spaces, whitespace collapses, and a trailing plural
 ``s`` is stripped from each token.
 
 This is the one intake module that spells role names (design Decision 5). Each role
-names its predicate kind, which is also the check id the roles verifier reports. Tokens
-are written as a tuple of single words per role and reviewed with every change.
+names its predicate kind: a data fact the roles verifier checks (``key``, ``date``,
+``array``, ``contained``) or a reading that only yields findings. Tokens are written as a
+tuple of single words per role, render as facts in the role-map prompt, and are reviewed
+with every change.
 """
 
 from __future__ import annotations
@@ -22,10 +24,11 @@ from sema.binding.spec_sections import (
     ValueSetRoles,
 )
 
-LEXICON_VERSION = "s3-1"
+LEXICON_VERSION = "s5-1"
 
 PredicateKind = Literal[
-    "key", "text_key", "text", "long_text", "low_cardinality", "date", "array", "any", "filled"
+    "key", "text_key", "text", "long_text", "low_cardinality", "date", "array", "any", "filled",
+    "contained",
 ]
 ReferenceKind = Literal["vocabulary", "entity"]
 
@@ -60,17 +63,12 @@ class RoleEntry:
     tokens: tuple[str, ...]
     description: str
     predicate: PredicateKind
-    name_gated: bool = False
-
-    @property
-    def check(self) -> str:
-        return self.predicate
 
 
 # Settled in this order; code precedes the identifier because its words are narrower,
 # and a property's description precedes the property because dictionary headers name
-# both with the same leading word. Identity roles come last and are name-gated: no
-# profile signature tells them apart, so only a column named for one is a candidate.
+# both with the same leading word. Identity roles are fields like any other (S5 decision
+# 18a); entries with no tokens follow, so a token match is claimed before them.
 ROLES: tuple[RoleEntry, ...] = (
     RoleEntry(
         "code", ("code", "value"), "the short code that identifies a term in its list", "key"
@@ -122,7 +120,6 @@ ROLES: tuple[RoleEntry, ...] = (
         ("title", "heading"),
         "a longer heading shown alongside the preferred name",
         "any",
-        name_gated=True,
     ),
     # One vocabulary per list is common, so a constant column still qualifies.
     RoleEntry(
@@ -130,14 +127,33 @@ ROLES: tuple[RoleEntry, ...] = (
         ("vocabulary", "vocabulary_id"),
         "the external vocabulary a term's concept code belongs to",
         "filled",
-        name_gated=True,
     ),
     RoleEntry(
         "concept_code",
         ("concept_code", "external_code"),
         "the term's code in its external vocabulary",
         "any",
-        name_gated=True,
+    ),
+    RoleEntry(
+        "replaced_by", (), "the identifier of the row that replaces a withdrawn one", "contained"
+    ),
+    RoleEntry("fk_entity", (), "the entity an attribute refers to", "contained"),
+    RoleEntry(
+        "fk_property", (), "the attribute of the referred entity an attribute joins on",
+        "contained",
+    ),
+    RoleEntry("data_type", (), "the data type of the values a concept takes", "any"),
+    RoleEntry("type", (), "the data type of one attribute", "any"),
+    RoleEntry("required", (), "whether an attribute must hold a value", "low_cardinality"),
+    RoleEntry(
+        "primary_key", (), "whether an attribute is part of its entity's key", "low_cardinality"
+    ),
+    RoleEntry("lang", (), "the language a row's text is written in", "low_cardinality"),
+    RoleEntry("sensitive", (), "whether a concept's values need protection", "low_cardinality"),
+    RoleEntry("entity_description", (), "prose explaining the entity itself", "text"),
+    RoleEntry("domain", (), "the vocabulary an attribute's values are drawn from", "text"),
+    RoleEntry(
+        "display_fallback", (), "the text shown for a code when its display is empty", "text"
     ),
 )
 
@@ -151,6 +167,19 @@ STATUS_VALUE_WORDS: dict[str, tuple[str, ...]] = {
 ENTITY_PROPERTY_ROLE = "property"
 PROPERTY_TEXT_ROLES = ("description",)
 NOTES_ROLE = "notes"
+ENTITY_ROLE = "entity"
+# A role-map field per role, except the entity a binding slot names and the notes assembly
+# derives from the unbound text columns.
+MAP_UNASKED_ROLES = frozenset({NOTES_ROLE, ENTITY_ROLE})
+# Each containment role and the roles whose column holds the values it must be among, in
+# preference order: a code list's own code before a value's concept key.
+CONTAINED_IN: dict[str, tuple[str, ...]] = {
+    "replaced_by": ("code", "concept_id"),
+    "fk_entity": (ENTITY_ROLE,),
+    "fk_property": ("property",),
+}
+# The containment roles checked by count; ``replaced_by`` is checked by its join rate.
+ENTITY_REFERENCE_ROLES = ("fk_entity", "fk_property")
 REFERENCE_ROLES: tuple[tuple[str, ReferenceKind], ...] = (
     ("domain", "vocabulary"),
     ("fk_entity", "entity"),
@@ -187,7 +216,9 @@ def _check_role_names() -> None:
     known = {name for model in _ROLE_MODELS for name in model.model_fields}
     named = {entry.name for entry in ROLES} - _UNMODELLED_ROLES
     named |= {STATUS_ROLE, ENTITY_PROPERTY_ROLE, NOTES_ROLE, *PROPERTY_TEXT_ROLES}
-    named |= {name for name, _ in REFERENCE_ROLES}
+    named |= {name for name, _ in REFERENCE_ROLES} | set(MAP_UNASKED_ROLES)
+    named |= {name for names in CONTAINED_IN.values() for name in names} | set(CONTAINED_IN)
+    named |= set(ENTITY_REFERENCE_ROLES)
     if unknown := sorted(named - known):
         raise ValueError(f"lexicon names roles no spec role model declares: {unknown}")
 

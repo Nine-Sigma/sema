@@ -285,19 +285,19 @@ def test_ignore_on_a_required_column_role_closes_it_unbound_and_fails_the_verifi
     assert (eta, "display", HUMAN) in named
 
 
-def test_human_display_choice_failing_a_value_check_is_listed_with_source_human(
+def test_human_display_choice_over_blanks_stands_with_its_finding(
     blanks: Synthetic, tmp_path: Path
 ) -> None:
+    """The display null rate is a finding, not a failure (S5 decision 18)."""
     eta = relation("eta")
     subject = f"{eta}.display"
 
     result, verdict = _decided_roles(blanks, tmp_path, [decision(ROLES, subject, "wim")])
 
     assert by_role(result.eligibilities, eta)["display"].source == HUMAN
-    (found,) = [f for f in verdict.failures if f.check == DISPLAY_NULL_RATE]
-    assert (found.relation, found.column, found.evidence["source"]) == (eta, "wim", HUMAN)
-    (listed,) = [a for a in verdict.ambiguities if a.subject == subject]
-    assert (listed.choice, listed.source) == ("wim", HUMAN)
+    assert not [f for f in verdict.failures if f.check == DISPLAY_NULL_RATE]
+    (found,) = [f for f in verdict.findings if f.name == DISPLAY_NULL_RATE]
+    assert found.subject == f"{eta}.wim"
 
 
 @pytest.fixture(scope="module")

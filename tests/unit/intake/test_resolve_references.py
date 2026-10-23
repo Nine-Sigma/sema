@@ -41,7 +41,7 @@ from tests.unit.intake.structure_env import fresh_tools
 
 pytestmark = pytest.mark.unit
 
-PROMPT_VERSION = "# prompt: roles v1"
+PROMPT_VERSION = "# prompt: roles v2"
 DOMAIN = "domain"
 SUBJECT = f"{relation(DICTIONARY)}.{DOMAIN}.{SLANT}"
 

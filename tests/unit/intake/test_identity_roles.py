@@ -2,17 +2,14 @@
 
 Pinned contract:
 
-- The lexicon declares each role with tokens and a description. The roles are NAME-GATED
-  (team lead, 2026-10-21): they have no structural signature, so the eligibility set is
-  the columns whose normalized name matches the role's tokens, plus ``none``. A constant
-  column may be in ``vocabulary_id``'s set (one vocabulary per list is common).
+- The lexicon declares each role with tokens and a description. They are role-map fields
+  like any other (S5 decision 18a, reversing the 2026-10-21 name gate): every column is a
+  member, plus ``none``; a name match is a lexicon fact; a constant column keeps its finding.
 - ``title`` is a concept role (``ConceptRoles``); ``vocabulary_id`` and ``concept_code`` are
-  code-list roles (``CodeListRoles``, so also ``ValueSetRoles``). All three are optional.
-  With no name match the set is ``(none,)``: the role settles ``none`` by code with no
-  entry, so a source without such columns gains no ambiguity and no model call.
-- A name-matched column settles the role with ``source: lexicon``. The earlier roles keep
-  their columns: ``code`` and ``display`` still settle, and a lone label column named like
-  a title stays the ``name``.
+  code-list roles (``CodeListRoles``, so also ``ValueSetRoles``). All three are optional,
+  and with no name match the model may name any column or ``none``.
+- A name match settles the role with ``source: lexicon``; ``code`` and ``display`` still
+  settle, and a lone label column named like a title stays the ``name``.
 - A chosen column reaches the spec field the importer reads (``title`` seeds the concept's
   synonyms; ``vocabulary_id`` with ``concept_code`` gives each term an external ref);
   ``none`` reaches no field.
@@ -135,6 +132,11 @@ def source(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Source]:
     con.close()
 
 
+def _members(source: Source, relation: str) -> set[str]:
+    (profile,) = [p for p in source.profiles() if p.ref.name == relation]
+    return {*(column.name for column in profile.columns), NONE}
+
+
 def _roles(source: Source, relation: str, section: str | None) -> dict[str, Any]:
     found = eligibility().compute(_binding(relation, section), source.profiles())
     return by_role(found, relation)
@@ -205,14 +207,13 @@ def test_concept_targets_offer_title_and_code_list_targets_the_vocabulary_pair(
     [(TOPICS, CONCEPTS, TITLE), (TERMS, CODE_LIST_SECTION, VOCABULARY),
      (TERMS, CODE_LIST_SECTION, CONCEPT_CODE)],
 )
-def test_identity_role_members_are_the_name_matched_columns(
+def test_identity_role_members_are_every_column_and_the_name_match_is_a_fact(
     source: Source, relation: str, section: str, role: str
 ) -> None:
-    """Other text, low-cardinality, and code-like columns (``topic_label``, ``term_band``,
-    ``term_code``) match no token, so they are not members."""
-    members = _roles(source, relation, section)[role].members
+    """Columns matching no token (``topic_label``, ``term_band``, ``term_code``) stay in."""
+    entry = _roles(source, relation, section)[role]
 
-    assert members == (CHOSEN[(relation, role)], NONE)
+    assert set(entry.members) == _members(source, relation) and entry.members[-1] == NONE
 
 
 @pytest.mark.parametrize(
@@ -239,30 +240,33 @@ def test_earlier_roles_keep_their_columns(source: Source) -> None:
 
 
 @pytest.mark.parametrize(
-    ("relation", "section", "names"),
-    [(BARE_CONCEPTS, CONCEPTS, (TITLE,)), (CAPTIONS, CONCEPTS, (TITLE,)),
-     (BARE_TERMS, CODE_LIST_SECTION, (VOCABULARY, CONCEPT_CODE)),
-     (PELL, CODE_LIST_SECTION, (VOCABULARY, CONCEPT_CODE))],
+    ("relation", "section", "names", "claimed"),
+    [(BARE_CONCEPTS, CONCEPTS, (TITLE,), True), (CAPTIONS, CONCEPTS, (TITLE,), False),
+     (BARE_TERMS, CODE_LIST_SECTION, (VOCABULARY, CONCEPT_CODE), True),
+     (PELL, CODE_LIST_SECTION, (VOCABULARY, CONCEPT_CODE), False)],
 )
-def test_a_relation_without_identity_names_settles_none_with_no_entry(
-    source: Source, relation: str, section: str, names: tuple[str, ...]
+def test_a_relation_without_identity_names_asks_them_unless_every_column_is_claimed(
+    source: Source, relation: str, section: str, names: tuple[str, ...], claimed: bool
 ) -> None:
+    """A free column leaves the role open; with every column claimed it settles ``none``."""
     roles = _roles(source, relation, section)
     listed = {a.subject for a in eligibility().ambiguities(roles.values())}
 
     for name in names:
-        assert roles[name].members == (NONE,), name
-        assert (roles[name].choice, roles[name].source) == (NONE, "code"), name
-        assert f"{relation}.{name}" not in listed, name
+        assert set(roles[name].members) == _members(source, relation), name
+        settled = (roles[name].choice, roles[name].source)
+        assert settled == ((NONE, "code") if claimed else (None, None)), name
+        assert (f"{relation}.{name}" in listed) is not claimed, name
 
 
-def test_the_optional_roles_shape_gains_no_new_open_entry(source: Source) -> None:
+def test_the_optional_roles_shape_opens_its_identity_roles(source: Source) -> None:
     roles = _roles(source, PELL, CODE_LIST_SECTION)
     listed = eligibility().ambiguities(roles.values())
+    opened = ("code", "display", "status", VOCABULARY, CONCEPT_CODE)
 
     assert set(IDENTITY_ROLES) - {TITLE} <= set(roles)
     open_subjects = {a.subject for a in listed if a.choice is None}
-    assert open_subjects == {f"{PELL}.{role}" for role in ("code", "display", "status")}
+    assert {f"{PELL}.{role}" for role in opened} <= open_subjects
 
 
 def test_chosen_identity_columns_reach_the_spec_and_the_import(

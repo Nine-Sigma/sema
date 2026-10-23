@@ -1,7 +1,9 @@
 """Roles verifier helpers: the spec's bound sections and each role's value predicate.
 
 Every value check is a count or a join rate over the bound relation, so it runs under
-``metadata_only`` without reading a value. Role names come from the spec role models.
+``metadata_only`` without reading a value. A display column's empty rate is a finding,
+reported beside the verdict and never a failure (S5 decision 18). Role names come from
+the spec role models.
 """
 
 from __future__ import annotations
@@ -16,18 +18,17 @@ from sema.binding.spec_sections import RelationRef, StatusRole
 from sema.intake import lexicon
 from sema.intake.eligibility_spec_utils import VALUE_SETS
 from sema.intake.eligibility_text_utils import CODE_LISTS, CONCEPTS
-from sema.intake.eligibility_utils import ARRAY_TYPE_MARKERS
+from sema.intake.eligibility_utils import ARRAY_TYPE_MARKERS, DISPLAY_NULL_RATE
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import TEXT_TYPE, RelationProfile, sql_string
 from sema.intake.shapes import entity_model
 from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR, is_text
 from sema.intake.shapes.base_utils import failure
 from sema.intake.structure_hint_utils import KEY_ROLE, SECTION_SEPARATOR
-from sema.intake.verify.base import Failure
+from sema.intake.verify.base import Failure, Finding
 
 IDENTITY_UNIQUE = f"{KEY_ROLE}_unique"
 CODE_UNIQUE = "code_unique"
-DISPLAY_NULL_RATE = "display_null_rate"
 SYNONYMS_SHAPE = "synonyms_shape"
 STATUS_VALUES = "status_values"
 VALID_DATES = "valid_dates"
@@ -36,7 +37,6 @@ LANG_TAGS = "lang_tags"
 VALUE_CHECKS = (
     IDENTITY_UNIQUE,
     CODE_UNIQUE,
-    DISPLAY_NULL_RATE,
     SYNONYMS_SHAPE,
     STATUS_VALUES,
     VALID_DATES,
@@ -129,11 +129,18 @@ def value_failures(
     roles = role_columns(section.roles)
     bound = {role: column for role, column in roles.items() if column in present}
     checks: tuple[ValueCheck, ...] = (
-        _identity_unique, _code_unique, _display_nulls, _status_values, _valid_dates,
-        _replaced_by, _lang_tags,
+        _identity_unique, _code_unique, _status_values, _valid_dates, _replaced_by, _lang_tags,
     )
     failures = [found for check in checks for found in check(section, bound, tools)]
     return failures + _synonyms_shape(section, bound, profile)
+
+
+def value_findings(
+    section: BoundSection, profile: RelationProfile, tools: ProfileTools
+) -> list[Finding]:
+    present = {column.name for column in profile.columns}
+    display = role_columns(section.roles).get("display")
+    return _display_nulls(section, display, tools) if display in present else []
 
 
 def _text(tools: ProfileTools, ref: RelationRef, column: str) -> str:
@@ -178,9 +185,8 @@ def _code_unique(
 
 
 def _display_nulls(
-    section: BoundSection, bound: dict[str, str], tools: ProfileTools
-) -> list[Failure]:
-    display = bound.get("display")
+    section: BoundSection, display: str | None, tools: ProfileTools
+) -> list[Finding]:
     if display is None:
         return []
     ref = section.relation
@@ -189,8 +195,7 @@ def _display_nulls(
     rate = empty / rows if rows else 0.0
     if rate < lexicon.DISPLAY_NULL_RATE_FLOOR:
         return []
-    return [failure(DISPLAY_NULL_RATE, ref.name, display, null_rate=rate,
-                    floor=lexicon.DISPLAY_NULL_RATE_FLOOR)]
+    return [Finding(name=DISPLAY_NULL_RATE, subject=f"{ref.name}.{display}", value=rate)]
 
 
 def _status_values(

@@ -1,12 +1,13 @@
 """Prompts fit a policy budget (intake-model-calls, accepted 2026-10-21).
 
-``MAX_PROMPT_TOKENS`` sits beside ``ModelCalls``. A prompt over it is compacted in a
-stated order: an entry offering every column but its exclusions becomes one statement
-(its output enum unchanged), then schema text is read in a stated order and capped per
-relation with a line naming the rows not shown, then only columns an open entry offers
-or a claim in force holds keep full facts and the rest are named. A prompt that still
-does not fit makes no provider call, is not counted, logs ``call_refused`` with its key
-and size, and leaves its entries open. A prompt under the budget renders as before.
+``MAX_PROMPT_TOKENS`` sits beside ``ModelCalls``. A role-map prompt shows a fixed sample
+of each schema relation's text, read in a stated order, with a line naming the rows not
+shown (S5 decision 6). A prompt over the budget is compacted in the delta's order, each
+omission stated: comments are truncated, then the schema sample shrinks to its first
+rows, then every column keeps only its name and type. A prompt that still does not fit
+makes no provider call, is not counted, logs ``call_refused`` with its key and size, and
+leaves its entries open. A prompt under the budget renders in full. The Structure prompt
+keeps its own ladder (``resolve_budget_utils``).
 
 Every width and row count is computed from the constant, never from a fixture. A
 prompt's size is what reaches the provider: the client's own estimate over the rendered
@@ -23,14 +24,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sema.intake.ledger_utils import prompt_hash
-from sema.intake.output_models import ROLES_CHOICE
+from sema.intake.output_models import ROLE_MAP_PREFIX
 from sema.intake.resolve_utils import member_bindings
 from sema.intake.shapes import concept_list, path_codes
 from sema.intake.shapes.base import profile_relations
 from sema.intake.shapes.precedence import STAGE
 from sema.intake.verify.base import Ambiguity
-from tests.unit.intake.model_calls_env import MODEL
 from tests.unit.intake.prompt_budget_env import (
     LABELS,
     REFUSED_EVENT,
@@ -44,8 +43,8 @@ from tests.unit.intake.prompt_budget_env import (
     dictionary,
     dictionary_key,
     dictionary_table,
-    enum_of,
     lines_naming,
+    long_dictionary_table,
     measured,
     mixed,
     output_models,
@@ -65,7 +64,8 @@ pytestmark = pytest.mark.unit
 
 OPEN_ROLES = ("code", "display")
 OFFERED = (concept_list.ID, path_codes.ID)
-MEMBER_LINE = len("- `col_0000`\n")
+NAME_AND_TYPE = len("- col_0000: type VARCHAR\n")
+OMITTED = "columns show only their name and type"
 STATEMENT_ALLOWANCE = 400
 NAMED_ALLOWANCE = len("col_0000, ")
 DICTIONARY_ROW = len(
@@ -73,13 +73,8 @@ DICTIONARY_ROW = len(
 )
 KEY = re.compile(r"\bk\d{6}\b")
 CONSTANT_LINE = re.compile(r"^MAX_PROMPT_TOKENS(: int)? = [\d_]+\s*(#.*)?$", re.MULTILINE)
-# Captured at HEAD f945592 for prompts far under any budget; compaction must not touch them.
-UNDER_BUDGET_KEYS = {
-    "wide_6": "dd11a935a369c48d26144f435313bbaaf237a4b888b3c4eada5bcf5a532474b5",
-    "dictionary_5_descending": (
-        "a4f558c403827a3958bc163669a466334d2ca5a8c2c928d3b18a424d80c32cf6"
-    ),
-}
+# Prompts far under any budget, by name: their column count and schema rows shown.
+UNDER_BUDGET_SHAPES = {"wide_6": (6, 0), "dictionary_5_descending": (3, 5)}
 
 
 @pytest.fixture(scope="module")
@@ -103,11 +98,10 @@ def facts(prompt: str, name: str) -> list[str]:
 
 
 def compacted_wide_width(shape: tuple[int, int]) -> int:
-    """A width whose full rendering exceeds the budget while one statement per entry fits."""
+    """A width whose full rendering exceeds the budget while name and type per column fit."""
     fixed, per_column = shape
     width = width_over(fixed, per_column, 1.05)
-    compacted = fixed + width * (per_column - len(OPEN_ROLES) * MEMBER_LINE)
-    if compacted + len(OPEN_ROLES) * STATEMENT_ALLOWANCE > chars(budget()) * 0.97:
+    if fixed + width * NAME_AND_TYPE + STATEMENT_ALLOWANCE > chars(budget()) * 0.97:
         pytest.fail(f"no width separates full {per_column}/column from compacted at this budget")
     return width
 
@@ -138,7 +132,7 @@ def test_budget_is_a_policy_constant_beside_model_calls() -> None:
     assert CONSTANT_LINE.search(inspect.getsource(model_calls)), "a literal, not derived"
 
 
-def test_wide_relation_entries_become_statements_and_fit_one_call(
+def test_wide_relation_keeps_name_and_type_per_column_and_fits_one_call(
     wide_shape: tuple[int, int], tmp_path: Path
 ) -> None:
     width = compacted_wide_width(wide_shape)
@@ -149,13 +143,13 @@ def test_wide_relation_entries_become_statements_and_fit_one_call(
     assert client.invoke.call_count == 1
     (prompt,), (output_model,) = prompts(client), output_models(client)
     assert size(prompt, output_model) <= budget()
+    assert output_model.__name__.startswith(ROLE_MAP_PREFIX)
     columns = tuple(column_name(i) for i in range(width))
     for role in OPEN_ROLES:
-        assert f"{relation('wide')}.{role}" in prompt
-        assert enum_of(output_model, f"role_{role}") == columns
+        assert f"`role_{role}`" in prompt, role
     for name in columns:
-        assert len(facts(prompt, name)) == 1, name
-        assert len(lines_naming(prompt, name)) <= 2, name
+        assert facts(prompt, name) == [f"- {name}: type VARCHAR"], name
+    assert lines_naming(prompt, OMITTED)
     assert watch.wired.row().model_calls == 1
     built.close()
 
@@ -199,13 +193,13 @@ def test_schema_text_is_read_in_a_stated_order_and_capped_per_relation(
         assert len(facts(prompt, column_name(index))) == 1
 
 
-def test_only_offered_and_claimed_columns_keep_full_facts(
+def test_compaction_keeps_every_column_named_with_its_type(
     mixed_shape: tuple[int, int], tmp_path: Path
 ) -> None:
     fixed, per_column = mixed_shape
     numbers = width_over(fixed, per_column, 1.2)
-    if fixed + numbers * NAMED_ALLOWANCE + STATEMENT_ALLOWANCE > chars(budget()) * 0.9:
-        pytest.fail("no numeric width separates full facts from names at this budget")
+    if fixed + (LABELS + 1 + numbers) * NAME_AND_TYPE + STATEMENT_ALLOWANCE > chars(budget()):
+        pytest.fail("no numeric width separates full facts from name and type at this budget")
     built = mixed(numbers, tmp_path / "source")
     watch, _ = roles_run(built, tmp_path)
     built.close()
@@ -213,22 +207,20 @@ def test_only_offered_and_claimed_columns_keep_full_facts(
     assert watch.wired.client.invoke.call_count == 1
     (prompt,), (output_model,) = prompts(watch.wired.client), output_models(watch.wired.client)
     assert size(prompt, output_model) <= budget()
-    for index in range(LABELS + 1):
-        assert len(facts(prompt, column_name(index))) == 1, "offered or in force"
+    for index in range(LABELS + 1 + numbers):
+        assert len(facts(prompt, column_name(index))) == 1, column_name(index)
     for index in range(LABELS + 1, LABELS + 1 + numbers):
         name = column_name(index)
-        assert lines_naming(prompt, name), f"{name} is not named"
-        assert not facts(prompt, name), f"{name} kept its facts"
-    assert numbered(prompt, numbers), "the omission of the other columns is not stated"
+        assert facts(prompt, name) == [f"- {name}: type DOUBLE"], name
+    assert lines_naming(prompt, OMITTED), "the omission of the column facts is not stated"
 
 
-def test_prompt_that_cannot_fit_is_refused_without_a_call(
-    wide_shape: tuple[int, int], tmp_path: Path
-) -> None:
-    fixed, per_column = wide_shape
-    compacted_column = per_column - len(OPEN_ROLES) * MEMBER_LINE
-    width = int(chars(budget()) * 1.1 // compacted_column) + 1
-    built = wide(width, tmp_path / "source")
+def test_prompt_that_cannot_fit_is_refused_without_a_call(tmp_path: Path) -> None:
+    """Five schema rows, each longer than the budget shares out, still do not fit once
+    every step of the order has run."""
+    sentence = int(chars(budget()) * 1.1 // 5) + 1
+    statement = long_dictionary_table("dict", 5, sentence)
+    built = Built([statement], tmp_path / "source", lambda: [dictionary("dict")])
     watch, result = roles_run(built, tmp_path)
     built.close()
 
@@ -243,10 +235,9 @@ def test_prompt_that_cannot_fit_is_refused_without_a_call(
     assert payload["prompt_hash"] == keys[0]
     numbers = [v for v in payload.values() if isinstance(v, int) and not isinstance(v, bool)]
     assert any(number > budget() for number in numbers), payload
-    for role in OPEN_ROLES:
-        (left,) = [a for a in result.ambiguities if a.subject == f"{relation('wide')}.{role}"]
-        assert (left.choice, left.source, left.call_key) == (None, None, None)
-        assert left.reason is not None and "budget" in left.reason
+    (left,) = [a for a in result.ambiguities if a.subject == f"{relation('dict')}.property"]
+    assert (left.choice, left.source, left.call_key) == (None, None, None)
+    assert left.reason is not None and "budget" in left.reason
 
 
 def test_structure_prompt_shares_the_schema_text_cap(tmp_path: Path) -> None:
@@ -275,8 +266,10 @@ def test_structure_prompt_shares_the_schema_text_cap(tmp_path: Path) -> None:
     assert [line for line in numbered(prompt, rows - shown) if "not shown" in line]
 
 
-@pytest.mark.parametrize("name", sorted(UNDER_BUDGET_KEYS))
-def test_prompt_under_the_budget_renders_as_before(name: str, tmp_path: Path) -> None:
+@pytest.mark.parametrize("name", sorted(UNDER_BUDGET_SHAPES))
+def test_prompt_under_the_budget_renders_in_full(name: str, tmp_path: Path) -> None:
+    """Compaction does not touch it: every column keeps its full facts, every schema row
+    is shown, and nothing is stated as omitted."""
     if name == "wide_6":
         built = Built([text_table("wide", 6)], tmp_path, lambda: [code_list("wide")])
     else:
@@ -285,7 +278,13 @@ def test_prompt_under_the_budget_renders_as_before(name: str, tmp_path: Path) ->
     built.close()
 
     (prompt,) = prompts(watch.wired.client)
-    assert prompt_hash(MODEL, prompt, ROLES_CHOICE) == UNDER_BUDGET_KEYS[name], prompt
+    columns, rows = UNDER_BUDGET_SHAPES[name]
+    assert "Omitted to fit the budget" not in prompt
+    assert [line for line in prompt.splitlines() if "more rows not shown" in line] == []
+    for index in range(columns):
+        (line,) = facts(prompt, column_name(index))
+        assert "distinct" in line and "null rate" in line, line
+    assert len(shown_keys(prompt)) == rows
 
 
 def dotted_table(numeric_width: int) -> str:

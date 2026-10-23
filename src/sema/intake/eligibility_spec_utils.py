@@ -93,6 +93,7 @@ class RolesResult:
     stated: dict[str, dict[str, Any]] = field(default_factory=dict)
     notes: dict[str, tuple[str, ...]] = field(default_factory=dict)
     header_keys: HeaderKeys | None = None
+    unverifiable: dict[str, str] = field(default_factory=dict)
 
 
 def assemble(descriptor: RunDescriptor, roles: RolesResult) -> ConceptSourceSpec | None:
@@ -222,7 +223,8 @@ def roles_of(
     extra: Mapping[str, Any] | None = None,
     section: str | None = None,
 ) -> Roles | None:
-    """``section`` picks one side of a relation that feeds two sections."""
+    """``section`` picks one side of a relation that feeds two sections. A status the
+    policy kept unread stays bound with empty value lists, marked ``unverifiable``."""
     scope = scope_of(relation, section)
     values: dict[str, Any] = {
         e.role: e.column
@@ -231,8 +233,10 @@ def roles_of(
         and e.column is not None and e.role in model.model_fields
     }
     if lexicon.STATUS_ROLE in values:
+        column = values.pop(lexicon.STATUS_ROLE)
         status = roles.statuses.get(scope)
-        values.pop(lexicon.STATUS_ROLE)
+        if status is None and scope in roles.unverifiable:
+            status = StatusRole(column=column, active_values=[], retired_values=[])
         values |= {lexicon.STATUS_ROLE: status} if status is not None else {}
     values |= dict(extra or {})
     values |= {k: v for k, v in roles.stated.get(scope, {}).items() if k in model.model_fields}

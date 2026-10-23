@@ -80,7 +80,7 @@ def test_two_model_roles_on_one_column_fail_naming_both_and_the_source(
     assert found.evidence["source"] == "model"
 
 
-def test_a_human_display_over_blanks_fails_the_null_rate_naming_human(
+def test_a_human_display_over_blanks_passes_with_the_null_rate_finding(
     blanks: Synthetic, tmp_path: Path
 ) -> None:
     eta = relation("eta")
@@ -89,9 +89,9 @@ def test_a_human_display_over_blanks_fails_the_null_rate_naming_human(
 
     verdict = verify_roles(roles, _tools(blanks, tmp_path), spec=None, relations=[eta])
 
-    (found,) = [f for f in verdict.failures if f.check == "display_null_rate"]
-    assert (found.relation, found.column) == (eta, "wim")
-    assert found.evidence["source"] == "human"
+    assert not [f for f in verdict.failures if f.check == "display_null_rate"]
+    (found,) = [f for f in verdict.findings if f.name == "display_null_rate"]
+    assert found.subject == f"{eta}.wim"
 
 
 def test_without_named_relations_no_chosen_role_is_checked(

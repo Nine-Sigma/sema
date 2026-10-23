@@ -7,28 +7,26 @@ Structure verifier re-runs on every answer; a batch whose choices fail is re-ask
 failed checks and the bindings in force, at most ``max_retries`` times, and then only the
 choices spanning a failing relation are left open, each with the failure as its reason.
 
-Role entries go out one call per relation signature (column roles), then one call per
-relation (reference entries). Choices re-enter Roles as stated choices, so a relation
-sharing a signature inherits them with ``source: memory``; the Roles verifier re-proves
-each answer over the asked relation and its kin, with the same retry bound.
+Column roles go out as one role map per relation signature (S5 decision 1), then
+reference entries one call per relation. The map names any column per role; code verifies
+it after (decision 2): a name outside the relation, two roles on one column, or a failed
+data fact is re-asked once with every failure listed, and then the failing roles stay
+open with the model's choice ranked first. A finding never fails a choice; it is recorded
+on the entry. A lexicon claim the model contests opens with both answers (decision 18c).
+Choices re-enter Roles as stated choices, so a relation sharing a signature inherits them
+with ``source: memory``. One retry serves every stage.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from collections.abc import Collection, Mapping, Sequence
+from dataclasses import dataclass, replace
 
 from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import Provider
-from sema.intake.eligibility import run_roles
 from sema.intake.eligibility_spec_utils import RolesResult
 from sema.intake.eligibility_text_utils import STAGE as ROLES_STAGE
-from sema.intake.eligibility_utils import (
-    EMBEDDING_MARGIN_FLOOR,
-    EligibilitySource,
-    Embedder,
-    StatedChoice,
-)
+from sema.intake.eligibility_utils import Embedder, RoleEligibility, StatedChoice
 from sema.intake.landing import LandResult
 from sema.intake.model_calls import ModelCalls
 from sema.intake.output_models import (
@@ -36,18 +34,25 @@ from sema.intake.output_models import (
     entry_choices,
     structure_batch_model,
 )
-from sema.intake.output_models_utils import ABSTAIN
 from sema.intake.profile import ProfileTools
-from sema.intake.resolve_budget_utils import PromptEvidence, fitted_structure_prompt
+from sema.intake.resolve_budget_utils import fitted_structure_prompt
+from sema.intake.resolve_answer_utils import (
+    RoleAttempt,
+    RolesRun,
+    read_map,
+    read_references,
+    recorded_entry,
+)
+from sema.intake.resolve_prompt_utils import RoleEvidence
 from sema.intake.resolve_roles_utils import (
     RoleAsk,
     chosen_notes,
     column_asks,
     fitted_roles_prompt,
-    in_force,
+    map_entries,
+    map_roles,
     reference_asks,
     spanned,
-    unasked_reason,
 )
 from sema.intake.resolve_utils import (
     OpenEntry,
@@ -66,17 +71,16 @@ from sema.intake.shapes.precedence import STAGE
 from sema.intake.structure import BoundEntry, StructureResult
 from sema.intake.structure_utils import describe_failure
 from sema.intake.verify.base import Ambiguity, Failure
-from sema.intake.verify.roles import ROLE_CHECKS, verify_roles
+from sema.intake.verify.roles import COLUMN_EXISTS, ROLE_CHECKS, verify_roles
 from sema.intake.verify.structure import verify_structure
 from sema.llm_client import LLMStageError
 from sema.log import logger
 
 __all__ = ["DEFAULT_MAX_RETRIES", "resolve_roles", "resolve_structure"]
 
-DEFAULT_MAX_RETRIES = 2
+DEFAULT_MAX_RETRIES = 1
 MISALIGNED = "the answer's confidences or reasons do not list one item per entry"
 CALL_FAILED = "the model call failed"
-MODEL: EligibilitySource = "model"
 
 
 @dataclass
@@ -216,48 +220,6 @@ def _notes(batch: Sequence[OpenEntry], attempt: _Attempt) -> list[str]:
     return failure_notes(batch, attempt.settlement, attempt.failures)
 
 
-@dataclass
-class _RolesRun:
-    """Choices accepted so far by subject, with each one's call key and reason, and the
-    reason every entry the model left open stays open."""
-
-    structure: StructureResult
-    profiles: list[RelationProfile]
-    tools: ProfileTools
-    calls: ModelCalls
-    hint: ConceptSourceSpec | None
-    embedder: Embedder | None
-    margin_floor: float | None
-    accepted: dict[str, StatedChoice] = field(default_factory=dict)
-    recorded: dict[str, tuple[str, str]] = field(default_factory=dict)
-    left: dict[str, str] = field(default_factory=dict)
-
-    def roles(self, extra: Mapping[str, StatedChoice] | None = None) -> RolesResult:
-        choices = {**self.accepted, **(extra or {})}
-        return run_roles(
-            self.structure, self.profiles, self.tools, hint=self.hint,
-            embedder=self.embedder, margin_floor=self.margin_floor, choices=choices,
-        )
-
-    def accept(self, attempt: _RoleAttempt, stated: Mapping[str, StatedChoice]) -> None:
-        self.accepted.update(stated)
-        for subject, reason in attempt.reasons.items():
-            if subject in stated:
-                self.recorded[subject] = (attempt.key, reason)
-            elif subject not in attempt.stated:
-                self.left[subject] = reason
-
-
-@dataclass(frozen=True)
-class _RoleAttempt:
-    stated: dict[str, StatedChoice]
-    reasons: dict[str, str]
-    key: str
-    failures: tuple[Failure, ...] = ()
-    problem: str | None = None
-    error: str | None = None
-
-
 def resolve_roles(
     roles: RolesResult,
     structure: StructureResult,
@@ -269,11 +231,10 @@ def resolve_roles(
     max_retries: int = DEFAULT_MAX_RETRIES,
     hint: ConceptSourceSpec | None = None,
     embedder: Embedder | None = None,
-    margin_floor: float | None = EMBEDDING_MARGIN_FLOOR,
 ) -> RolesResult:
-    """``hint``, ``embedder``, and ``margin_floor`` are the ones Roles ran with."""
+    """``hint`` and ``embedder`` are the ones Roles ran with."""
     profiles = profile_relations(land, tools, provider)
-    run = _RolesRun(structure, profiles, tools, calls, hint, embedder, margin_floor)
+    run = RolesRun(structure, profiles, tools, calls, hint, embedder)
     by_name = {profile.ref.name: profile for profile in profiles}
     asks = column_asks(roles, by_name)
     for ask in asks:
@@ -283,23 +244,25 @@ def resolve_roles(
         _settle_roles(run, ask, max_retries)
     result = run.roles()
     logger.info(
-        "resolve roles: {} column calls and {} reference calls, {} choices settled, {} left open",
-        len(asks), len(references), len(run.recorded), len(run.left),
+        "resolve roles: {} role-map calls and {} reference calls, {} choices settled, {} left"
+        " open, {} lexicon claims contested",
+        len(asks), len(references), len(run.recorded), len(run.left), len(run.contested),
     )
     asked = (*asks, *references)
-    recorded = tuple(_recorded(run, a, asked) for a in result.ambiguities)
-    return replace(result, ambiguities=recorded)
+    entries = tuple(recorded_entry(run, a, asked) for a in result.ambiguities)
+    return replace(result, ambiguities=entries)
 
 
-def _settle_roles(run: _RolesRun, ask: RoleAsk, max_retries: int) -> None:
+def _settle_roles(run: RolesRun, ask: RoleAsk, max_retries: int) -> None:
     current = run.roles()
     names = spanned(current, ask.relation)
     relations = [p for p in run.profiles if p.ref.name in names]
-    evidence = PromptEvidence(run.tools, relations)
-    claims = in_force(current, ask.relation)
+    entries = map_entries(current, ask.relation)
+    evidence = RoleEvidence(run.tools, relations, ask.relation, list(entries.values()))
 
-    def _ask(failed: Sequence[Sequence[str]]) -> _RoleAttempt:
-        return _ask_roles(run, ask, fitted_roles_prompt(ask, claims, evidence, failed))
+    def _ask(failed: Sequence[Sequence[str]]) -> RoleAttempt:
+        prompt = fitted_roles_prompt(ask, current, evidence, failed)
+        return _ask_roles(run, ask, entries, prompt)
 
     attempt, passed = retried(
         _ask,
@@ -313,56 +276,72 @@ def _settle_roles(run: _RolesRun, ask: RoleAsk, max_retries: int) -> None:
     _leave_roles_open(run, ask, attempt)
 
 
-def _ask_roles(run: _RolesRun, ask: RoleAsk, prompt: str) -> _RoleAttempt:
+def _ask_roles(
+    run: RolesRun, ask: RoleAsk, entries: Mapping[str, RoleEligibility], prompt: str
+) -> RoleAttempt:
     output_model = ask.output_model()
     key = run.calls.call_key(prompt, output_model)
     try:
         answer = run.calls.call(ROLES_STAGE, prompt, output_model)
     except LLMStageError as error:
         logger.warning(f"Roles call {key} for {ask.relation} failed: {error}")
-        return _RoleAttempt({}, {}, key, problem=CALL_FAILED, error=str(error))
+        return RoleAttempt({}, {}, key, problem=CALL_FAILED, error=str(error))
     choices = ask.choices(answer)
     if choices is None:
-        return _RoleAttempt({}, {}, key, problem=MISALIGNED)
-    paired = list(zip(ask.entries, choices, strict=True))
-    stated = {
-        entry.subject: StatedChoice(choice=choice, source=MODEL, confidence=confidence)
-        for entry, (choice, confidence, _) in paired
-        if choice != ABSTAIN
-    }
-    reasons = {entry.subject: reason for entry, (_, _, reason) in paired}
-    return _RoleAttempt(stated, reasons, key, _role_failures(run, ask, stated))
+        return RoleAttempt({}, {}, key, problem=MISALIGNED)
+    if ask.references:
+        stated, reasons, contested = read_references(ask, choices)
+    else:
+        stated, reasons, contested = read_map(ask, entries, choices)
+    failures, findings = _verified(run, ask, stated, contested)
+    return RoleAttempt(stated, reasons, key, failures, findings, contested)
 
 
-def _role_failures(
-    run: _RolesRun, ask: RoleAsk, stated: Mapping[str, StatedChoice]
-) -> tuple[Failure, ...]:
-    """The verifier's role-check failures on a chosen column of the asked relation or kin."""
+def _verified(
+    run: RolesRun,
+    ask: RoleAsk,
+    stated: Mapping[str, StatedChoice],
+    contested: Collection[str] = (),
+) -> tuple[tuple[Failure, ...], dict[str, tuple[str, ...]]]:
+    """The verifier's role-check failures on a chosen column of the asked relation or kin,
+    and the findings on each stated choice's column."""
     columns = ask.columns(stated)
     if not columns:
-        return ()
+        return (), {}
     relations = (ask.relation, *ask.kin)
-    verdict = verify_roles(run.roles(stated), run.tools, spec=None, relations=relations)
-    return tuple(
+    roles = run.roles(stated, contested)
+    verdict = verify_roles(roles, run.tools, spec=None, relations=relations)
+    failures = tuple(
         found for found in verdict.failures
         if found.check in ROLE_CHECKS and found.relation in relations and found.column in columns
     )
+    findings = {
+        subject: tuple(
+            f"finding: {found.name} on {found.subject} ({found.value})"
+            for found in verdict.findings
+            if found.subject == f"{ask.relation}.{choice.choice}"
+        )
+        for subject, choice in stated.items()
+    }
+    return failures, {subject: named for subject, named in findings.items() if named}
 
 
-def _role_notes(ask: RoleAsk, attempt: _RoleAttempt) -> list[str]:
+def _role_notes(ask: RoleAsk, attempt: RoleAttempt) -> list[str]:
     """Nothing for a passing attempt; else each failed check with the choices it names."""
     if attempt.problem is not None:
         return [attempt.problem]
     chosen = {subject: stated.choice for subject, stated in attempt.stated.items()}
+    roles = map_roles(ask)
     notes = []
     for found in attempt.failures:
         named = {s: c for s, c in chosen.items() if c == found.column}
-        notes.append(f"{describe_failure(found)}; {chosen_notes(ask.entries, named)}")
+        notes.append(f"{describe_failure(found)}; {chosen_notes(roles, named)}")
     return list(dict.fromkeys(notes))
 
 
-def _leave_roles_open(run: _RolesRun, ask: RoleAsk, attempt: _RoleAttempt) -> None:
-    """Drop every choice a failure names until the rest pass, then accept the rest."""
+def _leave_roles_open(run: RolesRun, ask: RoleAsk, attempt: RoleAttempt) -> None:
+    """Drop every choice a failure names until the rest pass, then accept the rest; a
+    dropped choice ranks first on its entry unless it named no column of the relation."""
     if attempt.problem is not None:
         reason = entry_reason(attempt.problem, attempt.error)
         run.left.update({entry.subject: reason for entry in ask.entries})
@@ -370,25 +349,16 @@ def _leave_roles_open(run: _RolesRun, ask: RoleAsk, attempt: _RoleAttempt) -> No
     stated, failures = dict(attempt.stated), attempt.failures
     while failures:
         for subject, choice in list(stated.items()):
-            failing = [describe_failure(f) for f in failures if f.column == choice.choice]
-            if failing:
-                run.left[subject] = "; ".join(dict.fromkeys(failing))
-                del stated[subject]
-        failures = _role_failures(run, ask, stated)
+            failing = [f for f in failures if f.column == choice.choice]
+            if not failing:
+                continue
+            run.left[subject] = "; ".join(dict.fromkeys(map(describe_failure, failing)))
+            if any(f.check != COLUMN_EXISTS for f in failing):
+                run.ranked[subject] = choice.choice
+            del stated[subject]
+        failures, _ = _verified(run, ask, stated, attempt.contested)
     logger.info(
         "roles call for {} left {} choices open after retries; {} kept",
         ask.relation, len(attempt.stated) - len(stated), len(stated),
     )
     run.accept(attempt, stated)
-
-
-def _recorded(run: _RolesRun, ambiguity: Ambiguity, asks: Sequence[RoleAsk]) -> Ambiguity:
-    if ambiguity.source == MODEL and ambiguity.subject in run.recorded:
-        key, reason = run.recorded[ambiguity.subject]
-        return ambiguity.model_copy(update={"call_key": key, "reason": reason})
-    if ambiguity.choice is None and ambiguity.subject in run.left:
-        return ambiguity.model_copy(update={"reason": run.left[ambiguity.subject]})
-    if ambiguity.choice is not None or ambiguity.source is not None or ambiguity.reason:
-        return ambiguity
-    unasked = unasked_reason(ambiguity, asks, run.accepted)
-    return ambiguity if unasked is None else ambiguity.model_copy(update={"reason": unasked})

@@ -21,6 +21,7 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel
 
 from sema.ingest.duckdb_staging import Staging
+from sema.intake.output_models import ROLE_MAP_PREFIX
 from sema.intake.registry import Registry, RunRecord
 from sema.models.stages import StageBBatchResult, StageBColumnResult, StageCBatchResult
 from tests.unit.intake.enrichment_env import (
@@ -44,7 +45,7 @@ APPROVER = "reviewer-a"
 VALUE_ASK, REVIEW = "value_ask", "review"
 
 STRUCTURE_BATCH = "StructureBatch_v1"
-ROLES_CHOICE = "RolesChoice_v1"
+ROLE_MAP = ROLE_MAP_PREFIX
 REFERENCE_CHOICE = "ReferenceChoice_v1"
 LAYOUT_PROPOSAL = "LayoutProposal_v1"
 CHOICE_PREFIXES = ("entry_", "role_", "reference_")
@@ -74,8 +75,9 @@ def graph() -> ModuleType:
 
 
 def enum(model: type[BaseModel], field: str) -> tuple[str, ...]:
+    """The members a field offers; a role-map field is free text and offers none."""
     schema = model.model_json_schema()["properties"][field]
-    return tuple(schema.get("items", schema)["enum"])
+    return tuple(schema.get("items", schema).get("enum", ()))
 
 
 def batch_answer(model: type[BaseModel], pick: Callable[[tuple[str, ...]], str]) -> BaseModel:
@@ -121,7 +123,7 @@ def fills_down(model: type[BaseModel]) -> BaseModel:
 
 DEFAULTS: dict[str, Answer] = {
     STRUCTURE_BATCH: abstain_all,
-    ROLES_CHOICE: abstain_all,
+    ROLE_MAP: abstain_all,
     REFERENCE_CHOICE: abstain_all,
     LAYOUT_PROPOSAL: lambda model: abstain()(model),
 }
@@ -152,7 +154,8 @@ def routed_client(
     defaults: Mapping[str, Answer] | None = None,
     exit_on: str | None = None,
 ) -> MagicMock:
-    """A mocked ``LLMClient``; ``exit_on`` names the model whose first call kills the process."""
+    """A mocked ``LLMClient``; ``exit_on`` names the model whose first call kills the process.
+    Every role-map model, whatever its name, is routed as ``ROLE_MAP``."""
     client = MagicMock()
     client.last_stats = stats()
     client.last_path = None
@@ -161,6 +164,7 @@ def routed_client(
 
     def _invoke(prompt: str, output_model: type[BaseModel], **_: Any) -> BaseModel:
         name = output_model.__name__
+        name = ROLE_MAP if name.startswith(ROLE_MAP_PREFIX) else name
         if name == exit_on:
             raise ProcessExit(name)
         client.last_stats = stats()

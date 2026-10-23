@@ -5,8 +5,9 @@ A call that exhausts the client's chain (``LLMStageError``) or is refused by the
 resolvers make no second call for that ask: the entries stay open with the failure as
 their reason, the error text stays in the ledger event and the reason, and the resolver
 returns so the run reaches Review. A verifier failure or a misaligned answer is still
-re-asked at most twice. Whatever note reaches a re-ask prompt carries no run id and no
-provider or exception text, so every call key is the same in any run.
+re-asked at most once (S5 decision 2, one constant for both stages). Whatever note
+reaches a re-ask prompt carries no run id and no provider or exception text, so every call
+key is the same in any run.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ import pytest
 from pydantic import BaseModel
 
 from sema.intake.ledger_utils import prompt_hash
-from sema.intake.output_models import ROLES_CHOICE, STRUCTURE_BATCH
+from sema.intake.output_models import ROLE_PREFIX, STRUCTURE_BATCH
 from sema.intake.output_models_utils import ABSTAIN
 from sema.llm_client import LLMStageError
 from tests.unit.intake.model_calls_env import MODEL, WiredRun, intake_config, stats, wired_run
@@ -94,7 +95,7 @@ def misaligned() -> MagicMock:
             name: next(value for value in field["enum"] if value != ABSTAIN)
             for name, field in properties.items()
             if "enum" in field
-        }
+        } | {name: "none" for name in properties if name.startswith(ROLE_PREFIX)}
         return output_model(**chosen, confidences=[], reasons=[])
 
     client.invoke.side_effect = _invoke
@@ -248,7 +249,7 @@ def test_roles_budget_refusal_is_refused_once_per_key(
 
 
 @pytest.mark.parametrize("failing_choice", ["verifier", "misaligned"])
-def test_roles_failed_choice_is_still_re_asked_twice(
+def test_roles_failed_choice_is_still_re_asked_once(
     roles_conflict: Synthetic, tmp_path: Path, failing_choice: str
 ) -> None:
     client = answering(shared_column) if failing_choice == "verifier" else misaligned()
@@ -256,8 +257,8 @@ def test_roles_failed_choice_is_still_re_asked_twice(
 
     resolved_roles(roles_conflict, watch, tmp_path)
 
-    assert client.invoke.call_count == 3
-    assert len(set(watch.keys())) == 3
+    assert client.invoke.call_count == 2
+    assert len(set(watch.keys())) == 2
 
 
 def test_roles_re_ask_keys_do_not_depend_on_the_run_id(
@@ -268,9 +269,10 @@ def test_roles_re_ask_keys_do_not_depend_on_the_run_id(
         root = tmp_path / run_id
         client = answering(shared_column)
         resolved_roles(roles_conflict, watched(root, client, run_id=run_id), root)
-        sequences.append([prompt_hash(MODEL, p, ROLES_CHOICE) for p in prompts(client)])
+        calls = client.invoke.call_args_list
+        sequences.append([prompt_hash(MODEL, c.args[0], c.args[1].__name__) for c in calls])
 
-    assert len(sequences[0]) == 3
+    assert len(sequences[0]) == 2
     assert sequences[0] == sequences[1]
 
 
@@ -343,7 +345,7 @@ def test_structure_budget_refusal_is_refused_once_per_key(
 
 
 @pytest.mark.parametrize("failing_choice", ["verifier", "misaligned"])
-def test_structure_failed_choice_is_still_re_asked_twice(
+def test_structure_failed_choice_is_still_re_asked_once(
     structure_conflict: Source, tmp_path: Path, failing_choice: str
 ) -> None:
     client = structure_answering(claim_own) if failing_choice == "verifier" else misaligned()
@@ -351,8 +353,8 @@ def test_structure_failed_choice_is_still_re_asked_twice(
 
     resolved_structure(structure_conflict, watch, tmp_path)
 
-    assert client.invoke.call_count == 3
-    assert len(set(watch.keys())) == 3
+    assert client.invoke.call_count == 2
+    assert len(set(watch.keys())) == 2
 
 
 def test_structure_re_ask_keys_do_not_depend_on_the_run_id(
@@ -365,7 +367,7 @@ def test_structure_re_ask_keys_do_not_depend_on_the_run_id(
         resolved_structure(structure_conflict, watched(root, client, run_id=run_id), root)
         sequences.append([prompt_hash(MODEL, p, STRUCTURE_BATCH) for p in prompts(client)])
 
-    assert len(sequences[0]) == 3
+    assert len(sequences[0]) == 2
     assert sequences[0] == sequences[1]
 
 

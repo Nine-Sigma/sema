@@ -22,6 +22,7 @@ from sema.intake.model_calls import ModelCalls
 from sema.intake.output_models_utils import ABSTAIN, NONE
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import NeedsValues
+from sema.intake.resolve import DEFAULT_MAX_RETRIES
 from sema.intake.proposal_utils import (
     binding_of,
     proposable,
@@ -55,7 +56,6 @@ __all__ = [
 STAGE = "propose_layouts"
 FINDING_KIND = "layout_finding"
 NEEDS_VALUES = "needs_values"
-DEFAULT_MAX_RETRIES = 2
 MODEL_CALL = "model_call"
 PROPOSAL_TEMPLATE = "proposal_template"
 PROPOSAL_RELATIONS = "proposal_relations"

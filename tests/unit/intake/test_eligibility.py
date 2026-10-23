@@ -31,7 +31,6 @@ from tests.unit.intake.structure_env import (
 pytestmark = pytest.mark.unit
 
 FLOORS = ("DISPLAY_NULL_RATE_FLOOR", "DEFINITION_MEAN_LENGTH_FLOOR", "STATUS_CARDINALITY_CAP")
-FLOOR = 0.2
 
 
 @pytest.fixture(scope="module")
@@ -96,12 +95,10 @@ def test_lexicon_declares_the_spec_tokens_in_a_fixed_role_order() -> None:
     assert order.index("name") < order.index("definition")
 
 
-def test_floors_are_named_and_the_embedding_floor_is_measured() -> None:
+def test_floors_are_named_and_no_embedding_floor_remains() -> None:
     for name in FLOORS:
         assert isinstance(getattr(lexicon(), name), int | float), name
-    floor = eligibility_utils().EMBEDDING_MARGIN_FLOOR
-    assert isinstance(floor, float)
-    assert 0.0 < floor < 1.0
+    assert not hasattr(eligibility_utils(), "EMBEDDING_MARGIN_FLOOR")
 
 
 def test_a8_sets_before_hints(env: Env) -> None:
@@ -109,9 +106,12 @@ def test_a8_sets_before_hints(env: Env) -> None:
 
     assert set(roles["concept_id"].members) == {"id", "code"}
     assert set(roles["code"].members) == {"id", "code"}
-    assert set(roles["name"].members) == {"label", "description"}
+    # A role with no data fact admits every column (S5 decision 18).
+    assert set(roles["name"].members) == {"id", "code", "label", "description"}
     # `definition` is optional, so it also offers "none" (14.3 pause decision).
-    assert set(roles["definition"].members) == {"label", "description", lexicon().NO_REFERENCE}
+    assert set(roles["definition"].members) == {
+        "id", "code", "label", "description", lexicon().NO_REFERENCE
+    }
 
 
 def test_a8_lexicon_settles_with_cross_role_exclusion(env: Env) -> None:
@@ -145,42 +145,44 @@ def test_lexicon_matches_whole_tokens_only() -> None:
     assert tuple(hits("concept_id", ["ConceptId", "concept_code"])) == ("ConceptId",)
 
 
-def test_constant_column_is_eligible_for_status_only(env: Env) -> None:
+def test_constant_column_stays_a_member_with_the_constant_finding(env: Env) -> None:
     binding = concept_list_over(env.ranked.ref("flagged"))
     found = eligibility().compute(binding, env.ranked.profiles())
+    (profile,) = [p for p in env.ranked.profiles() if p.ref.name == env.ranked.ref("flagged")]
+    (flag,) = [column for column in profile.columns if column.name == "flag"]
 
-    assert {entry.role for entry in found if "flag" in entry.members} == {"status"}
+    assert {"status", "name"} <= {entry.role for entry in found if "flag" in entry.members}
+    assert "constant" in dict(eligibility_utils().column_findings(flag))
 
 
-def test_embedding_with_a_clear_margin_settles_the_definition(env: Env) -> None:
+def test_embedding_with_a_clear_margin_states_the_rank_and_settles_nothing(env: Env) -> None:
     embedder = clear_embedder()
-    found = _ranked(env, embedder=embedder, margin_floor=FLOOR)
+    found = _ranked(env, embedder=embedder)
     definition = by_role(found)["definition"]
 
-    assert set(definition.members) == {"zorbit_text", "quaxle_body", lexicon().NO_REFERENCE}
-    assert (definition.choice, definition.source) == ("zorbit_text", "embedding")
+    assert {"zorbit_text", "quaxle_body", lexicon().NO_REFERENCE} <= set(definition.members)
+    assert (definition.choice, definition.source) == (None, None)
     assert _embedding(definition).rank[0][0] == "zorbit_text"
     assert _embedding(definition).margin == pytest.approx(1.0)
-    (entry,) = [a for a in eligibility().ambiguities(found) if a.choice == "zorbit_text"]
-    assert entry.source == "embedding"
+    (entry,) = [a for a in eligibility().ambiguities(found) if a.subject.endswith(".definition")]
+    assert entry.choice is None
     assert any("embedding" in text for text in entry.hints)
     assert embedder.calls >= 1
 
 
 def test_embedding_below_the_floor_records_the_rank_without_a_choice(env: Env) -> None:
-    found = _ranked(env, embedder=close_embedder(), margin_floor=FLOOR)
+    found = _ranked(env, embedder=close_embedder())
     definition = by_role(found)["definition"]
     hint = _embedding(definition)
 
     assert [column for column, _ in hint.rank] == ["zorbit_text", "quaxle_body"]
     expected = cosine([1.0, 0.9], [1.0, 0.0]) - cosine([0.9, 1.0], [1.0, 0.0])
     assert hint.margin == pytest.approx(expected)
-    assert hint.margin < FLOOR
     assert definition.choice is None
 
 
 def test_embedding_without_a_floor_records_the_rank_only(env: Env) -> None:
-    found = _ranked(env, embedder=clear_embedder(), margin_floor=None)
+    found = _ranked(env, embedder=clear_embedder())
     definition = by_role(found)["definition"]
 
     assert _embedding(definition).margin == pytest.approx(1.0)

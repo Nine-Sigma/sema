@@ -1,7 +1,8 @@
 """The one verdict shape every stage verifier returns (design Decision 16).
 
 A verifier returns ``pass`` or ``fail`` through ``Verdict.of``; ``escalate`` is set
-only by the orchestrator once its retry budget is spent.
+only by the orchestrator once its retry budget is spent. A finding is a measured reading
+reported beside the verdict; it never fails it (S5 decision 3).
 """
 
 from __future__ import annotations
@@ -21,6 +22,16 @@ class Failure(BaseModel):
     relation: str
     column: str | None = None
     evidence: dict[str, Any]
+
+
+class Finding(BaseModel):
+    """``subject`` is the ``relation.column`` the reading is over."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    subject: str
+    value: float | str | None = None
 
 
 class Ambiguity(BaseModel):
@@ -55,6 +66,7 @@ class Verdict(BaseModel):
     failures: tuple[Failure, ...] = ()
     ambiguities: tuple[Ambiguity, ...] = ()
     floors: dict[str, FloorValue] = {}
+    findings: tuple[Finding, ...] = ()
 
     @model_validator(mode="after")
     def _status_matches_failures(self) -> Self:
@@ -71,6 +83,7 @@ class Verdict(BaseModel):
         failures: list[Failure] | tuple[Failure, ...],
         ambiguities: list[Ambiguity] | tuple[Ambiguity, ...],
         floors: dict[str, FloorValue],
+        findings: list[Finding] | tuple[Finding, ...] = (),
     ) -> Verdict:
         status: VerdictStatus = "fail" if failures else "pass"
         return cls(
@@ -78,4 +91,5 @@ class Verdict(BaseModel):
             failures=tuple(failures),
             ambiguities=tuple(ambiguities),
             floors=dict(floors),
+            findings=tuple(findings),
         )

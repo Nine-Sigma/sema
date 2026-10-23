@@ -257,15 +257,17 @@ def test_run_metrics_calls_tokens_and_cost_equal_the_registry_row(gate: StageRun
 
 @pytest.mark.parametrize("gate", ["heldout"], indirect=True)
 def test_s2_baseline_metrics(gate: StageRun) -> None:
-    """Recorded S2 baseline with no model; S3 compares its slice values against these."""
+    """Recorded S2 baseline with no model; S3 compares its slice values against these.
+    Re-pinned at task 2.2 (S5 decisions 3, 18, 18a): with no model the role map leaves every
+    unsettled role of the bound relation open, so ``open_roles`` is 18, not 1."""
     written = _read_metrics(gate)
 
     assert written.relations == 8
     assert written.bound == 1
     assert written.bound_fraction == pytest.approx(1 / 8)
     assert written.ignored == {}
-    assert (written.open_structure, written.open_roles) == (7, 1)
-    assert written.open_structure + written.open_roles == 8
+    assert (written.open_structure, written.open_roles) == (7, 18)
+    assert written.open_structure == written.relations - written.bound
     assert (written.proposals_made, written.proposals_bound) == (0, 0)
     assert (written.model_calls, written.tokens, written.cost) == (0, 0, 0.0)
     assert written.value_asks == 0

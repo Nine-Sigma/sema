@@ -209,7 +209,8 @@ def test_edited_spec_settles_a_budget_stop_with_zero_calls(tmp_path: Path) -> No
 
 def _a2_settled(root: Path, cap: int) -> tuple[GraphRun, int]:
     """A2 under ``cap`` settled by a decisions file closing every open entry as ``none``;
-    a cap of 0 refuses its one Roles call, so the run stops at Review by the budget."""
+    a cap of 0 refuses its Roles calls (one role map per relation), so the run stops at
+    Review by the budget."""
     run = discover_with(
         root, A2_WORKBOOK, A2_DESCRIPTOR, routed_client(), config={"max_calls": cap}
     )
@@ -234,8 +235,8 @@ def test_decisions_dry_run_the_settled_spec_before_review(tmp_path: Path, cap: i
     assert run.nodes(mark) == ["decide", "dry_run", "review"]
     assert [kind for kind, stage in run.steps(mark) if stage == "dry_run"] == ["node", "verdict"]
     assert run.outcome.payload["dry_run"] is not None
-    assert run.row().model_calls == (0 if stopped else 1)
-    # A2's one Roles call was never recorded, so decide's recomputation is refused again.
+    assert run.row().model_calls == (0 if stopped else 2)
+    # A2's Roles calls were never recorded, so decide's recomputation is refused again.
     assert run.row().reason == ("budget_exceeded" if stopped else None)
 
 
@@ -338,6 +339,7 @@ def _ranked(root: Path, **options: object) -> GraphRun:
 
 
 def test_supplied_embedder_records_its_hint_on_the_role_entry(tmp_path: Path) -> None:
+    """The rank is a fact on the entry; it settles nothing (S5 decision 18b)."""
     embedder = clear_embedder()
 
     run = _ranked(tmp_path, embedder=embedder)
@@ -346,7 +348,7 @@ def test_supplied_embedder_records_its_hint_on_the_role_entry(tmp_path: Path) ->
     assert embedder.calls >= 1
     assert embedding_hints(definition)
     assert EMBEDDING_CHOICE in embedding_hints(definition)[0]
-    assert (definition["choice"], definition["source"]) == (EMBEDDING_CHOICE, "embedding")
+    assert definition["source"] != "embedding"
 
 
 def test_no_embedder_leaves_roles_unchanged(tmp_path: Path) -> None:
@@ -375,8 +377,13 @@ def test_embedder_carries_through_decide_and_import_with_zero_calls(tmp_path: Pa
     (entry,) = open_entries(presented(Ledger(tmp_path).run(run.run_id)), "structure")
 
     _decide(run, embedder, [("structure", entry.subject, flat_list(entry))], "structure.yaml")
-    section = role_entry(run, "section")
-    decided = _decide(run, embedder, [("roles", section["subject"], "concepts")], "roles.yaml")
+    section, ranked = role_entry(run, "section"), role_entry(run, "definition")
+    assert EMBEDDING_CHOICE in embedding_hints(ranked)[0]
+    rows = [("roles", section["subject"], "concepts"),
+            ("roles", ranked["subject"], EMBEDDING_CHOICE)]
+    embedded = embedder.calls
+    decided = _decide(run, embedder, rows, "roles.yaml")
+    assert embedder.calls > embedded, "decide re-ran Roles without the embedder"
     assert decided.payload["spec"] is not None
     definition = role_entry(run, "definition")
     imported = _settle(run, WIDE_CALL_CAP, embedder=embedder)
@@ -384,8 +391,7 @@ def test_embedder_carries_through_decide_and_import_with_zero_calls(tmp_path: Pa
     assert imported.node is None
     assert run.row().status == "approved"
     assert run.client.invoke.call_count == calls
-    assert (definition["choice"], definition["source"]) == (EMBEDDING_CHOICE, "embedding")
-    assert embedding_hints(definition)
+    assert (definition["choice"], definition["source"]) == (EMBEDDING_CHOICE, "human")
     manifest = yaml.safe_load((run.ledger_dir / "import" / "manifest.yaml").read_text())
     found = definitions(manifest)
     assert found and all(str(text).startswith("Zorbit text") for text in found)

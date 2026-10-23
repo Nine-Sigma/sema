@@ -293,7 +293,7 @@ def test_two_model_choices_claiming_one_relation_fail_precedence_applied(
     assert all(f.evidence.get("source") == "model" for f in failing)
 
 
-def test_conflicting_batch_is_retried_twice_with_the_failure_then_left_open(
+def test_conflicting_batch_is_retried_once_with_the_failure_then_left_open(
     conflict: Source, tmp_path: Path
 ) -> None:
     structure = _structure_of(conflict, tmp_path)
@@ -304,7 +304,7 @@ def test_conflicting_batch_is_retried_twice_with_the_failure_then_left_open(
     result, _ = _resolved(conflict, structure, client, tmp_path)
 
     sent = prompts(client)
-    assert len(sent) == 3
+    assert len(sent) == 2
     for retry in sent[1:]:
         assert retry != sent[0]
         assert "precedence_applied" in retry

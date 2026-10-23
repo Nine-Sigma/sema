@@ -209,7 +209,7 @@ def test_failing_header_less_proposal_stays_ignored(book: Landed, tmp_path: Path
 
     result, client, _ = _propose(book, script, tmp_path)
 
-    assert len(invokes_for(client, columns)) == 3
+    assert len(invokes_for(client, columns)) == 2
     assert bound_over(result.structure, listing) == []
     assert [b.slots["reason"] for b in ignored_over(result.structure, listing)] == ["no_header"]
     assert listing in result.escalated
@@ -267,12 +267,12 @@ def test_unanchored_fill_down_fails_with_the_anchor_check(
     result, _, _ = _propose(unanchored, {CODEBOOK_COLUMNS: [filled] * 3}, tmp_path)
 
     attempts = result.attempts[relation]
-    assert len(attempts) == 3
+    assert len(attempts) == 2
     assert all(ANCHOR in checks(attempt.failures) for attempt in attempts)
     assert bound_over(result.structure, relation) == []
 
 
-def test_three_failures_escalate_with_every_attempt(codebook: Landed, tmp_path: Path) -> None:
+def test_two_failures_escalate_with_every_attempt(codebook: Landed, tmp_path: Path) -> None:
     relation = codebook.name(CODEBOOK)
     unfilled = propose(DENORMALIZED, relation, group_by=VARIABLE)
 
@@ -280,7 +280,7 @@ def test_three_failures_escalate_with_every_attempt(codebook: Landed, tmp_path: 
 
     calls = invokes_for(client, CODEBOOK_COLUMNS)
     attempts = result.attempts[relation]
-    assert len(calls) == len(attempts) == 3
+    assert len(calls) == len(attempts) == 2
     assert [a.call_key for a in attempts] == [wired.calls.call_key(p, m) for p, m in calls]
     for attempt in attempts:
         assert attempt.proposal.template == DENORMALIZED

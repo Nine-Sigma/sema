@@ -7,6 +7,7 @@ section stated, ``source: human``), so only roles are open when Roles runs.
 from __future__ import annotations
 
 import csv
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path
@@ -17,7 +18,7 @@ import duckdb
 from pydantic import BaseModel
 
 from sema.intake.output_models import REFERENCE_PREFIX, ROLE_PREFIX
-from sema.intake.output_models_utils import ABSTAIN
+from sema.intake.output_models_utils import ABSTAIN, NONE
 from sema.intake.resolve_utils import text_columns
 from sema.intake.shapes import entity_model
 from sema.intake.shapes.base import SlotBinding
@@ -37,6 +38,12 @@ Rows = list[tuple[str, ...]]
 Tables = Mapping[str, tuple[tuple[str, ...], Rows]]
 Picker = Callable[[str, tuple[str, ...], set[str]], str]
 ReferencePicker = Callable[[tuple[str, ...]], str]
+ASKED = re.compile(r"asks one role of `([^`]+)`")
+COLUMN_LINE = re.compile(r"^- (.+?): type ")
+FIELD_LINE = re.compile(r"^- `(role_\w+)`: (.*)$")
+CLAIM = re.compile(r"claim in force: `([^`]+)`")
+NAMED = re.compile(r"`([^`]+)`")
+SECTION_QUESTION = "the spec section"
 
 
 def _same_rows() -> Rows:
@@ -156,13 +163,54 @@ def enum_of(output_model: type[BaseModel], field: str) -> tuple[str, ...]:
     return tuple(value for value in enum if value != ABSTAIN)
 
 
+def asked_columns(prompt: str) -> tuple[str, ...]:
+    """The columns of the relation a role-map prompt asks, in listed order."""
+    (relation,) = set(ASKED.findall(prompt))
+    lines = prompt.splitlines()
+    start = lines.index(f"### {relation}")
+    found = []
+    for line in lines[start + 3 :]:
+        matched = COLUMN_LINE.match(line)
+        if matched is None:
+            break
+        found.append(matched.group(1))
+    return tuple(found)
+
+
+def map_claims(prompt: str) -> dict[str, str]:
+    """Each role-map field's claim in force, which the mocked model keeps."""
+    found = {}
+    for line in prompt.splitlines():
+        matched = FIELD_LINE.match(line)
+        claim = CLAIM.search(matched.group(2)) if matched else None
+        if matched and claim:
+            found[matched.group(1)] = claim.group(1)
+    return found
+
+
+def map_members(prompt: str) -> dict[str, tuple[str, ...]]:
+    """What a role-map field may name: every asked column, and ``none`` when optional."""
+    columns = asked_columns(prompt)
+    described = dict(m.groups() for line in prompt.splitlines() if (m := FIELD_LINE.match(line)))
+    return {
+        field: _members(text, columns) for field, text in described.items()
+    }
+
+
+def _members(text: str, columns: tuple[str, ...]) -> tuple[str, ...]:
+    if text.startswith(SECTION_QUESTION):
+        return tuple(NAMED.findall(text))
+    return (*columns, NONE) if "; optional" in text else columns
+
+
 def first_member(members: tuple[str, ...]) -> str:
     return members[0]
 
 
 def answering(pick: Picker, reference: ReferencePicker = first_member) -> MagicMock:
-    """A mocked `LLMClient` answering every role field of a call with `pick` and every
-    reference field with `reference`; each answer is kept on `client.answers` by field."""
+    """A mocked `LLMClient` answering every role field of a call with `pick` (a role-map
+    field keeps its claim in force) and every reference field with `reference`; each
+    answer is kept on `client.answers` by field."""
     client = MagicMock()
     client.last_stats = stats()
     client.last_path = None
@@ -172,8 +220,13 @@ def answering(pick: Picker, reference: ReferencePicker = first_member) -> MagicM
         client.last_path = "structured_output"
         used: set[str] = set()
         chosen = {}
+        members = map_members(prompt) if role_fields(output_model) else {}
+        claims = map_claims(prompt)
         for field in role_fields(output_model):
-            choice = pick(field.removeprefix(ROLE_PREFIX), enum_of(output_model, field), used)
+            if field in claims:
+                chosen[field] = claims[field]
+                continue
+            choice = pick(field.removeprefix(ROLE_PREFIX), members.get(field, ()), used)
             chosen[field] = choice
             used.add(choice)
         for field in reference_fields(output_model):
@@ -187,12 +240,15 @@ def answering(pick: Picker, reference: ReferencePicker = first_member) -> MagicM
 
 
 def distinct(preferred: Mapping[str, str] | None = None) -> Picker:
-    """A role's preferred column when offered, else the first column no role took yet."""
+    """A role's preferred column when offered, else ``none`` for an optional role, else
+    the first column no role took yet."""
 
     def _pick(role: str, members: tuple[str, ...], used: set[str]) -> str:
         wanted = (preferred or {}).get(role)
         if wanted in members:
             return str(wanted)
+        if NONE in members:
+            return NONE
         free = [member for member in members if member not in used]
         return free[0] if free else ABSTAIN
 
@@ -200,7 +256,9 @@ def distinct(preferred: Mapping[str, str] | None = None) -> Picker:
 
 
 def shared_column(role: str, members: tuple[str, ...], used: set[str]) -> str:
-    """Every role takes a column already taken, so two roles name one column."""
+    """Every required role takes a column already taken, so two roles name one column."""
+    if NONE in members:
+        return NONE
     taken = [member for member in members if member in used]
     return taken[0] if taken else members[0]
 

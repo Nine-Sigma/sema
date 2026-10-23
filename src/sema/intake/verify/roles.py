@@ -1,8 +1,12 @@
 """Roles verifier: the spec's role bindings re-proved against eligibility and the landed data.
 
-Binding checks compare each bound column with the role's predicate set from the Roles
-stage; value checks run each role's predicate over the bound relation as counts. Without
-a spec only the stage's own sections and ambiguity list are checked. A required role a
+Binding checks compare each bound column with the relation (``column_exists``) and with
+the role's data-fact set from the Roles stage (``in_eligibility_set``, naming the fact);
+value checks run each role's predicate over the bound relation as counts, and reference
+roles are checked for containment in their target column. Readings such as a display's
+empty rate are findings beside the verdict, never failures (S5 decisions 2, 3). A status
+the policy kept unread is listed ``unverifiable`` for Review, never dropped. Without a
+spec only the stage's own sections and ambiguity list are checked. A required role a
 decision closed with no column fails ``required_roles_bound`` naming that decision's source.
 """
 
@@ -17,19 +21,20 @@ from sema.intake import lexicon
 from sema.intake.eligibility import ambiguities
 from sema.intake.eligibility_spec_utils import RolesResult
 from sema.intake.eligibility_text_utils import STAGE, VOCABULARY_ROLE
-from sema.intake.eligibility_utils import RoleEligibility
+from sema.intake.eligibility_utils import RoleEligibility, fact_of, scope_of, subject_of
 from sema.intake.profile import SAMPLE_CAP, ProfileTools, ValueSample
 from sema.intake.shapes import filled_sections
 from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR
 from sema.intake.shapes.base_utils import JOIN_FLOOR, failure, section_of
 from sema.intake.structure import StructureResult
 from sema.intake.structure_hint_utils import section_at
-from sema.intake.verify.base import Ambiguity, Failure, FloorValue, Verdict
+from sema.intake.verify.base import Ambiguity, Failure, Finding, FloorValue, Verdict
 from sema.intake.verify.roles_chosen_utils import (
     chosen_sections,
     closed_required,
     with_sources,
 )
+from sema.intake.verify.roles_contained import CONTAINED, containment_failures
 from sema.intake.verify.roles_utils import (
     GROUP_KEY_ROLES,
     VALUE_CHECKS,
@@ -38,6 +43,7 @@ from sema.intake.verify.roles_utils import (
     constant_group_key,
     role_columns,
     value_failures,
+    value_findings,
 )
 
 REQUIRED_ROLES_BOUND = "required_roles_bound"
@@ -54,6 +60,7 @@ CHECKS = (
     ONE_ROLE_PER_COLUMN,
     SECTION_RESOLVED,
     AMBIGUITY_LIST_COMPLETE,
+    CONTAINED,
     *VALUE_CHECKS,
     EXTERNAL_REFS_RESOLVE,
 )
@@ -61,8 +68,11 @@ FLOORS: dict[str, FloorValue] = {
     "DISPLAY_NULL_RATE_FLOOR": lexicon.DISPLAY_NULL_RATE_FLOOR,
     **JOIN_FLOOR,
 }
-ROLE_CHECKS = (COLUMN_EXISTS, IN_ELIGIBILITY_SET, ONE_ROLE_PER_COLUMN, *VALUE_CHECKS)
+ROLE_CHECKS = (
+    COLUMN_EXISTS, IN_ELIGIBILITY_SET, ONE_ROLE_PER_COLUMN, CONTAINED, *VALUE_CHECKS
+)
 UNVERIFIABLE = "unverifiable"
+UNVERIFIABLE_STATUS = "status values are unverifiable: {}"
 MAPPINGS = section_of(MappingsSpec)
 
 
@@ -80,7 +90,7 @@ def verify_roles(
         failure(REQUIRED_ROLES_BOUND, e.relation, role=e.role, source=e.source or "")
         for e in closed_required(roles)
     ]
-    listed: list[Ambiguity] = list(roles.ambiguities)
+    listed: list[Ambiguity] = [*roles.ambiguities, *_unverifiable_statuses(roles)]
     sections = chosen_sections(roles, relations) if relations else []
     if spec is not None:
         failures += _required_failures(roles.structure, spec)
@@ -88,21 +98,42 @@ def verify_roles(
         found, unverifiable = _external_refs(spec, tools)
         failures += found
         listed += unverifiable
+    findings: list[Finding] = []
     for section in sections:
-        failures += _section_role_failures(section, roles.eligibilities, tools)
+        found, read = _section_role_failures(section, roles.eligibilities, tools)
+        failures += found
+        findings += read
     failures = with_sources(failures, roles.eligibilities, ROLE_CHECKS)
     if spec is not None:
         failures += _domain_failures(spec, roles.eligibilities)
-    return Verdict.of(failures=failures, ambiguities=listed, floors=FLOORS)
+    return Verdict.of(failures=failures, ambiguities=listed, floors=FLOORS, findings=findings)
 
 
 def _section_role_failures(
     section: BoundSection, eligibilities: Sequence[RoleEligibility], tools: ProfileTools
-) -> list[Failure]:
+) -> tuple[list[Failure], list[Finding]]:
     profile = tools.describe_relation(section.relation)
     present = {column.name for column in profile.columns}
     failures = _binding_failures(section, present, eligibilities, tools)
-    return failures + value_failures(section, profile, tools)
+    bound = {r: c for r, c in role_columns(section.roles).items() if c in present}
+    failures += containment_failures(section.relation, bound, tools)
+    return failures + value_failures(section, profile, tools), value_findings(
+        section, profile, tools
+    )
+
+
+def _unverifiable_statuses(roles: RolesResult) -> list[Ambiguity]:
+    """Each bound status whose values the policy kept unread, listed for Review."""
+    return [
+        Ambiguity(
+            stage=STAGE, subject=subject_of(e), members=(str(e.column),),
+            hints=(UNVERIFIABLE,),
+            reason=UNVERIFIABLE_STATUS.format(roles.unverifiable[scope_of(e.relation, e.section)]),
+        )
+        for e in roles.eligibilities
+        if e.role == lexicon.STATUS_ROLE and e.subject is None and e.column is not None
+        and scope_of(e.relation, e.section) in roles.unverifiable
+    ]
 
 
 def _section_failures(structure: StructureResult) -> list[Failure]:
@@ -153,7 +184,10 @@ def _binding_failures(
         if column not in present
     ]
     failures += [
-        failure(IN_ELIGIBILITY_SET, relation, column, role=role, members=sorted(sets[role]))
+        failure(
+            IN_ELIGIBILITY_SET, relation, column, role=role, members=sorted(sets[role]),
+            **({"fact": fact} if (fact := fact_of(role)) else {}),
+        )
         for role, column in bound.items()
         if column in present and role in sets and column not in sets[role]
     ]

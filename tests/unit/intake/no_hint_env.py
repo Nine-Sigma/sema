@@ -271,6 +271,41 @@ def marked_param(name: str, reasons: Mapping[str, str], **xfail: Any) -> Any:
     return pytest.param(name, marks=marks)
 
 
+KEYS_MOVED_REASON = (
+    "the roles prompt v2 moved every recorded call key (task 2.2, 2026-10-23); re-recorded at"
+    " task 4.2"
+)
+# Measured at task 2.2 (decision 26): every source whose replay misses a moved Roles key.
+KEYS_MOVED = {
+    **dict.fromkeys(
+        ("a1", "a7_csv", "a10", "heldout", "heldout3", "heldout4", "heldout5"),
+        KEYS_MOVED_REASON,
+    ),
+    "a2": f"{KEYS_MOVED_REASON}; a2's Concepts and Values relations now each make a"
+    " role-map call",
+}
+
+
+def keyed_param(
+    name: str, moved: Mapping[str, str], reasons: Mapping[str, str] | None = None, **xfail: Any
+) -> Any:
+    """A moved call key fails the replay before its recorded assertion, so ``moved`` marks
+    the leg unless an earlier reason already catches any failure (no ``raises``)."""
+    reasons = reasons or {}
+    if name in moved and (name not in reasons or xfail):
+        return marked_param(name, moved)
+    return marked_param(name, reasons, **xfail)
+
+
+def keyed_marks(name: str, moved: Mapping[str, str], reason: str | None) -> list[Any]:
+    """The marks of a leg with extra parameters: ``moved`` first, as in ``keyed_param``."""
+    if name in moved:
+        return [pytest.mark.xfail(strict=True, reason=moved[name])]
+    if reason is None:
+        return []
+    return [pytest.mark.xfail(strict=True, raises=AssertionError, reason=reason)]
+
+
 def assert_zero_provider_calls(run: Replayed) -> None:
     row = run.row()
     calls, reason, invoked = row.model_calls, row.reason, run.client.invoke.call_count

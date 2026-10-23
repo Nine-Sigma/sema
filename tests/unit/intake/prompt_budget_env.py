@@ -18,6 +18,7 @@ from unittest.mock import MagicMock, patch
 import duckdb
 from pydantic import BaseModel
 
+from sema.intake.output_models import ROLE_PREFIX
 from sema.intake.output_models_utils import ABSTAIN
 from sema.intake.shapes import entity_model
 from sema.intake.shapes.base import SlotBinding
@@ -108,6 +109,17 @@ def dictionary_table(name: str, rows: int, descending: bool = False) -> Statemen
     )
 
 
+def long_dictionary_table(name: str, rows: int, sentence: int) -> Statement:
+    """A three-column dictionary whose sentence column holds ``sentence`` characters."""
+    return (
+        f"CREATE TABLE {relation(name)} AS SELECT"
+        f" 'k' || lpad(r::VARCHAR, 6, '0') AS {column_name(0)},"
+        f" 'generic label ' || lpad(r::VARCHAR, 6, '0') AS {column_name(1)},"
+        f" repeat('generic words ', {sentence // 14 + 1}) AS {column_name(2)}"
+        f" FROM range({rows}) t(r)"
+    )
+
+
 def dictionary_key(row: int) -> str:
     return f"k{row:06d}"
 
@@ -165,7 +177,8 @@ class Built:
 
 
 def abstaining() -> MagicMock:
-    """A mocked `LLMClient` that abstains on every choice field, so no verifier re-asks."""
+    """A mocked `LLMClient` that abstains on every choice and role-map field, so no
+    verifier re-asks."""
     client = MagicMock()
     client.last_stats = stats()
     client.last_path = None
@@ -173,7 +186,10 @@ def abstaining() -> MagicMock:
     def _invoke(prompt: str, output_model: type[BaseModel], **_: Any) -> BaseModel:
         client.last_path = "structured_output"
         properties = output_model.model_json_schema()["properties"]
-        chosen = {name: ABSTAIN for name, field in properties.items() if "enum" in field}
+        chosen = {
+            name: ABSTAIN for name, field in properties.items()
+            if "enum" in field or name.startswith(ROLE_PREFIX)
+        }
         count = len(chosen)
         return output_model(**chosen, confidences=[CONFIDENCE] * count, reasons=[REASON] * count)
 

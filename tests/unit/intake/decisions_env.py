@@ -38,6 +38,7 @@ from tests.unit.intake.structure_env import ACRIS_SPEC
 STRUCTURE, ROLES, HUMAN = "structure", "roles", "human"
 FLAT_LIST = "concept_list("
 UNRESOLVED = "unresolved_reference"
+ROLE_ROUNDS = 2
 
 
 def decisions() -> Any:
@@ -75,9 +76,14 @@ def write_decisions(path: Path, chosen: Sequence[tuple[str, str, str]]) -> Path:
 
 
 def hand_written_roles() -> dict[str, dict[str, str]]:
-    """Code list roles by relation as the hand-written spec states them: a reviewer's reading."""
+    """Code list and dictionary column roles by relation as the hand-written spec states
+    them: a reviewer's reading. Every role map is asked (S5 decision 1), so the dictionary
+    roles reach Review too."""
     raw = yaml.safe_load(ACRIS_SPEC.read_text())["concept_source"]
-    return {entry["relation"]: entry["roles"] for entry in raw["code_lists"]}
+    model = raw["entity_model"]
+    columns = {role: column for role, column in model["roles"].items() if isinstance(column, str)}
+    stated = {entry["relation"]: columns for entry in model["entities"]}
+    return {**stated, **{entry["relation"]: entry["roles"] for entry in raw["code_lists"]}}
 
 
 def hand_written_domains() -> dict[str, str]:
@@ -105,7 +111,8 @@ def reviewer_choice(
 
 @dataclass
 class Decided:
-    """A no-hint run taken through two Review rounds of decisions, then re-run from Structure."""
+    """A no-hint run taken through a Structure and a Roles round of decisions, then re-run
+    from Structure."""
 
     landed: Landed
     first_roles: RolesResult
@@ -140,12 +147,21 @@ def _review_round(landed: Landed, stage: str, path: Path) -> tuple[Any, ...]:
     return tuple(decisions().validate_decisions(loaded, presented(landed.ledger)))
 
 
+def _roles_rounds(landed: Landed, first: tuple[Any, ...], root: Path) -> tuple[Any, ...]:
+    """A dictionary's per-property reference entries open only once its role map is decided
+    (S5 decision 1), so Roles takes two Review rounds; their decisions are one round."""
+    second: tuple[Any, ...] = ()
+    for index in range(ROLE_ROUNDS):
+        _stages(landed, (*first, *second))
+        second += _review_round(landed, ROLES, root / f"second_{index}.yaml")
+    return second
+
+
 def decided(landed: Landed, root: Path) -> Decided:
     with patch.object(LLMClient, "invoke") as invoke:
         _, first_roles = _stages(landed, ())
         first = _review_round(landed, STRUCTURE, root / "first.yaml")
-        _stages(landed, first)
-        second = _review_round(landed, ROLES, root / "second.yaml")
+        second = _roles_rounds(landed, first, root)
         structure, roles = _stages(landed, (*first, *second))
     spec = assemble_spec(descriptor(ACRIS_RUN), roles)
     return Decided(landed, first_roles, (first, second), structure, roles, spec, invoke)
