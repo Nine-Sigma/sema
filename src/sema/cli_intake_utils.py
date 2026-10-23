@@ -326,4 +326,4 @@ def _member_text(entry: dict[str, Any], member: str) -> str:
 
 
 def _cause_line(entry: dict[str, Any]) -> str:
-    return f"{entry['stage']} {entry['subject']} | cause: {entry[CAUSE_KEY]}"
+    return f"{_open_line(entry)} | cause: {entry[CAUSE_KEY]}"

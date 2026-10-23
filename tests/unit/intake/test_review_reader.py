@@ -141,6 +141,22 @@ def test_no_spec_causes_print_after_every_other_open_entry(root: Path) -> None:
         assert caused["cause"] in line, line
 
 
+def test_a_cause_line_keeps_the_members_and_the_reason(root: Path) -> None:
+    reason = "file_a maps code to concept_code, file_b to code_value"
+    caused = entry(
+        ROLES, "epsilon_table.code", ("concept_code", "code_value"),
+        reason=reason, cause=DIVERGENT_CAUSE,
+    )
+    write_run(root, [alpha_structure()], [caused])
+
+    lines = printed_lines(invoke(root))
+
+    line = line_naming(lines, caused["subject"])
+    assert_in_order(line, ["concept_code", "code_value"])
+    assert reason in line, line
+    assert f"cause: {DIVERGENT_CAUSE}" in line, line
+
+
 def test_reading_makes_no_call_and_leaves_the_registry_record_unchanged(
     root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
