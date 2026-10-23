@@ -64,9 +64,9 @@ T = TypeVar("T")
 FIXTURES: Path = utils().FIXTURES
 WRITTEN_SPECS = {name: ORACLES[name] for name in ("a2", "a3", "a7_csv", "a10")}
 NO_HINT_SOURCES = ("a2", "a3", "a7_csv", "a7_athena", "a10")
-HELD_OUT = ("heldout", "heldout2", "heldout3", "heldout4")
+HELD_OUT = ("heldout", "heldout2", "heldout3", "heldout4", "heldout5")
 DECIDED_HELD_OUT = ("heldout", "heldout3", "heldout4")
-UNDECIDED_HELD_OUT = ("heldout2",)
+UNDECIDED_HELD_OUT = ("heldout2", "heldout5")
 A1, ATHENA = "a1", "a7_athena"
 A1_SPEC = ORACLES[A1]
 A1_DECISIONS = FIXTURES / "partner_sl" / DECISIONS_FILE
@@ -105,6 +105,8 @@ GATE_MISSES = {
     " (S4 task 3.4, 2026-10-22: recorded, carried to S4 review)",
     "heldout4": "heldout4 misses its gate at Review: bound_fraction 0.0 < 1.0, both relations"
     " open on a section conflict (S4 decision 18, 2026-10-22: recorded, carried to S4 review)",
+    "heldout5": "heldout5 is sealed with no recording yet (S5 task 1.2, 2026-10-23); replaced at"
+    " task 1.6",
 }
 
 

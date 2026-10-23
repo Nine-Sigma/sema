@@ -38,6 +38,7 @@ METRICS_ARTIFACT = "run_metrics"
 HELDOUT2 = HELDOUT.parent / "heldout2"
 HELDOUT3 = HELDOUT.parent / "heldout3"
 HELDOUT4 = HELDOUT.parent / "heldout4"
+HELDOUT5 = HELDOUT.parent / "heldout5"
 
 
 @dataclass(frozen=True)
@@ -108,6 +109,8 @@ GATE_THRESHOLDS = {
     # either source.
     "heldout3": GateThreshold(min_bound_fraction=1.0, max_open_choices=2),
     "heldout4": GateThreshold(min_bound_fraction=1.0, max_open_choices=3),
+    # Set by the supervisor 2026-10-23 (S5 decision 24), committed before any model-backed run.
+    "heldout5": GateThreshold(min_bound_fraction=1.0, max_open_choices=4),
 }
 
 
@@ -148,6 +151,7 @@ SOURCES = {
     ),
     "heldout3": HeldOut(HELDOUT3, "land_heldout3", _run_descriptor(HELDOUT3)),
     "heldout4": HeldOut(HELDOUT4, "land_heldout4", _run_descriptor(HELDOUT4)),
+    "heldout5": HeldOut(HELDOUT5, "land_heldout5", _run_descriptor(HELDOUT5)),
 }
 
 
@@ -296,6 +300,9 @@ def test_the_thresholds_are_committed_for_every_held_out_source() -> None:
     )
     assert GATE_THRESHOLDS["heldout4"] == GateThreshold(
         min_bound_fraction=1.0, max_open_choices=3
+    )
+    assert GATE_THRESHOLDS["heldout5"] == GateThreshold(
+        min_bound_fraction=1.0, max_open_choices=4
     )
 
 

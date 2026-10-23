@@ -132,6 +132,12 @@ RECORDED_SOURCES = (
         descriptor=FIXTURES / "heldout4" / "heldout4.run.yaml",
         schema="land_heldout4",
     ),
+    RecordedSource(
+        name="heldout5",
+        path=FIXTURES / "heldout5",
+        descriptor=FIXTURES / "heldout5" / "heldout5.run.yaml",
+        schema="land_heldout5",
+    ),
 )
 
 
