@@ -92,6 +92,7 @@ class AmbiguityList(BaseModel):
     count: int
     # A cause entry's ``cause`` key reaches the ledger, where the reader prints it.
     ambiguities: tuple[SerializeAsAny[Ambiguity], ...]
+    disagreements: dict[str, int] = {}
 
 
 class DecisionsArtifact(BaseModel):

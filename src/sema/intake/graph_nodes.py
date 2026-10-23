@@ -328,10 +328,14 @@ class Nodes:
         self, stages: Stages, current: Current, update: Update
     ) -> list[Ambiguity]:
         roles = current.roles.ambiguities if current.roles is not None else ()
+        counts = current.roles.disagreements if current.roles is not None else {}
         structure = current.structure
         opened = tuple(offered(entry) for entry in structure.ambiguities)
-        for stage, listed in ((STRUCTURE, opened), (ROLES, roles)):
-            entry = AmbiguityList(stage=stage, count=len(listed), ambiguities=tuple(listed))
+        for stage, listed, found in ((STRUCTURE, opened, {}), (ROLES, roles, counts)):
+            entry = AmbiguityList(
+                stage=stage, count=len(listed), ambiguities=tuple(listed),
+                disagreements={relation: n for relation, n in found.items() if n},
+            )
             _write(stages, update, stage + AMBIGUITY_SUFFIX, entry)
         return [*opened, *(offered(entry) for entry in structure.settled), *roles]
 

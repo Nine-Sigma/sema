@@ -46,6 +46,7 @@ OPEN_STAGES = (STRUCTURE, ROLES)
 EMBEDDING_PROVIDER_ENV = "EMBEDDING_PROVIDER"
 INTAKE_ERRORS = (ValueError, KeyError, OSError, RuntimeError, LLMStageError, yaml.YAMLError)
 AGREEMENT_KEY, FINDINGS_KEY, CAUSE_KEY = "agreement", "findings", "cause"
+DISAGREEMENTS_KEY = "disagreements"
 NO_HINTS = "none"
 
 
@@ -245,13 +246,14 @@ def echo_json(value: Any) -> None:
 
 
 def review_lines(root: Path, run_id: str, *, settled: bool = False) -> list[str]:
-    """One line per open entry, structure then roles in ledger order, the entries naming a
-    no-spec cause last; a run with none open prints its spec path, and one with no spec
+    """One line per open entry, structure then roles in ledger order, then each relation's
+    disagreement count, the entries naming a no-spec cause last; a run with none open prints its spec path, and one with no spec
     either is refused, because Review must name why no spec assembled (decision 14).
     ``settled`` adds one line per settled entry after those, so every choice can be read."""
     listed = _listed_entries(root, run_id)
     opened = [entry for entry in listed if _is_open(entry)]
     lines = [_open_line(entry) for entry in opened if CAUSE_KEY not in entry]
+    lines += _disagreement_lines(root, run_id) if opened else []
     lines += [_cause_line(entry) for entry in opened if CAUSE_KEY in entry]
     if not lines:
         lines = [str(_assembled_spec(root, run_id))]
@@ -290,6 +292,13 @@ def _listed_entries(root: Path, run_id: str) -> list[dict[str, Any]]:
     if missing:
         raise click.ClickException(f"run {run_id} has no {' or '.join(missing)} artifact")
     return [entry for path in paths for entry in json.loads(path.read_text())["ambiguities"]]
+
+
+def _disagreement_lines(root: Path, run_id: str) -> list[str]:
+    """Each relation whose two role-map asks differed; an older ledger records none."""
+    path = root / run_id / ARTIFACTS_DIR / f"{ROLES}{AMBIGUITY_SUFFIX}.json"
+    counts: dict[str, int] = json.loads(path.read_text()).get(DISAGREEMENTS_KEY, {})
+    return [f"{ROLES} {relation} | disagreements: {n}" for relation, n in counts.items() if n]
 
 
 def _open_line(entry: dict[str, Any]) -> str:

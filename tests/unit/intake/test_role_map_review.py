@@ -6,6 +6,9 @@
 - A contest reaches kin (decision 18c): when the model contests a lexicon claim on one
   relation, the same role on a same-signature kin relation stays open with both columns,
   never ``source: lexicon``, and ``RolesResult.contested`` names both subjects.
+- The disagreement count reaches Review (decision 4): with agreement on, two role-map
+  answers that differ on one role record the relation's count on the roles ambiguity
+  artifact, and the reader prints it.
 """
 
 from __future__ import annotations
@@ -14,9 +17,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from sema.cli_intake_utils import review_lines
+from sema.intake.output_models import ROLE_PREFIX
+from sema.intake.output_models_utils import NONE
 from sema.intake.verify.roles import UNVERIFIABLE
+from tests.unit.intake.graph_env import (
+    MAX_CALLS, ROLE_MAP, STRUCTURE_BATCH, GraphRun, choose_flat_lists, graph, routed_client,
+)
+from tests.unit.intake.model_calls_env import intake_config
 from tests.unit.intake.review_reader_env import RUN_ID, seeded_root, write_run
 from tests.unit.intake.role_map_env import (
     SQL, STATUSED, chosen, code_list, mapped, scenario, subject_entry, table,
@@ -32,6 +42,9 @@ GLIM_COLUMNS = {
     "zorb": "'Z' || lpad(CAST(i AS VARCHAR), 2, '0')",
     "item_label": "'Term entry ' || i",
 }
+FLIM = "flim_items"
+FLIM_ROWS = 20
+AGREED_ROLES = {"code": "item_code", "display": "item_label", "section": "code_lists"}
 
 
 def _status_entries(result: Any) -> list[Any]:
@@ -75,3 +88,53 @@ def test_a_contest_on_one_relation_keeps_the_kin_role_open(tmp_path: Path) -> No
         assert chosen(result, name, "code").source != "lexicon"
     assert {f"{name}.code" for name in GLIMS} <= set(result.contested), result.contested
     scene.con.close()
+
+
+def _flim_source(root: Path) -> Path:
+    directory = root / "inputs"
+    directory.mkdir(parents=True)
+    rows = [
+        f"T{i:02d},Term entry {i},Vell says a long sentence about item number {i}"
+        for i in range(1, FLIM_ROWS + 1)
+    ]
+    text = "\n".join(["item_code,item_label,vell", *rows]) + "\n"
+    (directory / f"{FLIM}.csv").write_text(text)
+    return directory
+
+
+def _role_answer(extra: dict[str, str]) -> Any:
+    named = {**AGREED_ROLES, **extra}
+
+    def _answer(model: type[BaseModel]) -> BaseModel:
+        fields = {
+            name: named.get(name.removeprefix(ROLE_PREFIX), NONE)
+            for name in model.model_fields
+            if name.startswith(ROLE_PREFIX)
+        }
+        count = len(fields)
+        return model(**fields, confidences=[0.8] * count, reasons=["facts fit"] * count)
+
+    return _answer
+
+
+def test_review_records_and_prints_the_disagreement_count(tmp_path: Path) -> None:
+    client = routed_client({
+        STRUCTURE_BATCH: [choose_flat_lists],
+        ROLE_MAP: [_role_answer({"display_fallback": "vell"}), _role_answer({})],
+    })
+    descriptor = tmp_path / "flim.run.yaml"
+    descriptor.write_text("id: flim\nidentity_system: flim\nrelease: '2026-10-23'\n")
+    root = tmp_path / "runs"
+    outcome = graph().discover(
+        _flim_source(tmp_path), descriptor=descriptor, client=client, root=root,
+        config=intake_config(max_calls=MAX_CALLS, agreement=True),
+    )
+    run = GraphRun(root, outcome.run_id, client, outcome)
+    assert outcome.node == "review", outcome.node
+
+    counts = run.artifact("roles_ambiguities")["disagreements"]
+
+    ((relation, count),) = counts.items()
+    assert relation.endswith(FLIM) and count == 1, counts
+    lines = review_lines(root, run.run_id)
+    assert [line for line in lines if relation in line and "disagreements: 1" in line], lines
