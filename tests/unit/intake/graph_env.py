@@ -90,12 +90,16 @@ def abstain_all(model: type[BaseModel]) -> BaseModel:
 
 def choose_flat_lists(model: type[BaseModel]) -> BaseModel:
     """Every structure entry settled on its flat concept list member."""
+    return choosing(lambda member: member.startswith(FLAT_LIST))(model)
+
+
+def choosing(wanted: Callable[[str], bool]) -> Answer:
+    """An answer settling every structure entry on its first wanted member, if it has one."""
 
     def _pick(members: tuple[str, ...]) -> str:
-        flat = [member for member in members if member.startswith(FLAT_LIST)]
-        return flat[0] if flat else "abstain"
+        return next((member for member in members if wanted(member)), "abstain")
 
-    return batch_answer(model, _pick)
+    return lambda model: batch_answer(model, _pick)
 
 
 def asks_for_values(model: type[BaseModel]) -> BaseModel:

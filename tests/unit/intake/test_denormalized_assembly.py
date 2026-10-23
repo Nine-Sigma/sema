@@ -83,6 +83,7 @@ CATALOG_DESCRIPTOR = RunDescriptor.model_validate({
     "release": "1",
     "scheme": {"qualified_name": "catalog.groups", "description": "Grouped item codes"},
 })
+SCHEMELESS_DESCRIPTOR = RunDescriptor(id="catalog", identity_system="grouped", release="2026.1")
 
 LIBRARY = FIXTURES / "partner_sl"
 LIBRARY_DB = LIBRARY / "library.duckdb"
@@ -233,6 +234,32 @@ def test_catalog_assembles_concepts_and_value_sets_over_one_relation(
     assert (concept_roles.name, concept_roles.definition) == ("group_label", "group_description")
     assert (value_roles.code, value_roles.display) == ("item_code", "item_label")
     assert [(e.section, e.template) for e in spec.shape or []] == [(CONCEPTS, ID)]
+
+
+def test_catalog_without_a_stated_scheme_derives_one_from_the_descriptor(
+    catalog: Source, catalog_structure: Any, tmp_path: Path
+) -> None:
+    run_descriptor = SCHEMELESS_DESCRIPTOR
+    roles, spec = _assembled(
+        catalog, catalog_structure, tmp_path, CATALOG_ORACLE, run_descriptor, CATALOG
+    )
+
+    assert spec is not None, [(a.subject, a.members) for a in roles.ambiguities]
+    assert spec.scheme is not None
+    assert spec.scheme.qualified_name == f"{run_descriptor.identity_system}.{run_descriptor.id}"
+    assert run_descriptor.id in spec.scheme.description
+    assert run_descriptor.release in spec.scheme.description
+
+
+def test_a_stated_scheme_wins_unchanged(
+    catalog: Source, catalog_structure: Any, tmp_path: Path
+) -> None:
+    _, spec = _assembled(
+        catalog, catalog_structure, tmp_path, CATALOG_ORACLE, CATALOG_DESCRIPTOR, CATALOG
+    )
+
+    assert spec is not None
+    assert spec.scheme == CATALOG_DESCRIPTOR.scheme
 
 
 def test_catalog_spec_imports_one_value_set_per_group(

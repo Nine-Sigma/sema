@@ -154,7 +154,11 @@ class DeclaredJoin(BaseModel):
 
 
 class RunDescriptor(BaseModel):
-    """What no predicate can derive; everything else follows from fixed rules."""
+    """What no predicate can derive; everything else follows from fixed rules.
+
+    An unstated ``scheme`` defaults, when a concepts section needs one, to
+    ``<identity_system>.<id>`` with a description naming the id and release.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

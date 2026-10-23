@@ -9,7 +9,7 @@ column assembles only once its values are read.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,7 @@ from tests.unit.intake.warehouse_env import CATALOG, SCHEMA, FakeConnector
 STEM = "catalog"
 ITEMS, VALUES, READINGS = "Items", "Values", "Readings"
 ITEMS_TABLE, VALUES_TABLE = "items", "item_values"
+GROUPS_TABLE, GROUP_VALUES_TABLE = "groups", "group_values"
 STATUS = "status"
 ACTIVE, RETIRED = ("active",), ("deprecated", "retired")
 WAREHOUSE = f"{CATALOG}.{SCHEMA}"
@@ -41,6 +42,36 @@ VALUE_ROWS: tuple[tuple[Any, ...], ...] = (
     ("TONE", "T1", "Light", "active"),
     ("TONE", "T2", "Dark", "deprecated"),
 )
+GROUP_ROWS: tuple[tuple[Any, ...], ...] = (
+    ("group_code", "group_name", "definition"),
+    ("SIZE", "Size", "Size of a thing"),
+    ("FORM", "Form", "Form of a thing"),
+)
+GROUP_VALUE_ROWS: tuple[tuple[Any, ...], ...] = (
+    ("group_code", "code", "label"),
+    ("SIZE", "S1", "Small"),
+    ("SIZE", "S2", "Large"),
+    ("FORM", "F1", "Round"),
+)
+DENORMALIZED_HEADER = ("group_key", "group_label", "group_description", "item_code", "item_label")
+COLOUR_ROWS: tuple[tuple[Any, ...], ...] = (
+    DENORMALIZED_HEADER,
+    ("G1", "Colour", "The colour a surface shows", "C01", "Crimson"),
+    ("G1", "Colour", "The colour a surface shows", "C02", "Teal"),
+    ("G2", "Size", "The extent of an object", "S01", "Petite"),
+    ("G2", "Size", "The extent of an object", "S02", "Grand"),
+)
+SHAPE_ROWS: tuple[tuple[Any, ...], ...] = (
+    DENORMALIZED_HEADER,
+    ("H1", "Shape", "The outline of an object", "R01", "Round"),
+    ("H1", "Shape", "The outline of an object", "R02", "Square"),
+    ("H2", "Tone", "The lightness of a colour", "T01", "Light"),
+    ("H2", "Tone", "The lightness of a colour", "T02", "Dark"),
+)
+FLAT_HEADER = ("code", "name", "definition")
+FIRST_FLAT_ROWS = (FLAT_HEADER, ("A1", "Alpha", "The first"), ("B2", "Beta", "The second"))
+SECOND_FLAT_ROWS = (FLAT_HEADER, ("C3", "Gamma", "The third"), ("D4", "Delta", "The fourth"))
+COLOURS_TABLE, SHAPES_TABLE = "colours", "shapes"
 # Numbers only: no row passes as a header, so Structure ignores it as ``no_header``.
 READING_ROWS: tuple[tuple[Any, ...], ...] = ((1, 0.5), (2, 0.25), (3, 0.125))
 
@@ -107,11 +138,37 @@ def warehouse_catalog(
 ) -> tuple[duckdb.DuckDBPyConnection, SchemaMetadata]:
     """The catalog's rows in an in-memory warehouse, and the metadata its connector reports;
     ``status=False`` drops the status column, so Roles asks for no value read."""
+    values = VALUE_ROWS if status else without_status(VALUE_ROWS)
+    return warehouse_tables({ITEMS_TABLE: ITEM_ROWS, VALUES_TABLE: values})
+
+
+def two_catalogs() -> tuple[duckdb.DuckDBPyConnection, SchemaMetadata]:
+    """Two independent concept and value set pairs, each binding the same spec sections."""
+    return warehouse_tables({
+        ITEMS_TABLE: ITEM_ROWS,
+        VALUES_TABLE: without_status(VALUE_ROWS),
+        GROUPS_TABLE: GROUP_ROWS,
+        GROUP_VALUES_TABLE: GROUP_VALUE_ROWS,
+    })
+
+
+def two_grouped_tables() -> tuple[duckdb.DuckDBPyConnection, SchemaMetadata]:
+    """Two tables, each one group-by-key concept list denormalized over its value rows."""
+    return warehouse_tables({COLOURS_TABLE: COLOUR_ROWS, SHAPES_TABLE: SHAPE_ROWS})
+
+
+def two_flat_tables() -> tuple[duckdb.DuckDBPyConnection, SchemaMetadata]:
+    return warehouse_tables({COLOURS_TABLE: FIRST_FLAT_ROWS, SHAPES_TABLE: SECOND_FLAT_ROWS})
+
+
+def warehouse_tables(
+    tables: Mapping[str, Sequence[tuple[Any, ...]]],
+) -> tuple[duckdb.DuckDBPyConnection, SchemaMetadata]:
+    """Each table's header row and body in an in-memory warehouse, and its metadata."""
     con = duckdb.connect()
     con.execute(f"CREATE SCHEMA {SCHEMA}")
     objects = []
-    values = VALUE_ROWS if status else without_status(VALUE_ROWS)
-    for table, rows in ((ITEMS_TABLE, ITEM_ROWS), (VALUES_TABLE, values)):
+    for table, rows in tables.items():
         header, *body = rows
         columns = ", ".join(f"{name} VARCHAR" for name in header)
         con.execute(f"CREATE TABLE {SCHEMA}.{table} ({columns})")

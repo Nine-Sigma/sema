@@ -44,6 +44,7 @@ from sema.intake.report import DryRunReport, dry_run
 from sema.intake.resolve import resolve_roles, resolve_structure
 from sema.intake.shapes.base import RelationProfile, profile_relations
 from sema.intake.structure import StructureResult, run_structure
+from sema.intake.structure_conflict_utils import open_section_conflicts
 from sema.intake.verify.base import Verdict
 from sema.intake.verify.dry_run import verify_dry_run
 from sema.models.config import IntakeModelConfig
@@ -238,16 +239,18 @@ class Stages:
 
     def _base_structure(self, reviewed: Reviewed) -> StructureResult:
         if PROPOSE in reviewed.reached:
-            return self.proposals(reviewed.approvals).structure
-        return self.resolved() if RESOLVE_STRUCTURE in reviewed.reached else self.structure()
+            base = self.proposals(reviewed.approvals).structure
+        else:
+            base = self.resolved() if RESOLVE_STRUCTURE in reviewed.reached else self.structure()
+        return open_section_conflicts(base)
 
     def _decided(self, reviewed: Reviewed) -> tuple[StructureResult, RolesResult]:
         """Decisions over the structure Review saw; the model's role choices are kept."""
         tools = self.tools(DECIDE)
         base = self._base_structure(reviewed)
         land, decisions = self.land(), reviewed.decisions
-        structure = apply_structure_decisions(
-            base, decisions, land, tools, provider=self.provider_name
+        structure = open_section_conflicts(
+            apply_structure_decisions(base, decisions, land, tools, provider=self.provider_name)
         )
         kept = (
             model_choices(self.resolved_roles(reviewed.approvals))

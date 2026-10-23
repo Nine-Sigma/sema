@@ -28,6 +28,7 @@ from sema.binding.spec_sections import (
     LevelColumnsHierarchy,
     PerFileEntry,
     RelationRef,
+    SchemeSpec,
     StatusRole,
     TermStorageSpec,
     ValueSetRoles,
@@ -67,6 +68,10 @@ from sema.log import logger
 ASSEMBLED_SPEC_VERSION = 2
 VALUE_SETS = section_of(ValueSetsSpec)
 HIERARCHY = section_of(LevelColumnsHierarchy)
+# Sections whose bindings add up rather than compete; every other section takes one binding.
+MERGED_SECTIONS = frozenset({CODE_LISTS})
+# Templates whose bindings assembly builds into one section together.
+JOINT_TEMPLATES = frozenset({entity_model.ID})
 Roles = TypeVar("Roles", bound=BaseModel)
 Part = dict[str, Any]
 LoaderSections = Callable[[Mapping[str, RelationRef], str], dict[str, BaseModel]]
@@ -115,13 +120,25 @@ def assemble(descriptor: RunDescriptor, roles: RolesResult) -> ConceptSourceSpec
             release=descriptor.release,
             default_provider=next(iter(roles.refs.values())).provider,
             shape=structure.to_shape(),
-            scheme=descriptor.scheme,
+            scheme=_scheme(descriptor) if CONCEPTS in sections else descriptor.scheme,
             term_storage=descriptor.term_storage or TermStorageSpec(),
             **sections,
         )
     except ValidationError as error:
         logger.info("no spec assembled: the sections do not validate: {}", error)
         return None
+
+
+def _scheme(descriptor: RunDescriptor) -> SchemeSpec:
+    if descriptor.scheme is not None:
+        return descriptor.scheme
+    return SchemeSpec(
+        qualified_name=f"{descriptor.identity_system}.{descriptor.id}",
+        description=(
+            f"Concept source {descriptor.id}, release {descriptor.release}, "
+            "assembled without a stated scheme"
+        ),
+    )
 
 
 def stated_roles(hint: ConceptSourceSpec, structure: StructureResult) -> dict[str, dict[str, Any]]:
@@ -166,7 +183,7 @@ def _merge(parts: Sequence[Part | None]) -> Part | None:
         if part is None:
             return None
         for name, value in part.items():
-            if name == CODE_LISTS:
+            if name in MERGED_SECTIONS:
                 merged[name] = [*merged.get(name, []), *value]
             elif name in merged:
                 logger.info("no spec assembled: two bindings fill section {}", name)
