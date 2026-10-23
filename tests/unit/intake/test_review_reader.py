@@ -41,6 +41,7 @@ from tests.unit.intake.review_reader_env import (
     alpha_structure,
     assert_in_order,
     assert_line_shows,
+    assert_settled_line_shows,
     assert_succeeded,
     beta_structure,
     entry,
@@ -48,9 +49,14 @@ from tests.unit.intake.review_reader_env import (
     gamma_role,
     human_none,
     invoke,
+    invoke_settled,
+    lexicon_settled_role,
     line_naming,
+    marks_settled,
+    model_settled_structure,
     printed_lines,
     seeded_root,
+    settled_entry,
     settled_structure,
     write_run,
 )
@@ -64,6 +70,7 @@ DIVERGENT_CAUSE = "per-file dictionaries map the role code differently"
 SPEC_BODY = {"concept_source": {"spec_version": 2}}
 NO_SPEC = "no spec"
 HUMAN_NONE_SUBJECT = "zeta_table.label"
+AGREED, CONFIDENCE = "2/2", 0.83
 
 
 @pytest.fixture
@@ -200,3 +207,98 @@ def test_a_role_a_human_settled_none_is_closed_and_not_printed(root: Path) -> No
     assert len(lines) == 1, lines
     assert_line_shows(lines[0], gamma_role())
     assert HUMAN_NONE_SUBJECT not in result.output, result.output
+
+
+def _open_and_settled(root: Path) -> None:
+    write_run(
+        root,
+        [beta_structure(), model_settled_structure()],
+        [lexicon_settled_role(), gamma_role()],
+    )
+
+
+def test_settled_prints_settled_entries_after_open_ones_marked_with_their_source(
+    root: Path,
+) -> None:
+    _open_and_settled(root)
+
+    result = invoke_settled(root)
+
+    assert_succeeded(result)
+    lines = printed_lines(result)
+    assert len(lines) == 4, lines
+    assert_line_shows(lines[0], beta_structure())
+    assert_line_shows(lines[1], gamma_role())
+    assert not [line for line in lines[:2] if marks_settled(line)], lines
+    assert_settled_line_shows(lines[2], model_settled_structure())
+    assert_settled_line_shows(lines[3], lexicon_settled_role())
+
+
+def test_settled_prints_the_confidence_and_agreement_when_present(root: Path) -> None:
+    agreed = settled_entry(
+        ROLES, "iota_table.i_code", ("concept_code", "concept_label"), source="model",
+        choice="concept_label", confidence=CONFIDENCE, agreement=AGREED,
+    )
+    write_run(root, [beta_structure()], [agreed])
+
+    result = invoke_settled(root)
+
+    assert_succeeded(result)
+    lines = printed_lines(result)
+    assert len(lines) == 2, lines
+    assert_settled_line_shows(lines[1], agreed)
+
+
+def test_a_human_none_entry_is_settled_and_printed_only_with_the_flag(root: Path) -> None:
+    closed = human_none(ROLES, HUMAN_NONE_SUBJECT, ("concept_label", "concept_note"))
+    write_run(root, [beta_structure()], [closed])
+
+    plain, flagged = invoke(root), invoke_settled(root)
+
+    assert_succeeded(plain)
+    assert_succeeded(flagged)
+    assert not [line for line in printed_lines(plain) if marks_settled(line)], plain.output
+    lines = printed_lines(flagged)
+    assert len(lines) == 2, lines
+    assert_line_shows(lines[0], beta_structure())
+    assert_settled_line_shows(lines[1], closed)
+
+
+def test_without_the_flag_output_is_unchanged_by_settled_entries(root: Path) -> None:
+    _open_and_settled(root)
+
+    result = invoke(root)
+
+    assert_succeeded(result)
+    lines = printed_lines(result)
+    assert len(lines) == 2, lines
+    assert_line_shows(lines[0], beta_structure())
+    assert_line_shows(lines[1], gamma_role())
+
+
+def test_settled_on_a_run_with_a_spec_prints_the_spec_path_then_the_settled_lines(
+    root: Path,
+) -> None:
+    spec_path = write_run(
+        root, [model_settled_structure()], [lexicon_settled_role()], spec=SPEC_BODY
+    )
+
+    result = invoke_settled(root)
+
+    assert_succeeded(result)
+    lines = printed_lines(result)
+    assert len(lines) == 3, lines
+    assert lines[0] == str(spec_path)
+    assert_settled_line_shows(lines[1], model_settled_structure())
+    assert_settled_line_shows(lines[2], lexicon_settled_role())
+
+
+def test_settled_never_masks_a_run_with_no_open_entry_and_no_spec(root: Path) -> None:
+    spec_path = write_run(root, [model_settled_structure()], [lexicon_settled_role()])
+
+    result = invoke_settled(root)
+
+    assert not spec_path.exists()
+    assert result.exit_code != 0, result.output
+    assert RUN_ID in result.output, result.output
+    assert NO_SPEC in result.output.lower(), result.output

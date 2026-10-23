@@ -10,6 +10,7 @@ Every name is invented; nothing here reads a fixture or a held-out source.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,8 @@ OPTIONAL_ENTRY_POINTS = (
     "sema.cli_intake.configured_embedder",
 )
 PROVIDER_CALLED = "a provider call was made"
+SETTLED_FLAG = "--settled"
+SETTLED_WORD = re.compile(r"\bsettled\b")
 
 LIST_MEMBER = "concept_list(code=c1, label=l1)"
 VALUES_MEMBER = "concept_with_values(code=c1, value=v1)"
@@ -69,14 +72,51 @@ def entry(
     }
 
 
+def settled_entry(
+    stage: str,
+    subject: str,
+    members: Sequence[str],
+    *,
+    source: str,
+    choice: str | None,
+    confidence: float | None = None,
+    **extra: Any,
+) -> Entry:
+    """A settled entry: ``extra`` carries ``hints``, ``exclusions``, and later keys."""
+    settled_fields = {"choice": choice, "source": source, "confidence": confidence}
+    return {**entry(stage, subject, members, **extra), **settled_fields}
+
+
 def settled(stage: str, subject: str, members: Sequence[str]) -> Entry:
-    return {
-        **entry(stage, subject, members),
-        "choice": members[0],
-        "confidence": 0.9,
-        "source": "model",
-        "call_key": "invented-call-key",
-    }
+    return settled_entry(
+        stage, subject, members, source="model", choice=members[0], confidence=0.9,
+        call_key="invented-call-key",
+    )
+
+
+def model_settled_structure() -> Entry:
+    """The model chose the second member, so the settled line reorders the two."""
+    return settled_entry(
+        STRUCTURE,
+        "eta_table",
+        (LIST_MEMBER, VALUES_MEMBER),
+        source="model",
+        choice=VALUES_MEMBER,
+        hints=("embedding: value margin 0.204",),
+        exclusions={LIST_MEMBER: "label column l1 repeats every code"},
+    )
+
+
+def lexicon_settled_role() -> Entry:
+    return settled_entry(
+        ROLES,
+        "theta_table.t_code",
+        (CODE_ROLE, LABEL_ROLE),
+        source="lexicon",
+        choice=CODE_ROLE,
+        hints=("embedding: margin 0.401",),
+        exclusions={LABEL_ROLE: "t_code values hold no spaces"},
+    )
 
 
 def human_none(stage: str, subject: str, members: Sequence[str]) -> Entry:
@@ -188,8 +228,18 @@ def forbid_provider_calls(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(target, _refuse, raising=False)
 
 
-def invoke(root: Path, run_id: str = RUN_ID) -> Result:
-    return CliRunner().invoke(target_group, ["review", run_id, "--root", str(root)])
+def invoke(root: Path, run_id: str = RUN_ID, *flags: str) -> Result:
+    argv = ["review", run_id, "--root", str(root), *flags]
+    return CliRunner().invoke(target_group, argv)
+
+
+def invoke_settled(root: Path, run_id: str = RUN_ID) -> Result:
+    return invoke(root, run_id, SETTLED_FLAG)
+
+
+def marks_settled(line: str) -> bool:
+    """The whole word, so data such as a ``settled_by`` hint is not the marker."""
+    return SETTLED_WORD.search(line) is not None
 
 
 def printed_lines(result: Result) -> list[str]:
@@ -223,3 +273,20 @@ def line_naming(lines: Sequence[str], subject: str) -> str:
     found = [line for line in lines if subject in line]
     assert len(found) == 1, (subject, lines)
     return found[0]
+
+
+def assert_settled_line_shows(line: str, shown: Entry) -> None:
+    """Marked settled with its source; the choice leads the members, the rest in ledger
+    order; facts, hints, and the agreement and confidence when present."""
+    assert marks_settled(line), line
+    choice = shown["choice"]
+    others = [member for member in shown["members"] if member != choice]
+    assert_in_order(line, [choice, *others] if choice is not None else others)
+    texts = [shown["stage"], shown["subject"], shown["source"], *shown["hints"]]
+    texts += shown["exclusions"].values()
+    if "agreement" in shown:
+        texts.append(shown["agreement"])
+    if shown["confidence"] is not None:
+        texts.append(str(shown["confidence"]))
+    absent = [text for text in texts if text not in line]
+    assert not absent, (absent, line)

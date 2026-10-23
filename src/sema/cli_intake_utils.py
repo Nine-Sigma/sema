@@ -243,19 +243,27 @@ def echo_json(value: Any) -> None:
     click.echo(json.dumps(value, indent=2, default=str))
 
 
-def review_lines(root: Path, run_id: str) -> list[str]:
+def review_lines(root: Path, run_id: str, *, settled: bool = False) -> list[str]:
     """One line per open entry, structure then roles in ledger order, the entries naming a
     no-spec cause last; a run with none open prints its spec path, and one with no spec
-    either is refused, because Review must name why no spec assembled (decision 14)."""
-    opened = [entry for entry in _listed_entries(root, run_id) if _is_open(entry)]
-    lines = [_entry_line(entry) for entry in opened if CAUSE_KEY not in entry]
+    either is refused, because Review must name why no spec assembled (decision 14).
+    ``settled`` adds one line per settled entry after those, so every choice can be read."""
+    listed = _listed_entries(root, run_id)
+    opened = [entry for entry in listed if _is_open(entry)]
+    lines = [_open_line(entry) for entry in opened if CAUSE_KEY not in entry]
     lines += [_cause_line(entry) for entry in opened if CAUSE_KEY in entry]
-    if lines:
-        return lines
+    if not lines:
+        lines = [str(_assembled_spec(root, run_id))]
+    if settled:
+        lines += [_settled_line(entry) for entry in listed if not _is_open(entry)]
+    return lines
+
+
+def _assembled_spec(root: Path, run_id: str) -> Path:
     spec = root / run_id / ARTIFACTS_DIR / f"{SPEC_ARTIFACT}.json"
     if not spec.is_file():
         raise click.ClickException(f"run {run_id} has no open entry and no spec")
-    return [str(spec)]
+    return spec
 
 
 def _listed_entries(root: Path, run_id: str) -> list[dict[str, Any]]:
@@ -268,15 +276,28 @@ def _listed_entries(root: Path, run_id: str) -> list[dict[str, Any]]:
     return [entry for path in paths for entry in json.loads(path.read_text())["ambiguities"]]
 
 
-def _entry_line(entry: dict[str, Any]) -> str:
-    members = " > ".join(_member_text(entry, member) for member in entry["members"])
-    parts = [
-        f"{entry['stage']} {entry['subject']}",
-        f"members: {members}",
-        f"hints: {'; '.join(entry['hints']) or NO_HINTS}",
-    ]
+def _open_line(entry: dict[str, Any]) -> str:
+    return _entry_line(entry, f"{entry['stage']} {entry['subject']}", entry["members"], ())
+
+
+def _settled_line(entry: dict[str, Any]) -> str:
+    """The choice leads the members; a human ``none`` has no choice, so none leads."""
+    choice, confidence = entry["choice"], entry["confidence"]
+    others = [member for member in entry["members"] if member != choice]
+    ranked = others if choice is None else [choice, *others]
+    head = f"{entry['stage']} {entry['subject']} | settled by {entry['source']}"
+    scores = () if confidence is None else (f"confidence: {confidence}",)
+    return _entry_line(entry, head, ranked, scores)
+
+
+def _entry_line(
+    entry: dict[str, Any], head: str, ranked: list[str], scores: tuple[str, ...]
+) -> str:
+    members = " > ".join(_member_text(entry, member) for member in ranked)
+    parts = [head, f"members: {members}", f"hints: {'; '.join(entry['hints']) or NO_HINTS}"]
     if AGREEMENT_KEY in entry:
         parts.append(f"agreement: {entry[AGREEMENT_KEY]}")
+    parts.extend(scores)
     if entry["reason"] is not None:
         parts.append(f"reason: {entry['reason']}")
     return " | ".join(parts)
