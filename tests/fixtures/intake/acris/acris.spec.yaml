@@ -1,6 +1,6 @@
 # review_status: reviewed_correct
 # reviewed_by: Dean
-# reviewed_on: 2026-10-20
+# reviewed_on: 2026-10-22
 # A10: the ACRIS directory (15 dictionary workbooks, 5 code tables) landed by the
 # tabular loader into schema land_acris. Values no predicate derives come from
 # acris.run.yaml; joins and domains are the ones the dictionaries state in prose.
