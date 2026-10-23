@@ -95,7 +95,12 @@ HELD_OUT_UNASSEMBLED = (
     " assembles no spec: its per-file dictionaries do not share one role map and a concept"
     " section has no settled name role (S4 closure C1, 2026-10-23) (bug-846)"
 )
-DECIDED_MISSES = {"heldout": HELD_OUT_UNASSEMBLED}
+HELDOUT5_UNASSEMBLED = (
+    "the heldout5 seal reaches Review with both relations bound, zero open entries, and no"
+    " spec (S5 task 1.6, 2026-10-23: 2 calls, bound_fraction 1.0, open 0; the decision 14"
+    " state, bug-846); task 2.5 opens one entry per cause"
+)
+DECIDED_MISSES = {"heldout": HELD_OUT_UNASSEMBLED, "heldout5": HELDOUT5_UNASSEMBLED}
 GATE_MISSES = {
     "heldout": "College Scorecard misses its gate at Review: bound_fraction 0.625 < 0.75"
     " and open_choices 6 > 2 (Dean, 2026-10-22: recorded, carried to S4)",
@@ -105,8 +110,6 @@ GATE_MISSES = {
     " (S4 task 3.4, 2026-10-22: recorded, carried to S4 review)",
     "heldout4": "heldout4 misses its gate at Review: bound_fraction 0.0 < 1.0, both relations"
     " open on a section conflict (S4 decision 18, 2026-10-22: recorded, carried to S4 review)",
-    "heldout5": "heldout5 is sealed with no recording yet (S5 task 1.2, 2026-10-23); replaced at"
-    " task 1.6",
 }
 
 
