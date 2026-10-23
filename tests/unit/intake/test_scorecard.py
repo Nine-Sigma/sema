@@ -48,8 +48,8 @@ pytestmark = pytest.mark.unit
 FIXED_KINDS = (
     "entities", "type", "nullable", "definition", "decoded_values", "external_refs",
     "required_fields", "primary_key", "foreign_keys", "domain_constraints", "declared",
-    "relationships", "term_definition", "term_external_refs", "column_bindings",
-    "value_mappings",
+    "relationships", "term_definition", "term_external_refs", "terms", "column_bindings",
+    "value_mappings", "mappings", "retirements",
 )
 TERM_KINDS = (f"terms:{CONCEPT}", f"terms:{RELATIONSHIP}", f"terms:{SYNONYM}")
 EQUAL_CELLS = {
@@ -57,7 +57,7 @@ EQUAL_CELLS = {
     "required_fields": 2, "primary_key": 2, "foreign_keys": 1, "domain_constraints": 1,
     "declared": 1, f"terms:{CONCEPT}": 3, f"terms:{RELATIONSHIP}": 1, f"terms:{SYNONYM}": 1,
     "external_refs": 1, "relationships": 2, "term_definition": 2, "term_external_refs": 1,
-    "column_bindings": 2, "value_mappings": 1,
+    "column_bindings": 2, "value_mappings": 1, "terms": 3, "mappings": 0, "retirements": 0,
 }
 ALL_CELLS = sum(EQUAL_CELLS.values())
 
@@ -212,8 +212,8 @@ NEW_KIND_CASES: list[Any] = [
     pytest.param(_edit(TERMS, 1, definition="3"), None, {TERM_DEF: (1, 0, 1, 0)}, id="t-def"),
     pytest.param(_edit(TERMS, 2, definition="Y"), None, {TERM_DEF: (2, 0, 0, 1)}, id="def-new"),
     pytest.param(
-        lambda m: m[TERMS].pop(0), None, {TERM_DEF: (1, 1, 0, 0), TERM_REFS: (0, 1, 0, 0)},
-        id="term-gone",
+        lambda m: m[TERMS].pop(0), None,
+        {TERM_DEF: (1, 1, 0, 0), TERM_REFS: (0, 1, 0, 0), TERMS: (2, 1, 0, 0)}, id="term-gone",
     ),
     pytest.param(None, _edit(BINDINGS, 0, columns=["rc"]), {BINDINGS: (1, 0, 1, 0)}, id="bind"),
     pytest.param(None, lambda a: a[BINDINGS].pop(), {BINDINGS: (1, 1, 0, 0)}, id="bind-gone"),

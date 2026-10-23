@@ -37,10 +37,13 @@ TERM_KEY_FIELDS = ("vocabulary", "code")
 TERM_VALUES: dict[str, Callable[[Mapping[str, Any]], Any]] = {
     "term_definition": lambda term: term.get("definition"),
     "term_external_refs": lambda term: _records(term.get("external_refs"), REF_FIELDS),
+    "terms": lambda term: (term.get("display"),),
 }
 AUTHORED_KEY_FIELDS: dict[str, Key] = {
     "column_bindings": ("concept_ref", "dataset_label"),
     "value_mappings": ("concept_ref", "source_value"),
+    "mappings": ("subject_id", "predicate_id", "object_id"),
+    "retirements": ("kind", "vocabulary", "code"),
 }
 FIXED_KINDS = (
     ENTITY_KIND, *PROPERTY_VALUES, *OBLIGATION_KINDS, DECLARED_KIND, RELATIONSHIP_KIND,

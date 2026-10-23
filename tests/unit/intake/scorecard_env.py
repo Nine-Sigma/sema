@@ -36,11 +36,11 @@ BASELINE: dict[tuple[str, str], Floor] = {
     # stage_all writes no term definitions or term external refs (term_staging.staged_tables writes
     # id, display, vocabulary, code, lifecycle, replaced_by, synonyms only), so those two
     # kinds have zero cells and the stage_all floor leaves them out by construction (carried gap).
-    ("a1", "spec_cap"): Floor(precision=41 / 61, recall=41 / 93, ignored=4),
+    ("a1", "spec_cap"): Floor(precision=77 / 97, recall=77 / 129, ignored=4),
     ("a1", "stage_all"): Floor(precision=1.0, recall=81 / 101, ignored=4),
     ("a10", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=30),
     ("a10", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=30),
-    ("a2", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=0),
+    ("a2", "spec_cap"): Floor(precision=23 / 24, recall=23 / 24, ignored=0),
     ("a2", "stage_all"): Floor(precision=1.0, recall=24 / 25, ignored=0),
     ("a3", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=0),
     ("a3", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=0),
@@ -49,7 +49,7 @@ BASELINE: dict[tuple[str, str], Floor] = {
     # honest floor against the correct oracle (codes are the concepts; 2026-10-23): the decided
     # run models the four levels as concepts and the codes as one value set, so one cell matches.
     # The code-prefix hierarchy is not expressible in spec_version 2 and is unscored until S6.
-    ("heldout4", "spec_cap"): Floor(precision=1 / 5166, recall=1 / 5110, ignored=1),
+    ("heldout4", "spec_cap"): Floor(precision=1 / 5478, recall=1 / 5110, ignored=1),
     ("heldout4", "stage_all"): Floor(precision=1 / 5478, recall=1 / 5110, ignored=1),
 }
 
