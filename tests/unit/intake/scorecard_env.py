@@ -29,7 +29,10 @@ class Floor:
 
 BASELINE: dict[tuple[str, str], Floor] = {
     # honest floor: the four relations the decisions file ignores carry concept_details,
-    # term_details, relationships, value_mappings, authored_bindings; measured on cb7b49b.
+    # term_details, relationships, value_mappings, authored_bindings; measured at 20a704b.
+    # stage_all writes no term definitions or term external refs (term_staging.staged_tables writes
+    # id, display, vocabulary, code, lifecycle, replaced_by, synonyms only), so those two
+    # kinds have zero cells and the stage_all floor leaves them out by construction (carried gap).
     ("a1", "spec_cap"): Floor(precision=41 / 61, recall=41 / 93, ignored=4),
     ("a1", "stage_all"): Floor(precision=1.0, recall=81 / 101, ignored=4),
     ("a10", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=30),

@@ -200,7 +200,7 @@ def _authored(change: Callable[[Manifest], Any] | None) -> Manifest:
 
 
 RELS, REFS, TERMS, BINDINGS = "relationships", "external_refs", "terms", "column_bindings"
-TERM_DEF, TERM_REFS, VALUE_MAPPINGS = "term_definition", "term_external_refs", "value_mappings"
+TERM_DEF, TERM_REFS, MAPPINGS = "term_definition", "term_external_refs", "value_mappings"
 NEW_KIND_CASES: list[Any] = [
     pytest.param(_edit(RELS, 0, type="precedes"), None, {RELS: (1, 1, 0, 1)}, id="rel-key"),
     pytest.param(_edit(RELS, 1, hierarchical=False), None, {RELS: (1, 0, 1, 0)}, id="rel-value"),
@@ -220,7 +220,7 @@ NEW_KIND_CASES: list[Any] = [
     pytest.param(
         None, lambda a: a[BINDINGS].append(binding("x")), {BINDINGS: (2, 0, 0, 1)}, id="bind-new"
     ),
-    pytest.param(None, _edit(VALUE_MAPPINGS, 0, codes=["K"]), {VALUE_MAPPINGS: (0, 0, 1, 0)}),
+    pytest.param(None, _edit(MAPPINGS, 0, codes=["K"]), {MAPPINGS: (0, 0, 1, 0)}, id="map"),
 ]
 
 

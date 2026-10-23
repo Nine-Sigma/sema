@@ -206,10 +206,18 @@ def _records(items: Iterable[Mapping[str, Any]] | None, fields: Key) -> frozense
 def _numbered(records: Iterable[tuple[Key, Any]]) -> Cells:
     occurrences: Counter[Key] = Counter()
     cells: Cells = {}
-    for key, value in sorted(records, key=repr):
+    for key, value in sorted(records, key=lambda record: repr(_canonical(record))):
         cells[(*key, str(occurrences[key]))] = value
         occurrences[key] += 1
     return cells
+
+
+def _canonical(value: Any) -> Any:
+    if isinstance(value, frozenset):
+        return tuple(sorted((_canonical(item) for item in value), key=repr))
+    if isinstance(value, tuple):
+        return tuple(_canonical(item) for item in value)
+    return value
 
 
 def _key(record: Mapping[str, Any], fields: Key) -> Key:
