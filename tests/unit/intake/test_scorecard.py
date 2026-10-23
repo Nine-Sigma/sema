@@ -6,7 +6,6 @@ are the import's own names and the term tables are the store's.
 
 from __future__ import annotations
 
-import copy
 from collections.abc import Callable
 from typing import Any
 
@@ -20,11 +19,14 @@ from tests.unit.intake.scorecard_env import (
     ENTITY_CASES,
     HARBOR,
     PROPERTY_CASES,
+    REGISTRY,
     RELATIONSHIP,
     SYNONYM,
+    VESSEL,
     VOYAGE,
     Floor,
     Table,
+    binding,
     change_definitions,
     concept_row,
     entity,
@@ -33,23 +35,29 @@ from tests.unit.intake.scorecard_env import (
     fk,
     floor_misses,
     manifest,
+    oracle_authored,
     oracle_manifest,
     oracle_tables,
     prop,
     prop_of,
+    ref,
 )
 
 pytestmark = pytest.mark.unit
 
 FIXED_KINDS = (
-    "entities", "type", "nullable", "definition", "decoded_values", "required_fields",
-    "primary_key", "foreign_keys", "domain_constraints", "declared",
+    "entities", "type", "nullable", "definition", "decoded_values", "external_refs",
+    "required_fields", "primary_key", "foreign_keys", "domain_constraints", "declared",
+    "relationships", "term_definition", "term_external_refs", "column_bindings",
+    "value_mappings",
 )
 TERM_KINDS = (f"terms:{CONCEPT}", f"terms:{RELATIONSHIP}", f"terms:{SYNONYM}")
 EQUAL_CELLS = {
     "entities": 3, "type": 8, "nullable": 8, "definition": 3, "decoded_values": 1,
     "required_fields": 2, "primary_key": 2, "foreign_keys": 1, "domain_constraints": 1,
     "declared": 1, f"terms:{CONCEPT}": 3, f"terms:{RELATIONSHIP}": 1, f"terms:{SYNONYM}": 1,
+    "external_refs": 1, "relationships": 2, "term_definition": 2, "term_external_refs": 1,
+    "column_bindings": 2, "value_mappings": 1,
 }
 ALL_CELLS = sum(EQUAL_CELLS.values())
 
@@ -57,19 +65,32 @@ Manifest = dict[str, Any]
 Tables = dict[str, Table]
 
 
-def _changed(change: Callable[[Manifest], None]) -> Manifest:
-    built = copy.deepcopy(oracle_manifest())
-    change(built)
+def _changed(change: Callable[[Manifest], Any] | None) -> Manifest:
+    built = oracle_manifest()
+    if change is not None:
+        change(built)
     return built
 
 
-def _score_manifest(assembled: Manifest) -> Scorecard:
-    staged = export(oracle_tables())
-    return score(oracle_manifest(), assembled, staged, staged)
+def _score(assembled: Manifest, staged: str, authored: Manifest) -> Scorecard:
+    expected = oracle_authored()
+    return score(
+        oracle_manifest(), assembled, export(oracle_tables()), staged,
+        expected_authored=expected, authored=authored,
+    )
+
+
+def _score_manifest(assembled: Manifest, authored: Manifest | None = None) -> Scorecard:
+    return _score(assembled, export(oracle_tables()), authored or oracle_authored())
 
 
 def _score_terms(assembled: Tables) -> Scorecard:
-    return score(oracle_manifest(), oracle_manifest(), export(oracle_tables()), export(assembled))
+    return _score(oracle_manifest(), export(assembled), oracle_authored())
+
+
+def _moved(card: Scorecard) -> set[str]:
+    identical = _identical().kinds
+    return {name for name, kind in card.kinds.items() if kind != identical.get(name)}
 
 
 def _counts(kind: KindScore) -> tuple[int, int, int, int]:
@@ -88,6 +109,7 @@ def test_identical_imports_score_one_on_every_kind() -> None:
     card = _identical()
 
     assert set(card.kinds) == {*FIXED_KINDS, *TERM_KINDS}
+    assert tuple(card.kinds)[: len(FIXED_KINDS)] == FIXED_KINDS
     for name, kind in card.kinds.items():
         assert (kind.precision, kind.recall) == (1.0, 1.0), name
         assert _counts(kind) == (EQUAL_CELLS[name], 0, 0, 0), name
@@ -160,6 +182,71 @@ def test_foreign_keys_compare_as_a_set_of_referenced_entity_and_join_keys() -> N
     card = score(_changed(add(1)), _changed(add(0)), staged, staged)
 
     assert _counts(card.kinds["foreign_keys"]) == (1, 0, 0, 0)
+
+
+def _edit(records: str, at: int, **fields: Any) -> Callable[[Manifest], None]:
+    return lambda built: built[records][at].update(fields)
+
+
+def _refs(entity_name: str, name: str, *refs: dict[str, str]) -> Callable[[Manifest], None]:
+    return lambda m: prop_of(m, entity_name, name).update(external_refs=list(refs))
+
+
+def _authored(change: Callable[[Manifest], Any] | None) -> Manifest:
+    built = oracle_authored()
+    if change is not None:
+        change(built)
+    return built
+
+
+RELS, REFS, TERMS, BINDINGS = "relationships", "external_refs", "terms", "column_bindings"
+TERM_DEF, TERM_REFS, VALUE_MAPPINGS = "term_definition", "term_external_refs", "value_mappings"
+NEW_KIND_CASES: list[Any] = [
+    pytest.param(_edit(RELS, 0, type="precedes"), None, {RELS: (1, 1, 0, 1)}, id="rel-key"),
+    pytest.param(_edit(RELS, 1, hierarchical=False), None, {RELS: (1, 0, 1, 0)}, id="rel-value"),
+    pytest.param(lambda m: m[RELS].pop(), None, {RELS: (1, 1, 0, 0)}, id="rel-gone"),
+    pytest.param(_refs(VESSEL, "rig", ref(REGISTRY, "R-2")), None, {REFS: (0, 0, 1, 0)}, id="ref"),
+    pytest.param(_refs(VOYAGE, "port", ref(REGISTRY, "P")), None, {REFS: (1, 0, 0, 1)}, id="new"),
+    pytest.param(_refs(VESSEL, "rig"), None, {REFS: (0, 1, 0, 0)}, id="ref-gone"),
+    pytest.param(_edit(TERMS, 0, external_refs=[]), None, {TERM_REFS: (0, 1, 0, 0)}, id="t-ref"),
+    pytest.param(_edit(TERMS, 1, definition="3"), None, {TERM_DEF: (1, 0, 1, 0)}, id="t-def"),
+    pytest.param(_edit(TERMS, 2, definition="Y"), None, {TERM_DEF: (2, 0, 0, 1)}, id="def-new"),
+    pytest.param(
+        lambda m: m[TERMS].pop(0), None, {TERM_DEF: (1, 1, 0, 0), TERM_REFS: (0, 1, 0, 0)},
+        id="term-gone",
+    ),
+    pytest.param(None, _edit(BINDINGS, 0, columns=["rc"]), {BINDINGS: (1, 0, 1, 0)}, id="bind"),
+    pytest.param(None, lambda a: a[BINDINGS].pop(), {BINDINGS: (1, 1, 0, 0)}, id="bind-gone"),
+    pytest.param(
+        None, lambda a: a[BINDINGS].append(binding("x")), {BINDINGS: (2, 0, 0, 1)}, id="bind-new"
+    ),
+    pytest.param(None, _edit(VALUE_MAPPINGS, 0, codes=["K"]), {VALUE_MAPPINGS: (0, 0, 1, 0)}),
+]
+
+
+@pytest.mark.parametrize(("change", "authored", "expected"), NEW_KIND_CASES)
+def test_relationships_refs_term_definitions_and_authored_records_score_per_record(
+    change: Callable[[Manifest], Any] | None,
+    authored: Callable[[Manifest], Any] | None,
+    expected: dict[str, tuple[int, int, int, int]],
+) -> None:
+    card = _score_manifest(_changed(change), _authored(authored))
+
+    assert {kind: _counts(card.kinds[kind]) for kind in _moved(card)} == expected
+
+
+def test_a_pair_differing_on_each_new_kind_scores_each_and_the_overall() -> None:
+    def change(built: Manifest) -> None:
+        _edit(RELS, 1, hierarchical=False)(built)
+        _refs(VESSEL, "rig")(built)
+        _edit(TERMS, 1, definition="3")(built)
+
+    card = _score_manifest(_changed(change), _authored(lambda a: a[BINDINGS].pop()))
+
+    assert {kind: _counts(card.kinds[kind]) for kind in _moved(card)} == {
+        RELS: (1, 0, 1, 0), REFS: (0, 1, 0, 0), TERM_DEF: (1, 0, 1, 0), BINDINGS: (1, 1, 0, 0),
+    }
+    assert card.recall == pytest.approx((ALL_CELLS - 4) / ALL_CELLS)
 
 
 def _replace(table: str, rows: tuple[tuple[str, ...], ...]) -> Tables:

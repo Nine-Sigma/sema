@@ -183,15 +183,24 @@ def staging_copy(run: Replayed, directory: Path) -> Iterator[Staging]:
         yield staging
 
 
-def imported(spec: ConceptSourceSpec, staging: Staging) -> tuple[dict[str, Any], str, str]:
+def imported_with_authored(
+    spec: ConceptSourceSpec, staging: Staging
+) -> tuple[dict[str, Any], str, str, dict[str, Any]]:
     """The import's manifest mapping with entities in qualified-name order, that mapping
-    as text, and the term staging export text."""
+    as text, the term staging export text, and the authored evidence mapping."""
     provider = RelationProvider(warehouse=None, staging=staging)
     result = import_concept_source(spec, provider, dataset_map={}, staging=staging)
     entities = sorted(result.manifest["entities"], key=lambda e: e["qualified_name"])
     manifest = result.manifest | {"entities": entities}
     text = yaml.safe_dump(manifest, sort_keys=False)
-    return manifest, text, export_schema(staging, spec.external_namespace)
+    staged = export_schema(staging, spec.external_namespace)
+    return manifest, text, staged, result.authored.model_dump()
+
+
+def imported(spec: ConceptSourceSpec, staging: Staging) -> tuple[dict[str, Any], str, str]:
+    """``imported_with_authored`` without the authored evidence."""
+    manifest, text, staged, _ = imported_with_authored(spec, staging)
+    return manifest, text, staged
 
 
 def jsonl(path: Path) -> list[dict[str, Any]]:
@@ -242,9 +251,12 @@ def scorecard_of(
     directory: Path,
 ) -> Scorecard:
     with staging_copy(run, directory) as staging:
-        manifest, _, staged = imported(capped(spec, cap), staging)
-        expected_manifest, _, expected_staged = imported(capped(oracle, cap), staging)
-    return score(expected_manifest, manifest, expected_staged, staged)
+        manifest, _, staged, authored = imported_with_authored(capped(spec, cap), staging)
+        expected = imported_with_authored(capped(oracle, cap), staging)
+    return score(
+        expected[0], manifest, expected[2], staged,
+        expected_authored=expected[3], authored=authored,
+    )
 
 
 def column(block: list[list[str]], name: str) -> list[str]:

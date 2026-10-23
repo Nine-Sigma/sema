@@ -28,16 +28,14 @@ class Floor:
 
 
 BASELINE: dict[tuple[str, str], Floor] = {
-    # A1 is scored on its full oracle with four relations ignored (S4 principal review,
-    # sections 3 and 5). The scorer reads manifest entities and term staging only, so the
-    # oracle's relationships, external refs, term definitions, and authored evidence that
-    # the ignores drop are not yet cells: these 1.0 values do not see them.
-    ("a1", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=4),
-    ("a1", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=4),
+    # honest floor: the four relations the decisions file ignores carry concept_details,
+    # term_details, relationships, value_mappings, authored_bindings; measured on cb7b49b.
+    ("a1", "spec_cap"): Floor(precision=41 / 61, recall=41 / 93, ignored=4),
+    ("a1", "stage_all"): Floor(precision=1.0, recall=81 / 101, ignored=4),
     ("a10", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=30),
     ("a10", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=30),
     ("a2", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=0),
-    ("a2", "stage_all"): Floor(precision=1.0, recall=20 / 21, ignored=0),
+    ("a2", "stage_all"): Floor(precision=1.0, recall=24 / 25, ignored=0),
     ("a3", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=0),
     ("a3", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=0),
     ("a7_csv", "spec_cap"): Floor(precision=291 / 903, recall=291 / 1323, ignored=0),
@@ -74,13 +72,55 @@ def prop(
     nullable: bool = True,
     definition: str | None = None,
     decoded_values: Mapping[str, str] | None = None,
+    external_refs: Sequence[dict[str, str]] = (),
 ) -> dict[str, Any]:
     built: dict[str, Any] = {"name": name, "type": type_, "nullable": nullable}
     if definition is not None:
         built["definition"] = definition
     if decoded_values is not None:
         built["decoded_values"] = dict(decoded_values)
+    if external_refs:
+        built["external_refs"] = list(external_refs)
     return built
+
+
+def ref(system: str, id_: str) -> dict[str, str]:
+    return {"system": system, "id": id_}
+
+
+def term(
+    code: str, display: str, definition: str | None = None, *refs: dict[str, str]
+) -> dict[str, Any]:
+    return {
+        "vocabulary": RIG_KINDS, "code": code, "display": display, "definition": definition,
+        "synonyms": [], "external_refs": list(refs),
+    }
+
+
+def relationship(start: str, end: str, type_: str, hierarchical: bool | None) -> dict[str, Any]:
+    return {
+        "from": ref(RIG_KINDS, start), "to": ref(RIG_KINDS, end), "type": type_,
+        "hierarchical": hierarchical, "far_end_loaded": True,
+    }
+
+
+def binding(concept_ref: str, *columns: str) -> dict[str, Any]:
+    return {
+        "concept_ref": concept_ref, "dataset_label": "fleet", "dataset_id": None,
+        "physical": None, "columns": list(columns), "resolved": False, "project": None,
+    }
+
+
+def value_mapping(concept_ref: str, source_value: str, *codes: str) -> dict[str, Any]:
+    return {
+        "concept_ref": concept_ref, "source_value": source_value, "codes": list(codes),
+        "status": None, "approved": False,
+    }
+
+
+def oracle_authored() -> dict[str, Any]:
+    bindings = [binding("rig", "rig"), binding("hull", "hull_code")]
+    return {"column_bindings": bindings, "value_mappings": [value_mapping("rig", "S", "S")]}
 
 
 def fk(referenced_entity: str, *pairs: tuple[str, str]) -> dict[str, Any]:
@@ -133,9 +173,16 @@ def entity(
     return built
 
 
-def manifest(*entities: dict[str, Any]) -> dict[str, Any]:
+def manifest(
+    *entities: dict[str, Any],
+    terms: Sequence[dict[str, Any]] = (),
+    relationships: Sequence[dict[str, Any]] = (),
+) -> dict[str, Any]:
     ordered = sorted(entities, key=lambda e: str(e["qualified_name"]))
-    return {"manifest_version": "1", "entities": ordered}
+    return {
+        "manifest_version": "1", "terms": list(terms), "entities": ordered,
+        "relationships": list(relationships),
+    }
 
 
 @dataclass(frozen=True)
@@ -159,6 +206,7 @@ def export(tables: Mapping[str, Table]) -> str:
 
 
 VESSEL, VOYAGE, CREW, HARBOR = "fleet.vessel", "fleet.voyage", "fleet.crew", "fleet.harbor"
+RIG_KINDS, REGISTRY = "rig_kinds", "sail_registry"
 CONCEPT, RELATIONSHIP, SYNONYM = "concept", "concept_relationship", "concept_synonym"
 CONCEPT_HEADER = (
     "concept_id:VARCHAR", "concept_name:VARCHAR", "domain_id:VARCHAR",
@@ -171,12 +219,16 @@ SYNONYM_HEADER = ("concept_id:VARCHAR", "concept_synonym_name:VARCHAR", "languag
 
 def oracle_manifest() -> dict[str, Any]:
     """Three invented entities: a stated single key with a domain, a compound key with a
-    foreign key, and no stated key with declared joins and domains."""
+    foreign key, and no stated key with declared joins and domains; three terms and two
+    relationships between them."""
     vessel = entity(
         VESSEL,
         prop("hull_code", nullable=False, definition="Registry code of the hull"),
         prop("tonnage", "integer", definition="Gross tonnage"),
-        prop("rig", decoded_values={"S": "Sloop", "K": "Ketch"}),
+        prop(
+            "rig", decoded_values={"S": "Sloop", "K": "Ketch"},
+            external_refs=[ref(REGISTRY, "R-1")],
+        ),
         obligation=obligation(["hull_code"], domain_constraints=[domain("rig", "rig_kinds")]),
     )
     voyage = entity(
@@ -197,7 +249,13 @@ def oracle_manifest() -> dict[str, Any]:
         joins=[fk(VESSEL, ("hull_code", "hull_code"))],
         domains=[domain("member", "crew_roles")],
     )
-    return manifest(vessel, voyage, crew)
+    terms = [
+        term("S", "Sloop", "Single-masted", ref(REGISTRY, "S-1")),
+        term("K", "Ketch", "Two-masted"),
+        term("Y", "Yawl"),
+    ]
+    links = [relationship("Y", "K", "succeeded_by", None), relationship("S", "K", "is_a", True)]
+    return manifest(vessel, voyage, crew, terms=terms, relationships=links)
 
 
 def concept_row(code: str, name: str) -> tuple[str, ...]:

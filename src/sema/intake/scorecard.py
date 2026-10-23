@@ -1,11 +1,12 @@
 """Accuracy of one import against another, cell by cell over the import's own shape.
 
-An import is its manifest mapping and its term staging export text (typed header lines
-under ``## <table>`` marks). A cell is one value the import writes: an entity, a property's
-field, an entity's obligation field or declared block, or one term staging row; rows sharing
-a key are numbered in sorted order, so each is its own cell. A cell counts only when at least
-one side writes it, and scores ``equal``, ``wrong`` (both sides, different values),
-``missing`` (expected side only), or ``extra`` (assembled side only).
+An import is its manifest mapping, its term staging export text (typed header lines under
+``## <table>`` marks), and optionally its authored evidence mapping. A cell is one value the
+import writes: an entity, a property's field, an entity's obligation field or declared block,
+a manifest relationship, a manifest term's field, an authored record, or one term staging row;
+records sharing a key are numbered in sorted order, so each is its own cell. A cell counts only
+when at least one side writes it, and scores ``equal``, ``wrong`` (both sides, different
+values), ``missing`` (expected side only), or ``extra`` (assembled side only).
 """
 
 from __future__ import annotations
@@ -21,10 +22,30 @@ from pydantic import BaseModel, ConfigDict
 from sema.binding.term_staging import TERM_STAGING_SCHEMA as STORE
 
 ENTITY_KIND = "entities"
-PROPERTY_KINDS = ("type", "nullable", "definition", "decoded_values")
+REF_FIELDS = ("system", "id")
+PROPERTY_VALUES: dict[str, Callable[[Any], Any]] = {
+    "type": lambda value: value,
+    "nullable": lambda value: value,
+    "definition": lambda value: value,
+    "decoded_values": lambda value: value,
+    "external_refs": lambda value: _records(value, REF_FIELDS),
+}
 OBLIGATION_KINDS = ("required_fields", "primary_key", "foreign_keys", "domain_constraints")
 DECLARED_KIND = "declared"
-FIXED_KINDS = (ENTITY_KIND, *PROPERTY_KINDS, *OBLIGATION_KINDS, DECLARED_KIND)
+RELATIONSHIP_KIND = "relationships"
+TERM_KEY_FIELDS = ("vocabulary", "code")
+TERM_VALUES: dict[str, Callable[[Mapping[str, Any]], Any]] = {
+    "term_definition": lambda term: term.get("definition"),
+    "term_external_refs": lambda term: _records(term.get("external_refs"), REF_FIELDS),
+}
+AUTHORED_KEY_FIELDS: dict[str, Key] = {
+    "column_bindings": ("concept_ref", "dataset_label"),
+    "value_mappings": ("concept_ref", "source_value"),
+}
+FIXED_KINDS = (
+    ENTITY_KIND, *PROPERTY_VALUES, *OBLIGATION_KINDS, DECLARED_KIND, RELATIONSHIP_KIND,
+    *TERM_VALUES, *AUTHORED_KEY_FIELDS,
+)
 TERM_KIND_PREFIX = "terms:"
 TABLE_MARK = "## "
 TYPE_SEPARATOR = ":"
@@ -77,10 +98,14 @@ def score(
     manifest: Mapping[str, Any],
     expected_staged: str,
     staged: str,
+    *,
+    expected_authored: Mapping[str, Any] | None = None,
+    authored: Mapping[str, Any] | None = None,
 ) -> Scorecard:
-    """Score the assembled import (``manifest``, ``staged``) against the expected one."""
-    expected = _manifest_cells(expected_manifest) | _staged_cells(expected_staged)
-    actual = _manifest_cells(manifest) | _staged_cells(staged)
+    """Score the assembled import (``manifest``, ``staged``, ``authored``) against the
+    expected one; authored evidence left out on a side writes no authored cells there."""
+    expected = _cells(expected_manifest, expected_staged, expected_authored)
+    actual = _cells(manifest, staged, authored)
     terms = sorted((expected.keys() | actual.keys()) - set(FIXED_KINDS))
     kinds = {
         kind: _kind_score(_verdicts(expected.get(kind, {}), actual.get(kind, {})))
@@ -169,12 +194,37 @@ def _written(value: Any) -> bool:
 def _frozen(value: Any) -> Any:
     if isinstance(value, list | tuple):
         return tuple(_frozen(item) for item in value)
+    if isinstance(value, Mapping):
+        return tuple(sorted((str(name), _frozen(item)) for name, item in value.items()))
     return value
 
 
 def _records(items: Iterable[Mapping[str, Any]] | None, fields: Key) -> frozenset[Any]:
     return frozenset(tuple(_frozen(item[name]) for name in fields) for item in items or ())
 
+
+def _numbered(records: Iterable[tuple[Key, Any]]) -> Cells:
+    occurrences: Counter[Key] = Counter()
+    cells: Cells = {}
+    for key, value in sorted(records, key=repr):
+        cells[(*key, str(occurrences[key]))] = value
+        occurrences[key] += 1
+    return cells
+
+
+def _key(record: Mapping[str, Any], fields: Key) -> Key:
+    return tuple("" if record.get(name) is None else str(record[name]) for name in fields)
+
+
+def _cells(
+    manifest: Mapping[str, Any], staged: str, authored: Mapping[str, Any] | None
+) -> dict[str, Cells]:
+    return (
+        _manifest_cells(manifest)
+        | _record_cells(manifest)
+        | _authored_cells(authored or {})
+        | _staged_cells(staged)
+    )
 
 
 def _declared(entity: Mapping[str, Any]) -> tuple[frozenset[Any], frozenset[Any]] | None:
@@ -189,13 +239,40 @@ def _manifest_cells(manifest: Mapping[str, Any]) -> dict[str, Cells]:
         name = str(entity["qualified_name"])
         cells[ENTITY_KIND][(name,)] = True
         for prop in entity.get("properties") or ():
-            for kind in PROPERTY_KINDS:
-                cells[kind][(name, str(prop["name"]))] = prop.get(kind)
+            for kind, value_of in PROPERTY_VALUES.items():
+                cells[kind][(name, str(prop["name"]))] = value_of(prop.get(kind))
         obligation = entity.get("obligation") or {}
         for kind, value_of in OBLIGATION_VALUES.items():
             cells[kind][(name,)] = value_of(obligation.get(kind))
         cells[DECLARED_KIND][(name,)] = _declared(entity)
     return cells
+
+
+def _record_cells(manifest: Mapping[str, Any]) -> dict[str, Cells]:
+    relationships = manifest.get(RELATIONSHIP_KIND) or ()
+    terms = manifest.get("terms") or ()
+    cells = {
+        kind: _numbered((_key(term, TERM_KEY_FIELDS), value_of(term)) for term in terms)
+        for kind, value_of in TERM_VALUES.items()
+    }
+    cells[RELATIONSHIP_KIND] = _numbered(
+        (_relationship_key(record), _frozen(record)) for record in relationships
+    )
+    return cells
+
+
+def _relationship_key(record: Mapping[str, Any]) -> Key:
+    ends = (record.get("from") or {}, record.get("to") or {})
+    return (*(part for end in ends for part in _key(end, REF_FIELDS)), str(record["type"]))
+
+
+def _authored_cells(authored: Mapping[str, Any]) -> dict[str, Cells]:
+    return {
+        kind: _numbered(
+            (_key(record, fields), _frozen(record)) for record in authored.get(kind) or ()
+        )
+        for kind, fields in AUTHORED_KEY_FIELDS.items()
+    }
 
 
 def _staged_cells(text: str) -> dict[str, Cells]:
@@ -225,10 +302,4 @@ def _term_rows(table: str, rows: list[list[str]]) -> Cells:
         indexes = [header.index(column) for column in keys]
     else:
         indexes = list(range(len(header)))
-    occurrences: Counter[Key] = Counter()
-    cells: Cells = {}
-    for row in sorted(tuple(row) for row in rows[1:]):
-        key = tuple(row[at] for at in indexes)
-        cells[(*key, str(occurrences[key]))] = row
-        occurrences[key] += 1
-    return cells
+    return _numbered((tuple(row[at] for at in indexes), row) for row in rows[1:])
