@@ -216,7 +216,8 @@ def runs_cmd(
 @click.option("--settled", is_flag=True, help="Also print the settled entries, choice first.")
 @ROOT_OPTION
 def review_cmd(run_id: str, settled: bool, root: Path) -> None:
-    """Print RUN_ID's open entries one per line, or its spec path when none is open."""
+    """Print RUN_ID's open entries one per line, or its spec path when none is open; with
+    --settled, then every settled entry, its choice first."""
     for line in review_lines(root, run_id, settled=settled):
         click.echo(line)
 

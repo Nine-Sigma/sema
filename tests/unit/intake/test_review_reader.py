@@ -80,7 +80,9 @@ def root(tmp_path: Path) -> Path:
 
 def test_each_open_entry_prints_one_line_structure_first_settled_absent(root: Path) -> None:
     opened = [alpha_structure(), beta_structure(), gamma_role()]
-    write_run(root, [opened[0], settled_structure(), opened[1]], [opened[2]])
+    write_run(
+        root, [opened[0], opened[1]], [opened[2]], structure_settled=[settled_structure()]
+    )
 
     result = invoke(root)
 
@@ -186,7 +188,7 @@ def test_a_run_without_a_ledger_exits_non_zero_naming_the_run(root: Path) -> Non
 def test_a_run_with_no_open_entry_and_no_spec_exits_non_zero_naming_the_run(
     root: Path,
 ) -> None:
-    spec_path = write_run(root, [settled_structure()], [])
+    spec_path = write_run(root, [], [], structure_settled=[settled_structure()])
 
     result = invoke(root)
 
@@ -212,8 +214,9 @@ def test_a_role_a_human_settled_none_is_closed_and_not_printed(root: Path) -> No
 def _open_and_settled(root: Path) -> None:
     write_run(
         root,
-        [beta_structure(), model_settled_structure()],
+        [beta_structure()],
         [lexicon_settled_role(), gamma_role()],
+        structure_settled=[model_settled_structure()],
     )
 
 
@@ -280,7 +283,8 @@ def test_settled_on_a_run_with_a_spec_prints_the_spec_path_then_the_settled_line
     root: Path,
 ) -> None:
     spec_path = write_run(
-        root, [model_settled_structure()], [lexicon_settled_role()], spec=SPEC_BODY
+        root, [], [lexicon_settled_role()], spec=SPEC_BODY,
+        structure_settled=[model_settled_structure()],
     )
 
     result = invoke_settled(root)
@@ -294,7 +298,9 @@ def test_settled_on_a_run_with_a_spec_prints_the_spec_path_then_the_settled_line
 
 
 def test_settled_never_masks_a_run_with_no_open_entry_and_no_spec(root: Path) -> None:
-    spec_path = write_run(root, [model_settled_structure()], [lexicon_settled_role()])
+    spec_path = write_run(
+        root, [], [lexicon_settled_role()], structure_settled=[model_settled_structure()]
+    )
 
     result = invoke_settled(root)
 
@@ -302,3 +308,33 @@ def test_settled_never_masks_a_run_with_no_open_entry_and_no_spec(root: Path) ->
     assert result.exit_code != 0, result.output
     assert RUN_ID in result.output, result.output
     assert NO_SPEC in result.output.lower(), result.output
+
+
+def test_settled_reads_structure_choices_from_the_structure_artifact(root: Path) -> None:
+    write_run(
+        root, [beta_structure()], [lexicon_settled_role()],
+        structure_settled=[model_settled_structure()],
+    )
+
+    flagged, plain = invoke_settled(root), invoke(root)
+
+    assert_succeeded(flagged)
+    lines = printed_lines(flagged)
+    assert len(lines) == 3, lines
+    assert_line_shows(lines[0], beta_structure())
+    assert_settled_line_shows(lines[1], model_settled_structure())
+    assert_settled_line_shows(lines[2], lexicon_settled_role())
+    assert_succeeded(plain)
+    assert len(printed_lines(plain)) == 1, plain.output
+
+
+def test_a_run_without_a_structure_artifact_still_prints_with_settled(root: Path) -> None:
+    write_run(root, [beta_structure()], [lexicon_settled_role()])
+
+    result = invoke_settled(root)
+
+    assert_succeeded(result)
+    lines = printed_lines(result)
+    assert len(lines) == 2, lines
+    assert_line_shows(lines[0], beta_structure())
+    assert_settled_line_shows(lines[1], lexicon_settled_role())

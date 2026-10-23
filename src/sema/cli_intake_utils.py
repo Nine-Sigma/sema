@@ -20,6 +20,7 @@ from sema.intake.graph_nodes import (
     APPROVED,
     METRICS_ARTIFACT,
     SPEC_ARTIFACT,
+    STRUCTURE_ARTIFACT,
     WAITING,
 )
 from sema.intake.graph_stages import (
@@ -255,8 +256,23 @@ def review_lines(root: Path, run_id: str, *, settled: bool = False) -> list[str]
     if not lines:
         lines = [str(_assembled_spec(root, run_id))]
     if settled:
-        lines += [_settled_line(entry) for entry in listed if not _is_open(entry)]
+        lines += [_settled_line(entry) for entry in _settled_entries(root, run_id, listed)]
     return lines
+
+
+def _settled_entries(
+    root: Path, run_id: str, listed: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Structure then roles; a settled structure entry leaves the ambiguity list for the
+    ``settled`` list of the structure artifact, which an older ledger does not hold."""
+    closed = [entry for entry in listed if not _is_open(entry)]
+    path = root / run_id / ARTIFACTS_DIR / f"{STRUCTURE_ARTIFACT}.json"
+    moved = json.loads(path.read_text()).get("settled", []) if path.is_file() else []
+    return [
+        *(entry for entry in closed if entry["stage"] == STRUCTURE),
+        *moved,
+        *(entry for entry in closed if entry["stage"] != STRUCTURE),
+    ]
 
 
 def _assembled_spec(root: Path, run_id: str) -> Path:

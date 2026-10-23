@@ -27,6 +27,11 @@ STRUCTURE, ROLES = "structure", "roles"
 RUN_ID, MISSING_RUN_ID = "review-run-1", "review-run-absent"
 SOURCE = "invented-source"
 REGISTRY_FILE, ARTIFACTS_DIR, SPEC_FILE = "registry.sqlite", "artifacts", "spec.json"
+STRUCTURE_FILE = "structure.json"
+EMPTY_STRUCTURE: dict[str, Any] = {
+    "order": [], "groups": [], "signatures": {}, "bound": [], "ignored": [],
+    "ambiguities": [], "edges": [], "floors": {}, "proposal_targets": [],
+}
 SEEDED_TOKENS, SEEDED_COST = 120, 0.002
 PROVIDER_ENTRY_POINTS = (
     "sema.cli_intake._intake_client",
@@ -180,9 +185,17 @@ def write_run(
     *,
     run_id: str = RUN_ID,
     spec: dict[str, Any] | None = None,
+    structure_settled: Sequence[Entry] | None = None,
 ) -> Path:
-    """Write the two lists, ``run_metrics``, and the spec when given; return the spec path."""
+    """Write the two lists, ``run_metrics``, and the spec when given; return the spec path.
+
+    Settled structure entries go where the ledger writes them: the ``settled`` list of the
+    ``structure`` artifact (``StructureResult.with_settled``), never the ambiguity file;
+    ``None`` writes no ``structure`` artifact, as an older ledger has none."""
     artifacts = root / run_id / ARTIFACTS_DIR
+    if structure_settled is not None:
+        settled_payload = {**EMPTY_STRUCTURE, "settled": list(structure_settled)}
+        _write_json(artifacts / STRUCTURE_FILE, settled_payload)
     for stage, listed in ((STRUCTURE, structure), (ROLES, roles)):
         payload = {"stage": stage, "count": len(listed), "ambiguities": list(listed)}
         _write_json(artifacts / f"{stage}_ambiguities.json", payload)
