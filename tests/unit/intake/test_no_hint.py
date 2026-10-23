@@ -80,6 +80,7 @@ UNDECIDED_HELD_OUT = ("heldout2",)
 A1, ATHENA = "a1", "a7_athena"
 A1_SPEC = FIXTURES / "partner_sl" / "standard_library.spec.yaml"
 A1_DECISIONS = FIXTURES / "partner_sl" / DECISIONS_FILE
+SCORED_SPECS = {**ORACLE_SPECS, A1: A1_SPEC}
 DECISIONS = {
     A1: A1_DECISIONS,
     **{name: source_of(name).path / DECISIONS_FILE for name in DECIDED_HELD_OUT},
@@ -98,10 +99,12 @@ IMPORT_MISSES = {
     ("a7_csv", "spec_cap"): A7_CSV_MISS,
     ("a7_csv", "stage_all"): A7_CSV_MISS,
 }
-HELD_OUT_DECISIONS_REJECTED = (
-    "the committed held-out decisions file holds two `no_template` choices rejected since"
-    " 14.4b; they become `ignore` with the 14.4c re-record in S4"
+HELD_OUT_UNASSEMBLED = (
+    "with its two ignores accepted the decided College Scorecard run settles every entry but"
+    " assembles no spec: its per-file dictionaries do not share one role map and a concept"
+    " section has no settled name role (S4 closure C1, 2026-10-23)"
 )
+DECIDED_MISSES = {"heldout": HELD_OUT_UNASSEMBLED}
 GATE_MISSES = {
     "heldout": "College Scorecard misses its gate at Review: bound_fraction 0.625 < 0.75"
     " and open_choices 6 > 2 (Dean, 2026-10-22: recorded, carried to S4)",
@@ -112,7 +115,6 @@ GATE_MISSES = {
     "heldout4": "heldout4 misses its gate at Review: bound_fraction 0.0 < 1.0, both relations"
     " open on a section conflict (S4 decision 18, 2026-10-22: recorded, carried to S4 review)",
 }
-DECIDED_MISSES = {"heldout": HELD_OUT_DECISIONS_REJECTED}
 
 
 class Runs:
@@ -288,19 +290,17 @@ def _settled_outcome(runs: Runs, name: str) -> Any:
 
 
 def _scored_specs(outcome: Any, name: str) -> tuple[ConceptSourceSpec, ConceptSourceSpec]:
-    """The assembled and oracle specs of a scorecard leg (A1's scoped to its sections)."""
+    """The assembled spec of a scorecard leg and its full oracle, neither scoped."""
     spec = spec_of(outcome)
     assert spec is not None, metrics_of(outcome)
-    if name == A1:
-        return _a1_pair(spec)
-    return spec, load_concept_source_spec(ORACLE_SPECS[name])
+    return spec, load_concept_source_spec(SCORED_SPECS[name])
 
 
 @pytest.mark.parametrize(
     ("name", "cap_id"),
     [
         pytest.param(name, cap_id, id=f"{name}-{cap_id}")
-        for name in (*sorted(ORACLE_SPECS), A1)
+        for name in sorted(SCORED_SPECS)
         for cap_id in CAP_VALUES
     ],
 )

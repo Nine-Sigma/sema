@@ -1,4 +1,4 @@
-# heldout4: reviewed oracle written from the decided zero-call replay (S4 decision 17, 2026-10-23).
+# heldout4: ASSEMBLED, NOT REVIEWED AS CORRECT. Written from the decided zero-call replay (S4 decision 17, 2026-10-23). It models the classification upside down (hierarchy levels as concepts, codes as one value set; S4 principal review section 2). Serves as a regression guard only until Dean writes the correct spec; its floors then re-derive.
 concept_source:
   spec_version: 2
   id: heldout4

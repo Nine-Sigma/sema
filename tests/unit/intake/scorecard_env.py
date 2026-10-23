@@ -28,6 +28,10 @@ class Floor:
 
 
 BASELINE: dict[tuple[str, str], Floor] = {
+    # A1 is scored on its full oracle with four relations ignored (S4 principal review,
+    # sections 3 and 5). The scorer reads manifest entities and term staging only, so the
+    # oracle's relationships, external refs, term definitions, and authored evidence that
+    # the ignores drop are not yet cells: these 1.0 values do not see them.
     ("a1", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=4),
     ("a1", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=4),
     ("a10", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=30),
