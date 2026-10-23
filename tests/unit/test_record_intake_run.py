@@ -60,7 +60,10 @@ from tests.unit.record_intake_run_env import (
 
 pytestmark = pytest.mark.unit
 
-SOURCE_NAMES = {"a1", "a2", "a3", "a7_csv", "a7_athena", "a10", "heldout", "heldout2"}
+SOURCE_NAMES = {
+    "a1", "a2", "a3", "a7_csv", "a7_athena", "a10",
+    "heldout", "heldout2", "heldout3", "heldout4",
+}
 COMMITTED_DESCRIPTORS = {
     "a1": FIXTURES / "partner_sl" / "standard_library.run.yaml",
     "a2": FIXTURES / "tabular" / "codes_a2.run.yaml",
