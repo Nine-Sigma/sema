@@ -11,8 +11,9 @@ expected failure; any other known-source or held-out miss is an ``xfail(strict=T
 carrying the spec diff, the missed metric, or the rejection, and together they are the S3
 baseline (Dean, 2026-10-22). Every leg with a spec oracle is also scored per import cell kind
 (``sema.intake.scorecard``) and held at its floor in ``scorecard_env.BASELINE``, with the run's
-relation and ignored counts printed beside the table. Held-out ledger text is never printed,
-only counts and metrics.
+relation and ignored counts printed beside the table; a fresh held-out is scored against its
+reviewed spec with no spec diff printed. Held-out ledger text is never printed, only counts
+and metrics.
 """
 
 from __future__ import annotations
@@ -25,9 +26,7 @@ import pytest
 import yaml
 
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
-from sema.intake.metrics import RunMetrics
-from sema.intake.model_calls import BUDGET_REASON
-from sema.intake.scorecard import render, score
+from sema.intake.scorecard import render
 from sema.log import logger
 from tests.support.athena_bundle import export_schema
 from tests.unit.intake.no_hint_env import (
@@ -35,13 +34,17 @@ from tests.unit.intake.no_hint_env import (
     RECORDED_CALL_CAP,
     RECORDED_COST_CAP,
     Replayed,
+    assert_zero_provider_calls,
     capped,
+    column,
     csv_blocks,
     decide,
     imported,
+    marked_param,
     metrics_of,
     recording,
     replay,
+    scorecard_of,
     source_of,
     spec_diff,
     spec_of,
@@ -65,11 +68,22 @@ WRITTEN_SPECS = {
     "a7_csv": FIXTURES / "omop" / "cdm_field_level.spec.yaml",
     "a10": FIXTURES / "acris" / "acris.spec.yaml",
 }
+REVIEWED_SPECS = {
+    "heldout3": FIXTURES / "heldout3" / "heldout3.spec.yaml",
+    "heldout4": FIXTURES / "heldout4" / "heldout4.spec.yaml",
+}
+ORACLE_SPECS = {**WRITTEN_SPECS, **REVIEWED_SPECS}
 NO_HINT_SOURCES = ("a2", "a3", "a7_csv", "a7_athena", "a10")
 HELD_OUT = ("heldout", "heldout2", "heldout3", "heldout4")
+DECIDED_HELD_OUT = ("heldout", "heldout3", "heldout4")
+UNDECIDED_HELD_OUT = ("heldout2",)
 A1, ATHENA = "a1", "a7_athena"
 A1_SPEC = FIXTURES / "partner_sl" / "standard_library.spec.yaml"
 A1_DECISIONS = FIXTURES / "partner_sl" / DECISIONS_FILE
+DECISIONS = {
+    A1: A1_DECISIONS,
+    **{name: source_of(name).path / DECISIONS_FILE for name in DECIDED_HELD_OUT},
+}
 SPEC_HEAD = ("spec_version", "id", "identity_system", "release", "default_provider", "scheme")
 A1_SECTIONS = ("concepts", "value_sets")
 CAP_VALUES: dict[str, int | None] = {"spec_cap": None, "stage_all": 1}
@@ -93,9 +107,12 @@ GATE_MISSES = {
     " and open_choices 6 > 2 (Dean, 2026-10-22: recorded, carried to S4)",
     "heldout2": "PUMS misses its gate at Review: bound_fraction 0.0 < 1.0, its only"
     " relation ignored no_header and its layout proposal unbound (Dean, 2026-10-22)",
-    "heldout3": "sealed, no recording yet (S4 task 3.2)",
-    "heldout4": "sealed, no recording yet (S4 task 3.2)",
+    "heldout3": "heldout3 misses its gate at Review: bound_fraction 0.5 < 1.0"
+    " (S4 task 3.4, 2026-10-22: recorded, carried to S4 review)",
+    "heldout4": "heldout4 misses its gate at Review: bound_fraction 0.0 < 1.0, both relations"
+    " open on a section conflict (S4 decision 18, 2026-10-22: recorded, carried to S4 review)",
 }
+DECIDED_MISSES = {"heldout": HELD_OUT_DECISIONS_REJECTED}
 
 
 class Runs:
@@ -141,14 +158,6 @@ def runs(tmp_path_factory: pytest.TempPathFactory) -> Runs:
     return Runs(tmp_path_factory)
 
 
-def _assert_zero_provider_calls(run: Replayed) -> None:
-    row = run.row()
-    calls, reason, invoked = row.model_calls, row.reason, run.client.invoke.call_count
-
-    assert (calls, invoked) == (0, 0)
-    assert reason != BUDGET_REASON
-
-
 def _assert_imports_equal(
     run: Replayed, spec: ConceptSourceSpec, written: ConceptSourceSpec, cap: int | None,
     directory: Path,
@@ -177,7 +186,7 @@ def test_known_source_reaches_review_with_a_spec_and_no_provider_call(
 
     assert run.outcome.node == "review"
     assert spec_of(run.outcome) is not None, metrics_of(run.outcome)
-    _assert_zero_provider_calls(run)
+    assert_zero_provider_calls(run)
     assert recorded["calls"] <= RECORDED_CALL_CAP
     assert recorded["cost"] <= RECORDED_COST_CAP
 
@@ -205,12 +214,6 @@ def test_known_source_import_equals_the_written_spec_import(
     _assert_imports_equal(run, spec, written, cap, tmp_path)
 
 
-def _column(block: list[list[str]], name: str) -> list[str]:
-    header, *rows = block
-    index = [cell.partition(":")[0] for cell in header].index(name)
-    return [row[index] for row in rows]
-
-
 def test_athena_landed_tables_equal_the_loader_golden(runs: Runs, tmp_path: Path) -> None:
     with staging_copy(runs.replayed(ATHENA), tmp_path) as staging:
         landed = csv_blocks(export_schema(staging))
@@ -232,8 +235,8 @@ def test_athena_staged_terms_equal_the_golden_concept_rows(
     concept = csv_blocks(GOLDEN.read_text())["concept"]
     terms = csv_blocks(staged)["concept"]
 
-    expected = sorted(zip(_column(concept, "concept_id"), _column(concept, "concept_name")))
-    assert sorted(zip(_column(terms, "concept_code"), _column(terms, "concept_name"))) == (
+    expected = sorted(zip(column(concept, "concept_id"), column(concept, "concept_name")))
+    assert sorted(zip(column(terms, "concept_code"), column(terms, "concept_name"))) == (
         expected
     ), staged
 
@@ -242,7 +245,7 @@ def test_a1_reaches_review_with_no_hint_and_no_provider_call(runs: Runs) -> None
     run = runs.replayed(A1)
 
     assert run.outcome.node == "review"
-    _assert_zero_provider_calls(run)
+    assert_zero_provider_calls(run)
 
 
 def test_a1_decisions_settle_every_entry_with_zero_further_calls(runs: Runs) -> None:
@@ -252,7 +255,7 @@ def test_a1_decisions_settle_every_entry_with_zero_further_calls(runs: Runs) -> 
     assert outcome.node == "review"
     assert spec_of(outcome) is not None, metrics
     assert (metrics.open_structure, metrics.open_roles) == (0, 0)
-    _assert_zero_provider_calls(runs.replayed(A1))
+    assert_zero_provider_calls(runs.replayed(A1))
 
 
 def _a1_scoped(raw: dict[str, Any]) -> ConceptSourceSpec:
@@ -279,39 +282,39 @@ def test_a1_import_equals_the_written_spec_on_concepts_and_value_sets(
     _assert_imports_equal(runs.replayed(A1), assembled, written, cap, tmp_path)
 
 
-def _scored_specs(
-    runs: Runs, name: str
-) -> tuple[ConceptSourceSpec, ConceptSourceSpec, RunMetrics]:
-    """The assembled and oracle specs of a scorecard leg and the metrics of the run that
-    assembled it (A1's after its decisions)."""
-    outcome = runs.decided(A1, A1_DECISIONS) if name == A1 else runs.replayed(name).outcome
+def _settled_outcome(runs: Runs, name: str) -> Any:
+    decisions = DECISIONS.get(name)
+    return runs.replayed(name).outcome if decisions is None else runs.decided(name, decisions)
+
+
+def _scored_specs(outcome: Any, name: str) -> tuple[ConceptSourceSpec, ConceptSourceSpec]:
+    """The assembled and oracle specs of a scorecard leg (A1's scoped to its sections)."""
     spec = spec_of(outcome)
     assert spec is not None, metrics_of(outcome)
     if name == A1:
-        return (*_a1_pair(spec), metrics_of(outcome))
-    return spec, load_concept_source_spec(WRITTEN_SPECS[name]), metrics_of(outcome)
+        return _a1_pair(spec)
+    return spec, load_concept_source_spec(ORACLE_SPECS[name])
 
 
 @pytest.mark.parametrize(
     ("name", "cap_id"),
     [
         pytest.param(name, cap_id, id=f"{name}-{cap_id}")
-        for name in (*sorted(WRITTEN_SPECS), A1)
+        for name in (*sorted(ORACLE_SPECS), A1)
         for cap_id in CAP_VALUES
     ],
 )
 def test_known_source_scorecard_meets_its_floor(
     runs: Runs, name: str, cap_id: str, tmp_path: Path
 ) -> None:
-    spec, written, metrics = _scored_specs(runs, name)
-    cap, ignored = CAP_VALUES[cap_id], sum(metrics.ignored.values())
-    with staging_copy(runs.replayed(name), tmp_path) as staging:
-        manifest, _, staged = imported(capped(spec, cap), staging)
-        expected_manifest, _, expected_staged = imported(capped(written, cap), staging)
-    card = score(expected_manifest, manifest, expected_staged, staged)
-    table = render(card)
-    print(f"\n{name}-{cap_id} spec diff (written -> assembled):\n{spec_diff(spec, written)}")
-    print(f"{table}\nrelations {metrics.relations} ignored {ignored}")
+    run, outcome = runs.replayed(name), _settled_outcome(runs, name)
+    metrics, cap = metrics_of(outcome), CAP_VALUES[cap_id]
+    spec, oracle = _sealed(name, lambda: _scored_specs(outcome, name))
+    card = _sealed(name, lambda: scorecard_of(run, spec, oracle, cap, tmp_path))
+    table, ignored = render(card), sum(metrics.ignored.values())
+    if name not in HELD_OUT:
+        print(f"\n{name}-{cap_id} spec diff (oracle -> assembled):\n{spec_diff(spec, oracle)}")
+    print(f"\n{table}\nrelations {metrics.relations} ignored {ignored}")
 
     floor = BASELINE.get((name, cap_id))
     assert floor is not None, f"no scorecard floor for {name}-{cap_id}\n{table}"
@@ -325,18 +328,11 @@ def test_held_out_source_reaches_review_with_no_hint(runs: Runs, name: str) -> N
     print(f"\n{name} run_metrics at Review: {metrics_of(run.outcome).model_dump()}")
 
     assert node == "review"
-    _assert_zero_provider_calls(run)
+    assert_zero_provider_calls(run)
 
 
 @pytest.mark.parametrize(
-    "name",
-    [
-        pytest.param(
-            name,
-            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason=GATE_MISSES[name]),
-        )
-        for name in HELD_OUT
-    ],
+    "name", [marked_param(name, GATE_MISSES, raises=AssertionError) for name in HELD_OUT]
 )
 def test_held_out_source_meets_its_committed_thresholds(runs: Runs, name: str) -> None:
     misses = gate_misses(metrics_of(runs.replayed(name).outcome), GATE_THRESHOLDS[name])
@@ -344,26 +340,50 @@ def test_held_out_source_meets_its_committed_thresholds(runs: Runs, name: str) -
     assert misses == (), [str(miss) for miss in misses]
 
 
-@pytest.mark.xfail(strict=True, reason=HELD_OUT_DECISIONS_REJECTED)
-def test_held_out_decisions_assemble_with_zero_further_calls(runs: Runs) -> None:
-    decisions = source_of("heldout").path / DECISIONS_FILE
-    assert decisions.is_file(), "the committed held-out decisions file is missing"
+def test_every_held_out_source_is_either_decided_or_undecided() -> None:
+    assert sorted((*DECIDED_HELD_OUT, *UNDECIDED_HELD_OUT)) == sorted(HELD_OUT)
 
-    outcome = runs.decided("heldout", decisions)
+
+@pytest.mark.parametrize(
+    "name", [marked_param(name, DECIDED_MISSES) for name in DECIDED_HELD_OUT]
+)
+def test_held_out_decisions_assemble_with_zero_further_calls(runs: Runs, name: str) -> None:
+    decisions = DECISIONS[name]
+    assert decisions.is_file(), f"the committed {name} decisions file is missing"
+
+    outcome = runs.decided(name, decisions)
     node, assembled = outcome.node, spec_of(outcome) is not None
     metrics = metrics_of(outcome).model_dump()
 
     assert node == "review"
     assert assembled, metrics
     assert (metrics["open_structure"], metrics["open_roles"]) == (0, 0), metrics
-    _assert_zero_provider_calls(runs.replayed("heldout"))
+    assert_zero_provider_calls(runs.replayed(name))
 
 
-def test_second_held_out_source_has_no_open_entry_and_no_decisions_file(runs: Runs) -> None:
-    metrics = metrics_of(runs.replayed("heldout2").outcome)
+@pytest.mark.parametrize("name", UNDECIDED_HELD_OUT)
+def test_undecided_held_out_source_has_no_open_entry_and_no_decisions_file(
+    runs: Runs, name: str
+) -> None:
+    metrics = metrics_of(runs.replayed(name).outcome)
 
-    assert not (source_of("heldout2").path / DECISIONS_FILE).exists()
+    assert not (source_of(name).path / DECISIONS_FILE).exists()
     assert (metrics.open_structure, metrics.open_roles) == (0, 0)
+
+
+@pytest.mark.parametrize(
+    "name", [marked_param(name, DECIDED_MISSES) for name in (A1, *NO_HINT_SOURCES, *HELD_OUT)]
+)
+def test_a_review_with_a_binding_and_no_open_entry_presents_a_spec(runs: Runs, name: str) -> None:
+    outcome = _settled_outcome(runs, name)
+    metrics = metrics_of(outcome)
+    settled = outcome.node == "review" and metrics.bound > 0
+    settled = settled and (metrics.open_structure, metrics.open_roles) == (0, 0)
+    assembled = _sealed(name, lambda: spec_of(outcome) is not None)
+
+    assert assembled or not settled, (
+        "held-out details withheld" if name in HELD_OUT else metrics.model_dump()
+    )
 
 
 @pytest.mark.parametrize("name", (A1, *NO_HINT_SOURCES, *HELD_OUT))

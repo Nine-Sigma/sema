@@ -38,6 +38,10 @@ BASELINE: dict[tuple[str, str], Floor] = {
     ("a3", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=0),
     ("a7_csv", "spec_cap"): Floor(precision=291 / 903, recall=291 / 1323, ignored=0),
     ("a7_csv", "stage_all"): Floor(precision=291 / 903, recall=291 / 1323, ignored=0),
+    ("heldout3", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=1),
+    ("heldout3", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=1),
+    ("heldout4", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=1),
+    ("heldout4", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=1),
 }
 
 

@@ -1,0 +1,25 @@
+# heldout3: reviewed oracle written from the decided zero-call replay (S4 decision 17, 2026-10-23).
+concept_source:
+  spec_version: 2
+  id: heldout3
+  identity_system: heldout3
+  release: '2026-10-22'
+  default_provider: staging
+  shape:
+  - section: concepts
+    template: concept_list
+  scheme:
+    qualified_name: heldout3.heldout3
+    description: Concept source heldout3, release 2026-10-22, assembled without a
+      stated scheme
+  concepts:
+    relation:
+      provider: staging
+      name: land_heldout3.soc_2018_definitions__2018_SOC
+    group_by: SOC Code
+    roles:
+      concept_id: SOC Code
+      name: SOC Title
+      definition: SOC Definition
+  term_storage:
+    inline_cap: 5000

@@ -14,7 +14,7 @@ import importlib
 import io
 import json
 import shutil
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -33,7 +33,9 @@ from sema.intake import graph as intake_graph
 from sema.intake.graph_stages import REGISTRY_FILE, STAGING_FILE
 from sema.intake.ledger import Ledger
 from sema.intake.metrics import RunMetrics
+from sema.intake.model_calls import BUDGET_REASON
 from sema.intake.registry import Registry, RunRecord
+from sema.intake.scorecard import Scorecard, score
 from sema.intake.relations import RelationProvider
 from sema.models.config import IntakeModelConfig, ModelPrice
 from tests.support.athena_bundle import export_schema
@@ -233,3 +235,33 @@ def csv_blocks(text: str) -> dict[str, list[list[str]]]:
         else:
             current.append(row)
     return blocks
+
+
+def scorecard_of(
+    run: Replayed, spec: ConceptSourceSpec, oracle: ConceptSourceSpec, cap: int | None,
+    directory: Path,
+) -> Scorecard:
+    with staging_copy(run, directory) as staging:
+        manifest, _, staged = imported(capped(spec, cap), staging)
+        expected_manifest, _, expected_staged = imported(capped(oracle, cap), staging)
+    return score(expected_manifest, manifest, expected_staged, staged)
+
+
+def column(block: list[list[str]], name: str) -> list[str]:
+    header, *rows = block
+    index = [cell.partition(":")[0] for cell in header].index(name)
+    return [row[index] for row in rows]
+
+
+def marked_param(name: str, reasons: Mapping[str, str], **xfail: Any) -> Any:
+    reason = reasons.get(name)
+    marks = () if reason is None else pytest.mark.xfail(strict=True, reason=reason, **xfail)
+    return pytest.param(name, marks=marks)
+
+
+def assert_zero_provider_calls(run: Replayed) -> None:
+    row = run.row()
+    calls, reason, invoked = row.model_calls, row.reason, run.client.invoke.call_count
+
+    assert (calls, invoked) == (0, 0)
+    assert reason != BUDGET_REASON

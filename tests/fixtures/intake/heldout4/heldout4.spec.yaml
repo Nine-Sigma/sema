@@ -1,0 +1,32 @@
+# heldout4: reviewed oracle written from the decided zero-call replay (S4 decision 17, 2026-10-23).
+concept_source:
+  spec_version: 2
+  id: heldout4
+  identity_system: heldout4
+  release: '2026-10-22'
+  default_provider: staging
+  shape:
+  - section: concepts
+    template: concept_with_values_denormalized
+  scheme:
+    qualified_name: heldout4.heldout4
+    description: Concept source heldout4, release 2026-10-22, assembled without a
+      stated scheme
+  concepts:
+    relation:
+      provider: staging
+      name: land_heldout4.sgc_cgt_2021_structure_eng
+    group_by: Level
+    roles:
+      concept_id: Level
+      name: Hierarchical structure
+  value_sets:
+    relation:
+      provider: staging
+      name: land_heldout4.sgc_cgt_2021_structure_eng
+    roles:
+      code: Code
+      display: Class title
+      concept_id: Level
+  term_storage:
+    inline_cap: 5000
