@@ -374,10 +374,6 @@ def test_a2_assembles_a_spec_whose_import_equals_the_golden(env: Env) -> None:
     assert model_calls(env.root / "a2" / "roles") == []
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=(
-    "no zero-call path derives a dictionary's self domain and the hinted path does not "
-    "read a hint's `domains`; S4 honours hint domains as `source: human`"
-))
 def test_a10_with_the_hint_assembles_the_hand_written_spec(env: Env) -> None:
     roles = env.hinted_roles
     column_roles = {(e.relation, e.role): e for e in roles.eligibilities if e.subject is None}

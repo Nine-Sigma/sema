@@ -221,7 +221,6 @@ def derived_free_hint(directory: Path) -> ConceptSourceSpec:
     model["roles"].pop("notes")
     for entry in model["entities"]:
         entry.pop("foreign_keys", None)
-        entry.pop("domains", None)
     return write_hint(directory, raw)
 
 

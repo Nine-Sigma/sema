@@ -19,6 +19,7 @@ import yaml
 from sema.binding.spec import ConceptSourceSpec
 from sema.intake.eligibility import assemble_spec, run_roles
 from sema.intake.eligibility_spec_utils import RolesResult
+from sema.intake.eligibility_text_utils import VOCABULARY_ROLE
 from sema.intake.ledger import RunLedger
 from sema.intake.lexicon import NO_REFERENCE
 from sema.intake.shapes.base import profile_relations
@@ -79,9 +80,23 @@ def hand_written_roles() -> dict[str, dict[str, str]]:
     return {entry["relation"]: entry["roles"] for entry in raw["code_lists"]}
 
 
-def reviewer_choice(entry: Ambiguity, stated: dict[str, dict[str, str]]) -> str | None:
+def hand_written_domains() -> dict[str, str]:
+    """Reference choices by ambiguity subject, from the hand-written spec's entity ``domains``."""
+    raw = yaml.safe_load(ACRIS_SPEC.read_text())["concept_source"]
+    return {
+        f"{entry['relation']}.{VOCABULARY_ROLE}.{prop}": vocabulary
+        for entry in raw["entity_model"]["entities"]
+        for prop, vocabulary in (entry.get("domains") or {}).items()
+    }
+
+
+def reviewer_choice(
+    entry: Ambiguity, stated: dict[str, dict[str, str]], domains: dict[str, str]
+) -> str | None:
     if UNRESOLVED in entry.hints:
         return str(decisions().IGNORE)
+    if entry.subject in domains:
+        return domains[entry.subject]
     relation, _, role = entry.subject.rpartition(".")
     if relation in stated and role in stated[relation]:
         return stated[relation][role]
@@ -117,8 +132,9 @@ def _stages(landed: Landed, chosen: Sequence[Any]) -> tuple[StructureResult, Rol
 def _review_round(landed: Landed, stage: str, path: Path) -> tuple[Any, ...]:
     """Structure first: role entries over unbound code tables would read as unresolved."""
     listed, stated = open_entries(presented(landed.ledger), stage), hand_written_roles()
+    domains = hand_written_domains()
     rows = [(STRUCTURE, a.subject, flat_list(a)) for a in listed if stage == STRUCTURE]
-    choices = [(a.subject, reviewer_choice(a, stated)) for a in listed if stage == ROLES]
+    choices = [(a.subject, reviewer_choice(a, stated, domains)) for a in listed if stage == ROLES]
     rows += [(ROLES, subject, choice) for subject, choice in choices if choice is not None]
     loaded = decisions().load_decisions(write_decisions(path, rows))
     return tuple(decisions().validate_decisions(loaded, presented(landed.ledger)))

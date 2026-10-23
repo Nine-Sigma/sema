@@ -326,10 +326,6 @@ def test_role_decision_enters_run_roles_as_a_stated_human_choice(a10: Decided) -
     assert (role.choice, role.source, role.confidence) == (made.choice, HUMAN, 1.0)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=(
-    "no zero-call path derives a dictionary's self domain and the hinted path does not "
-    "read a hint's `domains`; S4 honours hint domains as `source: human`"
-))
 def test_a10_no_hint_run_assembles_after_decisions_with_zero_model_calls(a10: Decided) -> None:
     first, second = a10.rounds
     code_tables = {a10.landed.qualified(name) for name in CODE_TABLES}

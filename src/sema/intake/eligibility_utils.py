@@ -131,7 +131,9 @@ def subject_of(entry: RoleEligibility) -> str:
 def with_stated(
     entry: RoleEligibility, choices: Mapping[str, StatedChoice]
 ) -> RoleEligibility:
-    """A human ``none`` over an entry offering no ``none`` closes it with no choice."""
+    """A human ``none`` over an entry offering no ``none`` closes it with no choice; any
+    other human choice settles the entry even outside its members, for the verifier to judge.
+    A model or rule choice outside the members is dropped."""
     stated = choices.get(subject_of(entry))
     if stated is None:
         return entry
@@ -139,6 +141,8 @@ def with_stated(
         return entry.settled(stated.choice, stated.source, stated.confidence)
     if stated.source == HUMAN and stated.choice == lexicon.NO_REFERENCE:
         return entry.model_copy(update=dict(source=stated.source, confidence=stated.confidence))
+    if stated.source == HUMAN:
+        return entry.settled(stated.choice, stated.source, stated.confidence)
     return entry
 
 

@@ -16,7 +16,12 @@ from typing import Any
 from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import StatusRole
 from sema.intake import lexicon
-from sema.intake.eligibility_spec_utils import RolesResult, assemble, stated_roles
+from sema.intake.eligibility_spec_utils import (
+    RolesResult,
+    assemble,
+    stated_domains,
+    stated_roles,
+)
 from sema.intake.eligibility_target_utils import (
     Target,
     memory_key,
@@ -126,10 +131,12 @@ def run_roles(
     margin_floor: float | None = EMBEDDING_MARGIN_FLOOR,
     choices: Mapping[str, StatedChoice] | None = None,
 ) -> RolesResult:
-    """``choices`` are stated choices by ambiguity subject (model answers, decisions)."""
+    """``choices`` are stated choices by ambiguity subject (model answers, decisions); the
+    hint's ``domains`` join them, and a choice in ``choices`` wins on the same subject."""
     by_name = {profile.ref.name: profile for profile in profiles}
-    hints = Hints(RoleMemory(), embedder, margin_floor, choices or {}, tools)
     stated = stated_roles(hint, structure) if hint is not None else {}
+    domains = stated_domains(hint, structure) if hint is not None else {}
+    hints = Hints(RoleMemory(), embedder, margin_floor, {**domains, **(choices or {})}, tools)
     keys = hint.entity_model.header_keys if hint is not None and hint.entity_model else None
     models = [e.binding for e in structure.bound if e.binding.template == entity_model.ID]
     found = [role for b in models for role in _compute(b, by_name, hints, stated)]

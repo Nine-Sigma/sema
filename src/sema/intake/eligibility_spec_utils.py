@@ -42,10 +42,14 @@ from sema.intake.eligibility_text_utils import (
     HeaderReading,
 )
 from sema.intake.eligibility_utils import (
+    HUMAN,
+    SOURCE_CONFIDENCE,
     DeclaredJoin,
     RoleEligibility,
     RunDescriptor,
+    StatedChoice,
     scope_of,
+    subject_of,
 )
 from sema.intake.loaders import athena, semsql_utils
 from sema.intake.shapes import (
@@ -154,6 +158,24 @@ def stated_roles(hint: ConceptSourceSpec, structure: StructureResult) -> dict[st
                 if getattr(model, name) is not None
             }
     return stated
+
+
+def stated_domains(hint: ConceptSourceSpec, structure: StructureResult) -> dict[str, StatedChoice]:
+    """The hint's per-file ``domains`` as human reference choices, keyed by ambiguity subject."""
+    dictionaries = {
+        e.binding.slots.get(entity_model.DICTIONARY)
+        for e in structure.bound
+        if e.binding.template == entity_model.ID
+    }
+    entries = hint.entity_model.entities if hint.entity_model is not None else None
+    return {
+        subject_of(RoleEligibility(
+            relation=entry.relation.name, role=VOCABULARY_ROLE, subject=prop, members=()
+        )): StatedChoice(choice=vocabulary, source=HUMAN, confidence=SOURCE_CONFIDENCE[HUMAN])
+        for entry in entries or ()
+        if entry.relation.name in dictionaries
+        for prop, vocabulary in entry.domains.items()
+    }
 
 
 def _stated_models(

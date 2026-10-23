@@ -16,7 +16,7 @@ from sema.binding.spec_sections import ExternalRefRole, MappingsSpec, RelationRe
 from sema.intake import lexicon
 from sema.intake.eligibility import ambiguities
 from sema.intake.eligibility_spec_utils import RolesResult
-from sema.intake.eligibility_text_utils import STAGE
+from sema.intake.eligibility_text_utils import STAGE, VOCABULARY_ROLE
 from sema.intake.eligibility_utils import RoleEligibility
 from sema.intake.profile import SAMPLE_CAP, ProfileTools, ValueSample
 from sema.intake.shapes import filled_sections
@@ -91,6 +91,8 @@ def verify_roles(
     for section in sections:
         failures += _section_role_failures(section, roles.eligibilities, tools)
     failures = with_sources(failures, roles.eligibilities, ROLE_CHECKS)
+    if spec is not None:
+        failures += _domain_failures(spec, roles.eligibilities)
     return Verdict.of(failures=failures, ambiguities=listed, floors=FLOORS)
 
 
@@ -174,6 +176,28 @@ def _eligibility_sets(
         if entry.relation == relation and entry.subject is None:
             sets.setdefault(entry.role, set()).update(entry.members)
     return sets
+
+
+def _domain_failures(
+    spec: ConceptSourceSpec, eligibilities: Iterable[RoleEligibility]
+) -> list[Failure]:
+    """Each bound domain re-proved against the reference entry for its relation and property."""
+    references = {
+        (e.relation, e.subject): e
+        for e in eligibilities
+        if e.role == VOCABULARY_ROLE and e.subject is not None
+    }
+    entities = spec.entity_model.entities if spec.entity_model is not None else None
+    return [
+        failure(
+            IN_ELIGIBILITY_SET, entry.relation.name, prop, role=VOCABULARY_ROLE,
+            vocabulary=vocabulary, members=sorted(reference.members), source=reference.source or "",
+        )
+        for entry in entities or ()
+        for prop, vocabulary in entry.domains.items()
+        if (reference := references.get((entry.relation.name, prop))) is not None
+        and vocabulary not in reference.members
+    ]
 
 
 def _may_share(held: Sequence[str]) -> bool:

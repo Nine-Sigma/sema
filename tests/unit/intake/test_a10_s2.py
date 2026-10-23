@@ -55,10 +55,13 @@ UNRESOLVED_COUNT = 2
 def _hint_without_grouped_table(directory: Path) -> ConceptSourceSpec:
     raw = yaml.safe_load(ACRIS_SPEC.read_text())
     section = raw["concept_source"]
-    section["code_lists"] = [
-        e for e in section["code_lists"] if e["vocabulary_id"] != GROUPED_CODE_TABLE
-    ]
+    lists = section["code_lists"]
+    removed = {e["vocabulary_id"] for e in lists if e["vocabulary_id"] == GROUPED_CODE_TABLE}
+    section["code_lists"] = [e for e in lists if e["vocabulary_id"] not in removed]
     section["shape"] = [s for s in section["shape"] if GROUPED_CODE_TABLE not in s["section"]]
+    for entry in section["entity_model"]["entities"]:
+        domains = entry.get("domains") or {}
+        entry["domains"] = {p: v for p, v in domains.items() if v not in removed}
     return write_hint(directory, raw)
 
 
@@ -100,10 +103,6 @@ def test_land_structure_and_roles_verdicts_pass(hinted: StageRun) -> None:
     assert hinted.dry_run_verdict.status == "pass", describe(hinted.dry_run_verdict)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=(
-    "no zero-call path derives a dictionary's self domain and the hinted path does not "
-    "read a hint's `domains`; S4 honours hint domains as `source: human`"
-))
 def test_assembled_spec_equals_the_hand_written_spec(hinted: StageRun) -> None:
     assert hinted.spec is not None, [(a.subject, a.members) for a in hinted.roles.ambiguities]
 
