@@ -41,6 +41,7 @@ from sema.intake.registry import Registry
 from sema.intake.relations import RelationProvider
 from sema.intake.report import DryRunReport, dry_run
 from sema.intake.resolve import resolve_roles, resolve_structure
+from sema.intake.resolve_answer_utils import CONTESTED
 from sema.intake.shapes.base import RelationProfile, profile_relations
 from sema.intake.structure import StructureResult, run_structure
 from sema.intake.structure_conflict_utils import open_section_conflicts
@@ -62,6 +63,7 @@ PROPOSE, ROLES, RESOLVE_ROLES = "propose_layouts", "roles", "resolve_roles"
 DECIDE, DRY_RUN = "decide", "dry_run"
 FAILED, NO_LOADER = "failed", "no_loader"
 LAND_ARTIFACT = "land_result"
+CONTESTED_PREFIX = CONTESTED.split("{}", 1)[0]
 
 RECOMPUTED = frozenset({PROPOSE, ROLES, RESOLVE_ROLES, RESOLVE_STRUCTURE})
 
@@ -245,24 +247,25 @@ class Stages:
         return open_section_conflicts(base)
 
     def _decided(self, reviewed: Reviewed) -> tuple[StructureResult, RolesResult]:
-        """Decisions over the structure Review saw; the model's role choices are kept."""
+        """Decisions over the structure Review saw; the model's role choices are kept, and
+        a lexicon claim the model contested stays open unless a decision chose it."""
         tools = self.tools(DECIDE)
         base = self._base_structure(reviewed)
         land, decisions = self.land(), reviewed.decisions
         structure = open_section_conflicts(
             apply_structure_decisions(base, decisions, land, tools, provider=self.provider_name)
         )
-        kept = (
-            model_choices(self.resolved_roles(reviewed.approvals))
-            if RESOLVE_ROLES in reviewed.reached
-            else {}
+        resolved = (
+            self.resolved_roles(reviewed.approvals) if RESOLVE_ROLES in reviewed.reached else None
         )
+        kept = model_choices(resolved) if resolved is not None else {}
+        contested = contested_reasons(resolved) if resolved is not None else {}
         choices = {**kept, **stated_choices(decisions)}
         roles = run_roles(
             structure, self.profiles(DECIDE), self.tools(DECIDE, structure, reviewed.approvals),
-            hint=self.hint(), embedder=self.embedder, choices=choices,
+            hint=self.hint(), embedder=self.embedder, choices=choices, contested=contested,
         )
-        return structure, roles
+        return structure, with_contested_reasons(roles, contested)
 
     def _land(self) -> LandResult:
         inputs = self.inputs
@@ -363,3 +366,24 @@ def model_choices(roles: RolesResult) -> dict[str, StatedChoice]:
         for entry in roles.ambiguities
         if entry.source == MODEL_SOURCE and entry.choice is not None
     }
+
+
+
+def contested_reasons(roles: RolesResult) -> dict[str, str]:
+    """The reason each open role carries because the model contested its lexicon claim."""
+    return {
+        entry.subject: entry.reason
+        for entry in roles.ambiguities
+        if entry.choice is None and entry.reason and entry.reason.startswith(CONTESTED_PREFIX)
+    }
+
+
+def with_contested_reasons(roles: RolesResult, contested: dict[str, str]) -> RolesResult:
+    """A re-run of Roles drops the contest's reason; an entry still open carries it again."""
+    entries = tuple(
+        entry.model_copy(update={"reason": contested[entry.subject]})
+        if entry.choice is None and entry.subject in contested
+        else entry
+        for entry in roles.ambiguities
+    )
+    return replace(roles, ambiguities=entries)
