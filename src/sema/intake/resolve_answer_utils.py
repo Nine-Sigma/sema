@@ -150,7 +150,8 @@ def read_map(
         reasons[found.subject] = reason
         if entry.source == LEXICON:
             if choice not in (entry.choice, ABSTAIN):
-                contested[found.subject] = CONTESTED.format(entry.choice, choice, reason)
+                text = CONTESTED.format(entry.choice, choice, reason)
+                contested.update(dict.fromkeys(_with_kin(ask, found.subject), text))
             continue
         offered = choice != NONE or NONE in entry.members
         if entry.source is None and choice != ABSTAIN and offered:
@@ -158,6 +159,12 @@ def read_map(
                 choice=choice, source=MODEL, confidence=confidence
             )
     return stated, reasons, contested
+
+
+def _with_kin(ask: RoleAsk, subject: str) -> tuple[str, ...]:
+    """The subject and the same role on each kin relation, which inherits the map."""
+    role = subject.removeprefix(ask.relation)
+    return (subject, *(f"{kin}{role}" for kin in ask.kin))
 
 
 def recorded_entry(run: RolesRun, ambiguity: Ambiguity, asks: Sequence[RoleAsk]) -> Ambiguity:

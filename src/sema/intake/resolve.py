@@ -254,7 +254,10 @@ def resolve_roles(
     asked = (*asks, *references)
     entries = [recorded_entry(run, a, asked) for a in result.ambiguities]
     marked = marked_unverifiable(entries, result.eligibilities, result.unverifiable)
-    return replace(result, ambiguities=tuple(marked), disagreements=run.disagreements)
+    return replace(
+        result, ambiguities=tuple(marked), disagreements=run.disagreements,
+        contested=run.contested,
+    )
 
 
 def _settle_roles(run: RolesRun, ask: RoleAsk, max_retries: int) -> None:

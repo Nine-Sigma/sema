@@ -95,6 +95,7 @@ class RolesResult:
     header_keys: HeaderKeys | None = None
     unverifiable: dict[str, str] = field(default_factory=dict)
     disagreements: dict[str, int] = field(default_factory=dict)
+    contested: dict[str, str] = field(default_factory=dict)
 
 
 def assemble(descriptor: RunDescriptor, roles: RolesResult) -> ConceptSourceSpec | None:
