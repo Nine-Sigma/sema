@@ -334,7 +334,7 @@ uv run sema target approve <run id> --approver <name> --root /tmp/intake \
 uv run sema target approve <run id> --approver <name> --root /tmp/intake
 ```
 
-The second command returns the run to Review with `open_entries: 0`; the third imports it. After the final approve, `.sema/specs/<descriptor id>/spec.yaml` holds the imported spec: `/tmp/specs/partner-standard-library/spec.yaml` here, since the ledger root is `/tmp/intake`.
+The second command returns the run to Review with `open_entries: 0`; the third imports it. After the final approve, `<ledger root>/../specs/<descriptor id>/spec.yaml` holds the imported spec, so `/tmp/specs/partner-standard-library/spec.yaml` here.
 
 `sema target runs` lists the registry newest first, filtered by `--status`, `--stage`, or `--source`. Each row holds the run's stage, status, reason, approver, `model_calls`, `tokens`, and `cost_estimate`; the cost is an estimate from the price table. `--metrics RUN_ID` prints the run's `run_metrics`:
 

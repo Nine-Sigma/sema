@@ -189,6 +189,10 @@ def write_spec(root: Path, run_id: str, status: str, out: Path | None) -> Path:
     the run, ``status``, and the source; the assembled spec's id is the descriptor id."""
     artifact = root / run_id / ARTIFACTS_DIR / f"{SPEC_ARTIFACT}.json"
     spec = ConceptSourceSpec.model_validate_json(artifact.read_text())
+    if spec.id == ".." or Path(spec.id).name != spec.id:
+        raise click.ClickException(
+            f"spec id {spec.id!r} of run {run_id} is not a folder name; no spec file is written"
+        )
     path = (out or root.parent / SPECS_DIR) / spec.id / SPEC_FILE
     header = (
         f"# run_id: {run_id}",

@@ -102,7 +102,7 @@ IMPORT_MISSES = {
 HELD_OUT_UNASSEMBLED = (
     "with its two ignores accepted the decided College Scorecard run settles every entry but"
     " assembles no spec: its per-file dictionaries do not share one role map and a concept"
-    " section has no settled name role (S4 closure C1, 2026-10-23)"
+    " section has no settled name role (S4 closure C1, 2026-10-23) (bug-846)"
 )
 DECIDED_MISSES = {"heldout": HELD_OUT_UNASSEMBLED}
 GATE_MISSES = {

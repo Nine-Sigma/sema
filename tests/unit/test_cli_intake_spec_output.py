@@ -23,6 +23,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 from tests.unit.cli_intake_env import (
     SPEC_PATH_KEY,
@@ -45,6 +46,7 @@ pytestmark = pytest.mark.unit
 WAITING, IMPORTED = "waiting_review", "imported"
 ASSEMBLING = ("--tier", "full")
 NO_CHOICE = "none"
+ESCAPING_ID = "../escape"
 
 
 @pytest.fixture
@@ -140,3 +142,19 @@ def test_spec_output_a_run_without_a_spec_writes_nothing_and_says_so(cli: Cli) -
     assert not run.has_artifact("spec")
     assert SPEC_PATH_KEY in printed and printed[SPEC_PATH_KEY] is None
     assert files_under(default_specs_dir(cli)) == []
+
+
+def test_spec_output_refuses_an_edited_spec_id_that_leaves_the_folder(cli: Cli) -> None:
+    run, _ = _discover_a2(cli)
+    edited = cli.root.parent / "edited.spec.yaml"
+    escaping = {**run.artifact("spec"), "id": ESCAPING_ID}
+    edited.write_text(yaml.safe_dump({"concept_source": escaping}, sort_keys=False))
+    out = default_specs_dir(cli)
+    before = files_under(out)
+
+    result = cli.run("approve", run.run_id, "--approver", "reviewer", "--spec", edited)
+
+    assert result.exit_code != 0
+    assert ESCAPING_ID in result.output
+    assert files_under(out) == before
+    assert not (out / ESCAPING_ID).exists()
