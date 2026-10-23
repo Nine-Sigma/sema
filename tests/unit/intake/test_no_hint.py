@@ -53,7 +53,7 @@ from tests.unit.intake.no_hint_env import (
     uncovered_reads,
     utils,
 )
-from tests.unit.intake.scorecard_env import BASELINE, floor_misses
+from tests.unit.intake.scorecard_env import BASELINE, ORACLES, UNREVIEWED, floor_misses
 from tests.unit.intake.test_athena_golden import GOLDEN
 from tests.unit.intake.test_heldout_gate import GATE_THRESHOLDS, gate_misses
 
@@ -62,25 +62,15 @@ pytestmark = pytest.mark.unit
 T = TypeVar("T")
 
 FIXTURES: Path = utils().FIXTURES
-WRITTEN_SPECS = {
-    "a2": FIXTURES / "tabular" / "codes_a2.spec.yaml",
-    "a3": FIXTURES / "semsql" / "ontology.spec.yaml",
-    "a7_csv": FIXTURES / "omop" / "cdm_field_level.spec.yaml",
-    "a10": FIXTURES / "acris" / "acris.spec.yaml",
-}
-REVIEWED_SPECS = {
-    "heldout3": FIXTURES / "heldout3" / "heldout3.spec.yaml",
-    "heldout4": FIXTURES / "heldout4" / "heldout4.spec.yaml",
-}
-ORACLE_SPECS = {**WRITTEN_SPECS, **REVIEWED_SPECS}
+WRITTEN_SPECS = {name: ORACLES[name] for name in ("a2", "a3", "a7_csv", "a10")}
 NO_HINT_SOURCES = ("a2", "a3", "a7_csv", "a7_athena", "a10")
 HELD_OUT = ("heldout", "heldout2", "heldout3", "heldout4")
 DECIDED_HELD_OUT = ("heldout", "heldout3", "heldout4")
 UNDECIDED_HELD_OUT = ("heldout2",)
 A1, ATHENA = "a1", "a7_athena"
-A1_SPEC = FIXTURES / "partner_sl" / "standard_library.spec.yaml"
+A1_SPEC = ORACLES[A1]
 A1_DECISIONS = FIXTURES / "partner_sl" / DECISIONS_FILE
-SCORED_SPECS = {**ORACLE_SPECS, A1: A1_SPEC}
+SCORED_SPECS = ORACLES
 DECISIONS = {
     A1: A1_DECISIONS,
     **{name: source_of(name).path / DECISIONS_FILE for name in DECIDED_HELD_OUT},
@@ -90,6 +80,7 @@ A1_SECTIONS = ("concepts", "value_sets")
 CAP_VALUES: dict[str, int | None] = {"spec_cap": None, "stage_all": 1}
 CAPS = pytest.mark.parametrize("cap", list(CAP_VALUES.values()), ids=list(CAP_VALUES))
 MANIFEST_DIFF_LINES = 200
+UNREVIEWED_REASON = "unreviewed: the oracle is not reviewed_correct, so no floor row"
 A7_CSV_MISS = (
     "S3 baseline: the A7 CSV manifest misses the roles type, required, primary_key,"
     " fk_entity, fk_property, domain, description"
@@ -296,13 +287,16 @@ def _scored_specs(outcome: Any, name: str) -> tuple[ConceptSourceSpec, ConceptSo
     return spec, load_concept_source_spec(SCORED_SPECS[name])
 
 
+def _scorecard_leg(name: str, cap_id: str) -> Any:
+    marks = [] if name not in UNREVIEWED else [
+        pytest.mark.xfail(strict=True, raises=AssertionError, reason=UNREVIEWED_REASON)
+    ]
+    return pytest.param(name, cap_id, id=f"{name}-{cap_id}", marks=marks)
+
+
 @pytest.mark.parametrize(
     ("name", "cap_id"),
-    [
-        pytest.param(name, cap_id, id=f"{name}-{cap_id}")
-        for name in sorted(SCORED_SPECS)
-        for cap_id in CAP_VALUES
-    ],
+    [_scorecard_leg(name, cap_id) for name in sorted(SCORED_SPECS) for cap_id in CAP_VALUES],
 )
 def test_known_source_scorecard_meets_its_floor(
     runs: Runs, name: str, cap_id: str, tmp_path: Path

@@ -1,3 +1,6 @@
+# review_status: reviewed_correct
+# reviewed_by: Dean
+# reviewed_on: 2026-10-20
 # A7: the OMOP CDM v5.4 field-level CSV, landed by the tabular loader into
 # schema land_cdm, read as a data dictionary. The DDL is not an A7 input.
 concept_source:

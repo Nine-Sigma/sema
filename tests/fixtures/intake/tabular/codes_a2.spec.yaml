@@ -1,3 +1,6 @@
+# review_status: reviewed_correct
+# reviewed_by: Dean
+# reviewed_on: 2026-10-20
 # A2: a three-sheet workbook landed by the tabular loader into schema land_a2.
 concept_source:
   spec_version: 2

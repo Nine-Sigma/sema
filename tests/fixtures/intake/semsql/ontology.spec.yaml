@@ -1,3 +1,6 @@
+# review_status: reviewed_correct
+# reviewed_by: Dean
+# reviewed_on: 2026-10-20
 # A3: the 50-class fixture ontology landed by the semsql loader into schema land_a3.
 # Classes are the terms of one value set hung off a single concept, the ontology
 # itself; subclass edges arrive through the hierarchy form over semsql_edges.

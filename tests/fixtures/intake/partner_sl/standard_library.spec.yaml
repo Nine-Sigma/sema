@@ -1,3 +1,6 @@
+# review_status: reviewed_correct
+# reviewed_by: Dean
+# reviewed_on: 2026-10-21
 # A1: the synthesized standard-library relations in library.duckdb, read from
 # staging schema standard_library. Roles follow the concept-binding design
 # section 5.2 spec; filters are dropped because the fixture holds only the

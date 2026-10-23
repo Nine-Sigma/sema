@@ -16,6 +16,9 @@ from typing import Any
 import pytest
 
 from sema.intake.scorecard import Scorecard
+from tests.unit.intake.oracle_review_env import ORACLES as ORACLES, UNREVIEWED as UNREVIEWED
+from tests.unit.intake.oracle_review_env import oracle_review as oracle_review
+from tests.unit.intake.oracle_review_env import unreviewed_floors as unreviewed_floors
 
 DECLARED_EVIDENCE = "declared"
 
@@ -43,10 +46,11 @@ BASELINE: dict[tuple[str, str], Floor] = {
     ("a3", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=0),
     ("a7_csv", "spec_cap"): Floor(precision=291 / 903, recall=291 / 1323, ignored=0),
     ("a7_csv", "stage_all"): Floor(precision=291 / 903, recall=291 / 1323, ignored=0),
-    ("heldout3", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=1),
-    ("heldout3", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=1),
-    ("heldout4", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=1),
-    ("heldout4", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=1),
+    # honest floor against the correct oracle (codes are the concepts; 2026-10-23): the decided
+    # run models the four levels as concepts and the codes as one value set, so one cell matches.
+    # The code-prefix hierarchy is not expressible in spec_version 2 and is unscored until S6.
+    ("heldout4", "spec_cap"): Floor(precision=1 / 5166, recall=1 / 5110, ignored=1),
+    ("heldout4", "stage_all"): Floor(precision=1 / 5478, recall=1 / 5110, ignored=1),
 }
 
 
