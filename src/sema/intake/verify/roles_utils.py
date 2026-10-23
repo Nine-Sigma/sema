@@ -263,10 +263,9 @@ def _lang_tags(
         return []
     ref = section.relation
     text, pattern = _text(tools, ref, lang), sql_string(BCP47_PATTERN)
-    matched = (
-        f"regexp_full_match({text}, {pattern})" if ref.provider == "staging"
-        else f"{text} RLIKE {pattern}"
-    )
+    # regexp_extract shares one signature on DuckDB and Databricks; RLIKE is Databricks-only.
+    # The pattern never matches the empty string, so a non-empty extract means a match.
+    matched = f"regexp_extract({text}, {pattern}, 0) <> ''"
     quoted = tools.provider.quote(ref, lang)
     _, bad = _count(section, tools, f"{quoted} IS NOT NULL AND NOT ({matched})")
     return [failure(LANG_TAGS, ref.name, lang, rows=bad)] if bad else []
