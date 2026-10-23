@@ -4,8 +4,8 @@ Pinned contract (generality-gate spec, "Open entries have a human-readable view"
 
 - The command reads ``<root>/<run>/artifacts/structure_ambiguities.json`` and
   ``roles_ambiguities.json`` as plain JSON, not through ``Ambiguity``, and prints one line
-  per open entry (``choice`` null): structure entries in ledger order, then roles entries.
-  A settled entry prints nothing.
+  per open entry (``choice`` and ``source`` both null; a human ``none`` is closed):
+  structure entries in ledger order, then roles entries. A settled entry prints nothing.
 - Each line carries the entry's ``stage``, ``subject``, every member in the writer's rank
   (the reader never re-ranks), every exclusion fact, every hint (lexicon and embedding
   hits), and the ``reason`` when it is not null.
@@ -15,7 +15,9 @@ Pinned contract (generality-gate spec, "Open entries have a human-readable view"
   with the cause and the subject.
 - Text only, read-only: no JSON, no provider call, the registry record unchanged.
 - A run with no open entry and an assembled ``artifacts/spec.json`` prints that path and
-  nothing else. A run id with no ledger directory exits non-zero naming the run id.
+  nothing else; with no open entry and no spec (decision 14 forbids it at Review) it exits
+  non-zero naming the run id and ``no spec``. A run id with no ledger directory exits
+  non-zero naming the run id.
 
 "Line" means a non-blank output line. Every name is invented.
 """
@@ -44,6 +46,7 @@ from tests.unit.intake.review_reader_env import (
     entry,
     forbid_provider_calls,
     gamma_role,
+    human_none,
     invoke,
     line_naming,
     printed_lines,
@@ -59,6 +62,8 @@ FINDING = "denormalized group ratio 0.4"
 REQUIRED_NONE_CAUSE = "required role label settled none"
 DIVERGENT_CAUSE = "per-file dictionaries map the role code differently"
 SPEC_BODY = {"concept_source": {"spec_version": 2}}
+NO_SPEC = "no spec"
+HUMAN_NONE_SUBJECT = "zeta_table.label"
 
 
 @pytest.fixture
@@ -169,3 +174,29 @@ def test_a_run_without_a_ledger_exits_non_zero_naming_the_run(root: Path) -> Non
     assert result.exit_code != 0
     assert "No such command" not in result.output, result.output
     assert MISSING_RUN_ID in result.output, result.output
+
+
+def test_a_run_with_no_open_entry_and_no_spec_exits_non_zero_naming_the_run(
+    root: Path,
+) -> None:
+    spec_path = write_run(root, [settled_structure()], [])
+
+    result = invoke(root)
+
+    assert not spec_path.exists()
+    assert result.exit_code != 0, result.output
+    assert RUN_ID in result.output, result.output
+    assert NO_SPEC in result.output.lower(), result.output
+
+
+def test_a_role_a_human_settled_none_is_closed_and_not_printed(root: Path) -> None:
+    closed = human_none(ROLES, HUMAN_NONE_SUBJECT, ("concept_label", "none"))
+    write_run(root, [], [closed, gamma_role()])
+
+    result = invoke(root)
+
+    assert_succeeded(result)
+    lines = printed_lines(result)
+    assert len(lines) == 1, lines
+    assert_line_shows(lines[0], gamma_role())
+    assert HUMAN_NONE_SUBJECT not in result.output, result.output

@@ -79,6 +79,12 @@ def settled(stage: str, subject: str, members: Sequence[str]) -> Entry:
     }
 
 
+def human_none(stage: str, subject: str, members: Sequence[str]) -> Entry:
+    """A required role a human settled ``none``: ``choice`` stays null, ``source`` names
+    the human (as the eligibility writers close it)."""
+    return {**entry(stage, subject, members), "source": "human"}
+
+
 def alpha_structure() -> Entry:
     return entry(
         STRUCTURE,

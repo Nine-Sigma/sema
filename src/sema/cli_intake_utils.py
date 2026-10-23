@@ -45,6 +45,7 @@ OPEN_STAGES = (STRUCTURE, ROLES)
 EMBEDDING_PROVIDER_ENV = "EMBEDDING_PROVIDER"
 INTAKE_ERRORS = (ValueError, KeyError, OSError, RuntimeError, LLMStageError, yaml.YAMLError)
 AGREEMENT_KEY, FINDINGS_KEY, CAUSE_KEY = "agreement", "findings", "cause"
+NO_HINTS = "none"
 
 
 def error_message(exc: BaseException) -> str:
@@ -244,14 +245,17 @@ def echo_json(value: Any) -> None:
 
 def review_lines(root: Path, run_id: str) -> list[str]:
     """One line per open entry, structure then roles in ledger order, the entries naming a
-    no-spec cause last; a run with none open prints its spec path when it assembled one."""
+    no-spec cause last; a run with none open prints its spec path, and one with no spec
+    either is refused, because Review must name why no spec assembled (decision 14)."""
     opened = [entry for entry in _listed_entries(root, run_id) if _is_open(entry)]
     lines = [_entry_line(entry) for entry in opened if CAUSE_KEY not in entry]
     lines += [_cause_line(entry) for entry in opened if CAUSE_KEY in entry]
     if lines:
         return lines
     spec = root / run_id / ARTIFACTS_DIR / f"{SPEC_ARTIFACT}.json"
-    return [str(spec)] if spec.is_file() else []
+    if not spec.is_file():
+        raise click.ClickException(f"run {run_id} has no open entry and no spec")
+    return [str(spec)]
 
 
 def _listed_entries(root: Path, run_id: str) -> list[dict[str, Any]]:
@@ -269,7 +273,7 @@ def _entry_line(entry: dict[str, Any]) -> str:
     parts = [
         f"{entry['stage']} {entry['subject']}",
         f"members: {members}",
-        f"hints: {'; '.join(entry['hints'])}",
+        f"hints: {'; '.join(entry['hints']) or NO_HINTS}",
     ]
     if AGREEMENT_KEY in entry:
         parts.append(f"agreement: {entry[AGREEMENT_KEY]}")
