@@ -107,6 +107,15 @@ class ValueSample:
 
 
 @dataclass(frozen=True)
+class RowSample:
+    """The first landed rows of ``columns``, each row in the order of ``columns``."""
+
+    relation: str
+    columns: tuple[str, ...]
+    rows: tuple[tuple[Any, ...], ...]
+
+
+@dataclass(frozen=True)
 class NeedsValues:
     """Values the policy withholds; the approval interrupt decides whether to read them."""
 
@@ -339,6 +348,11 @@ def text_sql(relation_sql: str, quoted_columns: Sequence[str], limit: int | None
         return statement
     positions = ", ".join(str(n) for n in range(1, len(quoted_columns) + 1))
     return f"{statement} ORDER BY {positions} LIMIT {limit}"
+
+
+def first_rows_sql(relation_sql: str, quoted_columns: Sequence[str], limit: int) -> str:
+    """The first ``limit`` rows as landed: no ``DISTINCT`` and no ``ORDER BY``."""
+    return f"{text_sql(relation_sql, quoted_columns)} LIMIT {limit}"
 
 
 def _any_filled(quoted_columns: Sequence[str]) -> str:

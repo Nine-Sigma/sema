@@ -1,4 +1,5 @@
-"""Structure resolution helpers: entries to send, member lookups, choices, and the prompt."""
+"""Structure resolution helpers: entries to send, member lookups, choices, the prompt, and
+the values a prompt shows."""
 
 from __future__ import annotations
 
@@ -6,11 +7,12 @@ from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib import resources
 from string import Template
-from typing import TypeVar
+from typing import Any, TypeVar
 
+from sema.binding.spec_sections import RelationRef
 from sema.intake.output_models_utils import ABSTAIN, Choice
 from sema.intake.profile import ProfileTools
-from sema.intake.profile_utils import ColumnProfile
+from sema.intake.profile_utils import ColumnProfile, RowSample, ValueSample
 from sema.intake.shapes.base import RelationProfile, SlotBinding, is_text
 from sema.intake.shapes.precedence import STAGE, member
 from sema.intake.structure import BindingSource, BoundEntry, StructureResult
@@ -22,6 +24,7 @@ STRUCTURE_PROMPT = "prompts/structure_v1.md"
 MODEL_SOURCE: BindingSource = "model"
 NOTHING = "none"
 HUMAN = "human"
+FIRST_ROWS_HEADING = "## First rows"
 
 Bindings = dict[str, dict[str, SlotBinding]]
 SchemaText = dict[str, list[tuple[object, ...]]]
@@ -207,6 +210,51 @@ def render_prompt(
 def bullets(lines: Iterable[str]) -> str:
     rendered = [f"- {line}" for line in lines]
     return "\n".join(rendered) if rendered else NOTHING
+
+
+@dataclass(frozen=True)
+class ShownValues:
+    """What a prompt shows of one relation's values: distinct values per column, then the
+    first landed rows of the columns that showed any (S5 decision 5)."""
+
+    lines: tuple[str, ...] = ()
+    rows: RowSample | None = None
+
+    def values(self) -> str:
+        return bullets(self.lines)
+
+    @property
+    def has_rows(self) -> bool:
+        return self.rows is not None and bool(self.rows.rows)
+
+    def first_rows(self) -> str:
+        """The block after Values; empty with no rows, so no heading stands without a value."""
+        if self.rows is None or not self.has_rows:
+            return ""
+        columns = " | ".join(self.rows.columns)
+        lead = f"The first {len(self.rows.rows)} rows in landed order, as {columns}:"
+        table = bullets(" | ".join(map(_cell, row)) for row in self.rows.rows)
+        return f"\n\n{FIRST_ROWS_HEADING}\n\n{lead}\n\n{table}"
+
+
+def shown_values(
+    tools: ProfileTools, ref: RelationRef, columns: Sequence[str], n: int
+) -> ShownValues:
+    """Values of the columns the policy approves; a withheld column issues no statement."""
+    approved = [column for column in columns if tools.values_approved(ref, column)]
+    samples = [
+        sample
+        for column in approved
+        if isinstance(sample := tools.sample_values(ref, column, n), ValueSample) and sample.values
+    ]
+    lines = tuple(f"{s.column}: {', '.join(map(str, s.values))}" for s in samples)
+    shown = [sample.column for sample in samples]
+    rows = tools.sample_rows(ref, shown, n) if shown else None
+    return ShownValues(lines, rows if isinstance(rows, RowSample) else None)
+
+
+def _cell(value: Any) -> str:
+    return "null" if value is None else str(value)
 
 
 def history(failed: Sequence[Sequence[str]]) -> str:

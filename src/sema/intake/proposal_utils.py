@@ -10,15 +10,21 @@ from pydantic import BaseModel
 from sema.intake.output_models import LITERAL_PREFIX, SLOT_PREFIX, layout_model
 from sema.intake.output_models_utils import NONE
 from sema.intake.profile import ProfileTools
-from sema.intake.profile_utils import ValueSample
-from sema.intake.resolve_utils import bullets, history, render_relations, render_template
+from sema.intake.resolve_utils import (
+    ShownValues,
+    bullets,
+    history,
+    render_relations,
+    render_template,
+    shown_values,
+)
 from sema.intake.shapes import TEMPLATES, ignore
 from sema.intake.shapes.base import RelationProfile, Slot, SlotBinding, Template
 from sema.intake.structure import BoundEntry, StructureResult
 from sema.intake.structure_utils import NO_TEMPLATE
 from sema.intake.views import VIEWS
 
-LAYOUT_PROMPT = "prompts/layout_v1.md"
+LAYOUT_PROMPT = "prompts/layout_v2.md"
 VALUE_SAMPLE = 20
 
 
@@ -100,20 +106,16 @@ def relation_slot_count(template: str, binding: SlotBinding) -> int:
     )
 
 
-def value_lines(tools: ProfileTools, profile: RelationProfile) -> list[str]:
+def layout_values(tools: ProfileTools, profile: RelationProfile) -> ShownValues:
     """Values of the columns the run's policy lets it read; none under ``metadata_only``."""
-    lines = []
-    for column in profile.columns:
-        sample = tools.sample_values(profile.ref, column.name, VALUE_SAMPLE)
-        if isinstance(sample, ValueSample) and sample.values:
-            lines.append(f"{column.name}: {', '.join(map(str, sample.values))}")
-    return lines
+    columns = [column.name for column in profile.columns]
+    return shown_values(tools, profile.ref, columns, VALUE_SAMPLE)
 
 
 def render_layout_prompt(
     profile: RelationProfile,
     group: Sequence[RelationProfile],
-    values: Sequence[str],
+    values: ShownValues,
     failed: Sequence[Sequence[str]],
 ) -> str:
     others = [p for p in group if p.ref.name != profile.ref.name]
@@ -123,7 +125,8 @@ def render_layout_prompt(
         failures=history(failed),
         relation=render_relations([profile], {}),
         group=render_relations(others, {}) if others else NONE,
-        samples=bullets(values),
+        samples=values.values(),
+        first_rows=values.first_rows(),
     )
     return render_template(LAYOUT_PROMPT, sections)
 

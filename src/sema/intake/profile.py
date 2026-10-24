@@ -1,8 +1,9 @@
 """Read-only, logged profiling tools over landed relations (design Decisions 2 and 18).
 
 Describes and structural checks return aggregates only. Values come back only through
-``sample_values`` when the evidence policy allows them, and schema text only through
-``read_schema_text`` for a relation the structure output binds as a dictionary or header.
+``sample_values`` and ``sample_rows`` when the evidence policy allows them, and schema text
+only through ``read_schema_text`` for a relation the structure output binds as a dictionary
+or header.
 Every statement is written to the run ledger before it is issued.
 """
 
@@ -26,6 +27,7 @@ from sema.intake.profile_utils import (
     PathCheck,
     RelationListing,
     RelationProfile,
+    RowSample,
     ValueSample,
     CatalogColumn,
     aggregate_sql,
@@ -34,6 +36,7 @@ from sema.intake.profile_utils import (
     count_where_sql,
     distinct_count_sql,
     distinct_tuples_sql,
+    first_rows_sql,
     hierarchy_sql,
     join_check,
     join_sql,
@@ -62,6 +65,7 @@ __all__ = [
     "ProfileTools",
     "RelationListing",
     "RelationProfile",
+    "RowSample",
     "ValueSample",
 ]
 
@@ -235,19 +239,32 @@ class ProfileTools:
     def sample_values(
         self, ref: RelationRef, column: str, n: int
     ) -> ValueSample | NeedsValues:
-        key = (ref.name, column)
-        if key in self.policy.sensitive:
-            raise ProfileRefusedError(
-                f"column {column} of {ref.name} is bound to sensitive and is never sampled"
-            )
-        if not self._values_allowed(ref, column):
-            request = NeedsValues(relation=ref.name, columns=(column,))
-            self.value_requests.append(request)
-            return request
+        if (withheld := self._withheld(ref, (column,))) is not None:
+            return withheld
         limit = max(0, min(n, SAMPLE_CAP))
         relation_sql, quoted = self.provider.relation_sql(ref), self.provider.quote(ref, column)
         rows = self._run(ref, sample_sql(relation_sql, quoted, limit), value_bearing=True)
         return ValueSample(ref.name, column, tuple(row[0] for row in rows))
+
+    def sample_rows(
+        self, ref: RelationRef, columns: Sequence[str], k: int
+    ) -> RowSample | NeedsValues:
+        """The first ``k`` landed rows of ``columns``, neither distinct nor sorted."""
+        if (withheld := self._withheld(ref, columns)) is not None:
+            return withheld
+        limit = max(0, min(k, SAMPLE_CAP))
+        quoted = [self.provider.quote(ref, column) for column in columns]
+        statement = first_rows_sql(self.provider.relation_sql(ref), quoted, limit)
+        rows = self._run(ref, statement, value_bearing=True)
+        return RowSample(ref.name, tuple(columns), tuple(tuple(row) for row in rows))
+
+    def values_approved(self, ref: RelationRef, column: str) -> bool:
+        """Whether the policy lets ``column`` be read, before any statement is issued."""
+        key = (ref.name, column)
+        if key in self.policy.sensitive:
+            return False
+        tier = self.policy.tier
+        return tier == "full" or (tier == "bounded_values" and key in self.policy.allowlist)
 
     def read_schema_text(
         self, ref: RelationRef, columns: Sequence[str], limit: int | None = None
@@ -277,12 +294,24 @@ class ProfileTools:
         distinct, listed, uncompared = (int(value) for value in self._run(ref, statement)[0])
         return NameListing(distinct, listed, uncompared)
 
+    def _withheld(self, ref: RelationRef, columns: Sequence[str]) -> NeedsValues | None:
+        """Refuses a sensitive column; a request for the columns the policy withholds."""
+        if sensitive := [c for c in columns if (ref.name, c) in self.policy.sensitive]:
+            raise ProfileRefusedError(
+                f"column {sensitive[0]} of {ref.name} is bound to sensitive and is never sampled"
+            )
+        withheld = tuple(column for column in columns if not self._values_allowed(ref, column))
+        if not withheld:
+            return None
+        request = NeedsValues(relation=ref.name, columns=withheld)
+        self.value_requests.append(request)
+        return request
+
     def _values_allowed(self, ref: RelationRef, column: str) -> bool:
-        tier = self.policy.tier
-        if tier == "full":
-            return True
-        if tier != "bounded_values" or (ref.name, column) not in self.policy.allowlist:
+        if not self.values_approved(ref, column):
             return False
+        if self.policy.tier == "full":
+            return True
         statement = distinct_count_sql(
             self.provider.relation_sql(ref), self.provider.quote(ref, column)
         )

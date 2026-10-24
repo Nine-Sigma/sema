@@ -3,10 +3,11 @@
 Every column of the asked relation is listed with its facts: aggregates, comment, the
 roles whose lexicon tokens its name matches, its embedding rank per role when an embedder
 ran, and its findings (S5 decisions 1, 3, 18). A schema relation shows a fixed sample of
-``SCHEMA_TEXT_SAMPLE_ROWS`` rows with the rows not shown (decision 6). Over the budget,
+``SCHEMA_TEXT_SAMPLE_ROWS`` rows with the rows not shown (decision 6). The asked relation's
+approved columns show their values and first landed rows (decision 5). Over the budget,
 the order is: comments are truncated, then the schema sample shrinks to its first rows,
-then columns keep only name and type; each omission is stated in the prompt. No row
-sample is rendered yet, so that step of the delta's order has nothing to drop.
+then the first rows are dropped, then columns keep only name and type; each omission is
+stated in the prompt, and a step with nothing to drop is not taken.
 """
 
 from __future__ import annotations
@@ -15,16 +16,25 @@ import hashlib
 import json
 import random
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from pydantic import BaseModel
 
 from sema.intake import lexicon
 from sema.intake.eligibility_utils import RoleEligibility, column_findings, lexicon_hits
 from sema.intake.model_calls import fits
-from sema.intake.profile import ProfileTools
+from sema.intake.profile import SAMPLE_CAP, ProfileTools
 from sema.intake.profile_utils import ColumnProfile
-from sema.intake.resolve_utils import SchemaText, bullets, history, render_template, text_columns
+from sema.intake.resolve_utils import (
+    NOTHING,
+    SchemaText,
+    ShownValues,
+    bullets,
+    history,
+    render_template,
+    shown_values,
+    text_columns,
+)
 from sema.intake.shapes.base import RelationProfile
 from sema.log import logger
 
@@ -42,6 +52,7 @@ class Compaction:
 
     comment_chars: int | None = None
     schema_rows: int = SCHEMA_TEXT_SAMPLE_ROWS
+    first_rows: bool = True
     full_facts: bool = True
 
     def omissions(self) -> list[str]:
@@ -50,6 +61,8 @@ class Compaction:
             stated.append(f"comments are truncated to {self.comment_chars} characters")
         if self.schema_rows < SCHEMA_TEXT_SAMPLE_ROWS:
             stated.append(f"schema text shows its first {self.schema_rows} rows")
+        if not self.first_rows:
+            stated.append("the first rows of the approved columns are not shown")
         if not self.full_facts:
             stated.append("columns show only their name and type")
         return stated
@@ -59,20 +72,22 @@ COMPACTION_ORDER = (
     Compaction(),
     Compaction(COMMENT_CHARS),
     Compaction(COMMENT_CHARS, SHRUNK_SCHEMA_ROWS),
-    Compaction(COMMENT_CHARS, SHRUNK_SCHEMA_ROWS, full_facts=False),
+    Compaction(COMMENT_CHARS, SHRUNK_SCHEMA_ROWS, first_rows=False),
+    Compaction(COMMENT_CHARS, SHRUNK_SCHEMA_ROWS, first_rows=False, full_facts=False),
 )
 
 
 @dataclass
 class RoleEvidence:
     """The relations one ask shows; the asked relation's columns carry role facts from
-    ``entries``. The schema sample is read once, at creation."""
+    ``entries``. The schema sample and the shown values are read once, at creation."""
 
     tools: ProfileTools
     relations: Sequence[RelationProfile]
     asked: str
     entries: Sequence[RoleEligibility]
     texts: SchemaText = field(init=False)
+    shown: ShownValues = field(init=False)
 
     def __post_init__(self) -> None:
         readable = self.tools.structure.schema_relations if self.tools.structure else ()
@@ -83,6 +98,14 @@ class RoleEvidence:
             for p in self.relations
             if p.ref.name in readable and text_columns(p)
         }
+        asked = next((p for p in self.relations if p.ref.name == self.asked), None)
+        columns = [column.name for column in asked.columns] if asked else []
+        self.shown = (
+            shown_values(self.tools, asked.ref, columns, SAMPLE_CAP) if asked else ShownValues()
+        )
+
+    def first_rows(self, compaction: Compaction) -> str:
+        return self.shown.first_rows() if compaction.first_rows else ""
 
     def width(self, relation: str) -> int:
         return next((len(p.columns) for p in self.relations if p.ref.name == relation), 0)
@@ -179,22 +202,37 @@ def _ranks(entries: Iterable[RoleEligibility]) -> dict[str, list[str]]:
 
 
 def render_roles_prompt(
-    relation: str, claims: str, evidence: str, fields: str, failed: Sequence[Sequence[str]]
+    relation: str,
+    claims: str,
+    evidence: str,
+    fields: str,
+    failed: Sequence[Sequence[str]],
+    *,
+    values: str = NOTHING,
+    first_rows: str = "",
 ) -> str:
     sections = {
         "relation": relation,
         "in_force": claims,
         "failures": history(failed),
         "relations": evidence,
+        "samples": values,
+        "first_rows": first_rows,
         "fields": fields,
     }
     return render_template(ROLES_PROMPT, sections)
 
 
-def fitted(render: Callable[[Compaction], str], output_model: type[BaseModel]) -> str:
+def fitted(
+    render: Callable[[Compaction], str], output_model: type[BaseModel], *, rows: bool = False
+) -> str:
     """The first step's rendering that fits the budget, else the most compacted one, with
-    each omission stated; ``ModelCalls`` refuses a prompt that still does not fit."""
-    for level, compaction in enumerate(COMPACTION_ORDER):
+    each omission stated; ``ModelCalls`` refuses a prompt that still does not fit. With no
+    ``rows`` shown, the step that drops them is not taken."""
+    order: tuple[Compaction, ...] = COMPACTION_ORDER
+    if not rows:
+        order = tuple(dict.fromkeys(replace(c, first_rows=True) for c in COMPACTION_ORDER))
+    for level, compaction in enumerate(order):
         prompt = render(compaction)
         omitted = compaction.omissions()
         if omitted:

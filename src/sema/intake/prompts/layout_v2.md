@@ -1,4 +1,4 @@
-# prompt: layout v1
+# prompt: layout v2
 
 You propose how one landed relation is read. Code has profiled it and found that no shape
 template reads it as landed, or the loader landed it without a header. You may bind it with
@@ -20,11 +20,13 @@ when every check passes.
 - `abstain`: no template over any registered view reads this relation. Use `reason` to
   describe the layout you see, so a reviewer can decide what reads it.
 - `needs_values`: list in `needs_values` the columns whose values would let you decide.
-  Values are shown only after a reviewer approves reading them.
+  Values are shown only after a reviewer approves reading them. Columns are approved once:
+  asking again for approved columns is recorded as an abstention.
 - Set every field you do not use to `none` or to an empty list. Give a `confidence` between
   0 and 1 and a one-sentence `reason` naming the evidence.
 - Use only the evidence given here. Names, types, comments, and aggregates are shown; data
-  values are shown only under "Values".
+  values are shown only under "Values", and the first landed rows of the same columns,
+  in landed order, follow them once a reviewer approves reading them.
 
 ## Templates
 
@@ -72,4 +74,4 @@ $group
 
 ## Values
 
-$samples
+$samples$first_rows

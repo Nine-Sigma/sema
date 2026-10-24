@@ -317,9 +317,11 @@ def fitted_roles_prompt(
         fields = _map_lines(ask, map_entries(roles, ask.relation), width)
     return fitted(
         lambda compaction: render_roles_prompt(
-            ask.relation, claims, evidence.render(compaction, shuffled=shuffled), fields, failed
+            ask.relation, claims, evidence.render(compaction, shuffled=shuffled), fields, failed,
+            values=evidence.shown.values(), first_rows=evidence.first_rows(compaction),
         ),
         ask.output_model(),
+        rows=evidence.shown.has_rows,
     )
 
 

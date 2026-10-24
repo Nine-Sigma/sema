@@ -20,7 +20,8 @@ after you give it.
 - A reason is one short sentence naming the evidence that decided the answer.
 - Use only the evidence given here: names, types, comments, aggregates, lexicon and
   embedding facts, findings, and the text of relations that describe the schema. Data
-  values are not shown.
+  values are shown only under Values, for the columns a reviewer approved reading, with
+  the first landed rows of those columns after them in landed order.
 - Code sends an answer back once with its failures: a name that is not a column of the
   relation, two roles on one column, or a column that fails its role's data fact. A
   finding is a reading, not a failure.
@@ -36,6 +37,10 @@ $failures
 ## Relations
 
 $relations
+
+## Values
+
+$samples$first_rows
 
 ## Fields
 

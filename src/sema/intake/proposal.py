@@ -6,7 +6,8 @@ relations and slots, and optionally one view. Code applies the view, runs the te
 ``verify``, then the Structure verifier; a passing proposal is bound with ``source: model``.
 Failures are re-asked with every earlier failure, at most ``max_retries`` times, and then
 the relation is escalated for Review. An abstention is a layout finding; a request for
-values is returned for the value ask and replays until values are approved.
+values is returned for the value ask and replays until values are approved, and a request
+for columns already approved is an abstention (S5 decision 5).
 """
 
 from __future__ import annotations
@@ -23,17 +24,17 @@ from sema.intake.output_models_utils import ABSTAIN, NONE
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import NeedsValues
 from sema.intake.resolve import DEFAULT_MAX_RETRIES
+from sema.intake.resolve_utils import ShownValues, retried
 from sema.intake.proposal_utils import (
     binding_of,
+    layout_values,
     proposable,
     proposal_model,
     relation_slot_count,
     render_layout_prompt,
-    value_lines,
     with_bound,
     with_reason,
 )
-from sema.intake.resolve_utils import retried
 from sema.intake.shapes.base import RelationProfile, SlotBinding, profile_relations
 from sema.intake.shapes.base_utils import failure
 from sema.intake.structure import BoundEntry, StructureResult
@@ -142,7 +143,7 @@ def propose_layouts(
 def _propose(run: _Run, relation: str, max_retries: int) -> None:
     profile = run.profiles[relation]
     group = _group(run, relation)
-    values = value_lines(run.tools, profile)
+    values = layout_values(run.tools, profile)
     made: list[LayoutAttempt] = []
 
     def ask(failed: Sequence[Sequence[str]]) -> _Outcome:
@@ -173,11 +174,15 @@ def _settle(run: _Run, relation: str, outcome: _Outcome) -> None:
         return
     if answer is None:
         return
+    rationale = str(getattr(answer, "reason"))
     if str(getattr(answer, "answer")) == NEEDS_VALUES:
         columns = tuple(getattr(answer, NEEDS_VALUES))
-        run.value_requests.append(NeedsValues(relation=relation, columns=columns))
-        return
-    rationale = str(getattr(answer, "reason"))
+        ref = run.profiles[relation].ref
+        if not all(run.tools.values_approved(ref, column) for column in columns):
+            run.value_requests.append(NeedsValues(relation=relation, columns=columns))
+            return
+        asked = ", ".join(columns)
+        rationale = f"values were asked again for approved columns {asked}: {rationale}"
     run.findings.append(LayoutFinding(relation=relation, rationale=rationale))
     payload = dict(relation=relation, rationale=rationale, call_key=outcome.attempt.call_key)
     run.tools.ledger.event(STAGE, FINDING_KIND, payload)
@@ -188,7 +193,7 @@ def _ask(
     run: _Run,
     profile: RelationProfile,
     group: Sequence[str],
-    values: Sequence[str],
+    values: ShownValues,
     failed: Sequence[Sequence[str]],
 ) -> _Outcome:
     relation = profile.ref.name

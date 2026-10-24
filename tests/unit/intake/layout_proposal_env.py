@@ -29,7 +29,7 @@ LITERAL_PREFIX = "literal_"
 CONFIDENCE = 0.85
 REASON = "the relation reads as one flat list of labelled codes"
 UNSCRIPTED = "no template over any view reads this relation"
-PROMPT_HEADER = "# prompt: layout v1"
+PROMPT_HEADER = "# prompt: layout v2"
 
 LISTING, REMARKS, TERMS = "book__listing", "book__remarks", "book__terms"
 # Integer ids first: no row passes the header test, so the sheet lands with positional
