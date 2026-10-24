@@ -28,7 +28,7 @@ from sema.intake.shapes.base_utils import (
     section_of,
     verdict,
 )
-from sema.intake.verify.base import Failure, FloorValue, Verdict
+from sema.intake.verify.base import Failure, FloorValue, Verdict, classed
 
 ID = "semsql"
 REQUIRED = (*DERIVED_RELATIONS, *REQUIRED_BASE_TABLES)
@@ -46,6 +46,9 @@ SECTIONS = (
 # Measured: A3 fixture semsql_terms labels 50 of 50 classes (coverage 1.0).
 LABEL_COVERAGE_FLOOR = 0.9
 FLOORS: dict[str, FloorValue] = {"LABEL_COVERAGE_FLOOR": LABEL_COVERAGE_FLOOR}
+GATES = frozenset({"LABEL_COVERAGE_FLOOR"})
+FINDINGS: frozenset[str] = frozenset()
+CLASSES = classed(GATES, FINDINGS)
 
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
@@ -63,7 +66,7 @@ def verify(
     terms = find(group, binding.slots.get(TERMS_RELATION))
     if not failures and terms is not None:
         failures = _coverage_failures(terms)
-    return verdict(failures, FLOORS)
+    return verdict(failures, FLOORS, CLASSES)
 
 
 def _coverage_failures(terms: RelationProfile) -> list[Failure]:

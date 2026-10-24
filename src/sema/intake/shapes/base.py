@@ -16,9 +16,10 @@ from sema.binding.spec_sections import Provider, RelationRef
 from sema.intake.landing import LOCATOR_COLUMN, SHEET_SEPARATOR, LandedRelation, LandResult
 from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
-from sema.intake.verify.base import Verdict
+from sema.intake.verify.base import Finding, FloorClass, Verdict, classed
 
 __all__ = [
+    "CLASSES",
     "ID_DISTINCT_RATIO_FLOOR",
     "JOIN_RESOLVE_FLOOR",
     "LABEL_MEAN_LENGTH_BOUNDS",
@@ -45,6 +46,9 @@ LABEL_MEAN_LENGTH_BOUNDS = (3.0, 120.0)
 # Measured: A2 Values.concept_code into Concepts.concept_code 1.0, syn-library
 # data_element.data_element_id into the concept relation's key 1.0.
 JOIN_RESOLVE_FLOOR = 0.95
+GATES = frozenset({"JOIN_RESOLVE_FLOOR"})
+FINDINGS = frozenset({"ID_DISTINCT_RATIO_FLOOR", "LABEL_MEAN_LENGTH_BOUNDS"})
+CLASSES: dict[str, FloorClass] = classed(GATES, FINDINGS)
 
 TEXT_TYPES = frozenset({"VARCHAR", "STRING", "TEXT", "CHAR"})
 SIZED_TEXT_PREFIXES = ("VARCHAR(", "CHAR(", "STRING(")
@@ -75,7 +79,10 @@ class RelationProfile:
 
 
 class SlotBinding(BaseModel):
-    """One way a template's slots bind; ``relations`` lists every relation it spans."""
+    """One way a template's slots bind; ``relations`` lists every relation it spans.
+
+    ``findings`` are the measured readings the candidate carries; none removed it.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -84,6 +91,7 @@ class SlotBinding(BaseModel):
     slots: dict[str, str]
     evidence: dict[str, float | str] = {}
     relations: tuple[str, ...]
+    findings: tuple[Finding, ...] = ()
 
 
 @dataclass(frozen=True)

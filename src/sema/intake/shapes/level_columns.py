@@ -14,12 +14,16 @@ from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import RelationProfile, Slot, SlotBinding
 from sema.intake.shapes.base_utils import failure, section_of, slot_relations, verdict
-from sema.intake.verify.base import Failure, Verdict
+from sema.intake.verify.base import Failure, FloorValue, Verdict, classed
 
 ID = "level_columns"
 SECTION = section_of(LevelColumnsHierarchy)
 RELATION, LEVEL = "relation", "level_"
 MIN_LEVELS = 2
+FLOORS: dict[str, FloorValue] = {"MIN_LEVELS": MIN_LEVELS}
+GATES = frozenset({"MIN_LEVELS"})
+FINDINGS: frozenset[str] = frozenset()
+CLASSES = classed(GATES, FINDINGS)
 # A proposal offers this many level slots, which keeps its output model far under the
 # provider key cap; deeper level tables are found by code, not proposed.
 PROPOSED_LEVELS = 8
@@ -49,7 +53,7 @@ def verify(
             failures.append(failure("levels_exist", profile.ref.name, levels=len(names)))
         else:
             failures += _failures(profile, names, tools)
-    return verdict(failures, {})
+    return verdict(failures, FLOORS, CLASSES)
 
 
 def ordered_levels(profile: RelationProfile) -> list[str]:

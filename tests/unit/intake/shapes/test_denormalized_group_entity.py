@@ -131,7 +131,7 @@ def test_document_control_members_are_concept_list_and_entity_model(acris: Sourc
     result = shapes().apply_precedence(every_template_candidates(group, acris))
 
     (ambiguity,) = [a for a in result.ambiguities if a.subject == acris.ref(DOCUMENT_CONTROL)]
-    templates = sorted(m.partition("(")[0] for m in ambiguity.members)
+    templates = sorted({m.partition("(")[0] for m in ambiguity.members})
     assert templates == ["concept_list", "entity_model"]
 
 

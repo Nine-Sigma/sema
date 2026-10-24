@@ -16,7 +16,7 @@ from sema.intake.shapes.base import (
     RelationProfile,
     SlotBinding,
 )
-from sema.intake.verify.base import Failure, FloorValue, Verdict
+from sema.intake.verify.base import Failure, Finding, FloorClass, FloorValue, Verdict
 
 ID_FLOOR: dict[str, FloorValue] = {"ID_DISTINCT_RATIO_FLOOR": ID_DISTINCT_RATIO_FLOOR}
 JOIN_FLOOR: dict[str, FloorValue] = {"JOIN_RESOLVE_FLOOR": JOIN_RESOLVE_FLOOR}
@@ -57,8 +57,29 @@ def failure(check: str, relation: str, column: str | None = None, **evidence: An
     return Failure(check=check, relation=relation, column=column, evidence=evidence)
 
 
-def verdict(failures: Sequence[Failure], floors: Mapping[str, FloorValue]) -> Verdict:
-    return Verdict.of(failures=list(failures), ambiguities=[], floors=dict(floors))
+def finding(name: str, relation: str, column: str | None, value: float | str | None) -> Finding:
+    subject = relation if column is None else f"{relation}.{column}"
+    return Finding(name=name, subject=subject, value=value)
+
+
+def verdict(
+    failures: Sequence[Failure],
+    floors: Mapping[str, FloorValue],
+    classes: Mapping[str, FloorClass] | None = None,
+    findings: Sequence[Finding] = (),
+) -> Verdict:
+    """Every listed constant carries its class; an unclassed one is a programming error."""
+    classes = classes or {}
+    unclassed = sorted(set(floors) - set(classes))
+    if unclassed:
+        raise ValueError(f"constants listed without a class: {unclassed}")
+    return Verdict.of(
+        failures=list(failures),
+        ambiguities=[],
+        floors=dict(floors),
+        floor_classes={name: classes[name] for name in floors},
+        findings=list(findings),
+    )
 
 
 def find(group: Sequence[RelationProfile], ref_name: str | None) -> RelationProfile | None:

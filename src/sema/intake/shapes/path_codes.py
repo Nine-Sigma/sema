@@ -13,18 +13,23 @@ from sema.intake.profile import ProfileTools
 from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import RelationProfile, Slot, SlotBinding, is_id, is_text
 from sema.intake.shapes.base_utils import (
+    ID_FLOOR,
     failure,
     section_of,
     slot_columns,
     slot_relations,
     verdict,
 )
-from sema.intake.verify.base import Failure, Verdict
+from sema.intake.verify.base import Failure, FloorValue, Verdict, classed
 
 ID = "path_codes"
 SECTION = section_of(PathCodesHierarchy)
 RELATION, CODE, SEPARATOR = "relation", "code", "separator"
 SEPARATORS = (".", "/", "-", ":", "|", ">")
+FLOORS: dict[str, FloorValue] = dict(ID_FLOOR)
+GATES: frozenset[str] = frozenset()
+FINDINGS = frozenset({"ID_DISTINCT_RATIO_FLOOR"})
+CLASSES = classed(GATES, FINDINGS)
 SLOTS = (
     Slot(RELATION, "relation"),
     Slot(CODE, "column"),
@@ -53,7 +58,7 @@ def verify(
         separator = binding.slots.get(SEPARATOR, "")
         failures += missing
         failures += [f for code in codes for f in _check(profile, code, separator, tools)[0]]
-    return verdict(failures, {})
+    return verdict(failures, FLOORS, CLASSES)
 
 
 def _check(

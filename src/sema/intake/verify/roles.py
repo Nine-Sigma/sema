@@ -28,7 +28,7 @@ from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR
 from sema.intake.shapes.base_utils import JOIN_FLOOR, failure, section_of
 from sema.intake.structure import StructureResult
 from sema.intake.structure_hint_utils import section_at
-from sema.intake.verify.base import Ambiguity, Failure, Finding, FloorValue, Verdict
+from sema.intake.verify.base import Ambiguity, Failure, Finding, FloorValue, Verdict, classed
 from sema.intake.verify.roles_chosen_utils import (
     chosen_sections,
     closed_required,
@@ -70,6 +70,9 @@ FLOORS: dict[str, FloorValue] = {
     "DISPLAY_NULL_RATE_FLOOR": lexicon.DISPLAY_NULL_RATE_FLOOR,
     **JOIN_FLOOR,
 }
+GATES = frozenset({"JOIN_RESOLVE_FLOOR"})
+FINDINGS = frozenset({"DISPLAY_NULL_RATE_FLOOR"})
+CLASSES = classed(GATES, FINDINGS)
 ROLE_CHECKS = (
     COLUMN_EXISTS, IN_ELIGIBILITY_SET, ONE_ROLE_PER_COLUMN, CONTAINED, *VALUE_CHECKS
 )
@@ -106,7 +109,13 @@ def verify_roles(
     failures = with_sources(failures, roles.eligibilities, ROLE_CHECKS)
     if spec is not None:
         failures += _domain_failures(spec, roles.eligibilities)
-    return Verdict.of(failures=failures, ambiguities=listed, floors=FLOORS, findings=findings)
+    return Verdict.of(
+        failures=failures,
+        ambiguities=listed,
+        floors=FLOORS,
+        findings=findings,
+        floor_classes=CLASSES,
+    )
 
 
 def _section_role_failures(

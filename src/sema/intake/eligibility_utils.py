@@ -21,6 +21,7 @@ from sema.intake import lexicon
 from sema.intake.lexicon import RoleEntry, normalize
 from sema.intake.shapes.base import RelationSignature, is_text
 from sema.intake.profile_utils import ColumnProfile
+from sema.intake.verify.base import Finding
 
 __all__ = [
     "DETERMINISTIC_SOURCES",
@@ -58,6 +59,12 @@ SOURCE_CONFIDENCE: dict[str, float] = {
     "memory": 0.95,
     "lexicon": 0.9,
 }
+ROLE_READINGS: dict[str, frozenset[str]] = {
+    "text": frozenset({CONSTANT, DISPLAY_NULL_RATE}),
+    "long_text": frozenset({CONSTANT, DEFINITION_MEAN_LENGTH}),
+    "low_cardinality": frozenset({STATUS_CARDINALITY}),
+    "any": frozenset({CONSTANT}),
+}
 DATE_TYPE_PREFIXES = ("DATE", "TIMESTAMP")
 ARRAY_TYPE_MARKERS = ("[]", "ARRAY", "LIST")
 MemoryKey = tuple[str, RelationSignature]
@@ -77,7 +84,8 @@ class Hint(BaseModel):
 
 class RoleEligibility(BaseModel):
     """``members`` is the data-fact set; ``exclusions`` maps a member another role took to
-    that role. A model or human choice may lie outside the members, for the verifier."""
+    that role. A model or human choice may lie outside the members, for the verifier.
+    ``findings`` are the measured readings on the members that the role's kind reads."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -86,6 +94,7 @@ class RoleEligibility(BaseModel):
     role: str
     subject: str | None = None
     members: tuple[str, ...]
+    findings: tuple[Finding, ...] = ()
     hints: tuple[Hint, ...] = ()
     excluded_by: str | None = None
     exclusions: dict[str, str] = {}
@@ -305,6 +314,18 @@ def column_findings(column: ColumnProfile) -> tuple[tuple[str, float | None], ..
     if column.distinct_count > lexicon.STATUS_CARDINALITY_CAP:
         found.append((STATUS_CARDINALITY, float(column.distinct_count)))
     return tuple(found)
+
+
+def role_findings(
+    entry: RoleEntry, relation: str, columns: Iterable[ColumnProfile], members: Sequence[str]
+) -> tuple[Finding, ...]:
+    """Each member's readings its role's predicate kind tested before S5, as findings."""
+    read = ROLE_READINGS.get(entry.predicate, frozenset())
+    return tuple(
+        Finding(name=name, subject=f"{relation}.{column.name}", value=value)
+        for column in columns if column.name in members
+        for name, value in column_findings(column) if name in read
+    )
 
 
 def _padded(text: str) -> str:

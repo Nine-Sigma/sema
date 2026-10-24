@@ -28,6 +28,7 @@ from sema.intake.landing import LandResult
 from sema.intake.profile import ProfileTools
 from sema.intake.shapes import TEMPLATES, entity_model, filled_sections, ignore
 from sema.intake.shapes.base import (
+    CLASSES,
     RelationProfile,
     RelationSignature,
     SlotBinding,
@@ -48,7 +49,7 @@ from sema.intake.structure_utils import (
     union,
     within_edges,
 )
-from sema.intake.verify.base import Ambiguity, Failure, FloorValue
+from sema.intake.verify.base import Ambiguity, Failure, FloorClass, FloorValue
 from sema.intake.views.base import ViewSpec
 from sema.log import logger
 
@@ -97,6 +98,9 @@ class StructureResult(BaseModel):
 
     ``ambiguities`` lists open entries only; ``settled`` keeps each entry a model or a
     reviewer settled, with its choice, confidence, source, and call key.
+
+    ``described_by`` maps each relation a bound dictionary describes to that dictionary;
+    the described-data gate kept it out of every dictionary and header slot (S5 decision 23).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -111,6 +115,7 @@ class StructureResult(BaseModel):
     floors: dict[str, FloorValue]
     proposal_targets: tuple[str, ...] = ()
     settled: tuple[Ambiguity, ...] = ()
+    described_by: dict[str, str] = {}
 
     def with_settled(self) -> StructureResult:
         """Entries carrying a choice or a source leave the open list for ``settled``."""
@@ -176,7 +181,7 @@ def run_structure(
     found = [group_candidates(group, tools) for group in open_groups]
     claimed = _claimed([*pinned, *(binding for group in found for binding in group)])
     graph = _join_graph(named, open_groups, found, claimed, tools)
-    bound, ambiguities = _bind_described(pinned, graph, by_name, tools)
+    bound, ambiguities, described = _bind_described(pinned, graph, by_name, tools)
     logger.info(
         "structure over {} relations: {} bound, {} ignored, {} ambiguous, {} groups",
         len(profiles), len(bound), len(ignored), len(ambiguities), len(graph.groups),
@@ -191,6 +196,7 @@ def run_structure(
         edges=tuple(graph.edges),
         floors=stage_floors(),
         proposal_targets=_proposal_targets(profiles, ignored, ambiguities),
+        described_by=described,
     )
 
 
@@ -214,6 +220,16 @@ def stage_floors() -> dict[str, FloorValue]:
     for template in TEMPLATES:
         floors |= getattr(template, "FLOORS", {})
     return floors
+
+
+def stage_floor_classes() -> dict[str, FloorClass]:
+    """The class of every constant ``stage_floors`` lists; one name has one class."""
+    classes: dict[str, FloorClass] = dict(CLASSES)
+    for template in TEMPLATES:
+        for name, found in getattr(template, "CLASSES", {}).items():
+            if classes.setdefault(name, found) != found:
+                raise ValueError(f"{name} is classed both {classes[name]} and {found}")
+    return classes
 
 
 def _proposal_targets(
@@ -259,7 +275,7 @@ def _bind_described(
     graph: _Graph,
     by_name: dict[str, RelationProfile],
     tools: ProfileTools,
-) -> tuple[list[BoundEntry], list[Ambiguity]]:
+) -> tuple[list[BoundEntry], list[Ambiguity], dict[str, str]]:
     """Bind with described data out of every dictionary and header slot.
 
     Only a dictionary that ends up bound may describe a relation, so a describing dictionary
@@ -275,7 +291,7 @@ def _bind_described(
         in_force = set(per_file_dictionaries(entry.binding for entry in bound))
         kept = {name: by for name, by in described.items() if by in in_force}
         if kept == described:
-            return bound, ambiguities
+            return bound, ambiguities, described
         described = kept
 
 

@@ -287,6 +287,6 @@ def test_a7_csv_dictionary_of_relations_not_landed_keeps_its_ambiguity(tmp_path:
 
     assert result.bound == ()
     (ambiguity,) = result.ambiguities
-    templates = sorted(member.partition("(")[0] for member in ambiguity.members)
+    templates = sorted({member.partition("(")[0] for member in ambiguity.members})
     assert templates == ["concept_with_values_denormalized", "entity_model"]
     assert any("layout=single_relation" in member for member in ambiguity.members)

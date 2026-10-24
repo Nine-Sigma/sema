@@ -55,6 +55,11 @@ DISPLAY_NULL_RATE_FLOOR = 0.05
 DEFINITION_MEAN_LENGTH_FLOOR = 12.0
 # Measured: A2 Values.status 2 distinct, A3 owl:deprecated 1 distinct.
 STATUS_CARDINALITY_CAP = 10
+# Every measured reading above is a finding on a column, never a removal (S5 decision 18).
+GATES: frozenset[str] = frozenset()
+FINDINGS = frozenset(
+    {"DISPLAY_NULL_RATE_FLOOR", "DEFINITION_MEAN_LENGTH_FLOOR", "STATUS_CARDINALITY_CAP"}
+)
 
 
 @dataclass(frozen=True)

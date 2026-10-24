@@ -20,6 +20,7 @@ from sema.intake.shapes.base import (
     is_id,
 )
 from sema.intake.shapes.base_utils import (
+    ID_FLOOR,
     JOIN_FLOOR,
     ColumnPair,
     failure,
@@ -30,7 +31,7 @@ from sema.intake.shapes.base_utils import (
     slot_relations,
     verdict,
 )
-from sema.intake.verify.base import Failure, Verdict
+from sema.intake.verify.base import Failure, FloorValue, Verdict, classed
 
 ID = "edge_list_hierarchy"
 SECTION = section_of(ParentColumnHierarchy)
@@ -45,6 +46,10 @@ SLOTS = (
     Slot(CHILD, "column"),
 )
 EDGE_LINK_COUNT = 2
+FLOORS: dict[str, FloorValue] = {**JOIN_FLOOR, **ID_FLOOR, "EDGE_LINK_COUNT": EDGE_LINK_COUNT}
+GATES = frozenset({"EDGE_LINK_COUNT", "JOIN_RESOLVE_FLOOR"})
+FINDINGS = frozenset({"ID_DISTINCT_RATIO_FLOOR"})
+CLASSES = classed(GATES, FINDINGS)
 Checked = tuple[list[Failure], dict[str, float | str]]
 
 
@@ -68,12 +73,12 @@ def verify(
     slots = (CONCEPT_RELATION, EDGE_RELATION) if edge_form else (CONCEPT_RELATION,)
     found, failures = slot_relations(group, binding, slots)
     if failures:
-        return verdict(failures, JOIN_FLOOR)
+        return verdict(failures, FLOORS, CLASSES)
     concepts, edges = found[0], found[-1]
     keys, failures = slot_columns(concepts, binding, (IDENTIFIER,))
     links, missing = slot_columns(edges, binding, (CHILD, PARENT) if edge_form else (PARENT,))
     if failures or missing:
-        return verdict(failures + missing, JOIN_FLOOR)
+        return verdict(failures + missing, FLOORS, CLASSES)
     key = keys[0]
     if not is_id(concepts, key):
         failures.append(failure("id_is_unique", concepts.ref.name, key.name))
@@ -82,7 +87,7 @@ def verify(
         failures += _edge_check(concepts, key, edges, links[0], links[1], tools)[0]
     else:
         failures += _parent_check(concepts, key, links[0], tools)[0]
-    return verdict(failures, JOIN_FLOOR)
+    return verdict(failures, FLOORS, CLASSES)
 
 
 def _parent_pairs(

@@ -32,27 +32,27 @@ def other_multi_groups(
     ]
 
 
-def repeated_in_share(
+def repeated_share(
     profile: RelationProfile,
     others: Sequence[Sequence[RelationProfile]],
     floor: float,
     tools: ProfileTools,
-) -> bool:
-    """Whether at least ``floor`` of ``others`` hold a relation identical to ``profile``.
+) -> float | None:
+    """The share of ``others`` holding a relation identical to ``profile``, or None below
+    ``floor``.
 
-    Stops as soon as the outcome is decided, so a sheet unique to its file costs few joins.
+    Stops as soon as the share cannot reach the floor, so a sheet unique to its file costs
+    few joins; a share at the floor is counted in full, because the binding states it.
     """
     if not others:
-        return False
+        return None
     needed = ceil(floor * len(others))
     matched = 0
     for checked, members in enumerate(others, 1):
         matched += any(identical(profile, other, tools) for other in members)
-        if matched >= needed:
-            return True
         if matched + len(others) - checked < needed:
-            return False
-    return False
+            return None
+    return matched / len(others)
 
 
 def identical(a: RelationProfile, b: RelationProfile, tools: ProfileTools) -> bool:

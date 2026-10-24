@@ -18,7 +18,7 @@ from sema.intake.shapes.base_utils import (
     section_of,
     verdict,
 )
-from sema.intake.verify.base import Verdict
+from sema.intake.verify.base import FloorValue, Verdict, classed
 
 ID = "athena_bundle"
 SLOTS = tuple(Slot(name, "relation") for name in REQUIRED_TABLES)
@@ -27,6 +27,10 @@ SLOTS = tuple(Slot(name, "relation") for name in REQUIRED_TABLES)
 # bug-757, S4). No term details: the concept table holds no definition or external reference;
 # its validity columns are lifecycle roles of its values.
 SECTIONS = (section_of(ConceptsSpec), section_of(ValueSetsSpec))
+FLOORS: dict[str, FloorValue] = {}
+GATES: frozenset[str] = frozenset()
+FINDINGS: frozenset[str] = frozenset()
+CLASSES = classed(GATES, FINDINGS)
 
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
@@ -37,4 +41,4 @@ def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[Sl
 def verify(
     binding: SlotBinding, group: Sequence[RelationProfile], tools: ProfileTools
 ) -> Verdict:
-    return verdict(fixed_failures(group, binding, REQUIRED_TABLES), {})
+    return verdict(fixed_failures(group, binding, REQUIRED_TABLES), FLOORS, CLASSES)

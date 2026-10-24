@@ -16,11 +16,15 @@ from sema.intake.shapes.base import (
     label_columns,
 )
 from sema.intake.shapes.base_utils import SIGNATURE_FLOORS, failure, slot_relations, verdict
-from sema.intake.verify.base import Failure, Verdict
+from sema.intake.verify.base import Failure, Verdict, classed
 
 ID = "concept_list"
 RELATION = "relation"
 SLOTS = (Slot(RELATION, "relation"),)
+FLOORS = SIGNATURE_FLOORS
+GATES: frozenset[str] = frozenset()
+FINDINGS = frozenset({"ID_DISTINCT_RATIO_FLOOR", "LABEL_MEAN_LENGTH_BOUNDS"})
+CLASSES = classed(GATES, FINDINGS)
 
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
@@ -33,7 +37,7 @@ def verify(
     found, failures = slot_relations(group, binding, (RELATION,))
     for profile in found:
         failures += _failures(profile)
-    return verdict(failures, SIGNATURE_FLOORS)
+    return verdict(failures, FLOORS, CLASSES)
 
 
 def _failures(profile: RelationProfile) -> list[Failure]:

@@ -24,6 +24,7 @@ from tests.unit.intake.eligibility_env import (
     close_embedder, concept_list_over, cosine, descriptor, eligibility, eligibility_utils,
     hint_sources, lexicon, memory_source, model_calls, normalized, per_property, run_roles,
 )
+from tests.unit.intake.role_entries_env import concept_list, pinned
 from tests.unit.intake.structure_env import (
     ACRIS_SPEC, CODE_TABLES, fresh_tools, ref, run, sheet, sql_lines,
 )
@@ -65,10 +66,10 @@ def test_a8_fixture_is_the_generator_output() -> None:
     assert module.build() == A8_CSV.read_bytes()
 
 
-def test_a8_lands_as_one_concept_list_with_its_section_open(env: Env) -> None:
-    (entry,) = env.structured(env.a8, "a8_structure").bound
+def test_a8_offers_concept_list_among_its_structure_readings(env: Env) -> None:
+    (entry,) = env.structured(env.a8, "a8_structure").ambiguities  # S5 decision 3: findings
 
-    assert (entry.binding.template, entry.binding.section) == (CONCEPT_LIST, None)
+    assert f"{CONCEPT_LIST}(relation={entry.subject})" in entry.members
 
 
 def test_a8_text_columns_are_above_the_definition_floor(env: Env) -> None:
@@ -389,7 +390,9 @@ def test_a10_with_the_hint_assembles_the_hand_written_spec(env: Env) -> None:
 
 
 def test_a8_ambiguity_list_is_never_empty(env: Env) -> None:
-    structured = env.structured(env.a8, "a8_roles")
+    (profile,) = env.a8.source.profiles()
+    binding = concept_list(profile.ref.name, None)
+    structured = pinned(env.a8.source, [binding], env.root / "a8_roles" / "pinned")
     roles = run_roles(env.a8.source, structured, env.root / "a8_roles" / "roles")
     a8_descriptor = eligibility_utils().RunDescriptor(id="a8", identity_system="a8", release="1")
 

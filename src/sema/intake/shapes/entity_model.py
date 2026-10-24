@@ -5,8 +5,10 @@ text column) and an optional header (two columns, unique non-null first). A dict
 header in its group is indistinguishable from a code list, so its header-less binding stays a
 candidate beside ``concept_list`` and precedence leaves the relation ambiguous. A key-value
 relation in a group that holds another dictionary is a header only. ``single_relation``: an
-entity column and a property column unique within each entity whose global ratio stays below
-the id floor, because property names recur across entities while codes do not.
+entity column that repeats (a unique one makes "unique within each entity" vacuous, S5
+decision 28) and a property column unique within each entity. An entity ratio above the cap
+and a property ratio at or above the id floor (property names recur across entities while
+codes do not) are findings on the binding, never removals (S5 decisions 3, 18).
 """
 
 from __future__ import annotations
@@ -27,12 +29,13 @@ from sema.intake.shapes.base import (
 from sema.intake.shapes.base_utils import (
     ID_FLOOR,
     failure,
+    finding,
     section_of,
     slot_columns,
     slot_relations,
     verdict,
 )
-from sema.intake.verify.base import Failure, FloorValue, Verdict
+from sema.intake.verify.base import Failure, Finding, FloorValue, Verdict, classed
 
 ID = "entity_model"
 SECTION = section_of(EntityModelSpec)
@@ -42,8 +45,18 @@ RELATION, ENTITY, PROPERTY = "relation", "entity", "property"
 # Measured: OMOP field-level CSV cdmTableName 39 distinct over 432 rows (0.09), while its
 # property column cdmFieldName is 0.771.
 ENTITY_DISTINCT_RATIO_CAP = 0.5
-FLOORS: dict[str, FloorValue] = {**ID_FLOOR, "ENTITY_DISTINCT_RATIO_CAP": ENTITY_DISTINCT_RATIO_CAP}
 KEY_VALUE_WIDTH = 2
+MIN_ENTITIES = 2
+FLOORS: dict[str, FloorValue] = {
+    **ID_FLOOR,
+    "ENTITY_DISTINCT_RATIO_CAP": ENTITY_DISTINCT_RATIO_CAP,
+    "KEY_VALUE_WIDTH": KEY_VALUE_WIDTH,
+    "MIN_ENTITIES": MIN_ENTITIES,
+}
+GATES = frozenset({"KEY_VALUE_WIDTH", "MIN_ENTITIES"})
+FINDINGS = frozenset({"ENTITY_DISTINCT_RATIO_CAP", "ID_DISTINCT_RATIO_FLOOR"})
+CLASSES = classed(GATES, FINDINGS)
+ENTITY_RATIO, PROPERTY_RATIO = "entity_distinct_ratio", "property_distinct_ratio"
 SLOTS = (
     Slot(LAYOUT, "literal", (PER_FILE, SINGLE_RELATION)),
     Slot(DICTIONARY, "relation", when=(LAYOUT, PER_FILE)),
@@ -52,7 +65,6 @@ SLOTS = (
     Slot(ENTITY, "column", when=(LAYOUT, SINGLE_RELATION)),
     Slot(PROPERTY, "column", when=(LAYOUT, SINGLE_RELATION)),
 )
-MIN_ENTITIES = 2
 
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
@@ -66,11 +78,13 @@ def verify(
     binding: SlotBinding, group: Sequence[RelationProfile], tools: ProfileTools
 ) -> Verdict:
     if binding.slots.get(LAYOUT) == PER_FILE:
-        return verdict(_per_file_failures(binding, group), FLOORS)
+        return verdict(_per_file_failures(binding, group), FLOORS, CLASSES)
     if binding.slots.get(LAYOUT) != SINGLE_RELATION:
         relation = binding.relations[0] if binding.relations else ""
-        return verdict([failure(LAYOUT, relation, layout=binding.slots.get(LAYOUT, ""))], FLOORS)
+        layout = binding.slots.get(LAYOUT, "")
+        return verdict([failure(LAYOUT, relation, layout=layout)], FLOORS, CLASSES)
     found, failures = slot_relations(group, binding, (RELATION,))
+    findings: list[Finding] = []
     for profile in found:
         columns, missing = slot_columns(profile, binding, (ENTITY, PROPERTY))
         failures += missing
@@ -78,7 +92,8 @@ def verify(
             entity, prop = columns
             failures += _entity_failures(profile, entity)
             failures += _property_failures(profile, entity, prop, tools)
-    return verdict(failures, FLOORS)
+            findings += _single_findings(profile, entity, prop)
+    return verdict(failures, FLOORS, CLASSES, findings)
 
 
 def is_dictionary(profile: RelationProfile) -> bool:
@@ -148,9 +163,8 @@ def _entity_failures(profile: RelationProfile, entity: ColumnProfile) -> list[Fa
         return [failure("entity_text_non_null", relation, entity.name)]
     if entity.distinct_count < MIN_ENTITIES:
         return [failure("entity_count", relation, entity.name, entities=entity.distinct_count)]
-    if entity.distinct_ratio > ENTITY_DISTINCT_RATIO_CAP:
-        ratio = entity.distinct_ratio
-        return [failure("entity_ratio", relation, entity.name, distinct_ratio=ratio)]
+    if entity.is_unique:
+        return [failure("entity_repeats", relation, entity.name)]
     return []
 
 
@@ -160,12 +174,21 @@ def _property_failures(
     relation = profile.ref.name
     if prop.name == entity.name or not is_text(prop) or prop.null_rate > 0.0:
         return [failure("property_text_non_null", relation, prop.name)]
-    if prop.distinct_ratio >= ID_DISTINCT_RATIO_FLOOR:
-        return [failure("property_recurs", relation, prop.name, ratio=prop.distinct_ratio)]
     pairs = tools.count_distinct(profile.ref, [entity.name, prop.name])
     if pairs != profile.row_count:
         return [failure("property_unique_per_entity", relation, prop.name, pairs=pairs)]
     return []
+
+
+def _single_findings(
+    profile: RelationProfile, entity: ColumnProfile, prop: ColumnProfile
+) -> list[Finding]:
+    relation, found = profile.ref.name, []
+    if entity.distinct_ratio > ENTITY_DISTINCT_RATIO_CAP:
+        found.append(finding(ENTITY_RATIO, relation, entity.name, entity.distinct_ratio))
+    if prop.distinct_ratio >= ID_DISTINCT_RATIO_FLOOR:
+        found.append(finding(PROPERTY_RATIO, relation, prop.name, prop.distinct_ratio))
+    return found
 
 
 def _per_file_binding(
@@ -192,4 +215,5 @@ def _single_binding(
             PROPERTY: prop.name,
         },
         relations=(ref_name,),
+        findings=tuple(_single_findings(profile, entity, prop)),
     )

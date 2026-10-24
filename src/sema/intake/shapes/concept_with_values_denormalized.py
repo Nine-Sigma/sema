@@ -1,4 +1,9 @@
-"""concept_with_values_denormalized: one relation grouped by a column, codes unique per group."""
+"""concept_with_values_denormalized: one relation grouped by a column, codes unique per group.
+
+A non-null key that repeats, in at least two groups, is a gate: a unique key makes every
+group one row and every per-group test vacuous (S5 decision 28). A group ratio above the
+floor is the finding ``group_by_ratio`` on the binding (S5 decisions 3, 18).
+"""
 
 from __future__ import annotations
 
@@ -10,12 +15,13 @@ from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes.base import RelationProfile, Slot, SlotBinding
 from sema.intake.shapes.base_utils import (
     failure,
+    finding,
     section_of,
     slot_columns,
     slot_relations,
     verdict,
 )
-from sema.intake.verify.base import Failure, FloorValue, Verdict
+from sema.intake.verify.base import Failure, Finding, FloorValue, Verdict, classed
 
 ID = "concept_with_values_denormalized"
 SECTION = section_of(ConceptsSpec)
@@ -24,8 +30,15 @@ SLOTS = (Slot(RELATION, "relation"), Slot(GROUP_BY, "column"))
 # Measured: syn-library data_element.data_element_id holds 4 distinct values over 9 rows
 # (0.444); every other syn and A2 id column is 1.0.
 DENORMALIZED_GROUP_RATIO_FLOOR = 0.5
-FLOORS: dict[str, FloorValue] = {"DENORMALIZED_GROUP_RATIO_FLOOR": DENORMALIZED_GROUP_RATIO_FLOOR}
 MIN_GROUPS = 2
+FLOORS: dict[str, FloorValue] = {
+    "DENORMALIZED_GROUP_RATIO_FLOOR": DENORMALIZED_GROUP_RATIO_FLOOR,
+    "MIN_GROUPS": MIN_GROUPS,
+}
+GATES = frozenset({"MIN_GROUPS"})
+FINDINGS = frozenset({"DENORMALIZED_GROUP_RATIO_FLOOR"})
+CLASSES = classed(GATES, FINDINGS)
+GROUP_BY_RATIO = "group_by_ratio"
 
 
 def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
@@ -41,10 +54,12 @@ def verify(
     binding: SlotBinding, group: Sequence[RelationProfile], tools: ProfileTools
 ) -> Verdict:
     found, failures = slot_relations(group, binding, (RELATION,))
+    findings: list[Finding] = []
     for profile in found:
         columns, missing = slot_columns(profile, binding, (GROUP_BY,))
         failures += missing + [f for c in columns for f in _failures(profile, c, tools)]
-    return verdict(failures, FLOORS)
+        findings += [f for column in columns for f in _findings(profile, column)]
+    return verdict(failures, FLOORS, CLASSES, findings)
 
 
 def _failures(
@@ -55,15 +70,21 @@ def _failures(
         return [failure("group_by_non_null", relation, group_by.name)]
     if group_by.distinct_count < MIN_GROUPS:
         return [failure("group_by_groups", relation, group_by.name, groups=MIN_GROUPS)]
-    if group_by.distinct_ratio > DENORMALIZED_GROUP_RATIO_FLOOR:
-        ratio = group_by.distinct_ratio
-        return [failure("group_by_ratio", relation, group_by.name, distinct_ratio=ratio)]
+    if group_by.is_unique:
+        return [failure("group_by_repeats", relation, group_by.name)]
     codes = [c for c in profile.columns if _unique_per_group(profile, group_by, c, tools)]
     if not codes:
         return [failure("code_unique_per_group", relation, group_by.name)]
     if not _is_entity(profile, group_by, codes, tools):
         return [failure("group_is_entity", relation, group_by.name)]
     return []
+
+
+def _findings(profile: RelationProfile, group_by: ColumnProfile) -> list[Finding]:
+    ratio = group_by.distinct_ratio
+    if ratio <= DENORMALIZED_GROUP_RATIO_FLOOR:
+        return []
+    return [finding(GROUP_BY_RATIO, profile.ref.name, group_by.name, ratio)]
 
 
 def _is_entity(
@@ -107,4 +128,5 @@ def _binding(profile: RelationProfile, group_by: ColumnProfile) -> SlotBinding:
         slots={RELATION: ref_name, GROUP_BY: group_by.name},
         evidence={"groups": float(group_by.distinct_count)},
         relations=(ref_name,),
+        findings=tuple(_findings(profile, group_by)),
     )

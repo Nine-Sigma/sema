@@ -5,6 +5,8 @@ A dictionary with no header in its group is a candidate beside ``concept_list`` 
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from tests.unit.intake.shapes.shapes_env import (
@@ -39,6 +41,17 @@ def _layouts(bindings: list[object]) -> set[str]:
     return {b.slots["layout"] for b in bindings}  # type: ignore[attr-defined]
 
 
+def _per_file(bindings: list[object]) -> list[object]:
+    """S5 decisions 18, 23: single_relation readings with findings stay beside these."""
+    return [b for b in bindings if b.slots["layout"] == "per_file"]  # type: ignore[attr-defined]
+
+
+def _omop_reading(bindings: list[Any]) -> Any:
+    reading = {"entity": "cdmTableName", "property": "cdmFieldName"}
+    (found,) = [b for b in bindings if reading.items() <= b.slots.items()]
+    return found
+
+
 def test_acris_workbook_group_is_per_file_with_the_key_value_sheet_as_header(
     acris: Source,
 ) -> None:
@@ -47,7 +60,7 @@ def test_acris_workbook_group_is_per_file_with_the_key_value_sheet_as_header(
 
     found = candidates(ID, _workbook_group(acris, WORKBOOK), acris)
 
-    (only,) = found
+    (only,) = _per_file(found)
     assert only.slots == {"layout": "per_file", "dictionary": dictionary, "header": header}
     assert set(only.relations) == {dictionary, header}
 
@@ -57,7 +70,7 @@ def test_every_acris_workbook_group_has_exactly_one_per_file_binding(acris: Sour
 
     assert len(stems) == 15
     for stem in stems:
-        (only,) = candidates(ID, _workbook_group(acris, stem), acris)
+        (only,) = _per_file(candidates(ID, _workbook_group(acris, stem), acris))
         assert only.slots["header"] == acris.ref(f"{stem}__Dataset_Info"), stem
         assert only.slots["dictionary"] == acris.ref(f"{stem}__Column_Info"), stem
 
@@ -92,7 +105,7 @@ def test_lone_dictionary_is_a_per_file_candidate_with_no_header(memory: Memory) 
     source = _fields_and_info(memory)
     fields = source.ref("fields")
 
-    (only,) = candidates(ID, [source.profile("fields")], source)
+    (only,) = _per_file(candidates(ID, [source.profile("fields")], source))
 
     assert only.slots == {"layout": "per_file", "dictionary": fields}
     assert only.relations == (fields,)
@@ -101,7 +114,9 @@ def test_lone_dictionary_is_a_per_file_candidate_with_no_header(memory: Memory) 
 def test_dictionary_beside_a_header_has_only_the_headed_binding(memory: Memory) -> None:
     source = _fields_and_info(memory)
 
-    (only,) = candidates(ID, [source.profile("fields"), source.profile("info")], source)
+    (only,) = _per_file(
+        candidates(ID, [source.profile("fields"), source.profile("info")], source)
+    )
 
     assert only.slots == {
         "layout": "per_file",
@@ -130,7 +145,7 @@ def test_lone_dictionary_is_ambiguous_against_concept_list(memory: Memory) -> No
 def test_verify_passes_a_per_file_binding_with_no_header(memory: Memory) -> None:
     source = _fields_and_info(memory)
     group = [source.profile("fields")]
-    (lone,) = candidates(ID, group, source)
+    (lone,) = _per_file(candidates(ID, group, source))
 
     assert verify(ID, lone, group, source).status == "pass"
 
@@ -138,8 +153,9 @@ def test_verify_passes_a_per_file_binding_with_no_header(memory: Memory) -> None
 def test_omop_csv_is_single_relation_with_one_entity_and_property_column(omop: Source) -> None:
     relation = omop.ref(OMOP)
 
-    (only,) = candidates(ID, omop.profiles(), omop)
+    only = _omop_reading(candidates(ID, omop.profiles(), omop))
 
+    assert only.findings == ()
     assert only.slots == {
         "layout": "single_relation",
         "relation": relation,
@@ -149,22 +165,24 @@ def test_omop_csv_is_single_relation_with_one_entity_and_property_column(omop: S
     assert only.relations == (relation,)
 
 
-def test_code_tables_have_no_single_relation_binding(acris: Source) -> None:
+def test_code_tables_single_relation_bindings_carry_their_findings(acris: Source) -> None:
+    """S5 decision 23: the described-data gate removes them at Structure, not the shape."""
     for name in CODE_TABLES:
         found = candidates(ID, acris.group(name), acris)
-        assert "single_relation" not in _layouts(found), name
+        single = [b for b in found if b.slots["layout"] == "single_relation"]
+        assert all(b.findings for b in single), name
 
 
 def test_code_tables_are_lone_dictionaries_with_no_header(acris: Source) -> None:
     for name in CODE_TABLES:
-        (only,) = candidates(ID, acris.group(name), acris)
+        (only,) = _per_file(candidates(ID, acris.group(name), acris))
         assert only.slots == {"layout": "per_file", "dictionary": acris.ref(name)}, name
         assert only.relations == (acris.ref(name),), name
 
 
 def test_verify_passes_and_records_the_entity_cap(omop: Source) -> None:
     group = omop.profiles()
-    (found,) = candidates(ID, group, omop)
+    found = _omop_reading(candidates(ID, group, omop))
 
     verdict = verify(ID, found, group, omop)
 
@@ -187,7 +205,7 @@ def test_verify_fails_a_header_that_is_not_a_key_value_relation(acris: Source) -
     assert header in {f.relation for f in verdict.failures}
 
 
-def test_verify_fails_a_single_relation_entity_column_above_the_cap(omop: Source) -> None:
+def test_verify_states_a_single_relation_entity_column_above_the_cap(omop: Source) -> None:
     relation = omop.ref(OMOP)
     forced = binding(
         ID,
@@ -198,4 +216,7 @@ def test_verify_fails_a_single_relation_entity_column_above_the_cap(omop: Source
         property="cdmTableName",
     )
 
-    assert verify(ID, forced, omop.profiles(), omop).status == "fail"
+    verdict = verify(ID, forced, omop.profiles(), omop)
+
+    assert verdict.status == "pass"
+    assert "entity_distinct_ratio" in {f.name for f in verdict.findings}

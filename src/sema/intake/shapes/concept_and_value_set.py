@@ -22,6 +22,7 @@ from sema.intake.shapes.base import (
     is_id,
 )
 from sema.intake.shapes.base_utils import (
+    ID_FLOOR,
     JOIN_FLOOR,
     failure,
     may_resolve,
@@ -31,7 +32,7 @@ from sema.intake.shapes.base_utils import (
     slot_relations,
     verdict,
 )
-from sema.intake.verify.base import Failure, Verdict
+from sema.intake.verify.base import Failure, FloorValue, Verdict, classed
 
 ID = "concept_and_value_set"
 SECTION = section_of(ConceptsSpec)
@@ -45,6 +46,10 @@ SLOTS = (
 )
 ONE_TO_MANY = "one_to_many"
 VALUES_ARE_NOT_CONCEPTS = "values_are_not_concepts"
+FLOORS: dict[str, FloorValue] = {**JOIN_FLOOR, **ID_FLOOR}
+GATES = frozenset({"JOIN_RESOLVE_FLOOR"})
+FINDINGS = frozenset({"ID_DISTINCT_RATIO_FLOOR"})
+CLASSES = classed(GATES, FINDINGS)
 
 KeyPair = tuple[RelationProfile, ColumnProfile, RelationProfile, ColumnProfile]
 
@@ -58,19 +63,19 @@ def verify(
 ) -> Verdict:
     found, failures = slot_relations(group, binding, (CONCEPT_RELATION, VALUE_RELATION))
     if failures:
-        return verdict(failures, JOIN_FLOOR)
+        return verdict(failures, FLOORS, CLASSES)
     concepts, values = found
     if concepts.ref.name == values.ref.name:
-        return verdict([failure("distinct_relations", values.ref.name)], JOIN_FLOOR)
+        return verdict([failure("distinct_relations", values.ref.name)], FLOORS, CLASSES)
     keys, failures = slot_columns(concepts, binding, (CONCEPT_KEY,))
     value_keys, missing = slot_columns(values, binding, (VALUE_KEY,))
     if failures or missing:
-        return verdict(failures + missing, JOIN_FLOOR)
+        return verdict(failures + missing, FLOORS, CLASSES)
     key, value_key = keys[0], value_keys[0]
     if not is_id(concepts, key):
         failures.append(failure("concept_key_is_id", concepts.ref.name, key.name))
     failures += _pair_failures(concepts, key, values, value_key, tools)
-    return verdict(failures, JOIN_FLOOR)
+    return verdict(failures, FLOORS, CLASSES)
 
 
 def _key_pairs(group: Sequence[RelationProfile]) -> Iterator[KeyPair]:

@@ -25,7 +25,12 @@ from sema.intake.shapes import TEMPLATES, apply_precedence, ignore
 from sema.intake.shapes.base import RelationProfile, SlotBinding, profile_relations
 from sema.intake.shapes.base_utils import failure
 from sema.intake.shapes.precedence import claims
-from sema.intake.structure import BoundEntry, StructureResult, stage_floors
+from sema.intake.structure import (
+    BoundEntry,
+    StructureResult,
+    stage_floor_classes,
+    stage_floors,
+)
 from sema.intake.structure_utils import group_candidates
 from sema.intake.verify.base import Failure, Verdict
 from sema.intake.verify.structure_utils import (
@@ -87,7 +92,10 @@ def verify_structure(
         members = [by_name[name] for name in group if name in by_name and name not in removed]
         failures += _group_failures(members, coded, known, listed, tools, described)
     return Verdict.of(
-        failures=failures, ambiguities=proposal.ambiguities, floors=stage_floors()
+        failures=failures,
+        ambiguities=proposal.ambiguities,
+        floors=stage_floors(),
+        floor_classes=stage_floor_classes(),
     )
 
 

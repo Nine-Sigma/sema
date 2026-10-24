@@ -72,7 +72,7 @@ def test_grouped_code_table_concept_list_is_not_contested_by_a_group(acris: Sour
 
 
 # Same scenario: members are concept_list and entity_model, as for the other code tables.
-def test_every_template_leaves_document_control_with_exactly_two_members(
+def test_every_template_leaves_document_control_with_its_list_and_model_members(
     acris: Source,
 ) -> None:
     group = acris.group(DOCUMENT_CONTROL)
@@ -86,7 +86,7 @@ def test_every_template_leaves_document_control_with_exactly_two_members(
     (ambiguity,) = [a for a in result.ambiguities if a.subject == acris.ref(DOCUMENT_CONTROL)]
     member = shapes("precedence").member
     assert ambiguity.members == tuple(sorted(member(b) for b in expected))
-    assert len(ambiguity.members) == 2
+    assert len(ambiguity.members) == 6  # S5 decision 23: four single_relation readings
     assert over(result.candidates, acris.ref(DOCUMENT_CONTROL)) == []
 
 

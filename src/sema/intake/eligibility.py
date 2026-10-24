@@ -56,6 +56,7 @@ from sema.intake.eligibility_utils import (
     eligible,
     embedding_rank,
     lexicon_hits,
+    role_findings,
     scope_of,
     status_classes,
     subject_of,
@@ -270,6 +271,7 @@ def _settle(
         section=section,
         role=entry.name,
         members=members,
+        findings=role_findings(entry, profile.ref.name, profile.columns, members),
         exclusions=excluded,
         excluded_by=next(iter(excluded.values()), None),
     )
