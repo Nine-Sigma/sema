@@ -283,6 +283,8 @@ KEYS_MOVED = {
     ),
     "a2": f"{KEYS_MOVED_REASON}; a2's Concepts and Values relations now each make a"
     " role-map call",
+    "heldout2": "the layout prompt v2 moved heldout2's recorded call keys (task 3.5, 2026-10-24);"
+    " re-recorded at task 4.2",
 }
 
 
