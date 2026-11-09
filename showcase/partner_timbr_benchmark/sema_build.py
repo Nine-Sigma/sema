@@ -132,7 +132,7 @@ def _embed(
     props = [
         {"name": col, "entity_name": b.table, "text": property_text(b, col, facts)}
         for b in resolution.approved()
-        for col in (b.column, *b.companions)
+        for col in (b.column, *b.companions, *b.catalog_companions)
     ]
     engine.embed_and_store("Property", "name", props, lambda p: str(p["text"]))
     return {"embedded_entities": len(entities), "embedded_properties": len(props)}

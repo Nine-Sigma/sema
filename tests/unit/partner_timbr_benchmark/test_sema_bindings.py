@@ -99,7 +99,9 @@ def catalog_fixture() -> dict[str, dict[str, str]]:
     del demo["ghost_col"]
     demo["age_years"] = "string"
     demo["first_name"] = "string"
-    return {DEMO: demo, TUMOR: _columns(_tumor_spec())}
+    tumor = _columns(_tumor_spec())
+    tumor["site_S1_concept_code"] = "string"
+    return {DEMO: demo, TUMOR: tumor}
 
 
 def facts_fixture() -> dict[str, Any]:
@@ -120,6 +122,7 @@ def facts_fixture() -> dict[str, Any]:
 
 def write_fixture(tmp_path: Path) -> tuple[Path, Path]:
     """Write a two-product sidecar plus facts; return (sidecar, facts) paths."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
     pins = []
     for product, table, spec in (
         ("demographics", DEMO, _demo_spec()),
@@ -145,6 +148,7 @@ def write_fixture(tmp_path: Path) -> tuple[Path, Path]:
         "membership_relation": "lib.sl.data_element",
         "hierarchy_reference": ["concept_ancestor: ancestor_concept_id is broader."],
         "context_budget_tokens": 4000,
+        "value_list_limit": 40,
     }
     sidecar_path = tmp_path / "sidecar.json"
     sidecar_path.write_text(json.dumps(sidecar))
@@ -217,3 +221,13 @@ def test_competing_bindings_for_one_column_are_ambiguous(tmp_path: Path) -> None
     resolution = resolve_bindings(sidecar, load_products(sidecar), catalog_fixture())
     assert "gender_G1" not in {b.column for b in resolution.approved()}
     assert any("gender_G1" in f and "ambiguous" in f for f in resolution.findings)
+
+
+def test_catalog_concept_code_column_is_a_marked_companion(tmp_path: Path) -> None:
+    resolution = resolution_fixture(tmp_path)
+    site = resolution.by_column(TUMOR, "site_S1")
+    gender = resolution.by_column(DEMO, "gender_G1")
+    assert site is not None and gender is not None
+    assert site.catalog_companions == ("site_S1_concept_code",)
+    assert site.companions == ("site_S1_label", "site_S1_mapping_type")
+    assert gender.catalog_companions == ()

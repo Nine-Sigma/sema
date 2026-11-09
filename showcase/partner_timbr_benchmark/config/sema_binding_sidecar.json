@@ -50,5 +50,7 @@
     "Ancestry: src_partner_wh.omop_cdm_2016.concept_ancestor(ancestor_concept_id, descendant_concept_id, min_levels_of_separation, max_levels_of_separation). ancestor_concept_id is the broader concept. Standard concepts have a self row (ancestor = descendant, min_levels_of_separation = 0), so 'X or a descendant of X' is descendant_concept_id IN (SELECT descendant_concept_id ... WHERE ancestor_concept_id = X).",
     "OMOP concept_id (integer) is not a vocabulary code. Resolve a named concept through src_partner_wh.omop_cdm_2016.concept (concept_name, vocabulary_id, standard_concept = 'S'); concept_code with vocabulary_id is the source code."
   ],
-  "context_budget_tokens": 10000
+  "context_budget_tokens": 8500,
+  "context_budget_note": "Budget is in approx_tokens (chars / 4). Measured 2026-11-09 on the two-table context: cl100k tokens / approx_tokens = 9331 / 7742 = 1.21, so 8500 approx is about 10300 real, leaving about 5700 of the 16000 whole-request ceiling for system prompt, conventions, question and two repairs.",
+  "value_list_limit": 40
 }

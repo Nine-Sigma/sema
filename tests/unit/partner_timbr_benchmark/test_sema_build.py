@@ -42,7 +42,6 @@ def _embedder() -> MagicMock:
 
 
 def _build(tmp_path: Path) -> tuple[MagicMock, MagicMock, BuildManifest]:
-    tmp_path.mkdir(parents=True, exist_ok=True)
     sidecar_path, facts_path = write_fixture(tmp_path)
     loader, embedder = MagicMock(), _embedder()
     manifest = build_scoped_graph(

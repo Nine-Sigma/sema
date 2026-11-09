@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 SIDECAR_PATH = Path(__file__).parent / "config" / "sema_binding_sidecar.json"
+CONCEPT_CODE_SUFFIX = "_concept_code"
 
 
 class SpecPinError(RuntimeError):
@@ -49,6 +50,8 @@ class Sidecar:
     catalog: str
     schema: str
     specs: tuple[SpecPin, ...]
+    conventions_path: Path
+    conventions_file_sha256: str
     conventions_sha256: str
     tumor_product: str
     tumor_grain: tuple[str, ...]
@@ -56,6 +59,7 @@ class Sidecar:
     membership_relation: str
     hierarchy_reference: tuple[str, ...]
     context_budget_tokens: int
+    value_list_limit: int
 
     def relation(self, table: str) -> str:
         return f"{self.catalog}.{self.schema}.{table}"
@@ -83,6 +87,7 @@ class SuppliedBinding:
     physical_type: str
     strategy: str
     companions: tuple[str, ...]
+    catalog_companions: tuple[str, ...]
     spec: SpecPin
     authority: str
     status: BindingStatus
@@ -121,6 +126,8 @@ def load_sidecar(path: Path = SIDECAR_PATH) -> Sidecar:
             SpecPin(s["product"], s["table"], root / s["path"], s["sha256"])
             for s in raw["specs"]
         ),
+        conventions_path=root / raw["conventions"]["path"],
+        conventions_file_sha256=raw["conventions"]["file_sha256"],
         conventions_sha256=raw["conventions"]["conventions_sha256"],
         tumor_product=grain["product"],
         tumor_grain=tuple(grain["columns"]),
@@ -128,6 +135,7 @@ def load_sidecar(path: Path = SIDECAR_PATH) -> Sidecar:
         membership_relation=raw["membership_relation"],
         hierarchy_reference=tuple(raw["hierarchy_reference"]),
         context_budget_tokens=int(raw["context_budget_tokens"]),
+        value_list_limit=int(raw["value_list_limit"]),
     )
 
 
@@ -160,7 +168,7 @@ def resolve_bindings(
         counts = Counter(f["column_name"] for f in product.fields)
         for field in product.fields:
             reason = _refusal(field, columns, sidecar, counts)
-            binding = _binding(sidecar, product.pin, field, reason)
+            binding = _binding(sidecar, product.pin, field, reason, columns)
             bindings.append(binding)
             if reason:
                 findings.append(
@@ -199,8 +207,13 @@ def _companions(field: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def _binding(
-    sidecar: Sidecar, pin: SpecPin, field: Mapping[str, Any], reason: str
+    sidecar: Sidecar,
+    pin: SpecPin,
+    field: Mapping[str, Any],
+    reason: str,
+    columns: Mapping[str, str],
 ) -> SuppliedBinding:
+    code_column = f"{field['column_name']}{CONCEPT_CODE_SUFFIX}"
     return SuppliedBinding(
         library_id=field["column_id"],
         de_id=field.get("de_id"),
@@ -212,6 +225,7 @@ def _binding(
         physical_type=field["physical_type"],
         strategy=field["strategy"],
         companions=_companions(field),
+        catalog_companions=(code_column,) if code_column in columns else (),
         spec=pin,
         authority=sidecar.authority,
         status=BindingStatus.REFUSED if reason else BindingStatus.APPROVED,

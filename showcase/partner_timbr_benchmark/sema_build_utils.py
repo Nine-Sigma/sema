@@ -130,7 +130,7 @@ def _properties(
         ))
         props.extend(
             TargetPropertyDecl(name=c, type="STRING", nullable=True)
-            for c in b.companions
+            for c in (*b.companions, *b.catalog_companions)
         )
     return props
 
@@ -196,4 +196,6 @@ def property_text(binding: SuppliedBinding, column: str, facts: LibraryFacts) ->
         return f"{base} label text"
     if column.endswith("_mapping_type"):
         return f"{base} mapping type"
+    if column in binding.catalog_companions:
+        return f"{base} vocabulary code"
     return f"{base}: {element.definition}" if element and element.definition else base
