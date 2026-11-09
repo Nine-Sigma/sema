@@ -31,6 +31,7 @@ from sema.intake.graph_stages import (
 )
 from sema.intake.graph_utils import REVIEW, VALUE_ASK, AmbiguityList
 from sema.intake.ledger import ARTIFACTS_DIR
+from sema.intake.model_calls_utils import recorded_embeddings
 from sema.intake.registry import Registry, RunRecord
 from sema.llm_client import LLMStageError
 from sema.log import logger
@@ -98,13 +99,16 @@ def intake_model_config() -> IntakeModelConfig:
 
 
 def configured_embedder(config: IntakeModelConfig) -> Embedder | None:
-    """SEMA's embedder when one is configured, else None; a zero-cap replay builds none."""
+    """SEMA's embedder when one is configured, else None; a zero-cap replay builds one
+    only when its recording was made with embeddings."""
     if not os.environ.get(EMBEDDING_PROVIDER_ENV):
         return None
-    if config.max_calls == 0 and config.recordings_dir is not None:
+    recordings = config.recordings_dir
+    if config.max_calls == 0 and recordings is not None and not recorded_embeddings(recordings):
         logger.warning(
-            "Embedder not built: INTAKE_MODEL_MAX_CALLS is 0 with a recordings directory,"
-            f" so {EMBEDDING_PROVIDER_ENV} is ignored for this replay"
+            "Embedder not built: INTAKE_MODEL_MAX_CALLS is 0 with a recordings directory"
+            f" not recorded with embeddings, so {EMBEDDING_PROVIDER_ENV} is ignored for this"
+            " replay"
         )
         return None
     embedder: Embedder = cli_factories._get_embedder(EmbeddingConfig())

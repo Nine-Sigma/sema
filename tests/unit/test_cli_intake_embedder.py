@@ -7,7 +7,8 @@ factory is never called. The real graph runs with the embedder dropped, so no pr
 
 Replay (design decision 4, bug-832): under ``INTAKE_MODEL_MAX_CALLS=0`` with a recordings
 directory, neither ``discover`` nor ``approve`` builds an embedder whatever
-``EMBEDDING_PROVIDER`` says, and one log line names the variable and the zero cap.
+``EMBEDDING_PROVIDER`` says, and one log line names the variable and the zero cap; a recording
+whose ``recording.json`` states ``"embeddings": true`` replays with the embedder.
 """
 
 from __future__ import annotations
