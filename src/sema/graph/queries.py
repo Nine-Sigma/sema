@@ -25,6 +25,33 @@ class CypherQueries:
         )
 
     @staticmethod
+    def expand_hierarchy_anchor(max_depth: int = 3) -> str:
+        # A column member sits under the anchor directly or through a
+        # MAPS_TO_CONCEPT bridge from a source code to a standard descendant.
+        return (
+            f"MATCH (anchor:Term)-[:PARENT_OF*1..{max_depth}]->(d:Term) "
+            f"WHERE anchor.code = $code "
+            f"AND (anchor.vocabulary_name = $vocabulary_name "
+            f"OR $vocabulary_name IS NULL) "
+            f"WITH DISTINCT anchor, d "
+            f"OPTIONAL MATCH (src:Term)-[:MAPS_TO_CONCEPT]->(d) "
+            f"WITH anchor, d, collect(src) AS sources "
+            f"UNWIND [d] + sources AS m "
+            f"MATCH (m)-[:MEMBER_OF]->(:ValueSet)<-[:HAS_VALUE_SET]-(c:Column) "
+            f"OPTIONAL MATCH (c)-[:IN_TABLE]->(tbl:Table) "
+            f"WITH DISTINCT anchor, c, tbl, m ORDER BY m.code "
+            f"WITH anchor, c, tbl, collect(m.code) AS members "
+            f"RETURN anchor.code AS anchor_code, anchor.label AS anchor_label, "
+            f"anchor.vocabulary_name AS anchor_vocabulary, "
+            f"c.name AS column_name, "
+            f"coalesce(tbl.name, c.table_name) AS table_name, "
+            f"coalesce(tbl.schema_name, c.schema_name) AS schema_name, "
+            f"size(members) AS member_count, "
+            f"members[..$member_cap] AS member_codes "
+            f"ORDER BY table_name, column_name"
+        )
+
+    @staticmethod
     def expand_value_set() -> str:
         # Value-set names are not globally unique (same table.column name
         # across studies), so callers that can should prefer

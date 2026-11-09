@@ -393,6 +393,7 @@ def _retrieve_context(config: QueryConfig) -> Any:
         driver=driver,
         embedder=embedder,
         embedder_model_name=config.embedding.model,
+        hierarchy_anchor=config.hierarchy_anchor,
     )
     candidate_set = engine.retrieve(config.question)
     sco = prune_to_sco(candidate_set, consumer=config.consumer)

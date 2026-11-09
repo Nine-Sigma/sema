@@ -189,6 +189,14 @@ def _artifact_identity_key(
             art.get("vocabulary", ""),
             art.get("code") or art.get("label", ""),
         )
+    if art_type == "hierarchy_anchor":
+        return (
+            art_type,
+            art.get("vocabulary") or "",
+            art.get("code", ""),
+            art.get("table", ""),
+            art.get("column", ""),
+        )
     if art_type == "ancestry":
         return (
             art_type,

@@ -239,7 +239,52 @@ def _expand_term_for_vocab(
             "confidence": hit_confidence,
             "confidence_policy": "semantic",
         })
+    results.extend(_expand_hierarchy_anchor(
+        engine, code, vocab, hit_status, hit_confidence,
+    ))
     return results
+
+
+def _expand_hierarchy_anchor(
+    engine: RetrievalEngine,
+    code: str,
+    vocabulary_name: str | None,
+    status: str,
+    confidence: float,
+) -> list[dict[str, Any]]:
+    """Walk down PARENT_OF from a matched term to the columns whose
+    value-set members sit under it, directly or through a value bridge."""
+    bounds = engine.hierarchy_anchor
+    try:
+        rows = engine._run_query(
+            CypherQueries.expand_hierarchy_anchor(bounds.max_depth),
+            code=code,
+            vocabulary_name=vocabulary_name,
+            member_cap=bounds.member_cap,
+        )
+    except Exception as exc:
+        logger.warning("Hierarchy anchor lookup failed for {!r}: {}", code, exc)
+        return []
+
+    return [
+        {
+            "type": "hierarchy_anchor",
+            "code": r.get("anchor_code", code),
+            "label": r.get("anchor_label") or "",
+            "vocabulary": r.get("anchor_vocabulary") or _display_vocab(vocabulary_name),
+            "table": r["table_name"],
+            "column": r["column_name"],
+            "schema": r.get("schema_name") or "",
+            "member_count": r.get("member_count", 0),
+            "member_codes": r.get("member_codes", []),
+            "source": "retrieval_hierarchy_anchor",
+            "status": status,
+            "confidence": confidence,
+            "confidence_policy": "semantic",
+        }
+        for r in rows
+        if r.get("table_name") and r.get("column_name")
+    ]
 
 
 def _expand_term_governed_values(
