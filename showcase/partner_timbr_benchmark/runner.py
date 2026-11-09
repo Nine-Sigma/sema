@@ -4,6 +4,7 @@ python -m showcase.partner_timbr_benchmark.runner --frozen <closure dir> --run-d
     [--arms A B S] [--reps 3] [--ids Q01,Q02] [--dry-run]
     [--s-context module:function] [--timbr-env <original POC env file>]
     [--settings settings.json]   # {"prices": {...usd_per_1m}, "max_cost_usd": 60}
+    [--budget-tokens N] [--values-top-k K] [--description-cap-chars C]  # common to all arms
 
 Slots run in a fixed order (rep, question, arm). Each slot appends one receipt to
 receipts.jsonl; a slot whose latest receipt has an outcome other than ``unrun`` is never
@@ -169,6 +170,15 @@ def _write_slots(run_dir: Path, slots: Sequence[Slot]) -> None:
     path.write_text(text)
 
 
+def _write_manifest(run_dir: Path, frozen: Path, knobs: ru.Knobs) -> None:
+    manifest = {"closure_id": frozen.resolve().name, "knobs": dataclasses.asdict(knobs),
+                "limits": dataclasses.asdict(Limits())}  # fmt: skip
+    path = run_dir / "manifest.json"
+    if path.is_file() and json.loads(path.read_text()) != manifest:
+        raise ValueError(f"{path} pins a different closure, knobs or limits; use a fresh run dir")
+    path.write_text(json.dumps(manifest, indent=1, sort_keys=True))
+
+
 def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--frozen", type=Path, required=True)
@@ -180,6 +190,7 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--s-context")
     parser.add_argument("--timbr-env", type=Path)
     parser.add_argument("--settings", type=Path)
+    ru.add_knob_args(parser)
     return parser.parse_args(argv)
 
 
@@ -191,6 +202,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError(f"unknown question ids: {sorted(set(wanted) - set(ids))}")
     slots = schedule(ids, args.arms, args.reps)
     _write_slots(args.run_dir, slots)
+    knobs = ru.knobs_from(args)
+    _write_manifest(args.run_dir, args.frozen, knobs)
     if args.dry_run:
         print(f"{len(slots)} slots written to {args.run_dir / 'slots.jsonl'}; no calls made")
         return 0
@@ -200,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     provider = ru.load_s_provider(args.s_context) if "S" in args.arms else None
     model, executors = ru.live_clients(harness, args.arms, args.timbr_env, settings.limits)
     require_clean_process(os.environ, sys.modules)
-    runtimes = ru.arm_runtimes(harness, args.frozen, executors, provider, settings.limits)
+    runtimes = ru.arm_runtimes(harness, args.frozen, executors, provider, settings.limits, knobs)
     questions = {q.id: q for q in ru.public_questions(harness, args.frozen, tuple(ids))}
     contracts = scorer.load_contracts(ru.question_paths(args.frozen))
     summary = run(slots, questions, runtimes, model, contracts, harness, settings,

@@ -5,6 +5,8 @@ Gold never reaches the harness: questions are rebuilt with gold fields emptied, 
 the typed scorer reads gold. Arm S reuses the arm A dialect and validation path.
 """
 
+import argparse
+import dataclasses
 import hashlib
 import importlib
 import json
@@ -57,8 +59,8 @@ class SContextLike(Protocol):
 class Limits:
     input_ceiling: int = 16_000
     output_ceiling: int = 8_192
-    # Measured on the Oct 21 receipts: endpoint tokens were 1.77-2.09x the chars/4 estimate.
-    chars_per_token: float = 1.8
+    # Lowest chars/prompt_tokens over 186 matched Oct 21 first attempts (fit.calibrate).
+    chars_per_token: float = 2.08
     row_limit: int = 1_000
     max_repairs: int = 2
 
@@ -67,6 +69,39 @@ class Limits:
 class Prices:
     input_usd_per_1m: float
     output_usd_per_1m: float
+
+
+@dataclass(frozen=True)
+class Knobs:
+    budget_tokens: int | None = None
+    values_top_k: int | None = None
+    description_cap_chars: int | None = None
+
+
+def estimate_tokens_from_chars(chars: int, messages: int, chars_per_token: float) -> int:
+    return math.ceil(chars / chars_per_token) + 4 * messages
+
+
+def add_knob_args(parser: argparse.ArgumentParser) -> None:
+    for name in ("budget-tokens", "values-top-k", "description-cap-chars"):
+        parser.add_argument(f"--{name}", type=int, help="common W4S override for every arm")
+
+
+def knobs_from(args: argparse.Namespace) -> Knobs:
+    return Knobs(args.budget_tokens, args.values_top_k, args.description_cap_chars)
+
+
+def cap_values(values: dict[str, Any], top_k: int) -> dict[str, Any]:
+    """The values cache as a smaller ``values_top_k`` would have built it: each profile keeps
+    its first ``top_k`` rows (the cache query orders by rows descending, then value)."""
+    relations = {
+        relation: {**entry, "values": {
+            column: {**profile, "values": (profile.get("values") or [])[:top_k]}
+            for column, profile in (entry.get("values") or {}).items()
+        }}
+        for relation, entry in (values.get("relations") or {}).items()
+    }  # fmt: skip
+    return {**values, "relations": relations}
 
 
 class TokenOverflow(RuntimeError):
@@ -163,15 +198,17 @@ class SArmContext:
 
 def arm_runtimes(harness: SimpleNamespace, frozen: Path, executors: Mapping[str, Any],
                  s_provider: Callable[[str], SContextLike] | None,
-                 limits: Limits = Limits()) -> dict[str, Any]:  # fmt: skip
+                 limits: Limits = Limits(), knobs: Knobs = Knobs()) -> dict[str, Any]:  # fmt: skip
     """One ArmRuntime per arm in ``executors``, all with W4S rules and matched limits."""
-    config = harness.config.load_bench_config(frozen / W4S_CONFIG)
+    config = _with_knobs(harness.config.load_bench_config(frozen / W4S_CONFIG), knobs)
     policy, budget = config.policy, config.budget_tokens
     contexts: dict[str, Callable[[str], Any]] = {}
     known: dict[str, tuple[str, ...]] = {"A": (), "S": ()}
     if "A" in executors:
         schema = harness.config.load_json(frozen / CACHE_DIR / "schema.json")
         values = harness.config.load_json(frozen / CACHE_DIR / "values.json")
+        if knobs.values_top_k is not None:
+            values = cap_values(values, knobs.values_top_k)
         contexts["A"] = lambda _q: harness.context.arm_a_context(
             schema, config.relations, policy, budget, values
         )
@@ -196,9 +233,18 @@ def arm_runtimes(harness: SimpleNamespace, frozen: Path, executors: Mapping[str,
     }
 
 
+def _with_knobs(config: Any, knobs: Knobs) -> Any:
+    if knobs.values_top_k is not None and not 0 < knobs.values_top_k <= config.values_top_k:
+        raise ValueError(f"values_top_k {knobs.values_top_k} is outside 1..{config.values_top_k}, "
+                         "the frozen values cache")  # fmt: skip
+    changes = {"budget_tokens": knobs.budget_tokens,
+               "description_cap_chars": knobs.description_cap_chars}  # fmt: skip
+    return dataclasses.replace(config, **{k: v for k, v in changes.items() if v is not None})
+
+
 def estimate_request_tokens(messages: list[dict[str, Any]], chars_per_token: float) -> int:
     chars = sum(len(str(m.get("content") or "")) for m in messages)
-    return math.ceil(chars / chars_per_token) + 4 * len(messages)
+    return estimate_tokens_from_chars(chars, len(messages), chars_per_token)
 
 
 class GuardedModel:
