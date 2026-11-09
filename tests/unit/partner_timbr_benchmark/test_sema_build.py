@@ -19,7 +19,6 @@ from showcase.partner_timbr_benchmark.sema_build import (
     write_manifest,
 )
 from showcase.partner_timbr_benchmark.sema_build_utils import (
-    CONCEPT_SPEC_PATH,
     FactsConceptSource,
     LibraryFacts,
     import_library_facts,
@@ -32,6 +31,7 @@ from tests.unit.partner_timbr_benchmark.test_sema_bindings import (
     facts_fixture,
     write_fixture,
     write_projection,
+    write_spec,
 )
 
 pytestmark = pytest.mark.unit
@@ -70,13 +70,13 @@ def _cypher_params(loader: MagicMock) -> list[dict[str, Any]]:
 def test_library_facts_come_from_the_concept_source_import(tmp_path: Path) -> None:
     projection, receipt = write_projection(tmp_path)
     before = hashlib.sha256(projection.read_bytes()).hexdigest()
-    facts = import_library_facts(CONCEPT_SPEC_PATH, projection, receipt)
+    facts = import_library_facts(write_spec(tmp_path), projection, receipt)
     gender = facts.elements["G1"]
     assert (gender.label, gender.definition) == ("Administrative gender", "Gender for billing.")
-    assert set(gender.members) == {("PRT8532", "Female"), ("PRT8507", "Male")}
+    assert set(gender.members) == {("VF", "Female"), ("VM", "Male")}
     assert set(facts.elements) == set(ELEMENTS)
-    assert "partner-standard-library-workload" in facts.release
-    detail = FactsConceptSource(facts).name_synonyms("PRT8532")
+    assert "synthetic-library" in facts.release
+    detail = FactsConceptSource(facts).name_synonyms("VF")
     assert detail is not None and detail.name == "Female"
     assert hashlib.sha256(projection.read_bytes()).hexdigest() == before
 
@@ -85,13 +85,13 @@ def test_projection_must_match_its_receipt(tmp_path: Path) -> None:
     projection, receipt = write_projection(tmp_path)
     receipt.write_text(json.dumps({"complete": True, "duckdb": {"sha256": "0" * 64}}))
     with pytest.raises(SpecPinError, match="projection"):
-        import_library_facts(CONCEPT_SPEC_PATH, projection, receipt)
+        import_library_facts(write_spec(tmp_path), projection, receipt)
     receipt.write_text(json.dumps({
         "complete": False,
         "duckdb": {"sha256": hashlib.sha256(projection.read_bytes()).hexdigest()},
     }))
     with pytest.raises(SpecPinError, match="incomplete"):
-        import_library_facts(CONCEPT_SPEC_PATH, projection, receipt)
+        import_library_facts(write_spec(tmp_path), projection, receipt)
 
 
 def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
@@ -113,7 +113,7 @@ def test_value_sets_hold_every_imported_member(tmp_path: Path) -> None:
     anchored = {c.args[1] for c in loader.upsert_value_set.call_args_list}
     assert anchored == {"gender_G1", "vital_V1", "site_S1"}
     members = {c.args[0] for c in loader.add_term_to_value_set.call_args_list}
-    assert members == {"PRT8532", "PRT8507", "PRT1", "PRT2", "P1", "P2", "P3"}
+    assert members == {"VF", "VM", "VA", "VD", "P1", "P2", "P3"}
 
 
 def test_absent_library_elements_are_build_findings(tmp_path: Path) -> None:
@@ -150,7 +150,7 @@ def test_graph_identity_tracks_inputs(tmp_path: Path) -> None:
     assert first.graph_identity == again.graph_identity
     fewer = {**ELEMENTS, "G1": (*ELEMENTS["G1"][:2], ELEMENTS["G1"][2][:1])}
     changed_facts = import_library_facts(
-        CONCEPT_SPEC_PATH, *write_projection(tmp_path / "b", fewer)
+        write_spec(tmp_path / "b"), *write_projection(tmp_path / "b", fewer)
     )
     _, _, changed = _build_with(tmp_path / "a", changed_facts)
     assert changed.graph_identity != first.graph_identity

@@ -198,5 +198,5 @@ def _add_rules(parts: list[str], sidecar: Sidecar) -> None:
         f"(sha256 {sidecar.conventions_sha256[:12]}) govern patient counting, tumor "
         "identity, null handling and attribute resolution; they are not restated here."
     )
-    parts.append("\nOMOP HIERARCHY REFERENCE (supplied):")
+    parts.append("\nHIERARCHY REFERENCE (supplied):")
     parts.extend(f"  - {line}" for line in sidecar.hierarchy_reference)

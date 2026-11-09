@@ -19,7 +19,6 @@ from showcase.partner_timbr_benchmark.sema_bindings import (
     resolve_bindings,
 )
 from showcase.partner_timbr_benchmark.sema_build_utils import (
-    CONCEPT_SPEC_PATH,
     LibraryFacts,
     import_library_facts,
 )
@@ -113,27 +112,36 @@ def catalog_fixture() -> dict[str, dict[str, str]]:
 
 ELEMENTS: dict[str, tuple[str, str, list[tuple[str, str]]]] = {
     "G1": ("Administrative gender", "Gender for billing.",
-           [("PRT8532", "Female"), ("PRT8507", "Male")]),
-    "V1": ("Vital status", "Dead or alive.", [("PRT1", "Alive"), ("PRT2", "Deceased")]),
+           [("VF", "Female"), ("VM", "Male")]),
+    "V1": ("Vital status", "Dead or alive.", [("VA", "Alive"), ("VD", "Deceased")]),
     "S1": ("Site of primary tumor", "ICD-O-3 site.",
            [("P1", "Lung"), ("P2", "Breast"), ("P3", "Colon")]),
 }
 
-_DATA_ELEMENT_DDL = (
-    "CREATE TABLE standard_library.standard_library_data_element ("
-    "data_element_prt_id VARCHAR, data_element_prt_preferred_label VARCHAR, "
-    "data_element_title VARCHAR, data_element_definition VARCHAR, "
-    "data_element_data_type_id VARCHAR, data_element_phi BOOLEAN, "
-    "data_element_synonym_name VARCHAR[], permissible_value_prt_id VARCHAR, "
-    "permissible_value_prt_preferred_label VARCHAR, permissible_value_title VARCHAR, "
-    "permissible_value_vocabulary_id VARCHAR, permissible_value_concept_code VARCHAR, "
-    "permissible_value_synonym_name VARCHAR[])"
-)
-_CONCEPT_DDL = (
-    "CREATE TABLE standard_library.standard_library_concept (concept_prt_id VARCHAR, "
-    "concept_athena_id VARCHAR, concept_code VARCHAR, vocabulary_id VARCHAR, "
-    "definition VARCHAR)"
-)
+SYNTHETIC_SPEC = """\
+concept_source:
+  spec_version: 2
+  id: synthetic-library
+  identity_system: syn
+  release: "2026-01-01"
+  default_provider: staging
+  scheme:
+    qualified_name: syn.library
+    description: "Synthetic library"
+  concepts:
+    relation: lib.element
+    group_by: element_id
+    roles:
+      concept_id: element_id
+      name: element_label
+      definition: element_definition
+  value_sets:
+    relation: lib.element
+    roles:
+      concept_id: element_id
+      code: value_id
+      display: value_label
+"""
 
 
 def write_projection(
@@ -144,15 +152,16 @@ def write_projection(
     path = tmp_path / "projection.duckdb"
     path.unlink(missing_ok=True)
     con = duckdb.connect(str(path))
-    con.execute("CREATE SCHEMA standard_library")
-    con.execute(_DATA_ELEMENT_DDL)
-    con.execute(_CONCEPT_DDL)
+    con.execute("CREATE SCHEMA lib")
+    con.execute(
+        "CREATE TABLE lib.element (element_id VARCHAR, element_label VARCHAR, "
+        "element_definition VARCHAR, value_id VARCHAR, value_label VARCHAR)"
+    )
     con.executemany(
-        "INSERT INTO standard_library.standard_library_data_element VALUES "
-        "(?, ?, ?, ?, 'value set', false, [], ?, ?, ?, NULL, NULL, [])",
-        [(de, label, f"{de}: {label}", definition, pv, pv_label, pv_label)
-         for de, (label, definition, members) in elements.items()
-         for pv, pv_label in members],
+        "INSERT INTO lib.element VALUES (?, ?, ?, ?, ?)",
+        [(element, label, definition, code, value_label)
+         for element, (label, definition, members) in elements.items()
+         for code, value_label in members],
     )
     con.close()
     receipt = tmp_path / "receipt.json"
@@ -163,8 +172,15 @@ def write_projection(
     return path, receipt
 
 
+def write_spec(tmp_path: Path) -> Path:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    path = tmp_path / "concept_source.yaml"
+    path.write_text(SYNTHETIC_SPEC)
+    return path
+
+
 def facts_fixture(tmp_path: Path) -> LibraryFacts:
-    return import_library_facts(CONCEPT_SPEC_PATH, *write_projection(tmp_path))
+    return import_library_facts(write_spec(tmp_path), *write_projection(tmp_path))
 
 
 def write_fixture(tmp_path: Path) -> Path:

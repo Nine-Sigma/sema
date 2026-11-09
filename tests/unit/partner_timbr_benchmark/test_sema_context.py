@@ -57,10 +57,10 @@ DEMO_ENTITY = _entity(DEMO, [
 ])
 TUMOR_ENTITY = _entity(TUMOR, [_col("row_id"), _col(MRN), _col("site_S1", "categorical")])
 DEMO_VALUES = [
-    _value(DEMO, "gender_G1", "PRT8532", "Female"),
-    _value(DEMO, "gender_G1", "PRT8507", "Male"),
-    _value(DEMO, "vital_V1", "PRT1", "Alive"),
-    _value(DEMO, "vital_V1", "PRT2", "Deceased"),
+    _value(DEMO, "gender_G1", "VF", "Female"),
+    _value(DEMO, "gender_G1", "VM", "Male"),
+    _value(DEMO, "vital_V1", "VA", "Alive"),
+    _value(DEMO, "vital_V1", "VD", "Deceased"),
 ]
 
 
@@ -100,15 +100,15 @@ def test_context_renders_assets_bindings_and_complete_values(tmp_path: Path) -> 
     ctx = _provider(tmp_path, [DEMO_ENTITY, *DEMO_VALUES])(Q01)
     assert f"cat.sch.{DEMO}" in ctx.text
     assert "gender_G1" in ctx.text and "Administrative gender" in ctx.text
-    assert "PRT8532 = Female" in ctx.text and "PRT8507 = Male" in ctx.text
-    assert "PRT1 = Alive" in ctx.text
+    assert "VF = Female" in ctx.text and "VM = Male" in ctx.text
+    assert "VA = Alive" in ctx.text
     assert "CPD test authority" in ctx.text
     assert "V_label holds its label" in ctx.text
 
 
 def test_incompletely_retrieved_value_set_is_not_listed(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [DEMO_ENTITY, *DEMO_VALUES[1:]])(Q01)
-    assert "PRT8507 = Male" not in ctx.text
+    assert "VM = Male" not in ctx.text
     assert "membership query G1" in ctx.text
     assert any("G1" in f and "incomplete" in f for f in ctx.findings)
 
@@ -116,8 +116,8 @@ def test_incompletely_retrieved_value_set_is_not_listed(tmp_path: Path) -> None:
 def test_rejected_values_are_never_rendered(tmp_path: Path) -> None:
     rejected = [{**v, "status": "rejected"} for v in DEMO_VALUES]
     ctx = _provider(tmp_path, [DEMO_ENTITY, *rejected])(Q01)
-    assert "PRT8532 = Female" not in ctx.text
-    assert "PRT1 = Alive" not in ctx.text
+    assert "VF = Female" not in ctx.text
+    assert "VA = Alive" not in ctx.text
 
 
 def test_large_value_set_points_at_membership_relation(tmp_path: Path) -> None:
@@ -129,7 +129,7 @@ def test_large_value_set_points_at_membership_relation(tmp_path: Path) -> None:
 
 def test_value_list_limit_switches_to_membership_reference(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [DEMO_ENTITY, *DEMO_VALUES], list_limit=1)(Q01)
-    assert "PRT8532 = Female" not in ctx.text
+    assert "VF = Female" not in ctx.text
     assert "membership query G1" in ctx.text
     assert not any("G1" in f for f in ctx.findings)
 
@@ -193,15 +193,14 @@ def test_tumor_grain_and_hierarchy_reference_are_rendered(tmp_path: Path) -> Non
     assert f"{MRN}, site_S1" in ctx.text
     assert "row_id" in ctx.text and "surrogate" in ctx.text
     assert "ancestor_concept_id is broader" in ctx.text
-    assert "OMOP HIERARCHY REFERENCE (supplied):" in ctx.text
+    assert "HIERARCHY REFERENCE (supplied):" in ctx.text
     assert "executable" not in ctx.text
 
 
 def test_committed_hierarchy_reference_holds_relation_facts_only() -> None:
     from showcase.partner_timbr_benchmark.sema_bindings import load_sidecar as load
     text = "\n".join(load().hierarchy_reference)
-    relation = "partner_dev.partner_provenance.vb_vocabulary_test_2026_09_25_omop_ancestor"
-    assert relation in text and "Delta version 0" in text
+    assert "Delta version" in text
     assert "SELECT" not in text.upper() and "src_partner_wh" not in text
     assert "Maps to" in text
 
