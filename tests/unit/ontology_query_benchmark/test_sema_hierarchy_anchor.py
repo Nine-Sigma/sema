@@ -95,16 +95,18 @@ def fragments(text: str, column: str, *, filled: bool = True) -> list[str]:
     template = template.replace("{column}", column)
     if not filled:
         return [template]
-    quoted = ["'" + code.replace("'", "''") + "'" for code in listed(lines, column)]
-    return [template.replace("{anchor_id}", q) for q in quoted]
+    return [template.replace("{anchor_id}", code) for code in listed(lines, column)]
+
+
+LISTED = r"anchor .+? = id ('(?:[^'\\]|\\.|'')*')(?: in [^;]+)?; \d+ members"
 
 
 def listed(lines: list[str], column: str) -> list[str]:
-    """Anchor codes on the lines under the column's ``holds`` line."""
+    """Anchor id literals on the lines under the column's ``holds`` line."""
     start = next(i for i, x in enumerate(lines) if f".{column} holds " in x and x.endswith(":"))
     codes = []
     for x in lines[start + 1:]:
-        found = re.fullmatch(r"anchor .+? = id (.+?)(?: in [^;]+)?; \d+ members", x)
+        found = re.fullmatch(LISTED, x)
         if found is None:
             break
         codes.append(found.group(1))
@@ -125,7 +127,7 @@ def test_a_retrieved_anchor_fills_the_fragment_and_is_named(tmp_path: Path) -> N
 
     section = text[text.index("CONCEPT HIERARCHY"):]
     assert "Neoplasm" in section and "C1" in section and "std" in section
-    assert "C1 in std; 2 members" in section
+    assert "'C1' in std; 2 members" in section
     [fragment] = fragments(text, "site_S1")
     assert members(warehouse(), EVENTS_SQL, fragment) == {"L10", "L11"}
 

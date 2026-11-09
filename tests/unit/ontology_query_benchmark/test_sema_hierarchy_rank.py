@@ -135,7 +135,7 @@ def test_the_member_count_reads_as_strict_descendants_only(tmp_path: Path) -> No
 
     assert ("An anchor's member count is the column's values strictly below it; a value "
             "mapped to the anchor itself is not counted.") in text  # fmt: skip
-    assert "anchor Neoplasm = id C1 in std; 2 members" in text
+    assert "anchor Neoplasm = id 'C1' in std; 2 members" in text
 
 
 def test_the_section_states_the_join_once_however_many_anchors_are_retrieved(
@@ -149,3 +149,12 @@ def test_the_section_states_the_join_once_however_many_anchors_are_retrieved(
     assert len(predicates) == 2
     assert "{column}" in predicates[0] and "{anchor_id}" in predicates[0]
     assert _filled(text) == [predicates[1].strip().removeprefix("WHERE ")]
+
+
+def test_a_listed_anchor_id_is_a_literal_in_the_warehouse_dialect(tmp_path: Path) -> None:
+    found = [anchor(CRAFTED, "Crafted", "std", 0), anchor("C1", "Neoplasm", "std", 2)]
+    text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found,
+                 "Which neoplasm events?", dialect="databricks")  # fmt: skip
+
+    assert "anchor Crafted = id 'x\\' OR TRUE) --' in std; 0 members" in text
+    assert "anchor Neoplasm = id 'C1' in std; 2 members" in text

@@ -108,7 +108,7 @@ def add_hierarchy(
     kind = "source member ids" if spec.mapping else "concept ids of the hierarchy"
     for b in columns:
         parts.append(f"  {b.table}.{b.column} holds {kind}:")
-        parts.extend(_anchor_lines(b.column, found[(b.table, b.column)]))
+        parts.extend(_anchor_lines(b.column, found[(b.table, b.column)], dialect))
 
 
 def ranked(anchors: Sequence[HierarchyAnchor], question: str) -> list[HierarchyAnchor]:
@@ -137,12 +137,15 @@ def _example(
     return [f"  Filled for anchor {a.label} on {a.table}.{a.column}:", f"  WHERE {sql}"]
 
 
-def _anchor_lines(column: str, anchors: Sequence[HierarchyAnchor]) -> list[str]:
+def _anchor_lines(
+    column: str, anchors: Sequence[HierarchyAnchor], dialect: str,
+) -> list[str]:
     """The first ``ANCHORS_PER_COLUMN`` anchors, then a count of the rest."""
     lines = []
     for a in anchors[:ANCHORS_PER_COLUMN]:
         vocabulary = f" in {a.vocabulary}" if a.vocabulary else ""
-        lines.append(f"  anchor {a.label} = id {a.code}{vocabulary}; {a.member_count} members")
+        code = _literal(a.code, dialect)
+        lines.append(f"  anchor {a.label} = id {code}{vocabulary}; {a.member_count} members")
     if (omitted := len(anchors) - ANCHORS_PER_COLUMN) > 0:
         lines.append(f"  {omitted} more retrieved anchors on {column} are not shown.")
     return lines
