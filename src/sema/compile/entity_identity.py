@@ -3,8 +3,9 @@
 Each attribute takes its value from the first row of a ``ROW_NUMBER`` ordering:
 preferred rows that carry a value first, in their ranked order, then the rule's
 ordering column with nulls last, then the lowest attribute value when the rule
-orders by another column. Null ordering is a
-``CASE`` term, so the SQL means the same in every dialect.
+orders by another column. Null ordering is a ``CASE`` term, so the SQL means the
+same in every dialect. Every column is quoted, the CTE reads only the identity's
+columns, and its internal column names never equal one of them.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ def _col(name: str) -> exp.Column:
     return exp.column(name, quoted=True)
 
 
-def _as(expression: exp.Expr, name: str) -> exp.Alias:
+def _as(expression: exp.Expr, name: str) -> exp.Expr:
     return exp.alias_(expression, name, quoted=True)
 
 
@@ -65,23 +66,31 @@ def _ordering(attribute: ResolvedAttribute) -> list[exp.Ordered]:
     return terms
 
 
-def _rank_name(attribute: ResolvedAttribute) -> str:
-    return f"_rank_{attribute.output_name}"
+def _internal(name: str, identity: EntityIdentity) -> str:
+    """``name``, prefixed with underscores until no column the identity reads has it."""
+    while name in identity.columns:
+        name = f"_{name}"
+    return name
 
 
-def _rank(attribute: ResolvedAttribute, partition: list[exp.Column]) -> exp.Expr:
+def _rank_name(attribute: ResolvedAttribute, identity: EntityIdentity) -> str:
+    return _internal(f"_rank_{attribute.output_name}", identity)
+
+
+def _rank(
+    attribute: ResolvedAttribute, identity: EntityIdentity, partition: list[exp.Column]
+) -> exp.Expr:
     window = exp.Window(
         this=exp.RowNumber(),
         partition_by=partition,
         order=exp.Order(expressions=_ordering(attribute)),
     )
-    return _as(window, _rank_name(attribute))
+    return _as(window, _rank_name(attribute, identity))
 
 
-def _first_ranked(attribute: ResolvedAttribute) -> exp.Expr:
-    first = exp.Case().when(
-        _col(_rank_name(attribute)).eq(exp.Literal.number(1)), _col(attribute.column)
-    )
+def _first_ranked(attribute: ResolvedAttribute, identity: EntityIdentity) -> exp.Expr:
+    rank = _col(_rank_name(attribute, identity))
+    first = exp.Case().when(rank.eq(exp.Literal.number(1)), _col(attribute.column))
     return _as(exp.Max(this=first), attribute.output_name)
 
 
@@ -94,13 +103,13 @@ def _keyed_rows(relation: str, identity: EntityIdentity) -> exp.Expr:
     alone = _null_key_rows_stand_alone(identity)
     if not identity.non_null_keys and not alone:
         return table
-    columns: list[exp.Expr] = [exp.Star()]
+    columns: list[exp.Expr] = [_col(c) for c in identity.columns]
     if alone:
         any_null = exp.or_(*(_col(k).is_(exp.null()) for k in identity.nullable_keys))
         each_row = [exp.Ordered(this=_col(c)) for c in identity.columns]
         numbered = exp.Window(this=exp.RowNumber(), order=exp.Order(expressions=each_row))
         own_row = exp.Case().when(any_null, numbered)
-        columns.append(_as(own_row, NULL_KEY_ROW))
+        columns.append(_as(own_row, _internal(NULL_KEY_ROW, identity)))
     rows = exp.select(*columns).from_(table)
     if identity.non_null_keys:
         rows = rows.where(exp.and_(*(_col(k).is_(exp.null()).not_()
@@ -112,13 +121,15 @@ def identity_select(relation: str, identity: EntityIdentity) -> exp.Select:
     """One row per entity of ``relation``: its key columns and resolved attributes."""
     keys = [_col(k) for k in identity.key_columns]
     alone = _null_key_rows_stand_alone(identity)
-    groups = [*keys, _col(NULL_KEY_ROW)] if alone else keys
+    own_row = [_col(_internal(NULL_KEY_ROW, identity))] if alone else []
+    groups = [*keys, *own_row]
     rows = _keyed_rows(relation, identity)
     if not identity.attributes:
         return exp.select(*keys).from_(rows).group_by(*groups)
-    ranks = [_rank(a, groups) for a in identity.attributes]
-    ranked = exp.select(exp.Star(), *ranks).from_(rows).subquery("ranked")
-    values = [_first_ranked(a) for a in identity.attributes]
+    read = [*(_col(c) for c in identity.columns), *own_row]
+    ranks = [_rank(a, identity, groups) for a in identity.attributes]
+    ranked = exp.select(*read, *ranks).from_(rows).subquery("ranked")
+    values = [_first_ranked(a, identity) for a in identity.attributes]
     return exp.select(*keys, *values).from_(ranked).group_by(*groups)
 
 
