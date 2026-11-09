@@ -103,15 +103,16 @@ def add_hierarchy(
 
 
 def ranked(anchors: Sequence[HierarchyAnchor], question: str) -> list[HierarchyAnchor]:
-    """By the share of the anchor label's words the question holds; ties keep retrieval
-    order, which is core's seed rank by vector and lexical score."""
+    """By the share of the anchor label's words the question holds, then the score of the
+    retrieval hit that found the anchor, then code."""
     asked = set(tokenize_query(question))
 
-    def coverage(a: HierarchyAnchor) -> float:
+    def key(a: HierarchyAnchor) -> tuple[float, float, str]:
         words = set(tokenize_query(a.label))
-        return len(words & asked) / len(words) if words else 0.0
+        coverage = len(words & asked) / len(words) if words else 0.0
+        return -coverage, -a.score, a.code
 
-    return sorted(anchors, key=coverage, reverse=True)
+    return sorted(anchors, key=key)
 
 
 def _filled(
@@ -121,8 +122,9 @@ def _filled(
     lines = []
     for a in anchors[:ANCHORS_PER_COLUMN]:
         vocabulary = f" in {a.vocabulary}" if a.vocabulary else ""
-        lines.append(f"  anchor {a.label} = id {a.code}{vocabulary}; "
-                     f"{a.member_count} members of {column} sit under it:")  # fmt: skip
+        counted = (f"{a.member_count} member values of {column} sit strictly below this "
+                   "concept; a value mapped to the concept itself is not counted")  # fmt: skip
+        lines.append(f"  anchor {a.label} = id {a.code}{vocabulary}; {counted}:")
         lines.append(f"  WHERE {membership_sql(spec, column, dialect=dialect, anchor=a.code)}")
     if (omitted := len(anchors) - ANCHORS_PER_COLUMN) > 0:
         lines.append(f"  {omitted} more retrieved anchors on {column} are not shown.")

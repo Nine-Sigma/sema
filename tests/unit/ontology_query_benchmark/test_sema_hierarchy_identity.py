@@ -86,4 +86,4 @@ def test_the_fragment_selects_a_standard_member_under_its_anchor(tmp_path: Path)
     ]).text  # fmt: skip
 
     filled = fragments(text, "site_S1")
-    assert [members(_events(), EVENTS_SQL, f) for f in filled] == [{"C9"}, {"L10", "L11"}]
+    assert [members(_events(), EVENTS_SQL, f) for f in filled] == [{"L10", "L11"}, {"C9"}]

@@ -87,7 +87,7 @@ def test_a_question_naming_no_concept_keeps_the_instruction_and_the_template(
 ) -> None:
     _, text = _acris_text(tmp_path, "How many records were filed?")
 
-    assert _anchors(text) == ["OTHER DOCUMENTS", acris.CLASS]
+    assert _anchors(text) == [acris.CLASS, "OTHER DOCUMENTS"]
     assert "Replace {anchor_id} with the anchor concept id." in text
     assert any("{anchor_id}" in x for x in text.splitlines() if x.strip().startswith("WHERE "))
 
@@ -119,3 +119,20 @@ def test_a_databricks_warehouse_gets_its_own_string_quoting(tmp_path: Path) -> N
 
     [fragment] = _filled(text)
     assert "= 'x\\' OR TRUE) --'" in fragment
+
+
+def test_equal_coverage_ranks_by_match_score_then_code(tmp_path: Path) -> None:
+    found = [{**anchor(code, f"Concept {code}", "std", 1), "score": score}
+             for code, score in (("C5", 0.4), ("C3", 0.9), ("C2", 0.4))]  # fmt: skip
+    text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found, "Which events?")
+
+    assert _anchors(text) == ["Concept C3", "Concept C2", "Concept C5"]
+
+
+def test_the_member_count_reads_as_strict_descendants_only(tmp_path: Path) -> None:
+    text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS,
+                 [anchor("C1", "Neoplasm", "std", 2)], "Which events?")  # fmt: skip
+
+    assert ("2 member values of site_S1 sit strictly below this concept; a value mapped to "
+            "the concept itself is not counted") in text  # fmt: skip
+    assert "2 members of" not in text

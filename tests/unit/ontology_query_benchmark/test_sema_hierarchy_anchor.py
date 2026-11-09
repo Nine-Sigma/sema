@@ -104,7 +104,7 @@ def test_a_retrieved_anchor_fills_the_fragment_and_is_named(tmp_path: Path) -> N
 
     section = text[text.index("CONCEPT HIERARCHY"):]
     assert "Neoplasm" in section and "C1" in section and "std" in section
-    assert "2 members" in section
+    assert "2 member values" in section
     [fragment] = fragments(text, "site_S1")
     assert members(warehouse(), EVENTS_SQL, fragment) == {"L10", "L11"}
 
