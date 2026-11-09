@@ -162,3 +162,30 @@ def test_approve_builds_no_embedder_under_a_zero_cap_replay(
     printed = ok_or_raise(cli.run("approve", run.run_id, "--approver", "dean", "--reject"))
 
     assert printed["status"] == "rejected"
+
+
+def test_discover_builds_the_embedder_for_a_replay_recorded_with_embeddings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cli = intake_cli(tmp_path / "runs", monkeypatch)
+    recordings = tmp_path / "recordings"
+    zero_cap_replay(monkeypatch, recordings, max_calls=0)
+    (recordings / "recording.json").write_text('{"agreement": true, "embeddings": true}\n')
+    _stray_provider(monkeypatch)
+    built: list[EmbeddingConfig] = []
+    embedder = object()
+
+    def _factory(config: EmbeddingConfig) -> Any:
+        built.append(config)
+        return embedder
+
+    monkeypatch.setattr(FACTORY, _factory)
+    seen = spy_discover(monkeypatch, drop=("embedder",))
+    with captured_logs() as messages:
+        _discover(cli)
+
+    ((_, kwargs),) = seen
+    assert kwargs["embedder"] is embedder
+    (config,) = built
+    assert (config.provider, config.model) == tuple(STRAY_EMBEDDING_ENV.values())
+    assert _provider_lines(messages) == []
