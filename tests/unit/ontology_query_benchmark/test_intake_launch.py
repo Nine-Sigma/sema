@@ -39,7 +39,7 @@ def _recording_cli(seen: list[dict[str, Any]]) -> click.Command:
     @click.argument("args", nargs=-1, type=click.UNPROCESSED)
     def stub(args: tuple[str, ...]) -> None:
         from sema.cli_intake_utils import intake_model_config
-        from sema.models.config import EmbeddingConfig
+        from sema.models.config import EmbeddingConfig, TracingConfig
 
         model = intake_model_config()
         seen.append({
@@ -48,6 +48,7 @@ def _recording_cli(seen: list[dict[str, Any]]) -> click.Command:
             "embedding": (os.environ.get("EMBEDDING_PROVIDER"), EmbeddingConfig().model),
             "databricks": (os.environ.get("DATABRICKS_HOST"),
                            os.environ.get("DATABRICKS_CONFIG_PROFILE")),
+            "tracing": TracingConfig().backend,
         })  # fmt: skip
 
     return stub
@@ -71,6 +72,7 @@ def test_the_cli_sees_the_profile_routing(profile: Profile) -> None:
         "model": ("databricks", routing.chat_endpoint),
         "embedding": ("databricks", routing.embedding_endpoint),
         "databricks": (routing.host, routing.databricks_profile),
+        "tracing": "none",
     }]  # fmt: skip
 
 
@@ -83,9 +85,18 @@ def test_an_explicit_empty_embedding_provider_stays_off(profile: Profile) -> Non
     assert seen[0]["embedding"] == ("", profile.routing.embedding_endpoint)
 
 
+def test_a_shell_tracing_backend_is_switched_off() -> None:
+    os.environ["INTAKE_TRACING_BACKEND"] = "mlflow"
+    seen: list[dict[str, Any]] = []
+
+    assert _launch(_recording_cli(seen)) == 0
+
+    assert seen[0]["tracing"] == "none"
+
+
 @pytest.mark.parametrize(
     ("name", "value"),
-    [("OPENROUTER_API_KEY", "key"), ("DATABRICKS_HOST", FOREIGN_HOST),
+    [("OPENROUTER_API_KEY", "key"), ("MLFLOW_TRACKING_URI", FOREIGN_HOST), ("DATABRICKS_HOST", FOREIGN_HOST),
      ("INTAKE_MODEL_PROVIDER", "openrouter")],
 )  # fmt: skip
 def test_a_foreign_route_refuses_before_the_cli_runs(name: str, value: str) -> None:

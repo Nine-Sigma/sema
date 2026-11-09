@@ -10,7 +10,7 @@ from showcase.ontology_query_benchmark.profile import Routing, Timbr
 FORBIDDEN_ENV = (
     "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_API_BASE", "ANTHROPIC_API_KEY",
     "ANTHROPIC_BASE_URL", "LLM_BASE_URL", "LLM_API_KEY", "INTAKE_MODEL_BASE_URL",
-    "INTAKE_MODEL_API_KEY", "EMBEDDING_BASE_URL", "EMBEDDING_API_KEY",
+    "INTAKE_MODEL_API_KEY", "EMBEDDING_BASE_URL", "EMBEDDING_API_KEY", "MLFLOW_TRACKING_URI",
 )  # fmt: skip
 FORBIDDEN_ENV_PREFIXES = ("OPENROUTER_",)
 PROVIDER_ENV = ("LLM_PROVIDER", "INTAKE_MODEL_PROVIDER", "EMBEDDING_PROVIDER")
@@ -89,4 +89,5 @@ def intake_env(environ: Mapping[str, str], routing: Routing) -> dict[str, str]:
         # An explicit empty provider is the zero-call replay's embedder off switch.
         "EMBEDDING_PROVIDER": "" if embedder_off else "databricks",
         "EMBEDDING_MODEL": routing.embedding_endpoint,
+        "INTAKE_TRACING_BACKEND": "none",
     }

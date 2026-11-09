@@ -69,6 +69,7 @@ def test_loaded_dotenv_is_refused(profile: Profile) -> None:
         ("LLM_BASE_URL", "https://gateway.example.com"),
         ("EMBEDDING_BASE_URL", "https://gateway.example.com"),
         ("EMBEDDING_API_KEY", "sk-x"),
+        ("MLFLOW_TRACKING_URI", "https://tracking.example.test"),
         ("LLM_PROVIDER", "openrouter"),
         ("INTAKE_MODEL_PROVIDER", "custom"),
         ("EMBEDDING_PROVIDER", "openai"),
