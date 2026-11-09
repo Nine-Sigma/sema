@@ -13,7 +13,14 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 
 class Attribution(StrEnum):
@@ -130,6 +137,65 @@ class ElementRelation(ExtractRelation):
     member_key: str
 
 
+Column = Field(pattern=r"^\w+$")
+QualifiedRelation = Field(pattern=r"^\w+\.\w+\.\w+$")
+
+
+class MappingRelation(_Frozen):
+    """Typed rows taking a source member id to a concept id, then to its replacement."""
+
+    relation: str = QualifiedRelation
+    source_column: str = Column
+    target_column: str = Column
+    type_column: str = Column
+    mapping_types: tuple[str, ...] = Field(min_length=1)
+    replacement_types: tuple[str, ...] = ()
+    target_vocabulary: str = Field(min_length=1)
+
+
+class ClosureRelation(_Frozen):
+    """Transitive closure rows: the ancestor column holds the broader concept."""
+
+    relation: str = QualifiedRelation
+    ancestor_column: str = Column
+    descendant_column: str = Column
+    level_column: str = Column
+    self_rows: bool
+
+
+class ConceptRelation(_Frozen):
+    """Concept ids and names; with a standard column, only its listed values count."""
+
+    relation: str = QualifiedRelation
+    id_column: str = Column
+    name_column: str = Column
+    standard_column: str | None = Field(default=None, pattern=r"^\w+$")
+    standard_values: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _values_need_the_column(self) -> ConceptRelation:
+        if bool(self.standard_values) != bool(self.standard_column):
+            raise ValueError("standard_column and standard_values go together")
+        return self
+
+
+class ConceptHierarchy(_Frozen):
+    """Value-to-standard bridge and ancestor closure for governed coded columns.
+
+    Without ``mapping`` the governed column holds the hierarchy's own concept ids.
+    """
+
+    attribution: Attribution
+    mapping: MappingRelation | None = None
+    closure: ClosureRelation
+    concepts: ConceptRelation
+
+    @property
+    def relations(self) -> tuple[str, ...]:
+        mapping = (self.mapping.relation,) if self.mapping else ()
+        return (*mapping, self.closure.relation, self.concepts.relation)
+
+
 class Extract(_Frozen):
     """The scoped library projection: element rows by declared id, then their members."""
 
@@ -139,6 +205,7 @@ class Extract(_Frozen):
     elements: ElementRelation
     members: ExtractRelation
     row_limit: int
+    concept_hierarchy: ConceptHierarchy | None = None
 
     @property
     def relations(self) -> tuple[str, str]:

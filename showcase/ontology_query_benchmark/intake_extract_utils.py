@@ -14,6 +14,8 @@ from showcase.ontology_query_benchmark.profile import Extract
 DUCKDB_TYPES = {
     "string": "VARCHAR",
     "boolean": "BOOLEAN",
+    "int": "INTEGER",
+    "bigint": "BIGINT",
     "timestamp": "TIMESTAMPTZ",
     "array<string>": "VARCHAR[]",
 }
