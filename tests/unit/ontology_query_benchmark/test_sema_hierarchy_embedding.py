@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from showcase.ontology_query_benchmark import sema_hierarchy
+from showcase.ontology_query_benchmark import sema_build, sema_hierarchy
 from showcase.ontology_query_benchmark.sema_bindings import load_sidecar
 from showcase.ontology_query_benchmark.sema_build import BuildManifest, build_scoped_graph
 from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts
@@ -93,3 +93,15 @@ def test_within_the_cap_the_build_records_no_cap_finding(tmp_path: Path) -> None
     _, _, manifest = _build(tmp_path, _facts(tmp_path, hierarchy()))
 
     assert not any("cap of" in f for f in manifest.findings)
+
+
+def test_a_hierarchy_graph_identity_pins_the_embedding_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    facts, plain = _facts(tmp_path / "h", hierarchy()), _facts(tmp_path / "p")
+    before = [_build(tmp_path, f)[2].graph_identity for f in (facts, plain)]
+    monkeypatch.setattr(sema_build, "TERM_EMBEDDING_CAP", 3)
+    after = [_build(tmp_path, f)[2].graph_identity for f in (facts, plain)]
+
+    assert after[0] != before[0]
+    assert after[1] == before[1]

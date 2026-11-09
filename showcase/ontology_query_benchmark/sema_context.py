@@ -86,6 +86,11 @@ def check_manifest(manifest: BuildManifest, sidecar: Sidecar, facts: LibraryFact
         raise ManifestMismatchError(
             "graph manifest was built from different sidecar or library facts"
         )
+    if "hierarchy_depth" in manifest.counts and "embedded_terms" not in manifest.counts:
+        raise ManifestMismatchError(
+            "graph manifest has a hierarchy but no embedded_terms count: the graph was "
+            "built before hierarchy concepts were embedded; rebuild it"
+        )
 
 
 class SContextProvider:

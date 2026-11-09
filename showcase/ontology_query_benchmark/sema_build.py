@@ -45,6 +45,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     unbound_columns,
 )
 from showcase.ontology_query_benchmark.sema_hierarchy import (
+    TERM_EMBEDDING_CAP,
     check_relations,
     release_findings,
     term_embeddings,
@@ -201,6 +202,8 @@ def _identity(
         "model_role": sidecar.model_role, "dimensions": dimensions,
         "embedder": embedder_model,
     }
+    if facts.hierarchy is not None:
+        pinned["term_embedding_cap"] = TERM_EMBEDDING_CAP
     return hashlib.sha256(json.dumps(pinned, sort_keys=True).encode()).hexdigest()
 
 

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from sema.pipeline import retrieval
 from showcase.ontology_query_benchmark import sema_live, sema_trace
 from showcase.ontology_query_benchmark.profile import Attribution, Profile
 from showcase.ontology_query_benchmark.routing import RoutingError
@@ -19,6 +21,7 @@ from showcase.ontology_query_benchmark.sema_trace import open_live_provider
 from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
 from tests.unit.ontology_query_benchmark.test_sema_bindings import (
     CONCEPT_SPEC,
+    catalog_fixture,
     write_fixture,
     write_projection,
 )
@@ -124,3 +127,44 @@ def test_a_graph_built_from_these_inputs_goes_on_to_the_clients(
         with open_live_provider(local, "bolt://unused", tmp_path / "manifest.json",
                                 projection, receipt):
             pass
+
+
+def test_a_hierarchy_manifest_without_term_embeddings_is_refused_as_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: Profile
+) -> None:
+    clean_process(monkeypatch)
+    no_client(monkeypatch)
+    local, manifest, projection, receipt = _live_inputs(tmp_path, profile)
+    path = tmp_path / "manifest.json"
+    write_manifest(dataclasses.replace(manifest, counts={"hierarchy_depth": 2}), path)
+    with pytest.raises(ManifestMismatchError, match="embedded_terms"):
+        with open_live_provider(local, "bolt://unused", path, projection, receipt):
+            pass
+
+
+def test_the_live_engine_walks_as_deep_as_the_manifest_slice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: Profile
+) -> None:
+    clean_process(monkeypatch)
+    engines: list[dict[str, Any]] = []
+
+    class _Engine:
+        def __init__(self, *_args: Any, **kwargs: Any) -> None:
+            engines.append(kwargs)
+
+    monkeypatch.setattr(sema_live, "pinned_workspace", lambda _routing: object())
+    monkeypatch.setattr(sema_live, "UnityCatalogSource", lambda _workspace: object())
+    monkeypatch.setattr(sema_live, "embedder", lambda *_args: object())
+    monkeypatch.setattr(sema_live, "neo4j_driver", lambda _uri: contextlib.nullcontext())
+    monkeypatch.setattr(sema_trace, "read_catalog", lambda *_args: catalog_fixture())
+    monkeypatch.setattr(sema_trace, "load_conventions", lambda _sidecar: ())
+    monkeypatch.setattr(retrieval, "RetrievalEngine", _Engine)
+    local, manifest, projection, receipt = _live_inputs(tmp_path, profile)
+    counts = {"hierarchy_depth": 4, "embedded_terms": 7}
+    write_manifest(dataclasses.replace(manifest, counts=counts), tmp_path / "manifest.json")
+    with open_live_provider(local, "bolt://unused", tmp_path / "manifest.json",
+                            projection, receipt):  # fmt: skip
+        pass
+
+    [kwargs] = engines
+    assert kwargs["hierarchy_anchor"].max_depth == 4
