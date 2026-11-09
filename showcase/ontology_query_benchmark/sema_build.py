@@ -45,6 +45,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
 from showcase.ontology_query_benchmark.sema_hierarchy import (
     check_relations,
     release_findings,
+    term_embeddings,
     write_hierarchy,
 )
 
@@ -90,7 +91,7 @@ def build_scoped_graph(
         concept_fields=fields, value_bridges=(),
         bridge_source_schema=sidecar.schema, load_ancestors=False,
     )
-    written, readable, unreadable = _hierarchy(loader, facts, sidecar, relation_reader)
+    written, readable, unreadable = _hierarchy(loader, facts, sidecar, relation_reader, embedder)
     embedded = _embed(loader, embedder, dimensions, sidecar, products, resolution, facts)
     counts = {
         "approved_bindings": len(resolution.approved()),
@@ -121,16 +122,20 @@ def build_scoped_graph(
 
 def _hierarchy(
     loader: GraphLoader, facts: LibraryFacts, sidecar: Sidecar,
-    reader: Callable[[str], object] | None,
+    reader: Callable[[str], object] | None, embedder: Any,
 ) -> tuple[dict[str, int], dict[str, bool] | None, tuple[str, ...]]:  # fmt: skip
     if facts.hierarchy is None:
         return {}, None, ()
-    counts = write_hierarchy(
-        loader, facts.hierarchy, member_vocabulary=sidecar.concept_vocabulary,
-        library_codes=set(facts.concepts), source_schema=sidecar.schema,
-    )
+    vocabulary, codes = sidecar.concept_vocabulary, set(facts.concepts)
+    counts = write_hierarchy(loader, facts.hierarchy, member_vocabulary=vocabulary,
+                             library_codes=codes, source_schema=sidecar.schema)  # fmt: skip
+    embedded, capped = term_embeddings(facts.hierarchy, loader.query_nodes_by_label("Term"),
+                                       member_vocabulary=vocabulary, library_codes=codes)  # fmt: skip
+    engine = EmbeddingEngine(model=embedder, loader=loader)
+    engine.embed_and_store("Term", "code", embedded, lambda t: str(t["label"]))
     relations, findings = check_relations(facts.hierarchy.spec, reader)
-    return counts, relations, (*release_findings(facts.hierarchy), *findings)
+    return ({**counts, "embedded_terms": len(embedded)}, relations,
+            (*release_findings(facts.hierarchy), *findings, *capped))  # fmt: skip
 
 
 def read_catalog(

@@ -55,11 +55,11 @@ def build(driver: Any, tmp_path: Path, facts: LibraryFacts) -> BuildManifest:
 
 
 def ask(driver: Any, tmp_path: Path, facts: LibraryFacts, manifest: BuildManifest,
-        question: str, *, slice_depth: bool = True) -> str:  # fmt: skip
+        question: str, *, slice_depth: bool = True, embedder: Any = None) -> str:  # fmt: skip
     sidecar = load_sidecar(write_fixture(tmp_path), tmp_path)
     products = load_products(sidecar)
     engine = RetrievalEngine(
-        driver, ToyEmbedder(), embedder_model_name="toy-embed",
+        driver, embedder or ToyEmbedder(), embedder_model_name="toy-embed",
         scope=RetrievalScope(model_role=sidecar.model_role),
         hierarchy_anchor=anchor_bounds(manifest) if slice_depth else None,
     )

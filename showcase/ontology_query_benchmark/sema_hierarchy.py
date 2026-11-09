@@ -10,6 +10,7 @@ from collections import Counter
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import duckdb
 
@@ -20,6 +21,7 @@ from showcase.ontology_query_benchmark.intake_extract_hierarchy import SCHEMA
 from showcase.ontology_query_benchmark.profile import ConceptHierarchy
 
 TERM_SOURCE = "target-load"
+TERM_EMBEDDING_CAP = 10_000
 Edge = tuple[str, str]
 
 
@@ -95,10 +97,7 @@ def write_hierarchy(
     Without a mapping the hierarchy shares the members' vocabulary, so library member
     terms keep their library labels.
     """
-    mapping = facts.spec.mapping
-    vocabulary = mapping.target_vocabulary if mapping else member_vocabulary
-    codes = {*facts.names, *(code for edge in facts.edges for code in edge)}
-    terms = sorted(codes if mapping else codes - library_codes)
+    vocabulary, terms = _terms(facts, member_vocabulary, library_codes)
     for code in terms:
         loader.upsert_term(code, facts.names.get(code, code), source=TERM_SOURCE,
                            confidence=1.0, source_schema=source_schema,
@@ -115,6 +114,35 @@ def write_hierarchy(
     return {"hierarchy_terms": len(terms), "hierarchy_edges": len(facts.edges),
             "hierarchy_depth": edge_depth(facts.edges),
             "value_bridges": len(facts.bridges)}  # fmt: skip
+
+
+def _terms(
+    facts: HierarchyFacts, member_vocabulary: str, library_codes: set[str]
+) -> tuple[str, list[str]]:
+    mapping = facts.spec.mapping
+    vocabulary = mapping.target_vocabulary if mapping else member_vocabulary
+    codes = {*facts.names, *(code for edge in facts.edges for code in edge)}
+    return vocabulary, sorted(codes if mapping else codes - library_codes)
+
+
+def term_embeddings(
+    facts: HierarchyFacts, nodes: list[dict[str, Any]], *,
+    member_vocabulary: str, library_codes: set[str],
+) -> tuple[list[dict[str, Any]], tuple[str, ...]]:  # fmt: skip
+    """The graph's Term nodes this hierarchy wrote with a name, at most
+    ``TERM_EMBEDDING_CAP`` of them, with a finding when more exist."""
+    vocabulary, terms = _terms(facts, member_vocabulary, library_codes)
+    named = set(terms) & facts.names.keys()
+    written = sorted((n for n in nodes
+                      if n.get("vocabulary_name") == vocabulary and n.get("code") in named),
+                     key=lambda n: str(n["code"]))  # fmt: skip
+    if len(written) <= TERM_EMBEDDING_CAP:
+        return written, ()
+    # shortcut: keeps the first concepts by code, not the most useful; rank if this fires.
+    return written[:TERM_EMBEDDING_CAP], (
+        f"{len(written)} hierarchy concepts exceed the embedding cap of {TERM_EMBEDDING_CAP}; "
+        "the rest are reachable only by their label words",
+    )
 
 
 def release_findings(facts: HierarchyFacts) -> list[str]:
