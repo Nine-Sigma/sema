@@ -38,7 +38,8 @@ def read_hierarchy(
     slices: list[Slice] = []
     targets = members
     if (m := spec.mapping) is not None:
-        first = f"{m.source_column} IN ({_in(members)}) AND {m.type_column} IN ({_in(m.mapping_types)})"
+        mapped = f"{m.type_column} IN ({_in(m.mapping_types)})"
+        first = f"{_member(m.source_column, members)} AND {mapped}"
         replaced = (
             f" OR ({m.type_column} IN ({_in(m.replacement_types)}) AND {m.source_column} IN"
             f" (SELECT {m.target_column} FROM {m.relation} WHERE {first}))"
@@ -49,16 +50,15 @@ def read_hierarchy(
                             row_limit, before))  # fmt: skip
         targets = slices[-1].values(1)
     c, k = spec.closure, spec.concepts
-    reached = (
-        f"IN ({_in(targets)}) OR {{}} IN (SELECT {c.ancestor_column} FROM {c.relation}"
-        f" WHERE {c.descendant_column} IN ({_in(targets)}))"
-    )
+    ancestors = (f"IN (SELECT {c.ancestor_column} FROM {c.relation}"
+                 f" WHERE {_member(c.descendant_column, targets)})")  # fmt: skip
     named = (k.id_column, k.name_column, *((k.standard_column,) if k.standard_column else ()))
-    slices.append(_read(rows, "concept", k.relation, named,
-                        f"{k.id_column} {reached.format(k.id_column)}", row_limit, before))  # fmt: skip
-    edge = f"{c.level_column} = 1 AND ({c.descendant_column} {reached.format(c.descendant_column)})"
-    slices.append(_read(rows, "edge", c.relation, (c.ancestor_column, c.descendant_column),
-                        edge, row_limit, before))  # fmt: skip
+    concept = f"{_member(k.id_column, targets)} OR {k.id_column} {ancestors}"
+    slices.append(_read(rows, "concept", k.relation, named, concept, row_limit, before))
+    des = c.descendant_column
+    edge = f"{c.level_column} = 1 AND ({_member(des, targets)} OR {des} {ancestors})"
+    slices.append(_read(rows, "edge", c.relation, (c.ancestor_column, des), edge,
+                        row_limit, before))  # fmt: skip
     moved = [
         f"{SCHEMA}.{s.name}: updated_at moved from {before[s.source][0]} to {after}"
         for s in slices if (after := _altered(rows, s.source)[0]) != before[s.source][0]
@@ -86,7 +86,9 @@ def _short(slices: Iterable[Slice], row_limit: int) -> list[str]:
     found = []
     for s in slices:
         if s.rows is None:
-            found.append(f"{SCHEMA}.{s.name}: {s.expected} counted rows exceed row_limit {row_limit}")
+            found.append(
+                f"{SCHEMA}.{s.name}: {s.expected} counted rows exceed row_limit {row_limit}"
+            )
         elif len(s.rows) != s.expected:
             found.append(f"{SCHEMA}.{s.name}: returned_rows {len(s.rows)} != counted {s.expected}")
     return found
@@ -111,6 +113,11 @@ def _altered(rows: Rows, relation: str) -> tuple[str, str | None]:
         raise ValueError(f"hierarchy relation not in the catalog: {relation}")
     when = found[0][1]
     return (when.isoformat() if hasattr(when, "isoformat") else str(when)), found[0][2]
+
+
+def _member(column: str, ids: Iterable[str]) -> str:
+    """Ids compare as text, so an id column of any type takes ids read from another."""
+    return f"CAST({column} AS STRING) IN ({_in(ids)})"
 
 
 def _in(values: Iterable[str]) -> str:

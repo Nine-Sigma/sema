@@ -151,6 +151,7 @@ class MappingRelation(_Frozen):
     mapping_types: tuple[str, ...] = Field(min_length=1)
     replacement_types: tuple[str, ...] = ()
     target_vocabulary: str = Field(min_length=1)
+    target_type: str | None = Field(default=None, pattern=r"^\w+$")
 
 
 class ClosureRelation(_Frozen):

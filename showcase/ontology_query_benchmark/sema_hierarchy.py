@@ -39,6 +39,12 @@ class HierarchyFacts:
 
 def load_hierarchy(projection: Path, spec: ConceptHierarchy) -> HierarchyFacts:
     with duckdb.connect(str(projection), read_only=True) as con:
+        held = con.execute("SELECT 1 FROM duckdb_schemas() WHERE schema_name = ?", [SCHEMA])
+        if not held.fetchall():
+            raise ValueError(
+                f"projection {projection} holds no {SCHEMA} slice for the profile's "
+                "concept hierarchy; rerun the extract with this profile"
+            )
         concepts = _rows(con, "concept")
         edges = tuple(sorted((str(a), str(d)) for a, d in _rows(con, "edge")))
         mapping = _rows(con, "mapping") if spec.mapping else []
@@ -94,8 +100,10 @@ def write_hierarchy(
                            confidence=1.0, source_schema=source_schema,
                            vocabulary_name=vocabulary)  # fmt: skip
     for parent, child in facts.edges:
-        loader.add_term_hierarchy(parent_code=parent, child_code=child,
-                                  source_schema=source_schema, vocabulary_name=vocabulary)  # fmt: skip
+        loader.add_term_hierarchy(
+            parent_code=parent, child_code=child,
+            source_schema=source_schema, vocabulary_name=vocabulary,
+        )
     for member, concept in facts.bridges:
         write_value_bridge(loader, source_vocabulary=member_vocabulary, source_code=member,
                            concept_vocabulary=vocabulary, concept_code=concept,

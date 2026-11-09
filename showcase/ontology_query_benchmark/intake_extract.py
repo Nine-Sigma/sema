@@ -193,9 +193,10 @@ def _write(target: Path, schema: str, relations: Sequence[_Relation]) -> None:
             marks = ", ".join("?" for _ in relation.columns)
             con.executemany(f"INSERT INTO {table} VALUES ({marks})", list(relation.rows or ()))
             if relation.comment:
-                con.execute(
-                    build_table_comment_sql(relation.schema or schema, relation.name, relation.comment)
+                comment = build_table_comment_sql(
+                    relation.schema or schema, relation.name, relation.comment
                 )
+                con.execute(comment)
     partial.replace(target)
 
 

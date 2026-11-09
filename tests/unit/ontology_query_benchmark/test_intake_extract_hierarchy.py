@@ -16,9 +16,11 @@ from tests.unit.ontology_query_benchmark.hierarchy_fixture import (
     HIERARCHY,
     PARENT_EDGES,
     WarehouseCursor,
+    add_typed_vocabulary,
     closure_rows,
     hierarchy,
     spec_with,
+    typed_hierarchy,
     warehouse,
     write_product_spec,
 )
@@ -108,3 +110,12 @@ def test_without_a_hierarchy_only_the_library_relations_are_projected(tmp_path: 
     with duckdb.connect(str(tmp_path / "out" / receipt["duckdb"]["path"]), read_only=True) as con:
         schemas = {r[0] for r in con.execute("SELECT schema_name FROM duckdb_schemas()").fetchall()}
     assert "concept_hierarchy" not in schemas
+
+
+def test_a_text_target_that_is_not_an_id_does_not_break_the_slice(tmp_path: Path) -> None:
+    receipt = _extract(tmp_path, WarehouseCursor(add_typed_vocabulary(warehouse())),
+                       spec=spec_with(typed_hierarchy()))  # fmt: skip
+
+    assert receipt["complete"] is True, receipt["incomplete"]
+    assert {row[0] for row in _slice(tmp_path, receipt, "concept")} == {1, 3, 6}
+    assert _slice(tmp_path, receipt, "edge") == {(1, 3)}

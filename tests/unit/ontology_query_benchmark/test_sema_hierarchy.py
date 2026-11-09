@@ -23,11 +23,14 @@ from showcase.ontology_query_benchmark.sema_build import (
 )
 from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts, import_library_facts
 from showcase.ontology_query_benchmark.sema_context import SContext, SContextProvider
+from showcase.ontology_query_benchmark.sema_hierarchy_sql import membership_sql
 from tests.unit.ontology_query_benchmark.hierarchy_fixture import (
     ANCHOR,
     MEMBERS,
     add_hierarchy_slice,
+    add_typed_vocabulary,
     hierarchy,
+    typed_hierarchy,
     warehouse,
 )
 from tests.unit.ontology_query_benchmark.test_sema_bindings import (
@@ -68,7 +71,9 @@ def _reader(unreadable: str | None = None) -> MagicMock:
     return MagicMock(side_effect=read)
 
 
-def _build(tmp_path: Path, facts: LibraryFacts, reader: Any = None) -> tuple[MagicMock, BuildManifest]:
+def _build(
+    tmp_path: Path, facts: LibraryFacts, reader: Any = None
+) -> tuple[MagicMock, BuildManifest]:
     loader = MagicMock()
     manifest = build_scoped_graph(
         loader, _catalog(), load_sidecar(write_fixture(tmp_path), tmp_path), facts, _embedder(),
@@ -186,3 +191,22 @@ def test_without_a_hierarchy_the_context_has_no_hierarchy_section(tmp_path: Path
 
     assert "CONCEPT HIERARCHY" not in context.text
     assert not any("insufficient evidence" in f.message for f in context.findings)
+
+
+def test_a_declared_target_type_casts_text_mapping_targets() -> None:
+    sql = membership_sql(typed_hierarchy(), "dx").replace("{anchor_id}", "1")
+
+    found = add_typed_vocabulary(warehouse()).execute(
+        f"SELECT dx FROM (VALUES ('L10'), ('L11'), ('L12')) v(dx) WHERE {sql}"
+    ).fetchall()
+    assert found == [("L10",)]
+
+
+def test_a_projection_without_the_slice_is_refused_with_the_remedy(tmp_path: Path) -> None:
+    projection, receipt = write_projection(tmp_path, {**ELEMENTS, "S1": SITE})
+
+    with pytest.raises(ValueError, match="rerun the extract"):
+        import_library_facts(
+            CONCEPT_SPEC, projection, receipt,
+            spec_attribution=Attribution.ASSISTED, hierarchy=hierarchy(),
+        )

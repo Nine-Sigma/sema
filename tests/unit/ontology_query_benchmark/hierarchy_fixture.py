@@ -73,7 +73,7 @@ def closure_rows(edges: list[tuple[str, str]], *, self_rows: bool) -> set[tuple[
     return rows
 
 
-def warehouse() -> duckdb.DuckDBPyConnection:
+def warehouse(members: tuple[str, ...] = MEMBERS) -> duckdb.DuckDBPyConnection:
     """Base library relations under the neutral profile's names plus the vocabulary."""
     con = duckdb.connect()
     for catalog, schema in ((BASE.catalog, BASE.schema_name), ("wh", "voc"), ("wh", "data")):
@@ -84,20 +84,20 @@ def warehouse() -> duckdb.DuckDBPyConnection:
     con.execute(f"CREATE TABLE {base}.{BASE.elements.relation} "
                 "(element_row_id VARCHAR, element_id VARCHAR, member_id VARCHAR)")  # fmt: skip
     con.executemany(f"INSERT INTO {base}.{BASE.elements.relation} VALUES (?, 'G1', ?)",
-                    [(f"r{i}", m) for i, m in enumerate(MEMBERS)])  # fmt: skip
+                    [(f"r{i}", m) for i, m in enumerate(members)])  # fmt: skip
     con.execute(f"CREATE TABLE {base}.{BASE.members.relation} (concept_id VARCHAR)")
     con.executemany(f"INSERT INTO {base}.{BASE.members.relation} VALUES (?)",
-                    [(m,) for m in MEMBERS])  # fmt: skip
-    _table(con, "wh.voc.concept", "cid VARCHAR, cname VARCHAR, flag VARCHAR", CONCEPTS)
-    _table(con, "wh.voc.relationship", "id_1 VARCHAR, id_2 VARCHAR, rel VARCHAR", MAPPING)
+                    [(m,) for m in members])  # fmt: skip
+    table(con, "wh.voc.concept", "cid VARCHAR, cname VARCHAR, flag VARCHAR", CONCEPTS)
+    table(con, "wh.voc.relationship", "id_1 VARCHAR, id_2 VARCHAR, rel VARCHAR", MAPPING)
     standard_self = {(cid, cid, 0) for cid, _, flag in CONCEPTS if flag == "S"}
     closure = sorted(closure_rows(PARENT_EDGES, self_rows=True) | standard_self)
-    _table(con, "wh.voc.ancestor", "anc VARCHAR, des VARCHAR, lvl INTEGER", closure)
-    _table(con, "wh.data.events", "event_id INTEGER, dx VARCHAR", list(enumerate(EVENT_VALUES)))
+    table(con, "wh.voc.ancestor", "anc VARCHAR, des VARCHAR, lvl INTEGER", closure)
+    table(con, "wh.data.events", "event_id INTEGER, dx VARCHAR", list(enumerate(EVENT_VALUES)))
     return con
 
 
-def _table(con: duckdb.DuckDBPyConnection, name: str, columns: str, rows: list[Any]) -> None:
+def table(con: duckdb.DuckDBPyConnection, name: str, columns: str, rows: list[Any]) -> None:
     con.execute(f"CREATE TABLE {name} ({columns})")
     marks = ", ".join("?" for _ in columns.split(","))
     con.executemany(f"INSERT INTO {name} VALUES ({marks})", rows)
@@ -129,8 +129,9 @@ class WarehouseCursor:
         catalog, schema, table = _relation_of(sql)
         if "information_schema.columns" in sql:
             described = self.con.execute(
-                "SELECT table_name, column_name, lower(data_type) FROM information_schema.columns"
-                " WHERE table_catalog = ? AND table_schema = ? ORDER BY table_name, ordinal_position",
+                "SELECT table_name, column_name, lower(data_type)"
+                " FROM information_schema.columns WHERE table_catalog = ? AND table_schema = ?"
+                " ORDER BY table_name, ordinal_position",
                 [catalog, schema],
             ).fetchall()
             return [(t, c, WAREHOUSE_TYPES.get(k, k)) for t, c, k in described
@@ -166,11 +167,50 @@ def add_hierarchy_slice(projection: Path, receipt: Path) -> None:
     """Write the synthetic slice into a projection and re-pin its receipt."""
     with duckdb.connect(str(projection)) as con:
         con.execute("CREATE SCHEMA concept_hierarchy")
-        _table(con, "concept_hierarchy.mapping", "id_1 VARCHAR, id_2 VARCHAR, rel VARCHAR",
+        table(con, "concept_hierarchy.mapping", "id_1 VARCHAR, id_2 VARCHAR, rel VARCHAR",
                SLICE_MAPPING)  # fmt: skip
-        _table(con, "concept_hierarchy.concept", "cid VARCHAR, cname VARCHAR, flag VARCHAR",
+        table(con, "concept_hierarchy.concept", "cid VARCHAR, cname VARCHAR, flag VARCHAR",
                SLICE_CONCEPTS)  # fmt: skip
-        _table(con, "concept_hierarchy.edge", "anc VARCHAR, des VARCHAR", SLICE_EDGES)
+        table(con, "concept_hierarchy.edge", "anc VARCHAR, des VARCHAR", SLICE_EDGES)
     raw = json.loads(receipt.read_text())
     raw["duckdb"]["sha256"] = hashlib.sha256(projection.read_bytes()).hexdigest()
     receipt.write_text(json.dumps(raw))
+
+
+def copy_hierarchy_slice(extracted: Path, projection: Path, receipt: Path) -> None:
+    """Copy an extract's hierarchy slice into a projection and re-pin its receipt."""
+    with duckdb.connect(str(projection)) as con:
+        con.execute(f"ATTACH '{extracted}' AS extracted (READ_ONLY)")
+        con.execute("CREATE SCHEMA concept_hierarchy")
+        names = con.execute(
+            "SELECT table_name FROM duckdb_tables()"
+            " WHERE database_name = 'extracted' AND schema_name = 'concept_hierarchy'"
+        ).fetchall()
+        for (name,) in names:
+            con.execute(f"CREATE TABLE concept_hierarchy.{name} AS"
+                        f" SELECT * FROM extracted.concept_hierarchy.{name}")  # fmt: skip
+    raw = json.loads(receipt.read_text())
+    raw["duckdb"]["sha256"] = hashlib.sha256(projection.read_bytes()).hexdigest()
+    receipt.write_text(json.dumps(raw))
+
+
+def typed_hierarchy() -> ConceptHierarchy:
+    """Over ``add_typed_vocabulary``: integer concept ids, a text mapping target column."""
+    return hierarchy(
+        mapping={**HIERARCHY["mapping"], "relation": "wh.num.relationship",
+                 "replacement_types": [], "target_type": "INTEGER"},
+        closure={**HIERARCHY["closure"], "relation": "wh.num.ancestor"},
+        concepts={**HIERARCHY["concepts"], "relation": "wh.num.concept"},
+    )  # fmt: skip
+
+
+def add_typed_vocabulary(con: duckdb.DuckDBPyConnection) -> duckdb.DuckDBPyConnection:
+    """One mapping target is not an id, as a text column can hold."""
+    con.execute("CREATE SCHEMA wh.num")
+    table(con, "wh.num.relationship", "id_1 VARCHAR, id_2 VARCHAR, rel VARCHAR",
+          [("L10", "3", "Maps to"), ("L11", "not-an-id", "Maps to"), ("L12", "6", "Maps to")])
+    table(con, "wh.num.ancestor", "anc INTEGER, des INTEGER, lvl INTEGER",
+          [(1, 1, 0), (1, 3, 1), (3, 3, 0), (6, 6, 0)])
+    table(con, "wh.num.concept", "cid INTEGER, cname VARCHAR, flag VARCHAR",
+          [(1, "Neoplasm", "S"), (3, "Lung neoplasm", "S"), (6, "Fracture", "S")])
+    return con

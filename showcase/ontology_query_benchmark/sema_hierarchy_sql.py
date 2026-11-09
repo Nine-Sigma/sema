@@ -24,11 +24,11 @@ def membership_sql(spec: ConceptHierarchy, column: str) -> str:
     key, source = f"a.{c.descendant_column}", f"{c.relation} a"
     if m is not None:
         key, source = f"m.{m.source_column}", f"{m.relation} m"
-        targets = [f"m.{m.target_column}"]
+        targets = [_typed(f"m.{m.target_column}", m.target_type)]
         if m.replacement_types:
             joins.append(f"LEFT JOIN {m.relation} r ON r.{m.source_column} = m.{m.target_column}"
                          f" AND r.{m.type_column} IN ({_quoted(m.replacement_types)})")  # fmt: skip
-            targets.append(f"r.{m.target_column}")
+            targets.append(_typed(f"r.{m.target_column}", m.target_type))
         joins.append(f"JOIN {c.relation} a ON a.{c.descendant_column} IN ({', '.join(targets)})")
         where.append(f"m.{m.type_column} IN ({_quoted(m.mapping_types)})")
     if k.standard_column:
@@ -63,7 +63,8 @@ def add_hierarchy(
         return
     spec = hierarchy.spec
     parts.append(f"\nCONCEPT HIERARCHY ({spec.attribution.value}; each relation read at build):")
-    parts.append(f"  {_route(spec)} {_direction(spec)} Replace {ANCHOR} with the anchor concept id.")
+    replace = f"Replace {ANCHOR} with the anchor concept id."
+    parts.append(f"  {_route(spec)} {_direction(spec)} {replace}")
     kind = "source member ids" if spec.mapping else "concept ids of the hierarchy"
     for b in columns:
         parts.append(f"  {b.table}.{b.column} holds {kind}:")
@@ -83,7 +84,8 @@ def _route(spec: ConceptHierarchy) -> str:
         route = (f"A member reaches a concept through {m.relation} where {m.type_column} in "
                  f"({_quoted(m.mapping_types)})")  # fmt: skip
         if m.replacement_types:
-            route += f", then its replacement where {m.type_column} in ({_quoted(m.replacement_types)})"
+            replaced = _quoted(m.replacement_types)
+            route += f", then its replacement where {m.type_column} in ({replaced})"
         route += "."
     if k.standard_column:
         route += (f" Only concepts with {k.relation}.{k.standard_column} in "
@@ -99,6 +101,11 @@ def _direction(spec: ConceptHierarchy) -> str:
     )
     return (f"In {c.relation}, {c.ancestor_column} is the broader concept and "
             f"{c.descendant_column} the narrower; {policy}.")  # fmt: skip
+
+
+def _typed(column: str, target_type: str | None) -> str:
+    """A text id column compared to typed concept ids; a non-id value matches nothing."""
+    return f"TRY_CAST({column} AS {target_type})" if target_type else column
 
 
 def _quoted(values: Iterable[str]) -> str:
