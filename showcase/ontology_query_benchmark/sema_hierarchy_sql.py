@@ -20,6 +20,9 @@ from showcase.ontology_query_benchmark.sema_bindings import SuppliedBinding
 from showcase.ontology_query_benchmark.sema_build_utils import Finding, LibraryFacts
 
 ANCHOR = "{anchor_id}"
+COLUMN = "{column}"
+COUNTED = ("An anchor's member count is the column's values strictly below it; a value "
+           "mapped to the anchor itself is not counted.")
 ANCHORS_PER_COLUMN = 3
 
 
@@ -95,15 +98,17 @@ def add_hierarchy(
     if not columns:
         return
     spec, own = hierarchy.spec, bool(hierarchy.own_ids)
+    found = {(b.table, b.column): ranked([a for a in anchors if (a.table, a.column)
+                                          == (b.table, b.column)], question) for b in columns}
     parts.append(f"\nCONCEPT HIERARCHY ({spec.attribution.value}; each relation read at build):")
-    parts.append(f"  {_route(spec, dialect, own)} {_direction(spec)}"
-                 f" Replace {ANCHOR} with the anchor concept id.")  # fmt: skip
+    parts.append(f"  {_route(spec, dialect, own)} {_direction(spec)} Replace {COLUMN} with a "
+                 f"value column below and {ANCHOR} with the anchor concept id. {COUNTED}")
+    parts.append(f"  WHERE {membership_sql(spec, COLUMN, dialect=dialect, own_ids=own)}")
+    parts.extend(_example(spec, found, question, dialect, own))
     kind = "source member ids" if spec.mapping else "concept ids of the hierarchy"
     for b in columns:
-        found = [a for a in anchors if (a.table, a.column) == (b.table, b.column)]
         parts.append(f"  {b.table}.{b.column} holds {kind}:")
-        parts.append(f"  WHERE {membership_sql(spec, b.column, dialect=dialect, own_ids=own)}")
-        parts.extend(_filled(spec, b.column, ranked(found, question), dialect, own))
+        parts.extend(_anchor_lines(b.column, found[(b.table, b.column)]))
 
 
 def ranked(anchors: Sequence[HierarchyAnchor], question: str) -> list[HierarchyAnchor]:
@@ -119,19 +124,25 @@ def ranked(anchors: Sequence[HierarchyAnchor], question: str) -> list[HierarchyA
     return sorted(anchors, key=key)
 
 
-def _filled(
-    spec: ConceptHierarchy, column: str, anchors: Sequence[HierarchyAnchor], dialect: str,
-    own_ids: bool,
+def _example(
+    spec: ConceptHierarchy, found: Mapping[tuple[str, str], list[HierarchyAnchor]],
+    question: str, dialect: str, own_ids: bool,
 ) -> list[str]:
-    """A filled predicate for each of the first ``ANCHORS_PER_COLUMN`` anchors."""
+    """The template filled for the best-ranked anchor across every column."""
+    best = ranked([a for anchors in found.values() for a in anchors[:1]], question)
+    if not best:
+        return []
+    a = best[0]
+    sql = membership_sql(spec, a.column, dialect=dialect, anchor=a.code, own_ids=own_ids)
+    return [f"  Filled for anchor {a.label} on {a.table}.{a.column}:", f"  WHERE {sql}"]
+
+
+def _anchor_lines(column: str, anchors: Sequence[HierarchyAnchor]) -> list[str]:
+    """The first ``ANCHORS_PER_COLUMN`` anchors, then a count of the rest."""
     lines = []
     for a in anchors[:ANCHORS_PER_COLUMN]:
         vocabulary = f" in {a.vocabulary}" if a.vocabulary else ""
-        counted = (f"{a.member_count} member values of {column} sit strictly below this "
-                   "concept; a value mapped to the concept itself is not counted")  # fmt: skip
-        lines.append(f"  anchor {a.label} = id {a.code}{vocabulary}; {counted}:")
-        sql = membership_sql(spec, column, dialect=dialect, anchor=a.code, own_ids=own_ids)
-        lines.append(f"  WHERE {sql}")
+        lines.append(f"  anchor {a.label} = id {a.code}{vocabulary}; {a.member_count} members")
     if (omitted := len(anchors) - ANCHORS_PER_COLUMN) > 0:
         lines.append(f"  {omitted} more retrieved anchors on {column} are not shown.")
     return lines

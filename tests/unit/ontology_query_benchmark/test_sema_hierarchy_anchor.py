@@ -3,6 +3,7 @@ the structured hierarchy section is the only hierarchy route the context offers.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -84,10 +85,30 @@ def context(tmp_path: Path, facts: LibraryFacts, readable: dict[str, bool] | Non
 
 
 def fragments(text: str, column: str, *, filled: bool = True) -> list[str]:
-    """The column's anchor-filled fragments, or with ``filled=False`` its template."""
-    lines = [x.strip().removeprefix("WHERE ") for x in text.splitlines()]
-    found = [x for x in lines if x.lstrip("(").startswith(f"{column} IN")]
-    return [f for f in found if ("{anchor_id}" in f) != filled]
+    """The template on ``column``, or with ``filled`` that template filled with each anchor
+    listed under the column, in listed order."""
+    lines = [x.strip() for x in text.splitlines()]
+    template = next((x.removeprefix("WHERE ") for x in lines
+                     if x.startswith("WHERE ") and "{column}" in x), None)  # fmt: skip
+    if template is None:
+        return []
+    template = template.replace("{column}", column)
+    if not filled:
+        return [template]
+    quoted = ["'" + code.replace("'", "''") + "'" for code in listed(lines, column)]
+    return [template.replace("{anchor_id}", q) for q in quoted]
+
+
+def listed(lines: list[str], column: str) -> list[str]:
+    """Anchor codes on the lines under the column's ``holds`` line."""
+    start = next(i for i, x in enumerate(lines) if f".{column} holds " in x and x.endswith(":"))
+    codes = []
+    for x in lines[start + 1:]:
+        found = re.fullmatch(r"anchor .+? = id (.+?)(?: in [^;]+)?; \d+ members", x)
+        if found is None:
+            break
+        codes.append(found.group(1))
+    return codes
 
 
 def members(con: duckdb.DuckDBPyConnection, source: str, fragment: str) -> set[str]:
@@ -104,7 +125,7 @@ def test_a_retrieved_anchor_fills_the_fragment_and_is_named(tmp_path: Path) -> N
 
     section = text[text.index("CONCEPT HIERARCHY"):]
     assert "Neoplasm" in section and "C1" in section and "std" in section
-    assert "2 member values" in section
+    assert "C1 in std; 2 members" in section
     [fragment] = fragments(text, "site_S1")
     assert members(warehouse(), EVENTS_SQL, fragment) == {"L10", "L11"}
 

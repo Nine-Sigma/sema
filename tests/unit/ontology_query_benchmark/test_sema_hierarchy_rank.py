@@ -88,7 +88,7 @@ def test_a_question_naming_no_concept_keeps_the_instruction_and_the_template(
     _, text = _acris_text(tmp_path, "How many records were filed?")
 
     assert _anchors(text) == [acris.CLASS, "OTHER DOCUMENTS"]
-    assert "Replace {anchor_id} with the anchor concept id." in text
+    assert "Replace {column} with a value column below and {anchor_id} with the anchor" in text
     assert any("{anchor_id}" in x for x in text.splitlines() if x.strip().startswith("WHERE "))
 
 
@@ -133,6 +133,19 @@ def test_the_member_count_reads_as_strict_descendants_only(tmp_path: Path) -> No
     text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS,
                  [anchor("C1", "Neoplasm", "std", 2)], "Which events?")  # fmt: skip
 
-    assert ("2 member values of site_S1 sit strictly below this concept; a value mapped to "
-            "the concept itself is not counted") in text  # fmt: skip
-    assert "2 members of" not in text
+    assert ("An anchor's member count is the column's values strictly below it; a value "
+            "mapped to the anchor itself is not counted.") in text  # fmt: skip
+    assert "anchor Neoplasm = id C1 in std; 2 members" in text
+
+
+def test_the_section_states_the_join_once_however_many_anchors_are_retrieved(
+    tmp_path: Path,
+) -> None:
+    found = [anchor(code, f"Concept {code}", "std", 1) for code in ("C1", "C2", "C3", "C5")]
+    text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found, "Which events?")
+
+    section = text[text.index("CONCEPT HIERARCHY"):]
+    predicates = [x for x in section.splitlines() if x.strip().startswith("WHERE ")]
+    assert len(predicates) == 2
+    assert "{column}" in predicates[0] and "{anchor_id}" in predicates[0]
+    assert _filled(text) == [predicates[1].strip().removeprefix("WHERE ")]

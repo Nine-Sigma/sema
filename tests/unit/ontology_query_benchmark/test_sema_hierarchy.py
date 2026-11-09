@@ -152,7 +152,7 @@ def _context(tmp_path: Path, facts: LibraryFacts, readable: dict[str, bool] | No
 
 def _fragment(text: str, column: str) -> str:
     lines = [x.strip().removeprefix("WHERE ") for x in text.splitlines()]
-    return next(x for x in lines if x.lstrip("(").startswith(f"{column} IN"))
+    return next(x for x in lines if "{column} IN" in x).replace("{column}", column)
 
 
 def test_the_fragment_returns_the_descendant_members_including_the_replaced_one(
