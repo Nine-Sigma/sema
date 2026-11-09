@@ -1,0 +1,125 @@
+"""Scoped retrieval-graph build for arm S (Neo4j and embedder mocked)."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock
+
+import pytest
+
+from sema.graph.physical_catalog import PhysicalColumn, StaticPhysicalCatalogSource
+from showcase.partner_timbr_benchmark.sema_bindings import load_sidecar
+from showcase.partner_timbr_benchmark.sema_build import (
+    BuildManifest,
+    build_scoped_graph,
+    load_library_facts,
+    read_manifest,
+    write_manifest,
+)
+from tests.unit.partner_timbr_benchmark.test_sema_bindings import (
+    DEMO,
+    TUMOR,
+    catalog_fixture,
+    write_fixture,
+)
+
+pytestmark = pytest.mark.unit
+
+
+def _catalog() -> StaticPhysicalCatalogSource:
+    return StaticPhysicalCatalogSource({
+        ("cat", "sch", table): [PhysicalColumn(c, t, True) for c, t in cols.items()]
+        for table, cols in catalog_fixture().items()
+    })
+
+
+def _embedder() -> MagicMock:
+    embedder = MagicMock()
+    embedder.embed_documents.side_effect = lambda texts: [[0.5] * 4 for _ in texts]
+    return embedder
+
+
+def _build(tmp_path: Path) -> tuple[MagicMock, MagicMock, BuildManifest]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    sidecar_path, facts_path = write_fixture(tmp_path)
+    loader, embedder = MagicMock(), _embedder()
+    manifest = build_scoped_graph(
+        loader, _catalog(), load_sidecar(sidecar_path),
+        load_library_facts(facts_path), embedder, dimensions=4,
+    )
+    return loader, embedder, manifest
+
+
+def _cypher_params(loader: MagicMock) -> list[dict[str, Any]]:
+    return [c.kwargs for c in loader._run.call_args_list]
+
+
+def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
+    loader, _, _ = _build(tmp_path)
+    props = {
+        (p["entity_name"], p["name"]) for p in _cypher_params(loader)
+        if "semantic_type" in p
+    }
+    assert (DEMO, "gender_G1") in props
+    assert (DEMO, "gender_G1_label") in props
+    assert (TUMOR, "site_S1") in props
+    assert not {name for _, name in props} & {"derived_x", "ghost_col", "age_years"}
+    roles = {p["model_role"] for p in _cypher_params(loader) if "model_role" in p}
+    assert roles == {"BENCH_S"}
+
+
+def test_value_sets_hold_complete_lists_only(tmp_path: Path) -> None:
+    loader, _, manifest = _build(tmp_path)
+    anchored = {c.args[1] for c in loader.upsert_value_set.call_args_list}
+    assert anchored == {"gender_G1", "vital_V1"}
+    members = {c.args[0] for c in loader.add_term_to_value_set.call_args_list}
+    assert members == {"PRT8532", "PRT8507", "PRT1", "PRT2"}
+    assert any("C1" in f and "unloaded" in f for f in manifest.findings)
+    assert any("S1" in f and "reference" in f for f in manifest.notes)
+
+
+def test_entities_and_properties_are_embedded_with_library_text(
+    tmp_path: Path,
+) -> None:
+    loader, embedder, _ = _build(tmp_path)
+    texts = [t for c in embedder.embed_documents.call_args_list for t in c.args[0]]
+    assert any(t.startswith("Administrative gender") for t in texts)
+    matches = {
+        (c.kwargs["label"], tuple(sorted(c.kwargs["match"].items())))
+        for c in loader.set_node_embedding.call_args_list
+    }
+    assert ("Property", (("entity_name", DEMO), ("name", "gender_G1"))) in matches
+    assert ("Entity", (("name", TUMOR),)) in matches
+    loader.create_vector_index.assert_any_call("property_embedding_index", "Property", 4)
+
+
+def test_join_from_spec_relationship_is_materialized(tmp_path: Path) -> None:
+    loader, _, _ = _build(tmp_path)
+    loader.upsert_join_path.assert_called_once()
+    predicates = str(loader.upsert_join_path.call_args)
+    assert "mrn_PRT1" in predicates and DEMO in predicates and TUMOR in predicates
+
+
+def test_graph_identity_tracks_inputs(tmp_path: Path) -> None:
+    _, _, first = _build(tmp_path / "a")
+    _, _, again = _build(tmp_path / "a")
+    assert first.graph_identity == again.graph_identity
+    facts_path = tmp_path / "a" / "facts.json"
+    raw = json.loads(facts_path.read_text())
+    raw["data_elements"]["G1"]["members"].pop()
+    raw["data_elements"]["G1"]["pv_count"] = 1
+    facts_path.write_text(json.dumps(raw))
+    changed = build_scoped_graph(
+        MagicMock(), _catalog(), load_sidecar(tmp_path / "a" / "sidecar.json"),
+        load_library_facts(facts_path), _embedder(), dimensions=4,
+    )
+    assert changed.graph_identity != first.graph_identity
+
+
+def test_manifest_round_trips(tmp_path: Path) -> None:
+    _, _, manifest = _build(tmp_path)
+    path = tmp_path / "manifest.json"
+    write_manifest(manifest, path)
+    assert read_manifest(path) == manifest
