@@ -1,8 +1,9 @@
 """Compile an :class:`EntityIdentity` into one CTE with one row per entity.
 
 Each attribute takes its value from the first row of a ``ROW_NUMBER`` ordering:
-preferred rows first, in their ranked order, then the rule's ordering column with nulls last, then the
-lowest attribute value when the rule orders by another column. Null ordering is a
+preferred rows that carry a value first, in their ranked order, then the rule's
+ordering column with nulls last, then the lowest attribute value when the rule
+orders by another column. Null ordering is a
 ``CASE`` term, so the SQL means the same in every dialect.
 """
 
@@ -47,19 +48,17 @@ def _lowest_value_breaks_ties(column: str) -> list[exp.Ordered]:
     return _nulls_last(column, descending=False)
 
 
-def _preferred_first(prefer: PreferredValue | None) -> list[exp.Ordered]:
-    if prefer is None:
-        return []
-    rank = exp.Case()
+def _preferred_first(prefer: PreferredValue, column: str) -> list[exp.Ordered]:
+    unpreferred = exp.Literal.number(len(prefer.ranked))
+    rank = exp.Case().when(_col(column).is_(exp.null()), unpreferred)
     for position, value in enumerate(prefer.ranked):
         rank = rank.when(_col(prefer.column).eq(exp.convert(value)), exp.Literal.number(position))
-    rank = rank.else_(exp.Literal.number(len(prefer.ranked)))
-    return [exp.Ordered(this=rank, desc=False)]
+    return [exp.Ordered(this=rank.else_(unpreferred), desc=False)]
 
 
 def _ordering(attribute: ResolvedAttribute) -> list[exp.Ordered]:
     descending = attribute.rule in _DESCENDING
-    terms = _preferred_first(attribute.prefer)
+    terms = _preferred_first(attribute.prefer, attribute.column) if attribute.prefer else []
     terms += _nulls_last(attribute.by or attribute.column, descending=descending)
     if attribute.by:
         terms += _lowest_value_breaks_ties(attribute.column)
