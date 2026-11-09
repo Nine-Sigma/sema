@@ -155,7 +155,8 @@ def _read(
         if after.get(name) != before[name][0]
     ]
     if spec.concept_hierarchy is not None:
-        members = relations[0].ids(spec.elements.member_key)
+        elements = next(r for r in relations if r.name == spec.elements.relation)
+        members = elements.ids(spec.elements.member_key)
         slices, short = read_hierarchy(reader.rows, spec.concept_hierarchy, members, row_limit)
         relations += [_Relation(s.name, s.columns, s.updated_at, s.comment, s.expected, s.rows,
                                 SCHEMA, s.source) for s in slices]  # fmt: skip
