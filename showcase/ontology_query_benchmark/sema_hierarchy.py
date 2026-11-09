@@ -24,12 +24,14 @@ Edge = tuple[str, str]
 
 @dataclass(frozen=True)
 class HierarchyFacts:
-    """``edges`` are (parent, child); ``bridges`` are (member, standard concept)."""
+    """``edges`` are (parent, child); ``bridges`` are (member, standard concept);
+    ``targets`` are every concept id the slice's mapping rows point at."""
 
     spec: ConceptHierarchy
     names: Mapping[str, str]
     edges: tuple[Edge, ...]
     bridges: tuple[Edge, ...]
+    targets: frozenset[str]
 
     def reaches(self, member: str) -> bool:
         if self.spec.mapping is None:
@@ -53,7 +55,8 @@ def load_hierarchy(projection: Path, spec: ConceptHierarchy) -> HierarchyFacts:
         if spec.concepts.standard_column is None or row[2] in spec.concepts.standard_values
     }
     names = {str(row[0]): str(row[1]) for row in concepts}
-    return HierarchyFacts(spec, names, edges, _bridges(spec, mapping, standard))
+    targets = frozenset(str(row[1]) for row in mapping)
+    return HierarchyFacts(spec, names, edges, _bridges(spec, mapping, standard), targets)
 
 
 def _rows(con: duckdb.DuckDBPyConnection, table: str) -> list[tuple[object, ...]]:
@@ -112,15 +115,18 @@ def write_hierarchy(
             "value_bridges": len(facts.bridges)}  # fmt: skip
 
 
-def release_findings(spec: ConceptHierarchy) -> list[str]:
+def release_findings(facts: HierarchyFacts) -> list[str]:
+    spec, mapping = facts.spec, facts.spec.mapping
+    found = []
     if spec.release is None:
-        return ["concept hierarchy declares no vocabulary release; its relations may mix "
-                "releases and drop join rows silently"]  # fmt: skip
-    return [
-        f"hierarchy relation {r} is outside vocabulary release {spec.release}; "
-        "joins across it are unverified"
-        for r in spec.release_exempt
-    ]
+        found.append("concept hierarchy declares no vocabulary release; its relations may "
+                     "mix releases and drop join rows silently")  # fmt: skip
+    absent = facts.targets - set(facts.names)
+    if mapping is not None and absent:
+        found.append(f"{len(absent)} of {len(facts.targets)} mapping targets in "
+                     f"{mapping.relation} have no row in {spec.concepts.relation}; "
+                     "members mapped to them reach no concept")  # fmt: skip
+    return found
 
 
 def check_relations(

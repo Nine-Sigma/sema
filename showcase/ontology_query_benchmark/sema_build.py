@@ -130,7 +130,7 @@ def _hierarchy(
         library_codes=set(facts.concepts), source_schema=sidecar.schema,
     )
     relations, findings = check_relations(facts.hierarchy.spec, reader)
-    return counts, relations, (*release_findings(facts.hierarchy.spec), *findings)
+    return counts, relations, (*release_findings(facts.hierarchy), *findings)
 
 
 def read_catalog(

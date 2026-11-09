@@ -172,6 +172,11 @@ def add_hierarchy_slice(projection: Path, receipt: Path) -> None:
         table(con, "concept_hierarchy.concept", "cid VARCHAR, cname VARCHAR, flag VARCHAR",
                SLICE_CONCEPTS)  # fmt: skip
         table(con, "concept_hierarchy.edge", "anc VARCHAR, des VARCHAR", SLICE_EDGES)
+    repin(projection, receipt)
+
+
+def repin(projection: Path, receipt: Path) -> None:
+    """Pin the receipt to the projection as it is now."""
     raw = json.loads(receipt.read_text())
     raw["duckdb"]["sha256"] = hashlib.sha256(projection.read_bytes()).hexdigest()
     receipt.write_text(json.dumps(raw))
