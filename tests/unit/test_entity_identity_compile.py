@@ -6,6 +6,8 @@ from typing import Any
 
 import duckdb
 import pytest
+import sqlglot
+import sqlglot.expressions as exp
 
 from sema.compile.entity_identity import identity_cte_sql
 from sema.models.target.identity import EntityIdentity
@@ -15,12 +17,14 @@ pytestmark = pytest.mark.unit
 VISITS = "visit_id VARCHAR, site VARCHAR, seen_on INTEGER, ward VARCHAR, ward_kind VARCHAR"
 
 
-def _resolve(identity: dict[str, Any], columns: str, rows: list[tuple[Any, ...]]) -> list[Any]:
+def _resolve(
+    identity: dict[str, Any], columns: str, rows: list[tuple[Any, ...]], dialect: str | None = None
+) -> list[Any]:
     con = duckdb.connect()
     con.execute(f"CREATE TABLE src ({columns})")
     marks = ", ".join("?" for _ in columns.split(","))
     con.executemany(f"INSERT INTO src VALUES ({marks})", rows)
-    cte = identity_cte_sql("entity", "src", EntityIdentity.model_validate(identity))
+    cte = identity_cte_sql("entity", "src", EntityIdentity.model_validate(identity), dialect)
     return con.execute(f"{cte} SELECT * FROM entity ORDER BY ALL NULLS LAST").fetchall()
 
 
@@ -175,3 +179,60 @@ def test_the_cte_names_the_relation_and_the_entity() -> None:
     sql = identity_cte_sql("visit", "cat.sch.visits", EntityIdentity(key_columns=("visit_id",)))
     assert sql.startswith("WITH visit AS (")
     assert "cat.sch.visits" in sql
+
+
+WAREHOUSE_DIALECTS = ("databricks", "spark", "postgres")
+
+
+@pytest.mark.parametrize("dialect", ["duckdb", *WAREHOUSE_DIALECTS])
+def test_each_row_number_window_is_ordered(dialect: str) -> None:
+    identity = EntityIdentity.model_validate({"key_columns": ["visit_id", "site"],
+        "null_keys_group": False, "attributes": FIRST_SEEN})  # fmt: skip
+    sql = identity_cte_sql("entity", "cat.sch.visits", identity, dialect=dialect)
+    tree = sqlglot.parse_one(f"{sql} SELECT * FROM entity", read=dialect)
+    windows = list(tree.find_all(exp.Window))
+    assert len(windows) == 2
+    assert all(w.args.get("order") is not None for w in windows)
+
+
+RESERVED_AND_UPPER = {"key_columns": ["order", "SERIALNO"], "null_keys_group": False,
+                      "attributes": [{"column": "select", "rule": "min"}]}  # fmt: skip
+RESERVED_COLUMNS = '"order" INTEGER, SERIALNO VARCHAR, "select" INTEGER'
+
+
+@pytest.mark.parametrize("dialect", ["duckdb", *WAREHOUSE_DIALECTS])
+def test_every_column_is_quoted_in_the_warehouse_dialect(dialect: str) -> None:
+    identity = EntityIdentity.model_validate(RESERVED_AND_UPPER)
+    sql = identity_cte_sql("entity", "cat.sch.visits", identity, dialect=dialect)
+    tree = sqlglot.parse_one(f"{sql} SELECT * FROM entity", read=dialect)
+    columns = [c.this for c in tree.find_all(exp.Column)]
+    assert {c.name for c in columns} >= {"order", "SERIALNO", "select"}
+    assert all(c.quoted for c in columns)
+
+
+@pytest.mark.parametrize("dialect", ["duckdb", "postgres"])
+def test_reserved_and_upper_case_columns_execute(dialect: str) -> None:
+    rows = [(1, "2024HU01", 3), (1, "2024HU01", 2), (None, "2024HU02", 5), (None, "2024HU02", 4)]
+    assert _resolve(RESERVED_AND_UPPER, RESERVED_COLUMNS, rows, dialect) == [
+        (1, "2024HU01", 2), (None, "2024HU02", 4), (None, "2024HU02", 5),
+    ]
+
+
+@pytest.mark.parametrize(("rule", "by_rule"), [("min", "w1"), ("min_by", "w2")])
+def test_a_preferred_row_without_a_value_yields_to_the_rule(rule: str, by_rule: str) -> None:
+    by = {"by": "seen_on"} if rule == "min_by" else {}
+    prefer = {"column": "ward_kind", "value": "primary"}
+    identity = {"key_columns": ["visit_id"],
+                "attributes": [{"column": "ward", "rule": rule, **by, "prefer": prefer}]}  # fmt: skip
+    rows = [("v1", "a", 3, None, "primary"), ("v1", "a", 2, "w2", "other"),
+            ("v1", "a", 4, "w1", "other"), ("v2", "a", 1, None, "primary")]  # fmt: skip
+    assert _resolve(identity, VISITS, rows) == [("v1", by_rule), ("v2", None)]
+
+
+def test_source_columns_named_like_internal_columns_do_not_change_the_result() -> None:
+    identity = {"key_columns": ["k"], "null_keys_group": False, "attributes": [
+        {"column": "v", "rule": "min"}, {"column": "_rank_v", "rule": "max", "name": "r"},
+    ]}  # fmt: skip
+    columns = "k VARCHAR, v INTEGER, _rank_v INTEGER, _null_key_row INTEGER"
+    rows = [("a", 2, 7, 9), ("a", 1, 8, 9), (None, 3, 9, 1), (None, 4, 9, 1)]
+    assert _resolve(identity, columns, rows) == [("a", 1, 8), (None, 3, 9), (None, 4, 9)]
