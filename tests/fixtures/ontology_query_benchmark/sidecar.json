@@ -14,7 +14,8 @@
  "concept_vocabulary": "lib",
  "physical": {
   "catalog": "cat",
-  "schema": "sch"
+  "schema": "sch",
+  "sql_dialect": "duckdb"
  },
  "specs": [
   {

@@ -94,8 +94,9 @@ def _provider(
     graph_identity: str = "graph-1",
     denied: Mapping[str, tuple[str, ...]] | None = None,
     grain_note: str | None = None,
+    **fixture: Any,
 ) -> SContextProvider:
-    sidecar = load_sidecar(write_fixture(tmp_path), tmp_path)
+    sidecar = load_sidecar(write_fixture(tmp_path, **fixture), tmp_path)
     if grain_note is not None:
         sidecar = dataclasses.replace(sidecar, grain_note=grain_note)
     if list_limit is not None:

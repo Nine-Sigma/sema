@@ -77,11 +77,14 @@ def _people_spec() -> dict[str, Any]:
     }
 
 
-def _events_spec() -> dict[str, Any]:
+def _events_spec(identity: dict[str, Any] | None = None) -> dict[str, Any]:
+    entity: dict[str, Any] = {"entity_id": "event", "grain": "one row per event row",
+                              "key_columns": ["row_id"]}
+    if identity is not None:
+        entity["identity"] = identity
     return {
         "product_id": "events",
-        "entities": [{"entity_id": "event", "grain": "one row per event row",
-                      "key_columns": ["row_id"]}],
+        "entities": [entity],
         "fields": [
             _scalar("event", f"row-surrogate-id{ID_SUFFIX}", "row_id", "STRING"),
             _scalar("event", f"record-id{ID_SUFFIX}", RID, "STRING"),
@@ -178,26 +181,41 @@ def facts_fixture(tmp_path: Path, assistance: str = "supplied") -> LibraryFacts:
     )
 
 
-def write_fixture(tmp_path: Path) -> Path:
-    """Write a two-product sidecar; return its path."""
+def write_fixture(
+    tmp_path: Path,
+    *,
+    events_identity: dict[str, Any] | None = None,
+    events_overlay: dict[str, Any] | None = None,
+    sql_dialect: str | None = "duckdb",
+) -> Path:
+    """Write a two-product sidecar; return its path.
+
+    ``events_overlay`` is the sidecar's identity overlay for the events product;
+    ``sql_dialect=None`` leaves the warehouse dialect undeclared.
+    """
     tmp_path.mkdir(parents=True, exist_ok=True)
     pins = []
     for product, table, spec, attribution in (
         ("people", PEOPLE, _people_spec(), "supplied"),
-        ("events", EVENTS, _events_spec(), "assisted"),
+        ("events", EVENTS, _events_spec(events_identity), "assisted"),
     ):
         path = tmp_path / f"{product}.json"
         path.write_text(json.dumps(spec))
         pins.append({"product": product, "table": table, "path": path.name,
                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                      "attribution": attribution})
+    if events_overlay is not None:
+        pins[1]["entity_identity"] = events_overlay
+    physical = {"catalog": "cat", "schema": "sch"}
+    if sql_dialect is not None:
+        physical["sql_dialect"] = sql_dialect
     sidecar = {
         "schema_version": 1, "sidecar_version": "t-1",
         "authority": "Spec test authority", "attribution": "supplied",
         "approval_policy": {"kind": "supplied_approved",
                             "executable_strategies": ["scalar", "pass_through"]},
         "model_role": "BENCH_S", "concept_vocabulary": "lib",
-        "physical": {"catalog": "cat", "schema": "sch"},
+        "physical": physical,
         "specs": pins,
         "conventions": {"path": "rules.json", "file_sha256": "x",
                         "conventions_sha256": hashlib.sha256(
@@ -312,3 +330,25 @@ def test_a_spec_that_breaks_the_declared_format_is_refused_at_load(tmp_path: Pat
     sidecar = load_sidecar(_repin_people(tmp_path, spec), tmp_path)
     with pytest.raises(ValueError, match="people.json"):
         load_products(sidecar)
+
+
+def test_a_spec_declaring_two_entity_identities_is_refused_at_load(tmp_path: Path) -> None:
+    spec = _people_spec()
+    identity = {"key_columns": [RID]}
+    spec["entities"] = [{"entity_id": name, "key_columns": [RID], "identity": identity}
+                        for name in ("person", "member")]  # fmt: skip
+    sidecar = load_sidecar(_repin_people(tmp_path, spec), tmp_path)
+    with pytest.raises(ValueError, match="one entity identity"):
+        load_products(sidecar)
+
+
+def test_an_entity_identity_is_read_from_the_spec(tmp_path: Path) -> None:
+    identity = {"key_columns": [RID, "site_S1"], "exclude_null_keys": True}
+    sidecar = load_sidecar(write_fixture(tmp_path, events_identity=identity), tmp_path)
+    events = next(p for p in load_products(sidecar) if p.pin.product == "events")
+    (entity,) = events.doc.entities
+    assert entity.entity_id == "event"
+    assert entity.identity is not None
+    assert entity.identity.key_columns == (RID, "site_S1")
+    assert entity.identity.exclude_null_keys is True
+

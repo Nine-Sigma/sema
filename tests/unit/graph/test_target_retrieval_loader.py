@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -100,3 +101,45 @@ def test_projection_raises_on_catalog_drift() -> None:
     )
     with pytest.raises(CatalogDriftError, match="absent"):
         project_target_to_retrieval_graph(MagicMock(), model, binding, catalog)
+
+
+def _projected_entity(identity: dict[str, object] | None, columns: list[str]) -> dict[str, object]:
+    model = _model([_prop("visit_id", "integer")])
+    if identity is not None:
+        entity = model.entities[0].model_copy(
+            update={"identity": TargetEntityDecl.model_validate(
+                {"ref": model.entities[0].ref, "identity": identity}).identity}
+        )
+        model = model.model_copy(update={"entities": [entity]})
+    binding = PhysicalSchemaBinding(
+        catalog="c", schema="s", entity_tables=(EntityTableBinding("ns.thing", "thing"),),
+    )
+    catalog = StaticPhysicalCatalogSource(
+        {("c", "s", "thing"): [PhysicalColumn(name, "STRING", True) for name in columns]}
+    )
+    loader = MagicMock()
+    project_target_to_retrieval_graph(loader, model, binding, catalog)
+    (params,) = [c.kwargs for c in loader._run.call_args_list if "identity" in c.kwargs]
+    return params
+
+
+IDENTITY = {"key_columns": ["visit_id"], "exclude_null_keys": True,
+            "attributes": [{"column": "ward", "rule": "min_by", "by": "seen_on"}]}  # fmt: skip
+
+
+def test_an_identity_block_is_projected_onto_the_entity_node() -> None:
+    params = _projected_entity(IDENTITY, ["visit_id", "ward", "seen_on"])
+    assert json.loads(str(params["identity"])) == {
+        "key_columns": ["visit_id"], "exclude_null_keys": True, "null_keys_group": True,
+        "attributes": [{"column": "ward", "rule": "min_by", "by": "seen_on",
+                        "prefer": None, "name": None}],
+    }  # fmt: skip
+
+
+def test_an_entity_without_identity_projects_no_identity() -> None:
+    assert _projected_entity(None, ["visit_id"])["identity"] is None
+
+
+def test_an_identity_column_missing_from_the_catalog_is_drift() -> None:
+    with pytest.raises(CatalogDriftError, match="seen_on"):
+        _projected_entity(IDENTITY, ["visit_id", "ward"])

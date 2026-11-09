@@ -2,8 +2,9 @@
 
 Physical assets and joins reuse SEMA's nl2sql section renderers. The added
 sections render supplied binding evidence, the SCO's governed values (complete
-lists only, otherwise an executable membership reference), grain and the supplied
-hierarchy relation facts. Business rules are referenced by hash, never restated.
+lists only, otherwise an executable membership reference), grain, any declared entity
+identity as an executable CTE, and the supplied hierarchy relation facts. Business
+rules are referenced by hash, never restated.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import string
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
+from sema.compile.entity_identity import identity_cte_sql
 from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
 from sema.models.context import SemanticContextObject
 from showcase.ontology_query_benchmark.product_spec import SpecEntity, SpecRelationship
@@ -247,6 +249,7 @@ def _add_grain(
             units = _grain_units(rendering, exposure, table, relation, entity)
             if units:
                 lines.append((f"  {relation}: {'; '.join(units)}", [], "grain line"))
+            lines.extend(_executable_entity(entity, p, sidecar))
         for rel in p.doc.relationships:
             target = _table_of(products, rel)
             pairs = " AND ".join(
@@ -285,6 +288,20 @@ def _grain_units(
     if _kept(rendering, exposure, keys, relation, "grain key"):
         units.append(f"key {', '.join(entity.key_columns)}")
     return units
+
+
+def _executable_entity(
+    entity: SpecEntity, product: ProductSpec, sidecar: Sidecar
+) -> list[tuple[str, list[TableColumn], str]]:
+    if entity.identity is None:
+        return []
+    name = entity.entity_id or product.pin.product
+    keys = ", ".join(entity.identity.key_columns)
+    relation = sidecar.relation(product.pin.table)
+    cte = identity_cte_sql(name, relation, entity.identity, dialect=sidecar.sql_dialect)
+    names = [(product.pin.table, c) for c in entity.identity.columns]
+    text = f"  ENTITY {name} (executable; one row per {keys}):\n    {cte}"
+    return [(text, names, "entity identity")]
 
 
 def _table_of(products: tuple[ProductSpec, ...], rel: SpecRelationship) -> str:

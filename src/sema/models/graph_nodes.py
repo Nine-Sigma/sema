@@ -4,13 +4,14 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, Json, model_validator
 
 from sema.models.planner._enums import ModelRole, TargetArtifactKind
 from sema.models.planner._role_validation import (
     require_kind_matches_role,
     require_role_identifier,
 )
+from sema.models.target.identity import EntityIdentity
 
 
 class SemanticType(str, Enum):
@@ -73,6 +74,7 @@ class Entity(BaseModel):
     source_id: str | None = None
     target_model_id: str | None = None
     kind: TargetArtifactKind | None = None
+    identity: Json[EntityIdentity] | None = None
 
     @model_validator(mode="after")
     def _validate_role(self) -> Self:

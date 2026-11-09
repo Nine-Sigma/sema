@@ -192,6 +192,7 @@ def target_model(
             ),
             properties=_properties(resolution.approved(), p, catalog[p.pin.table]),
             declared_joins=_declared_joins(sidecar, p),
+            identity=p.doc.identity_entity.identity if p.doc.identity_entity else None,
         )
         for p in products
     ]
