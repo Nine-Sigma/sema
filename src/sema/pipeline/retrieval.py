@@ -245,7 +245,9 @@ class RetrievalEngine:
                 "confidence_policy": "structural",
             })
 
+        parents = {c["table"]: c for c in candidates if c["type"] == "entity"}
         for v in expansion.get("values", []):
+            parent = parents.get(v.get("table", ""), {})
             candidates.append({
                 "type": "value",
                 "property_name": v.get("property", ""),
@@ -253,8 +255,8 @@ class RetrievalEngine:
                 "table": v.get("table", ""),
                 "code": v.get("code", ""),
                 "label": v.get("label", ""),
-                "status": "auto",
-                "confidence": 0.5,
+                "status": parent.get("status", "auto"),
+                "confidence": parent.get("confidence", 0.5),
                 "confidence_policy": "semantic",
             })
 
