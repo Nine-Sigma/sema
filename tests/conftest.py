@@ -12,6 +12,30 @@ from sema.models.assertions import (
     AssertionStatus,
 )
 
+PROVIDER_ENV_PREFIXES = (
+    "EMBEDDING_",
+    "LLM_",
+    "OPENROUTER_",
+    "INTAKE_MODEL_",
+    "INTAKE_TRACING_",
+    "DATABRICKS_",
+    "MLFLOW_",
+    "LANGCHAIN_",
+    "LANGSMITH_",
+)
+
+
+@pytest.fixture(autouse=True)
+def no_provider_env(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A unit test sets every provider variable it needs; the shell's and a .env's never apply."""
+    if request.node.get_closest_marker("unit") is None:
+        return
+    for name in [name for name in os.environ if name.startswith(PROVIDER_ENV_PREFIXES)]:
+        monkeypatch.delenv(name)
+    monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
+    # Without a host the Databricks SDK falls back to ~/.databrickscfg profiles.
+    monkeypatch.setenv("DATABRICKS_CONFIG_FILE", os.devnull)
+
 
 @pytest.fixture
 def neo4j_driver():
