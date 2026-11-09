@@ -15,8 +15,9 @@ receipts.jsonl; a slot whose latest receipt has an outcome other than ``unrun`` 
 run again. An exception from a context provider or executor becomes a ``runner_error``
 receipt and the run continues. Spend and elapsed time are checked before each slot: when
 either reaches its ceiling every remaining slot is written ``unrun`` with the reason, so a
-run can overshoot a ceiling by at most one slot (three generations). Elapsed time counts
-from the start of this invocation.
+run can overshoot a ceiling by at most one slot (three generations). Each receipt records
+its slot's ``wall_s``; elapsed time is the wall time earlier invocations recorded plus the
+time since this invocation started.
 """
 
 import argparse
@@ -158,23 +159,24 @@ def _earliest_stage(record: dict[str, Any], meter: Meter, outcome: str) -> str |
     return min(stages, key=STAGES.index) if stages else None
 
 
-def recorded(receipts: Path) -> tuple[set[str], float]:
-    """Slot ids whose latest receipt has an outcome, and the spend recorded so far."""
+def recorded(receipts: Path) -> tuple[set[str], float, float]:
+    """Slot ids whose latest receipt has an outcome, and the spend and wall time so far."""
     latest: dict[str, dict[str, Any]] = {}
-    spent = 0.0
+    spent = wall = 0.0
     if receipts.is_file():
         for line in receipts.read_text().splitlines():
             entry = json.loads(line)
             latest[entry["slot_id"]] = entry
             spent += float(entry.get("cost_usd") or 0.0)
-    return {sid for sid, e in latest.items() if e.get("outcome") != "unrun"}, spent
+            wall += float(entry.get("wall_s") or 0.0)
+    return {sid for sid, e in latest.items() if e.get("outcome") != "unrun"}, spent, wall
 
 
 def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[str, Any],
         model: Any, contracts: Mapping[str, scorer.Contract], harness: SimpleNamespace,
         settings: RunSettings, receipts: Path,
         clock: Callable[[], float] = time.monotonic) -> dict[str, Any]:  # fmt: skip
-    done, spent = recorded(receipts)
+    done, spent, prior_wall = recorded(receipts)
     start = clock()
     stopped: str | None = None
     outcomes: Counter[str] = Counter()
@@ -183,13 +185,15 @@ def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[s
         for slot in slots:
             if slot.slot_id in done:
                 continue
-            stopped = _stop_reason(spent, clock() - start, settings)
+            began = clock()
+            stopped = _stop_reason(spent, prior_wall + began - start, settings)
             if stopped:
                 entry = {**_slot_fields(slot), "outcome": "unrun", "reason": stopped}
             else:
                 entry = run_slot(slot, questions[slot.question_id], runtimes[slot.arm], model,
                                  contracts[slot.question_id], harness, settings)  # fmt: skip
                 spent += entry["cost_usd"]
+                entry["wall_s"] = round(clock() - began, 6)
             outcomes[entry["outcome"]] += 1
             handle.write(json.dumps(entry, sort_keys=True, default=str) + "\n")
             handle.flush()

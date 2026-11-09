@@ -253,6 +253,20 @@ def test_time_ceiling_stops_and_marks_the_rest_unrun(
     assert [r["outcome"] for r in receipts] == ["correct", "unrun", "unrun"]
     assert [r.get("reason") for r in receipts[1:]] == ["time_ceiling"] * 2
     assert summary["stopped"] == "time_ceiling" and len(model.calls) == 1
+    assert receipts[0]["wall_s"] == 6.0
+
+
+def test_a_resumed_run_counts_the_wall_time_its_receipts_recorded(
+    harness: SimpleNamespace, frozen: Path, profile: Profile, tmp_path: Path
+) -> None:
+    out, ticks = tmp_path / "receipts.jsonl", itertools.count(0.0, 6.0)
+    prior = {"slot_id": "S:R01:1", "outcome": "wrong", "cost_usd": 0.0, "wall_s": 9.0}
+    out.write_text(json.dumps(prior) + "\n")
+    model = FakeModel(harness, [R01_SQL])
+    run_settings = dataclasses.replace(settings(profile), max_wall_s=10.0)
+    summary = _run(harness, frozen, profile, out, model, run_settings, clock=lambda: next(ticks))
+    assert [r.get("reason") for r in _receipts(out)[1:]] == ["time_ceiling"] * 2
+    assert summary["stopped"] == "time_ceiling" and model.calls == []
 
 
 def test_b_executor_refuses_engine_side_llm_tools(profile: Profile) -> None:
