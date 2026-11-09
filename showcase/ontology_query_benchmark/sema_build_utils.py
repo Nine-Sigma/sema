@@ -11,7 +11,7 @@ import json
 import shutil
 import tempfile
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +34,7 @@ from sema.models.target.normalized import NormalizedTargetModel
 from sema.models.target.properties import TargetPropertyDecl
 from sema.models.target.refs import TargetEntityRef
 from showcase.ontology_query_benchmark.product_spec import CompanionRole
-from showcase.ontology_query_benchmark.profile import Attribution
+from showcase.ontology_query_benchmark.profile import Attribution, ConceptHierarchy
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     InputFile,
@@ -43,6 +43,7 @@ from showcase.ontology_query_benchmark.sema_bindings import (
     SpecPinError,
     SuppliedBinding,
 )
+from showcase.ontology_query_benchmark.sema_hierarchy import HierarchyFacts, load_hierarchy
 
 COMPANION_TEXT = {
     CompanionRole.LABEL: "label text",
@@ -68,10 +69,12 @@ class LibraryFacts:
     elements: Mapping[str, ElementFacts]
     concepts: Mapping[str, ConceptDetail]
     inputs: tuple[InputFile, ...]
+    hierarchy: HierarchyFacts | None = None
 
 
 def import_library_facts(
-    spec_path: Path, projection: Path, receipt: Path, *, spec_attribution: Attribution
+    spec_path: Path, projection: Path, receipt: Path, *, spec_attribution: Attribution,
+    hierarchy: ConceptHierarchy | None = None,
 ) -> LibraryFacts:
     """Run the concept-source importer over a receipted projection copy."""
     digest, assistance = _check_receipt(projection, receipt)
@@ -87,13 +90,16 @@ def import_library_facts(
             )
         finally:
             staging.close()
-    identity = hashlib.sha256(spec_bytes + digest.encode()).hexdigest()
+        loaded = load_hierarchy(copy, hierarchy) if hierarchy else None
+    pinned = hierarchy.model_dump_json().encode() if hierarchy else b""
+    identity = hashlib.sha256(spec_bytes + digest.encode() + pinned).hexdigest()
     inputs = (
         InputFile("concept_spec", str(spec_path), hashlib.sha256(spec_bytes).hexdigest(),
                   spec_attribution),
         InputFile("projection", str(projection), digest, assistance),
     )
-    return _facts(f"{spec.id}@{spec.release}", identity, imported.manifest, inputs)
+    facts = _facts(f"{spec.id}@{spec.release}", identity, imported.manifest, inputs)
+    return replace(facts, hierarchy=loaded)
 
 
 def _check_receipt(projection: Path, receipt: Path) -> tuple[str, Attribution]:

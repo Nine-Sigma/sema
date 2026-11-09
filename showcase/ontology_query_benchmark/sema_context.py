@@ -83,6 +83,7 @@ class SContextProvider:
         conventions: tuple[str, ...],
         limits: Limits,
         top_k: int = 10,
+        hierarchy_relations: dict[str, bool] | None = None,
     ) -> None:
         self._retriever = retriever
         self._sidecar = sidecar
@@ -93,6 +94,7 @@ class SContextProvider:
         self._conventions = conventions
         self._limits = limits
         self._top_k = top_k
+        self._hierarchy_relations = hierarchy_relations
 
     @property
     def facts(self) -> LibraryFacts:
@@ -109,6 +111,7 @@ class SContextProvider:
         rendering = render(
             Rendering(prune_to_sco(candidates)), self._sidecar,
             self._products, self._resolution, self._facts,
+            readable=self._hierarchy_relations,
         )
         header = (
             f"SEMA CONTEXT graph={self._graph_identity[:12]} "

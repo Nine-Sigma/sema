@@ -25,6 +25,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     LibraryFacts,
     absent_elements,
 )
+from showcase.ontology_query_benchmark.sema_hierarchy_sql import add_hierarchy
 
 TableColumn = tuple[str, str]
 
@@ -51,6 +52,8 @@ def render(
     products: tuple[ProductSpec, ...],
     resolution: BindingResolution,
     facts: LibraryFacts,
+    *,
+    readable: Mapping[str, bool] | None = None,
 ) -> Rendering:
     if not rendering.tables:
         rendering.findings.append(Finding("retrieval returned no physical asset for the question"))
@@ -62,6 +65,7 @@ def render(
     _add_values(rendering, selected, _governed_values(rendering.sco), sidecar, facts)
     _add_grain(rendering.parts, rendering.tables, products, sidecar)
     _add_rules(rendering.parts, sidecar)
+    add_hierarchy(rendering.parts, rendering.findings, selected, facts, readable)
     return rendering
 
 

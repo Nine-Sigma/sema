@@ -78,6 +78,7 @@ def open_live_provider(
     facts = import_library_facts(
         concept_spec or profile.sema.concept_spec, projection, receipt,
         spec_attribution=profile.sema.concept_spec_attribution,
+        hierarchy=profile.extract.concept_hierarchy,
     )
     manifest = read_manifest(manifest_path)
     check_manifest(manifest, sidecar, facts)
@@ -94,6 +95,7 @@ def open_live_provider(
             engine, sidecar, products, resolve_bindings(sidecar, products, catalog), facts,
             graph_identity=manifest.graph_identity, conventions=load_conventions(sidecar),
             limits=limits or profile.limits,
+            hierarchy_relations=manifest.hierarchy_relations,
         )
 
 

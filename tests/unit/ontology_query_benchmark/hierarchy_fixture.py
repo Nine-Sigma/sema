@@ -3,6 +3,7 @@ relation with one replacement chain, a standard flag and a closure with self row
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import Counter
 from pathlib import Path
@@ -154,3 +155,22 @@ def write_product_spec(path: Path) -> Path:
          "strategy": "pass_through", "de_id": "G1"},
     ]}), encoding="utf-8")  # fmt: skip
     return path
+
+
+SLICE_MAPPING = [r for r in MAPPING if r[0] in MEMBERS and r[2] == "Maps to"] + [MAPPING[2]]
+SLICE_CONCEPTS = [c for c in CONCEPTS if c[0] not in ("C8", "C9")]
+SLICE_EDGES = [e for e in PARENT_EDGES if e[0] != "C8"]
+
+
+def add_hierarchy_slice(projection: Path, receipt: Path) -> None:
+    """Write the synthetic slice into a projection and re-pin its receipt."""
+    with duckdb.connect(str(projection)) as con:
+        con.execute("CREATE SCHEMA concept_hierarchy")
+        _table(con, "concept_hierarchy.mapping", "id_1 VARCHAR, id_2 VARCHAR, rel VARCHAR",
+               SLICE_MAPPING)  # fmt: skip
+        _table(con, "concept_hierarchy.concept", "cid VARCHAR, cname VARCHAR, flag VARCHAR",
+               SLICE_CONCEPTS)  # fmt: skip
+        _table(con, "concept_hierarchy.edge", "anc VARCHAR, des VARCHAR", SLICE_EDGES)
+    raw = json.loads(receipt.read_text())
+    raw["duckdb"]["sha256"] = hashlib.sha256(projection.read_bytes()).hexdigest()
+    receipt.write_text(json.dumps(raw))

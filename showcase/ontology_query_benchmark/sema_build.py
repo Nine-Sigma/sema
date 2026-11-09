@@ -13,6 +13,8 @@ import json
 import os
 import sys
 from dataclasses import asdict, dataclass, field
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +22,7 @@ from sema.engine.embeddings import EmbeddingEngine
 from sema.graph.loader import GraphLoader
 from sema.graph.physical_catalog import PhysicalCatalogSource
 from sema.graph.target_graph_build import build_target_retrieval_graph
-from showcase.ontology_query_benchmark.profile import Attribution, load_profile
+from showcase.ontology_query_benchmark.profile import Attribution, Profile, load_profile
 from showcase.ontology_query_benchmark.routing import require_clean_process
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
@@ -40,6 +42,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     property_text,
     target_model,
 )
+from showcase.ontology_query_benchmark.sema_hierarchy import check_relations, write_hierarchy
 
 BUILD_VERSION = "sema-build-1"
 
@@ -58,6 +61,7 @@ class BuildManifest:
     counts: dict[str, int] = field(default_factory=dict)
     findings: tuple[str, ...] = ()
     inputs: tuple[InputFile, ...] = ()
+    hierarchy_relations: dict[str, bool] | None = None
 
 
 def build_scoped_graph(
@@ -69,6 +73,7 @@ def build_scoped_graph(
     *,
     dimensions: int,
     embedder_model: str,
+    relation_reader: Callable[[str], object] | None = None,
 ) -> BuildManifest:
     products = load_products(sidecar)
     resolution = resolve_bindings(sidecar, products, read_catalog(catalog_source, sidecar))
@@ -81,6 +86,7 @@ def build_scoped_graph(
         concept_fields=fields, value_bridges=(),
         bridge_source_schema=sidecar.schema, load_ancestors=False,
     )
+    written, readable, unreadable = _hierarchy(loader, facts, sidecar, relation_reader)
     embedded = _embed(loader, embedder, dimensions, sidecar, products, resolution, facts)
     counts = {
         "approved_bindings": len(resolution.approved()),
@@ -88,6 +94,7 @@ def build_scoped_graph(
         "value_sets": len(fields),
         "value_set_members": sum(len(f.concept_codes) for f in fields),
         **embedded,
+        **written,
     }
     return BuildManifest(
         graph_identity=_identity(sidecar, facts, dimensions, embedder_model),
@@ -101,9 +108,25 @@ def build_scoped_graph(
         dimensions=dimensions,
         counts=counts,
         findings=resolution.findings
-        + tuple(f.message for f in absent_elements(resolution.approved(), facts)),
+        + tuple(f.message for f in absent_elements(resolution.approved(), facts))
+        + unreadable,
         inputs=sidecar.input_files() + facts.inputs,
+        hierarchy_relations=readable,
     )
+
+
+def _hierarchy(
+    loader: GraphLoader, facts: LibraryFacts, sidecar: Sidecar,
+    reader: Callable[[str], object] | None,
+) -> tuple[dict[str, int], dict[str, bool] | None, tuple[str, ...]]:  # fmt: skip
+    if facts.hierarchy is None:
+        return {}, None, ()
+    counts = write_hierarchy(
+        loader, facts.hierarchy, member_vocabulary=sidecar.concept_vocabulary,
+        library_codes=set(facts.concepts), source_schema=sidecar.schema,
+    )
+    relations, findings = check_relations(facts.hierarchy.spec, reader)
+    return counts, relations, tuple(findings)
 
 
 def read_catalog(
@@ -162,7 +185,10 @@ def _identity(
 
 def write_manifest(manifest: BuildManifest, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(asdict(manifest), indent=1, sort_keys=True))
+    raw = asdict(manifest)
+    if raw["hierarchy_relations"] is None:
+        del raw["hierarchy_relations"]
+    path.write_text(json.dumps(raw, indent=1, sort_keys=True))
 
 
 def read_manifest(path: Path) -> BuildManifest:
@@ -189,18 +215,34 @@ def main(argv: list[str] | None = None) -> None:
     concept_spec = args.concept_spec or profile.sema.concept_spec
     attribution = args.concept_spec_attribution or profile.sema.concept_spec_attribution
     workspace = sema_live.pinned_workspace(routing)
-    with sema_live.neo4j_driver(args.neo4j_uri) as driver:
+    hierarchy = profile.extract.concept_hierarchy
+    with sema_live.neo4j_driver(args.neo4j_uri) as driver, _relation_reader(profile) as reader:
         loader = GraphLoader(driver)
         manifest = build_scoped_graph(
             loader, sema_live.UnityCatalogSource(workspace),
             load_sidecar(profile.sema.sidecar, profile.harness.root),
             import_library_facts(concept_spec, args.projection, args.projection_receipt,
-                                 spec_attribution=attribution),
+                                 spec_attribution=attribution, hierarchy=hierarchy),
             sema_live.embedder(workspace, routing), dimensions=routing.embedding_dimensions,
-            embedder_model=routing.embedding_endpoint,
+            embedder_model=routing.embedding_endpoint, relation_reader=reader,
         )
     write_manifest(manifest, args.manifest)
     print(json.dumps({"graph_identity": manifest.graph_identity, **manifest.counts}))
+
+
+@contextmanager
+def _relation_reader(profile: Profile) -> Iterator[Callable[[str], object] | None]:
+    """The extract's warehouse connection, opened only when a hierarchy is declared."""
+    if profile.extract.concept_hierarchy is None:
+        yield None
+        return
+    from showcase.ontology_query_benchmark.intake_extract import _connect
+
+    cursor = _connect(profile.routing)
+    try:
+        yield lambda sql: (cursor.execute(sql), cursor.fetchall())
+    finally:
+        cursor.close()
 
 
 def _parser() -> argparse.ArgumentParser:
