@@ -5,6 +5,7 @@ python -m showcase.partner_timbr_benchmark.runner --frozen <closure dir> --run-d
     [--s-context module:function] [--timbr-env <original POC env file>]
     [--settings settings.json]   # {"prices": {...usd_per_1m}, "max_cost_usd": 60}
     [--budget-tokens N] [--values-top-k K] [--description-cap-chars C]  # common to all arms
+    [--input-ceiling 16000] [--repair-reserve 2066]   # frozen in manifest.json
 
 Slots run in a fixed order (rep, question, arm). Each slot appends one receipt to
 receipts.jsonl; a slot whose latest receipt has an outcome other than ``unrun`` is never
@@ -30,6 +31,7 @@ from sema.log import logger
 from showcase.partner_timbr_benchmark import runner_utils as ru
 from showcase.partner_timbr_benchmark import scorer
 from showcase.partner_timbr_benchmark.routing import require_clean_process
+from showcase.partner_timbr_benchmark.runner_live_utils import live_clients
 from showcase.partner_timbr_benchmark.runner_utils import Limits, Meter, Prices
 
 ARMS = ("A", "B", "S")
@@ -95,6 +97,7 @@ def run_slot(slot: Slot, question: Any, runtime: Any, model: Any, contract: scor
         "cost_usd": round(meter.cost_usd, 6), "latency_s": record["latency_s"],
         "error_class": record["error_class"], "answer": record["answer"],
         "earliest_failure_stage": _earliest_stage(record, meter, outcome),
+        "request_estimates": meter.request_estimates,
     }  # fmt: skip
 
 
@@ -105,7 +108,8 @@ def _runner_error(slot: Slot, meter: Meter, message: str) -> dict[str, Any]:
             "generation_calls": meter.generation_calls, "sql_executions": meter.sql_executions,
             "prompt_tokens": meter.prompt_tokens, "completion_tokens": meter.completion_tokens,
             "usage_reported": meter.usage_reported, "overflow": meter.overflow,
-            "cost_usd": round(meter.cost_usd, 6)}  # fmt: skip
+            "cost_usd": round(meter.cost_usd, 6),
+            "request_estimates": meter.request_estimates}  # fmt: skip
 
 
 def _slot_fields(slot: Slot) -> dict[str, Any]:
@@ -187,9 +191,9 @@ def _write_slots(run_dir: Path, slots: Sequence[Slot]) -> None:
     path.write_text(text)
 
 
-def _write_manifest(run_dir: Path, frozen: Path, knobs: ru.Knobs) -> None:
+def _write_manifest(run_dir: Path, frozen: Path, knobs: ru.Knobs, limits: Limits) -> None:
     manifest = {"closure_id": frozen.resolve().name, "knobs": dataclasses.asdict(knobs),
-                "limits": dataclasses.asdict(Limits())}  # fmt: skip
+                "limits": dataclasses.asdict(limits)}  # fmt: skip
     path = run_dir / "manifest.json"
     if path.is_file() and json.loads(path.read_text()) != manifest:
         raise ValueError(f"{path} pins a different closure, knobs or limits; use a fresh run dir")
@@ -208,6 +212,7 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--timbr-env", type=Path)
     parser.add_argument("--settings", type=Path)
     ru.add_knob_args(parser)
+    ru.add_limit_args(parser)
     return parser.parse_args(argv)
 
 
@@ -219,16 +224,16 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError(f"unknown question ids: {sorted(set(wanted) - set(ids))}")
     slots = schedule(ids, args.arms, args.reps)
     _write_slots(args.run_dir, slots)
-    knobs = ru.knobs_from(args)
-    _write_manifest(args.run_dir, args.frozen, knobs)
+    knobs, limits = ru.knobs_from(args), ru.limits_from(args)
+    _write_manifest(args.run_dir, args.frozen, knobs, limits)
     if args.dry_run:
         print(f"{len(slots)} slots written to {args.run_dir / 'slots.jsonl'}; no calls made")
         return 0
     raw = json.loads(args.settings.read_text())
-    settings = RunSettings(Limits(), Prices(**raw["prices"]), float(raw["max_cost_usd"]))
+    settings = RunSettings(limits, Prices(**raw["prices"]), float(raw["max_cost_usd"]))
     harness = ru.load_harness(args.frozen)
     provider = ru.load_s_provider(args.s_context) if "S" in args.arms else None
-    model, executors = ru.live_clients(harness, args.arms, args.timbr_env, settings.limits)
+    model, executors = live_clients(harness, args.arms, args.timbr_env, settings.limits)
     require_clean_process(os.environ, sys.modules)
     runtimes = ru.arm_runtimes(harness, args.frozen, executors, provider, settings.limits, knobs)
     questions = {q.id: q for q in ru.public_questions(harness, args.frozen, tuple(ids))}

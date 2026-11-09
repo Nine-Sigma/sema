@@ -49,18 +49,21 @@ def s_provider(findings: tuple[str, ...] = (), text: str = "TABLE main.s.person\
     return lambda question: FakeSContext(text, "s-identity-1", findings)
 
 
-def settings(max_cost: float = 100.0) -> runner.RunSettings:
+def settings(max_cost: float = 100.0,
+             limits: runner_utils.Limits | None = None) -> runner.RunSettings:  # fmt: skip
     prices = runner_utils.Prices(input_usd_per_1m=2.0, output_usd_per_1m=10.0)
-    return runner.RunSettings(runner_utils.Limits(), prices, max_cost)
+    return runner.RunSettings(limits or runner_utils.Limits(), prices, max_cost)
 
 
 def run_q01(harness: SimpleNamespace, frozen: Path, model: FakeModel, executor: FakeExecutor,
-            provider: Callable[[str], FakeSContext]) -> dict[str, Any]:  # fmt: skip
+            provider: Callable[[str], FakeSContext],
+            limits: runner_utils.Limits | None = None) -> dict[str, Any]:  # fmt: skip
     runtimes = runner_utils.arm_runtimes(harness, frozen, {"S": executor}, provider)
     question = runner_utils.public_questions(harness, frozen, ("Q01",))[0]
     contract = scorer.load_contracts(runner_utils.question_paths(frozen))["Q01"]
     slot = runner.Slot(0, "S", "Q01", 1)
-    return runner.run_slot(slot, question, runtimes["S"], model, contract, harness, settings())
+    return runner.run_slot(slot, question, runtimes["S"], model, contract, harness,
+                           settings(limits=limits))  # fmt: skip
 
 
 def test_schedule_is_441_unique_deterministic_slots(frozen: Path) -> None:
@@ -260,8 +263,31 @@ def test_first_prompt_over_the_repair_reserved_limit_is_a_context_overflow(
 ) -> None:
     limits = runner_utils.Limits()
     assert limits.first_prompt_ceiling == 13_934
-    text = "x" * int(14_800 * limits.chars_per_token)
+    text = "x" * int(14_800 * limits.guard_chars_per_token)
     model, executor = FakeModel(harness, [Q01_SQL]), FakeExecutor(harness, ((939376,),))
     receipt = run_q01(harness, frozen, model, executor, s_provider(text=text))
     assert (receipt["outcome"], receipt["overflow"]) == ("overflow", "context")
     assert model.calls == [] and receipt["earliest_failure_stage"] == "context"
+
+
+def test_guard_sends_a_request_that_only_the_conservative_ratio_would_refuse(
+    harness: SimpleNamespace, frozen: Path
+) -> None:
+    model, executor = FakeModel(harness, [Q01_SQL]), FakeExecutor(harness, ((939376,),))
+    receipt = run_q01(harness, frozen, model, executor, s_provider(text="x" * 28_000))
+    assert len(model.calls) == 1 and receipt["outcome"] == "correct"
+    limits = runner_utils.Limits()
+    lenient = runner_utils.estimate_request_tokens(model.calls[0], 2.334)
+    conservative = runner_utils.estimate_request_tokens(model.calls[0], 2.08)
+    assert lenient <= limits.first_prompt_ceiling < conservative
+    assert receipt["request_estimates"] == [[lenient, conservative]]
+
+
+def test_a_wider_frozen_ceiling_admits_a_larger_first_prompt(
+    harness: SimpleNamespace, frozen: Path
+) -> None:
+    model, executor = FakeModel(harness, [Q01_SQL]), FakeExecutor(harness, ((939376,),))
+    wide = runner_utils.Limits(input_ceiling=36_000)
+    assert wide.first_prompt_ceiling == 33_934
+    receipt = run_q01(harness, frozen, model, executor, s_provider(text="x" * 40_000), wide)
+    assert len(model.calls) == 1 and receipt["outcome"] == "correct"

@@ -13,22 +13,12 @@ import json
 import math
 import sys
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Protocol
 
-from showcase.partner_timbr_benchmark.routing import (
-    SQL_WAREHOUSE_ID,
-    TEST_PROFILE,
-    TIMBR_MCP_URL,
-    TIMBR_ONTOLOGY,
-    RoutingError,
-    require_chat_endpoint,
-    require_mcp_tool,
-    require_test_host,
-    require_timbr_mcp_url,
-)
+from showcase.partner_timbr_benchmark.routing import require_mcp_tool
 
 HARNESS_PACKAGE = "timbr_demographics_poc"
 HARNESS_MODULES = ("benchmark_models", "benchmark_workflow", "benchmark_clients",
@@ -42,8 +32,6 @@ KG_CACHE = "kg_cancer_plus_demographics_v2.json"
 PUBLIC_QUESTION_KEYS = ("id", "class", "question", "result_shape", "needs", "precision",
                         "tolerance", "category_columns")  # fmt: skip
 OVERFLOW_FINDING = "overflow"
-CHAT_ENDPOINT = "databricks-claude-sonnet-5"
-MODEL_TIMEOUT_S = 300.0
 
 
 class SContextLike(Protocol):
@@ -57,14 +45,22 @@ class SContextLike(Protocol):
 
 @dataclass(frozen=True)
 class Limits:
+    """Frozen per run (manifest.json); input_ceiling and repair_reserve come from the CLI."""
+
     input_ceiling: int = 16_000
+    # Two repair turns of 1,033 tokens, the largest Oct 21 repair (fit.calibrate).
+    repair_reserve: int = 2_066
     output_ceiling: int = 8_192
-    # Lowest chars/prompt_tokens over 186 matched Oct 21 first attempts (fit.calibrate).
-    chars_per_token: float = 2.08
+    # Highest and lowest chars/prompt_tokens over 186 matched Oct 21 first attempts. The
+    # guard refuses only a certain overflow (fewest tokens); the other is recorded.
+    guard_chars_per_token: float = 2.334
+    conservative_chars_per_token: float = 2.08
     row_limit: int = 1_000
     max_repairs: int = 2
-    # 16,000 minus two repair turns of 1,033 tokens (largest Oct 21 repair, fit.calibrate).
-    first_prompt_ceiling: int = 13_934
+
+    @property
+    def first_prompt_ceiling(self) -> int:
+        return self.input_ceiling - self.repair_reserve
 
 
 @dataclass(frozen=True)
@@ -99,6 +95,18 @@ def knobs_from(args: argparse.Namespace) -> Knobs:
     return Knobs(args.budget_tokens, args.values_top_k, args.description_cap_chars)
 
 
+def add_limit_args(parser: argparse.ArgumentParser) -> None:
+    defaults = Limits()
+    parser.add_argument("--input-ceiling", type=int, default=defaults.input_ceiling,
+                        help="whole-request input ceiling for every arm")
+    parser.add_argument("--repair-reserve", type=int, default=defaults.repair_reserve,
+                        help="tokens kept free for two repairs on the first prompt")
+
+
+def limits_from(args: argparse.Namespace) -> Limits:
+    return Limits(input_ceiling=args.input_ceiling, repair_reserve=args.repair_reserve)
+
+
 def cap_values(values: dict[str, Any], top_k: int) -> dict[str, Any]:
     """The values cache as a smaller ``values_top_k`` would have built it: each profile keeps
     its first ``top_k`` rows (the cache query orders by rows descending, then value)."""
@@ -131,6 +139,7 @@ class Meter:
     failed_stage: str | None = None
     findings: tuple[str, ...] = ()
     last_execution: Any = None
+    request_estimates: list[list[int]] = field(default_factory=list)
 
 
 def load_harness(frozen: Path) -> SimpleNamespace:
@@ -263,12 +272,14 @@ class GuardedModel:
         self.inner, self.meter, self.limits, self.prices = inner, meter, limits, prices
 
     def complete(self, messages: list[dict[str, Any]]) -> Any:
-        estimate = estimate_request_tokens(messages, self.limits.chars_per_token)
+        lenient = estimate_request_tokens(messages, self.limits.guard_chars_per_token)
+        estimate = estimate_request_tokens(messages, self.limits.conservative_chars_per_token)
+        self.meter.request_estimates.append([lenient, estimate])
         first = self.meter.generation_calls == 0
         ceiling = self.limits.first_prompt_ceiling if first else self.limits.input_ceiling
-        if estimate > ceiling:
+        if lenient > ceiling:
             self.meter.overflow = "context" if first else "pre_call"
-            raise TokenOverflow(f"request estimate {estimate} > {ceiling}")
+            raise TokenOverflow(f"request certainly exceeds {ceiling}: estimate {lenient}")
         self.meter.generation_calls += 1
         generation = self.inner.complete(messages)
         prompt, completion = generation.prompt_tokens, generation.completion_tokens
@@ -343,39 +354,3 @@ def read_env_keys(path: Path, keys: tuple[str, ...]) -> dict[str, str]:
             values[name.strip()] = value.split(" #", 1)[0].strip().strip("'\"")
     return values
 
-
-def live_clients(harness: SimpleNamespace, arms: list[str], timbr_env: Path | None,
-                 limits: Limits) -> tuple[Any, dict[str, Any]]:  # fmt: skip
-    """The TEST serving model and one executor per arm; any routing mismatch raises."""
-    from databricks import sql
-    from databricks.sdk.core import Config
-
-    profile = Config(profile=TEST_PROFILE)
-    host, token = require_test_host(profile.host or ""), profile.token
-    if not token:
-        raise RoutingError(f"profile {TEST_PROFILE} has no token")
-    clients = harness.clients
-    model = clients.DatabricksServingClient(
-        host, token, require_chat_endpoint(CHAT_ENDPOINT), max_tokens=limits.output_ceiling,
-        temperature=None, timeout=MODEL_TIMEOUT_S,
-    )  # fmt: skip
-
-    def connect() -> Any:
-        return sql.connect(server_hostname=host.removeprefix("https://"),
-                           http_path=f"/sql/1.0/warehouses/{SQL_WAREHOUSE_ID}",
-                           access_token=token)  # fmt: skip
-
-    executors: dict[str, Any] = {arm: clients.DatabricksSqlExecutor(connect)
-                                 for arm in arms if arm in ("A", "S")}  # fmt: skip
-    if "B" in arms:
-        if timbr_env is None:
-            raise ValueError("arm B needs --timbr-env (the original POC env file)")
-        env = read_env_keys(timbr_env, ("TIMBR_TOKEN", "TIMBR_CA_BUNDLE", "TIMBR_VERIFY_SSL"))
-        if not env.get("TIMBR_TOKEN"):
-            raise ValueError(f"TIMBR_TOKEN missing in {timbr_env}")
-        verify: bool | str = env.get("TIMBR_CA_BUNDLE") or env.get("TIMBR_VERIFY_SSL") != "false"
-        executor = clients.TimbrMcpExecutor(require_timbr_mcp_url(TIMBR_MCP_URL),
-                                            env["TIMBR_TOKEN"], verify, TIMBR_ONTOLOGY,
-                                            timeout=MODEL_TIMEOUT_S)  # fmt: skip
-        executors["B"] = guard_mcp_tools(executor)
-    return model, executors

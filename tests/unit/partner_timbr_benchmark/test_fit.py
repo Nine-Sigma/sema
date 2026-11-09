@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from showcase.partner_timbr_benchmark import fit, freeze, runner, runner_utils
-from showcase.partner_timbr_benchmark.runner_utils import Knobs
+from showcase.partner_timbr_benchmark.runner_utils import Knobs, Limits
 
 pytestmark = pytest.mark.unit
 
@@ -84,71 +84,87 @@ def test_values_top_k_zero_drops_the_a_values_block(harness: SimpleNamespace,
     assert "TABLE " in text and "\nVALUES " not in text
 
 
-def test_sweep_reports_fit_counts_per_arm_for_each_grid_point(harness: SimpleNamespace,
-                                                              frozen: Path) -> None:  # fmt: skip
-    grid = [Knobs(16_000, 25, 160), Knobs(6_000, 0, 80)]
-    rows = fit.sweep(harness, frozen, grid, chars_per_token=2.0, repair_reserve=1_000)
-    assert [r["knobs"] for r in rows] == [
-        {"budget_tokens": 16_000, "values_top_k": 25, "description_cap_chars": 160},
-        {"budget_tokens": 6_000, "values_top_k": 0, "description_cap_chars": 80},
-    ]
-    report = fit.fit_report(harness, frozen, grid[1], chars_per_token=2.0,
-                            repair_reserve=1_000, s_provider=None)  # fmt: skip
-    for arm in ("A", "B"):
-        expected = report["arms"][arm]
-        got = rows[1]["arms"][arm]
-        assert (got["fits_first"], got["fits_two_repairs"]) == (
-            expected["fits_first"], expected["fits_two_repairs"])
-        assert got["max_tokens"] == expected["estimated_tokens"]["max"]
+RATIOS = fit.Ratios(conservative=2.0, median=2.2, lenient=2.3)
 
 
-def test_fit_report_covers_every_arm_question_pair_with_the_guard_estimate(
+def test_sweep_reports_fit_counts_per_arm_for_each_knob_and_ceiling(
     harness: SimpleNamespace, frozen: Path
 ) -> None:
-    report = fit.fit_report(harness, frozen, Knobs(), chars_per_token=2.0,
-                            repair_reserve=1_000, s_provider=None)  # fmt: skip
+    grid = [(Knobs(16_000, 25, 160), 16_000), (Knobs(6_000, 0, 80), 36_000)]
+    rows = fit.sweep(harness, frozen, grid, ratios=RATIOS, limits=Limits())
+    assert [(r["knobs"]["budget_tokens"], r["input_ceiling"]) for r in rows] == [
+        (16_000, 16_000), (6_000, 36_000)]  # fmt: skip
+    wide = Limits(input_ceiling=36_000)
+    report = fit.fit_report(harness, frozen, grid[1][0], ratios=RATIOS, limits=wide,
+                            s_provider=None)  # fmt: skip
+    keys = ("fits_first", "fits_two_repairs", "certain_overflow", "likely_fits")
+    for arm in ("A", "B"):
+        assert {k: rows[1]["arms"][arm][k] for k in keys} == {
+            k: report["arms"][arm][k] for k in keys}  # fmt: skip
+
+
+def test_fit_report_reads_three_estimates_against_the_ceiling(
+    harness: SimpleNamespace, frozen: Path
+) -> None:
+    report = fit.fit_report(harness, frozen, Knobs(), ratios=RATIOS, limits=Limits(),
+                            s_provider=None)  # fmt: skip
     rows = report["rows"]
     assert {r["arm"] for r in rows} == {"A", "B"} and len(rows) == 98
     q01 = next(r for r in rows if r["arm"] == "A" and r["question_id"] == "Q01")
     chars = first_prompt_chars(harness, frozen, "A", "Q01")
-    assert q01["estimated_tokens"] == runner_utils.estimate_tokens_from_chars(chars, 2, 2.0)
-    assert q01["fits_first"] == (q01["estimated_tokens"] <= 16_000)
-    assert q01["fits_two_repairs"] == (q01["estimated_tokens"] + 2_000 <= 16_000)
+
+    def tokens(ratio: float) -> int:
+        return runner_utils.estimate_tokens_from_chars(chars, 2, ratio)
+
+    assert (q01["estimated_tokens"], q01["estimate_median"], q01["estimate_lenient"]) == (
+        tokens(2.0), tokens(2.2), tokens(2.3))  # fmt: skip
+    limit = 16_000 - 2_066
+    assert q01["fits_first"] == (tokens(2.0) <= 16_000)
+    assert q01["fits_two_repairs"] == (tokens(2.0) <= limit)
+    assert q01["certain_overflow"] == (tokens(2.3) > limit)
+    assert q01["likely_fits"] == (tokens(2.2) <= limit)
     assert report["arms"]["A"]["questions"] == 49
 
 
 def test_an_overflowing_context_never_counts_as_fitting(harness: SimpleNamespace,
                                                         frozen: Path) -> None:  # fmt: skip
-    report = fit.fit_report(harness, frozen, Knobs(budget_tokens=2_000), chars_per_token=2.0,
-                            repair_reserve=0, s_provider=None)  # fmt: skip
+    report = fit.fit_report(harness, frozen, Knobs(budget_tokens=2_000), ratios=RATIOS,
+                            limits=Limits(), s_provider=None)  # fmt: skip
     a_rows = [r for r in report["rows"] if r["arm"] == "A"]
-    assert all(r["context_overflow"] for r in a_rows)
-    assert not any(r["fits_first"] or r["fits_two_repairs"] for r in a_rows)
+    assert all(r["context_overflow"] and r["certain_overflow"] for r in a_rows)
+    assert not any(r["fits_first"] or r["fits_two_repairs"] or r["likely_fits"] for r in a_rows)
 
 
 def test_fit_report_includes_s_when_a_provider_is_given(harness: SimpleNamespace,
                                                          frozen: Path) -> None:  # fmt: skip
     provider = lambda q: SimpleNamespace(text="T" * 100, identity="i", findings=())  # noqa: E731
-    report = fit.fit_report(harness, frozen, Knobs(), chars_per_token=2.0,
-                            repair_reserve=0, s_provider=provider)  # fmt: skip
+    report = fit.fit_report(harness, frozen, Knobs(), ratios=RATIOS, limits=Limits(),
+                            s_provider=provider)  # fmt: skip
     assert report["arms"]["S"]["questions"] == 49
 
 
-def test_run_manifest_pins_knobs_and_refuses_a_different_resume(
+def test_run_manifest_pins_knobs_and_limits_and_refuses_a_different_resume(
     frozen: Path, tmp_path: Path
 ) -> None:
     args = ["--frozen", str(frozen), "--run-dir", str(tmp_path), "--dry-run"]
-    runner.main([*args, "--budget-tokens", "5000"])
+    runner.main([*args, "--budget-tokens", "5000", "--input-ceiling", "36000"])
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert manifest["knobs"] == {"budget_tokens": 5000, "values_top_k": 5,
                                  "description_cap_chars": 160}  # fmt: skip
+    assert (manifest["limits"]["input_ceiling"], manifest["limits"]["repair_reserve"]) == (
+        36_000, 2_066)  # fmt: skip
     assert manifest["closure_id"] == frozen.name
     with pytest.raises(ValueError, match="manifest"):
-        runner.main([*args, "--budget-tokens", "6000"])
+        runner.main([*args, "--budget-tokens", "5000", "--input-ceiling", "16000"])
+    with pytest.raises(ValueError, match="manifest"):
+        runner.main([*args, "--budget-tokens", "6000", "--input-ceiling", "36000"])
 
 
-def test_frozen_benchmark_knobs_are_the_cli_default(frozen: Path, tmp_path: Path) -> None:
+def test_frozen_benchmark_knobs_and_limits_are_the_cli_default(frozen: Path,
+                                                               tmp_path: Path) -> None:  # fmt: skip
     runner.main(["--frozen", str(frozen), "--run-dir", str(tmp_path), "--dry-run"])
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert manifest["knobs"] == {"budget_tokens": 6000, "values_top_k": 5,
                                  "description_cap_chars": 160}  # fmt: skip
+    assert (manifest["limits"]["input_ceiling"], manifest["limits"]["repair_reserve"]) == (
+        16_000, 2_066)  # fmt: skip
