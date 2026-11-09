@@ -18,6 +18,10 @@ either reaches its ceiling every remaining slot is written ``unrun`` with the re
 run can overshoot a ceiling by at most one slot (three generations). Each receipt records
 its slot's ``wall_s``; elapsed time is the wall time earlier invocations recorded plus the
 time since this invocation started.
+
+Every source relation the profile pins must be at its pinned Delta version, read through
+arm A's (else arm S's) SQL executor: a mismatch refuses the run before the first slot, and
+a change seen after any slot writes every remaining slot ``unrun`` with ``source_drift``.
 """
 
 import argparse
@@ -174,8 +178,12 @@ def recorded(receipts: Path) -> tuple[set[str], float, float]:
 
 def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[str, Any],
         model: Any, contracts: Mapping[str, scorer.Contract], harness: SimpleNamespace,
-        settings: RunSettings, receipts: Path,
+        settings: RunSettings, receipts: Path, *, pins: Mapping[str, int],
+        read_version: Callable[[str], int],
         clock: Callable[[], float] = time.monotonic) -> dict[str, Any]:  # fmt: skip
+    drift = ru.source_drift(pins, read_version)
+    if drift:
+        raise ru.SourceVersionError(f"refusing to start: {drift}")
     done, spent, prior_wall = recorded(receipts)
     start = clock()
     stopped: str | None = None
@@ -186,7 +194,9 @@ def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[s
             if slot.slot_id in done:
                 continue
             began = clock()
-            stopped = _stop_reason(spent, prior_wall + began - start, settings)
+            stopped = "source_drift" if drift else _stop_reason(
+                spent, prior_wall + began - start, settings
+            )
             if stopped:
                 entry = {**_slot_fields(slot), "outcome": "unrun", "reason": stopped}
             else:
@@ -194,11 +204,19 @@ def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[s
                                  contracts[slot.question_id], harness, settings)  # fmt: skip
                 spent += entry["cost_usd"]
                 entry["wall_s"] = round(clock() - began, 6)
+                drift = ru.source_drift(pins, read_version)
+                if drift:
+                    logger.warning("source drift after {}: {}", slot.slot_id, drift)
             outcomes[entry["outcome"]] += 1
             handle.write(json.dumps(entry, sort_keys=True, default=str) + "\n")
             handle.flush()
             logger.info("{} {} spent=${:.4f}", slot.slot_id, entry["outcome"], spent)
-    return {"outcomes": dict(outcomes), "spent_usd": round(spent, 6), "stopped": stopped}
+    return {
+        "outcomes": dict(outcomes),
+        "spent_usd": round(spent, 6),
+        "stopped": stopped,
+        "source_drift": drift,
+    }
 
 
 def _stop_reason(spent: float, elapsed: float, settings: RunSettings) -> str | None:
@@ -218,12 +236,17 @@ def _write_slots(run_dir: Path, slots: Sequence[Slot]) -> None:
     path.write_text(text)
 
 
-def _write_manifest(run_dir: Path, frozen: Path, knobs: Knobs, limits: Limits) -> None:
+def _write_manifest(
+    run_dir: Path, frozen: Path, knobs: Knobs, limits: Limits, pins: Mapping[str, int]
+) -> None:
     manifest = {"closure_id": frozen.resolve().name, "knobs": knobs.model_dump(),
-                "limits": limits.model_dump()}  # fmt: skip
+                "limits": limits.model_dump(), "source_versions": dict(pins)}  # fmt: skip
     path = run_dir / "manifest.json"
     if path.is_file() and json.loads(path.read_text()) != manifest:
-        raise ValueError(f"{path} pins a different closure, knobs or limits; use a fresh run dir")
+        raise ValueError(
+            f"{path} pins a different closure, knobs, limits or source versions; "
+            "use a fresh run dir"
+        )
     path.write_text(json.dumps(manifest, indent=1, sort_keys=True))
 
 
@@ -255,7 +278,7 @@ def main(argv: list[str] | None = None) -> int:
     slots = schedule(ids, args.arms, args.reps)
     _write_slots(args.run_dir, slots)
     knobs, limits = ru.knobs_from(args, profile.knobs), ru.limits_from(args, profile.limits)
-    _write_manifest(args.run_dir, args.frozen, knobs, limits)
+    _write_manifest(args.run_dir, args.frozen, knobs, limits, profile.source_versions)
     if args.dry_run:
         print(f"{len(slots)} slots written to {args.run_dir / 'slots.jsonl'}; no calls made")
         return 0
@@ -274,8 +297,12 @@ def main(argv: list[str] | None = None) -> int:
         model, executors = live_clients(harness, args.arms, args.timbr_env, limits, profile)
         runtimes = ru.arm_runtimes(harness, args.frozen, layout, executors, provider, limits,
                                    knobs)
+        sql = next((executors[arm] for arm in ("A", "S") if arm in executors), None)
+        if sql is None:
+            raise ValueError("source versions are read through arm A or S; include one in --arms")
         summary = run(slots, questions, runtimes, model, contracts, harness, settings,
-                      args.run_dir / "receipts.jsonl")
+                      args.run_dir / "receipts.jsonl", pins=profile.source_versions,
+                      read_version=ru.version_reader(sql))
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0
 

@@ -203,7 +203,8 @@ def _run(
     runtimes = runtimes_for(harness, frozen, profile, executors, s_provider())
     questions, contracts = _questions_and_contracts(harness, frozen, profile)
     return runner.run(
-        slots, questions, runtimes, model, contracts, harness, run_settings, out, **clock
+        slots, questions, runtimes, model, contracts, harness, run_settings, out,
+        pins=profile.source_versions, read_version=profile.source_versions.__getitem__, **clock,
     )
 
 
@@ -307,7 +308,8 @@ def test_a_raising_context_provider_becomes_a_runner_error_receipt(
     questions, contracts = _questions_and_contracts(harness, frozen, profile)
     out = tmp_path / "receipts.jsonl"
     model = FakeModel(harness, [R01_SQL])
-    runner.run(slots, questions, runtimes, model, contracts, harness, settings(profile), out)
+    runner.run(slots, questions, runtimes, model, contracts, harness, settings(profile), out,
+               pins=profile.source_versions, read_version=profile.source_versions.__getitem__)
     receipts = _receipts(out)
     assert [r["outcome"] for r in receipts] == ["runner_error", "runner_error"]
     assert {r["earliest_failure_stage"] for r in receipts} == {"context"}

@@ -1,5 +1,6 @@
+import itertools
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -25,6 +26,7 @@ S_INPUTS = (
     "--s-projection", "projection.json", "--s-projection-receipt", "receipt.json",
 )
 PRICES = {"input_usd_per_1m": 2.0, "output_usd_per_1m": 10.0}
+PINS = {"main.s.person": 7, "main.s.visit": 3}
 
 
 def _argv(frozen: Path, tmp_path: Path, arm: str) -> list[str]:
@@ -36,12 +38,37 @@ def _argv(frozen: Path, tmp_path: Path, arm: str) -> list[str]:
     ]
 
 
-def _record_clients(events: list[Any]) -> Any:
-    def live_clients(harness: SimpleNamespace, *_: Any) -> tuple[Any, dict[str, Any]]:
+class HistoryExecutor(FakeExecutor):
+    """Answers DESCRIBE HISTORY with the version ``versions`` gives; None is a denied read."""
+
+    def __init__(self, harness: SimpleNamespace, versions: Callable[[str], int | None]) -> None:
+        super().__init__(harness, ((GOLD,),))
+        self.versions = versions
+
+    def execute(self, sql: str, row_limit: int) -> Any:
+        if not sql.startswith("DESCRIBE HISTORY "):
+            return super().execute(sql, row_limit)
+        version, execution = self.versions(sql.split()[2]), self.harness.models.Execution
+        if version is None:
+            return execution(False, (), (), 0.01, "permission", "denied")
+        return execution(True, ("version", "timestamp"), ((version, "t"),), 0.01)
+
+
+def _record_clients(
+    events: list[Any], versions: Callable[[str], int | None] = PINS.get
+) -> Any:
+    def live_clients(harness: SimpleNamespace, arms: list[str], *_: Any) -> tuple[Any, Any]:
         events.append("clients")
-        return FakeModel(harness, [R01_SQL]), {"S": FakeExecutor(harness, ((GOLD,),))}
+        model = FakeModel(harness, [R01_SQL])
+        events.append(model)
+        return model, {arm: HistoryExecutor(harness, versions) for arm in arms}
 
     return live_clients
+
+
+def _receipts(tmp_path: Path) -> list[dict[str, Any]]:
+    path = tmp_path / "run/receipts.jsonl"
+    return [json.loads(line) for line in path.read_text().splitlines()] if path.is_file() else []
 
 
 def test_arm_s_without_its_inputs_is_refused_by_name(
@@ -84,7 +111,9 @@ def test_arm_s_runs_inside_the_provider_opened_from_explicit_inputs(
     monkeypatch.setattr(runner, "live_clients", _record_clients(events))
     assert runner.main([*_argv(frozen, tmp_path, "S"), *S_INPUTS]) == 0
     opened = ("bolt://localhost:1", "build.json", "projection.json", "receipt.json", None)
-    assert events == ["clean", opened, "clients", "closed"]
+    assert [e for e in events if not isinstance(e, FakeModel)] == [
+        "clean", opened, "clients", "closed"
+    ]
     receipts = (tmp_path / "run/receipts.jsonl").read_text().splitlines()
     assert [(r["outcome"], r["context_identity"]) for r in map(json.loads, receipts)] == [
         ("correct", "s-identity-1")
@@ -107,3 +136,55 @@ def test_an_overriding_ceiling_sizes_the_s_provider_from_the_run_limits(
     argv = [*_argv(frozen, tmp_path, "S"), *S_INPUTS, "--input-ceiling", "36000"]
     assert runner.main(argv) == 0
     assert [limits.input_ceiling for limits in opened_with] == [36000]
+
+
+@pytest.mark.parametrize(
+    ("versions", "refusal"),
+    [
+        ({"main.s.person": 8, "main.s.visit": 3}.get, r"main\.s\.person\D+8\D+7\b"),
+        ({"main.s.person": None, "main.s.visit": 3}.get, r"main\.s\.person.*denied"),
+    ],
+)
+def test_a_source_off_its_pin_refuses_the_run_before_any_model_call(
+    frozen: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    versions: Callable[[str], int | None], refusal: str,
+) -> None:
+    events: list[Any] = []
+    monkeypatch.setattr(runner, "require_clean_process", lambda *_: None)
+    monkeypatch.setattr(runner, "live_clients", _record_clients(events, versions))
+    with pytest.raises(RuntimeError, match=refusal):
+        runner.main(_argv(frozen, tmp_path, "A"))
+    assert [model.calls for model in events if isinstance(model, FakeModel)] == [[]]
+    assert _receipts(tmp_path) == []
+
+
+def test_a_source_change_mid_run_stops_and_writes_the_rest_unrun(
+    frozen: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reads = itertools.count()
+
+    def versions(relation: str) -> int:
+        return PINS[relation] + (next(reads) >= len(PINS))
+
+    events: list[Any] = []
+    monkeypatch.setattr(runner, "require_clean_process", lambda *_: None)
+    monkeypatch.setattr(runner, "live_clients", _record_clients(events, versions))
+    assert runner.main([*_argv(frozen, tmp_path, "A"), "--reps", "3"]) == 0
+    receipts = _receipts(tmp_path)
+    slots = (tmp_path / "run/slots.jsonl").read_text().splitlines()
+    assert len(receipts) == len(slots) == 3
+    assert [(r["outcome"], r.get("reason")) for r in receipts] == [
+        ("correct", None), ("unrun", "source_drift"), ("unrun", "source_drift")
+    ]
+    assert [len(model.calls) for model in events if isinstance(model, FakeModel)] == [1]
+
+
+def test_the_manifest_records_the_source_versions_the_run_read(
+    frozen: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(runner, "require_clean_process", lambda *_: None)
+    monkeypatch.setattr(runner, "live_clients", _record_clients([]))
+    assert runner.main(_argv(frozen, tmp_path, "A")) == 0
+    manifest = json.loads((tmp_path / "run/manifest.json").read_text())
+    assert manifest["source_versions"] == PINS
+    assert [r["outcome"] for r in _receipts(tmp_path)] == ["correct"]

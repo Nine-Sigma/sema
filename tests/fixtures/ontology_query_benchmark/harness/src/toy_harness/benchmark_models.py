@@ -42,6 +42,8 @@ class Execution:
     columns: tuple[str, ...] = ()
     rows: tuple[tuple[Any, ...], ...] = ()
     latency_s: float = 0.0
+    error_class: str | None = None
+    message: str | None = None
 
 
 @dataclass(frozen=True)

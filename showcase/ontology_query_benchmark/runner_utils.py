@@ -316,3 +316,27 @@ def read_env_keys(path: Path, keys: tuple[str, ...]) -> dict[str, str]:
             values[name.strip()] = value.split(" #", 1)[0].strip().strip("'\"")
     return values
 
+
+
+class SourceVersionError(RuntimeError):
+    """A pinned source relation is unreadable or no longer at its pinned version."""
+
+
+def version_reader(executor: Any) -> Callable[[str], int]:
+    """A relation's current Delta version, read through an arm's SQL executor."""
+
+    def read(relation: str) -> int:
+        execution = executor.execute(f"DESCRIBE HISTORY {relation} LIMIT 1", 1)
+        if not execution.ok or not execution.rows:
+            raise SourceVersionError(f"cannot read the version of {relation}: {execution.message}")
+        return int(execution.rows[0][execution.columns.index("version")])
+
+    return read
+
+
+def source_drift(pins: Mapping[str, int], read_version: Callable[[str], int]) -> str | None:
+    for relation, pinned in pins.items():
+        current = read_version(relation)
+        if current != pinned:
+            return f"{relation} is at version {current}, pinned at {pinned}"
+    return None
