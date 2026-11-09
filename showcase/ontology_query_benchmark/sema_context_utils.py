@@ -64,8 +64,11 @@ def render(
     _add_bindings(rendering.parts, selected, sidecar, facts)
     _add_values(rendering, selected, _governed_values(rendering.sco), sidecar, facts)
     _add_grain(rendering.parts, rendering.tables, products, sidecar)
-    _add_rules(rendering.parts, sidecar)
-    add_hierarchy(rendering.parts, rendering.findings, selected, facts, readable)
+    hierarchy: list[str] = []
+    add_hierarchy(hierarchy, rendering.findings, selected, facts, readable,
+                  rendering.sco.hierarchy_anchors)  # fmt: skip
+    _add_rules(rendering.parts, sidecar, hierarchy_prose=not hierarchy)
+    rendering.parts.extend(hierarchy)
     return rendering
 
 
@@ -200,11 +203,14 @@ def _table_of(products: tuple[ProductSpec, ...], rel: SpecRelationship) -> str:
     )
 
 
-def _add_rules(parts: list[str], sidecar: Sidecar) -> None:
+def _add_rules(parts: list[str], sidecar: Sidecar, *, hierarchy_prose: bool) -> None:
+    """The supplied hierarchy prose is withheld when the structured section renders,
+    so the context offers one hierarchy route."""
     parts.append(
         "\nBUSINESS RULES: the workload conventions supplied with this request "
         f"(sha256 {sidecar.conventions_sha256[:12]}) govern {sidecar.rules_scope}; "
         "they are not restated here."
     )
-    parts.append(f"\n{sidecar.hierarchy_heading} (supplied):")
-    parts.extend(f"  - {line}" for line in sidecar.hierarchy_reference)
+    if hierarchy_prose:
+        parts.append(f"\n{sidecar.hierarchy_heading} (supplied):")
+        parts.extend(f"  - {line}" for line in sidecar.hierarchy_reference)

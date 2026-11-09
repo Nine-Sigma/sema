@@ -27,6 +27,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import import_library_fa
 from showcase.ontology_query_benchmark.sema_context import (
     SContext,
     SContextProvider,
+    anchor_bounds,
     check_manifest,
     load_conventions,
 )
@@ -90,6 +91,7 @@ def open_live_provider(
             driver, sema_live.embedder(workspace, profile.routing),
             embedder_model_name=manifest.embedder_model,
             scope=RetrievalScope(model_role=sidecar.model_role),
+            hierarchy_anchor=anchor_bounds(manifest),
         )
         yield SContextProvider(
             engine, sidecar, products, resolve_bindings(sidecar, products, catalog), facts,

@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 
 from sema.connectors.databricks_utils import sql_string_literal
+from sema.models.context import HierarchyAnchor
 from showcase.ontology_query_benchmark.profile import ConceptHierarchy
 from showcase.ontology_query_benchmark.sema_bindings import SuppliedBinding
 from showcase.ontology_query_benchmark.sema_build_utils import Finding, LibraryFacts
@@ -47,6 +48,7 @@ def add_hierarchy(
     selected: Sequence[SuppliedBinding],
     facts: LibraryFacts,
     readable: Mapping[str, bool] | None,
+    anchors: Sequence[HierarchyAnchor] = (),
 ) -> None:
     hierarchy = facts.hierarchy
     if hierarchy is None:
@@ -64,13 +66,31 @@ def add_hierarchy(
     if not columns:
         return
     spec = hierarchy.spec
+    found = {(b.table, b.column): [a for a in anchors if (a.table, a.column) == (b.table, b.column)]
+             for b in columns}  # fmt: skip
     parts.append(f"\nCONCEPT HIERARCHY ({spec.attribution.value}; each relation read at build):")
-    replace = f"Replace {ANCHOR} with the anchor concept id."
-    parts.append(f"  {_route(spec)} {_direction(spec)} {replace}")
+    line = f"  {_route(spec)} {_direction(spec)}"
+    template = f"{line} Replace {ANCHOR} with the anchor concept id."
+    parts.append(line if all(found.values()) else template)
     kind = "source member ids" if spec.mapping else "concept ids of the hierarchy"
     for b in columns:
         parts.append(f"  {b.table}.{b.column} holds {kind}:")
-        parts.append(f"  WHERE {membership_sql(spec, b.column)}")
+        parts.extend(_fragments(spec, b.column, found[(b.table, b.column)]))
+
+
+def _fragments(
+    spec: ConceptHierarchy, column: str, anchors: Sequence[HierarchyAnchor]
+) -> list[str]:
+    """One filled predicate per retrieved anchor; without one, the {anchor_id} template."""
+    if not anchors:
+        return [f"  WHERE {membership_sql(spec, column)}"]
+    lines = []
+    for a in anchors:
+        vocabulary = f" in {a.vocabulary}" if a.vocabulary else ""
+        lines.append(f"  anchor {a.label} = id {a.code}{vocabulary}; "
+                     f"{a.member_count} members of {column} sit under it:")  # fmt: skip
+        lines.append(f"  WHERE {membership_sql(spec, column, anchor=a.code)}")
+    return lines
 
 
 def _reached(binding: SuppliedBinding, facts: LibraryFacts) -> bool:

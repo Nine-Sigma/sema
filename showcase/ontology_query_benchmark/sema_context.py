@@ -16,6 +16,7 @@ import math
 from dataclasses import dataclass
 from typing import Protocol
 
+from sema.models.config import HierarchyAnchorConfig
 from sema.models.context import SemanticCandidateSet
 from sema.pipeline.context import prune_to_sco
 from showcase.ontology_query_benchmark.profile import Limits
@@ -61,6 +62,18 @@ def load_conventions(sidecar: Sidecar) -> tuple[str, ...]:
 def context_char_budget(limits: Limits, sidecar: Sidecar, question: str) -> int:
     whole = math.floor(limits.first_prompt_ceiling * limits.conservative_chars_per_token)
     return whole - sidecar.prompt_frame_chars - len(question)
+
+
+# Bounds the variable-length PARENT_OF walk whatever depth a slice reports.
+ANCHOR_DEPTH_CEILING = 20
+
+
+def anchor_bounds(manifest: BuildManifest) -> HierarchyAnchorConfig | None:
+    """Walk as deep as the built slice; without a hierarchy keep the core default."""
+    depth = manifest.counts.get("hierarchy_depth")
+    if not depth:
+        return None
+    return HierarchyAnchorConfig(max_depth=min(depth, ANCHOR_DEPTH_CEILING))
 
 
 def check_manifest(manifest: BuildManifest, sidecar: Sidecar, facts: LibraryFacts) -> None:

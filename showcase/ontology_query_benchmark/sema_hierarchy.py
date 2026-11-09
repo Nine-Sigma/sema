@@ -6,6 +6,7 @@ reads the declared warehouse relations, each checked readable once at build.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -112,6 +113,7 @@ def write_hierarchy(
                            concept_vocabulary=vocabulary, concept_code=concept,
                            source_schema=source_schema)  # fmt: skip
     return {"hierarchy_terms": len(terms), "hierarchy_edges": len(facts.edges),
+            "hierarchy_depth": edge_depth(facts.edges),
             "value_bridges": len(facts.bridges)}  # fmt: skip
 
 
@@ -127,6 +129,25 @@ def release_findings(facts: HierarchyFacts) -> list[str]:
                      f"{mapping.relation} have no row in {spec.concepts.relation}; "
                      "members mapped to them reach no concept")  # fmt: skip
     return found
+
+
+def edge_depth(edges: tuple[Edge, ...]) -> int:
+    """Parent edges on the longest chain; an edge on a cycle adds nothing."""
+    children: dict[str, list[str]] = {}
+    waiting: Counter[str] = Counter()
+    for parent, child in edges:
+        children.setdefault(parent, []).append(child)
+        waiting[child] += 1
+    depth = {node: 0 for node in children if not waiting[node]}
+    ready = list(depth)
+    while ready:
+        node = ready.pop()
+        for child in children.get(node, ()):
+            depth[child] = max(depth.get(child, 0), depth[node] + 1)
+            waiting[child] -= 1
+            if not waiting[child]:
+                ready.append(child)
+    return max(depth.values(), default=0)
 
 
 def check_relations(
