@@ -17,7 +17,8 @@ from showcase.ontology_query_benchmark.sema_build_utils import Finding, LibraryF
 ANCHOR = "{anchor_id}"
 
 
-def membership_sql(spec: ConceptHierarchy, column: str) -> str:
+def membership_sql(spec: ConceptHierarchy, column: str, anchor: str | None = None) -> str:
+    """With no ``anchor`` code the ancestor slot stays the {anchor_id} placeholder."""
     c, k, m = spec.closure, spec.concepts, spec.mapping
     joins: list[str] = []
     where: list[str] = []
@@ -34,7 +35,8 @@ def membership_sql(spec: ConceptHierarchy, column: str) -> str:
     if k.standard_column:
         joins.append(f"JOIN {k.relation} s ON s.{k.id_column} = a.{c.descendant_column}"
                      f" AND s.{k.standard_column} IN ({_quoted(k.standard_values)})")  # fmt: skip
-    where.append(f"a.{c.ancestor_column} = {ANCHOR}")
+    slot = ANCHOR if anchor is None else sql_string_literal(anchor)
+    where.append(f"a.{c.ancestor_column} = {slot}")
     body = " ".join([f"SELECT {key} FROM {source}", *joins, "WHERE " + " AND ".join(where)])
     return f"{column} IN ({body})"
 

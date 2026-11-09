@@ -183,10 +183,14 @@ class ConceptRelation(_Frozen):
 class ConceptHierarchy(_Frozen):
     """Value-to-standard bridge and ancestor closure for governed coded columns.
 
-    Without ``mapping`` the governed column holds the hierarchy's own concept ids.
+    Without ``mapping`` the governed column holds the hierarchy's own concept ids. Every
+    relation name holds the ``release`` qualifier, so joins never cross vocabulary
+    releases; a relation the source owns is listed in ``release_exempt`` instead.
     """
 
     attribution: Attribution
+    release: str | None = Field(default=None, min_length=1)
+    release_exempt: tuple[str, ...] = ()
     mapping: MappingRelation | None = None
     closure: ClosureRelation
     concepts: ConceptRelation
@@ -195,6 +199,18 @@ class ConceptHierarchy(_Frozen):
     def relations(self) -> tuple[str, ...]:
         mapping = (self.mapping.relation,) if self.mapping else ()
         return (*mapping, self.closure.relation, self.concepts.relation)
+
+    @model_validator(mode="after")
+    def _one_release(self) -> ConceptHierarchy:
+        undeclared = sorted(set(self.release_exempt) - set(self.relations))
+        if undeclared:
+            raise ValueError(f"release_exempt names undeclared relations: {undeclared}")
+        if self.release is not None:
+            outside = [r for r in self.relations
+                       if self.release not in r and r not in self.release_exempt]  # fmt: skip
+            if outside:
+                raise ValueError(f"relations outside release {self.release}: {outside}")
+        return self
 
 
 class Extract(_Frozen):

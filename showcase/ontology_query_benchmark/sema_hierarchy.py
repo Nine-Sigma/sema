@@ -112,6 +112,17 @@ def write_hierarchy(
             "value_bridges": len(facts.bridges)}  # fmt: skip
 
 
+def release_findings(spec: ConceptHierarchy) -> list[str]:
+    if spec.release is None:
+        return ["concept hierarchy declares no vocabulary release; its relations may mix "
+                "releases and drop join rows silently"]  # fmt: skip
+    return [
+        f"hierarchy relation {r} is outside vocabulary release {spec.release}; "
+        "joins across it are unverified"
+        for r in spec.release_exempt
+    ]
+
+
 def check_relations(
     spec: ConceptHierarchy, read: Callable[[str], object] | None
 ) -> tuple[dict[str, bool], list[str]]:

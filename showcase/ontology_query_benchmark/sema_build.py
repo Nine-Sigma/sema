@@ -42,7 +42,11 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     property_text,
     target_model,
 )
-from showcase.ontology_query_benchmark.sema_hierarchy import check_relations, write_hierarchy
+from showcase.ontology_query_benchmark.sema_hierarchy import (
+    check_relations,
+    release_findings,
+    write_hierarchy,
+)
 
 BUILD_VERSION = "sema-build-1"
 
@@ -126,7 +130,7 @@ def _hierarchy(
         library_codes=set(facts.concepts), source_schema=sidecar.schema,
     )
     relations, findings = check_relations(facts.hierarchy.spec, reader)
-    return counts, relations, tuple(findings)
+    return counts, relations, (*release_findings(facts.hierarchy.spec), *findings)
 
 
 def read_catalog(
