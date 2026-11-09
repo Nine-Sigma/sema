@@ -1,7 +1,7 @@
 """Generic benchmark code and its tests name no source: every source value is profile data.
 
-The scan covers every line (code, strings, comments, docstrings) of the package's Python
-files, its tests and every neutral fixture file. The profile directory and the opt-in
+The scan covers every line (code, strings, comments, docstrings) of every package file of
+any type, the package tests and every neutral fixture file. The profile directory and the opt-in
 source-profile test hold source values by design; this file holds the denylist.
 """
 
@@ -19,7 +19,6 @@ PACKAGE = REPO / "showcase" / "ontology_query_benchmark"
 TESTS = Path(__file__).parent
 FIXTURES = REPO / "tests" / "fixtures" / "ontology_query_benchmark"
 FIXTURE_SUFFIXES = (".py", ".json", ".yaml")
-EXEMPT_DIRS = (PACKAGE / "profiles",)
 EXEMPT_FILES = (Path(__file__), TESTS / "test_source_profile.py")
 DENYLIST = tuple(
     re.compile(pattern, re.IGNORECASE)
@@ -28,17 +27,19 @@ DENYLIST = tuple(
         "omop", "tumor", "r3_platinum", "cancer_registry", "demographics", "cpd_v2",
         "v3_20261021", "w4s", "feedface", "deadbeef", "000000000000000",
         "databricks-claude", "databricks-bge", "naaccr", "vb_vocabulary", r"\bCPD\b",
-        "partner_wh", "concept_athena_id",
+        "partner_wh", "concept_athena_id", "partner_dev", r"UNV\d", r"\bpartnerplatform\b",
+        r"\bathena\b", r"\bpb_", "_r3_", "partner-harness", "cafebabe", "cancer_plus", "sonnet-5",
     )
 ) + (re.compile(r"\bQ14\b"),)
 
 
-def scanned_files() -> list[Path]:
+def scanned_files(package: Path = PACKAGE) -> list[Path]:
     fixtures = [p for p in FIXTURES.rglob("*") if p.suffix in FIXTURE_SUFFIXES]
-    files = sorted({*PACKAGE.rglob("*.py"), *TESTS.rglob("*.py"), *fixtures})
+    sources = [p for p in package.rglob("*") if p.is_file() and "__pycache__" not in p.parts]
+    files = sorted({*sources, *TESTS.rglob("*.py"), *fixtures})
     return [
         path for path in files
-        if path not in EXEMPT_FILES and not any(path.is_relative_to(d) for d in EXEMPT_DIRS)
+        if path not in EXEMPT_FILES and not path.is_relative_to(package / "profiles")
     ]
 
 
@@ -71,11 +72,25 @@ def test_the_guard_reports_a_planted_literal_with_its_line(tmp_path: Path) -> No
 @pytest.mark.parametrize("literal", [
     "naaccr_sequence_number_UNV00001374", "vb_vocabulary_test_2026_09_25_candidate_ancestor",
     "adapts the CPD product spec", "partner_wh", "concept_athena_id",
+    "partner_dev.x.y", "UNV00001374", "a partnerplatform export", "the Athena vocabulary",
+    "pb_person", "person_r3_copy", "partner-harness", "cafebabe", "cancer_plus",
+    "claude-sonnet-5",
 ])
 def test_the_guard_reports_each_known_source_identifier(tmp_path: Path, literal: str) -> None:
     planted = tmp_path / "planted.py"
     planted.write_text(f"VALUE = {literal!r}\n")
-    assert len(literal_hits([planted])) == 1
+    assert literal_hits([planted])
+
+
+def test_the_guard_scans_every_package_file_type_outside_the_profiles(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    for relative in ("notes.sql", "profiles/source.yaml", "__pycache__/m.cpython-312.pyc"):
+        (package / relative).parent.mkdir(parents=True, exist_ok=True)
+    (package / "notes.sql").write_text("SELECT 1\nFROM partner_dev.s.t\n")
+    (package / "profiles/source.yaml").write_text("relation: partner_dev.s.t\n")
+    (package / "__pycache__/m.cpython-312.pyc").write_bytes(b"\x00\xffpartner_dev")
+    hits = [h for h in literal_hits(scanned_files(package)) if h.startswith(str(package))]
+    assert hits == [f"{package / 'notes.sql'}:2: partner_dev"]
 
 
 def test_generic_code_and_tests_name_no_source() -> None:
