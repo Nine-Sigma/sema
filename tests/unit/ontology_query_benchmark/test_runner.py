@@ -149,7 +149,42 @@ def test_completeness_findings_withhold_credit(
     receipt = run_r01(harness, frozen, profile, model, executor, s_provider((finding,)))
     assert receipt["outcome"] == "context_incomplete" and receipt["strict"] is False
     assert receipt["raw_match"] is True and receipt["earliest_failure_stage"] == "context"
-    assert receipt["findings"] == ["missing:gender"]
+    assert receipt["findings"] == receipt["applied_findings"] == ["missing:gender"]
+
+
+@pytest.mark.parametrize("column", ["city", "rid_code", "ri"])
+def test_a_finding_on_a_column_the_sql_does_not_read_keeps_credit(
+    harness: SimpleNamespace, frozen: Path, profile: Profile, column: str
+) -> None:
+    model, executor = FakeModel(harness, [R01_SQL]), FakeExecutor(harness, ((GOLD,),))
+    finding = FakeFinding(f"element absent: {column}", "main.s.person", column)
+    receipt = run_r01(harness, frozen, profile, model, executor, s_provider((finding,)))
+    assert receipt["outcome"] == "correct" and receipt["strict"] is True
+    assert receipt["tolerant"] is True and receipt["earliest_failure_stage"] is None
+    assert receipt["findings"] == [finding.message] and receipt["applied_findings"] == []
+
+
+@pytest.mark.parametrize("read", ["rid", "RID", '"rid"', "`Rid`", "p.rid"])
+def test_a_finding_on_a_column_the_sql_reads_withholds_credit(
+    harness: SimpleNamespace, frozen: Path, profile: Profile, read: str
+) -> None:
+    reply = f"```sql\nSELECT count(DISTINCT {read}) AS people FROM main.s.person p\n```"
+    model, executor = FakeModel(harness, [reply]), FakeExecutor(harness, ((GOLD,),))
+    finding = FakeFinding("element absent: rid", "main.s.person", "rid")
+    receipt = run_r01(harness, frozen, profile, model, executor, s_provider((finding,)))
+    assert receipt["outcome"] == "context_incomplete" and receipt["raw_match"] is True
+    assert receipt["tolerant"] is False and receipt["earliest_failure_stage"] == "context"
+    assert receipt["findings"] == receipt["applied_findings"] == [finding.message]
+
+
+@pytest.mark.parametrize(("column", "stage"), [("city", "scoring"), (None, "context")])
+def test_the_failure_stage_follows_only_applied_findings(
+    harness: SimpleNamespace, frozen: Path, profile: Profile, column: str | None, stage: str
+) -> None:
+    model, executor = FakeModel(harness, [R01_SQL]), FakeExecutor(harness, ((5,),))
+    finding = FakeFinding("element absent", "main.s.person" if column else None, column)
+    receipt = run_r01(harness, frozen, profile, model, executor, s_provider((finding,)))
+    assert (receipt["outcome"], receipt["earliest_failure_stage"]) == ("wrong", stage)
 
 
 def test_a_reply_without_sql_is_kept_as_a_bounded_excerpt(

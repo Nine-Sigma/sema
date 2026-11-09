@@ -100,16 +100,18 @@ def run_slot(slot: Slot, question: Any, runtime: Any, model: Any, contract: scor
     except Exception as exc:  # noqa: BLE001 - a failing provider or executor ends only its slot
         logger.warning("{} runner_error: {}", slot.slot_id, type(exc).__name__)
         return _runner_error(slot, meter, harness.workflow.sanitize_message(str(exc)))
-    outcome, verdict = _classify(record, meter, contract, settings.limits.row_limit)
+    applied = ru.applied_findings(meter.findings, record["sql"])
+    outcome, verdict = _classify(record, meter, applied, contract, settings.limits.row_limit)
     attempts = record["attempts"]
     return {
         **_slot_fields(slot), "outcome": outcome,
         "strict": bool(verdict and verdict.strict and outcome == "correct"),
-        "tolerant": bool(verdict and verdict.tolerant and not meter.findings),
+        "tolerant": bool(verdict and verdict.tolerant and not applied),
         "raw_match": verdict.strict if verdict else None,
         "score_reason": verdict.reason if verdict else None,
         "first_sql": attempts[0].get("sql") if attempts else None, "final_sql": record["sql"],
         "context_identity": meter.context_identity, "findings": _messages(meter.findings),
+        "applied_findings": _messages(applied),
         "context_tokens_estimate": record["context_tokens"],
         "generation_calls": meter.generation_calls, "sql_executions": meter.sql_executions,
         "repairs": record["repairs"], "prompt_tokens": meter.prompt_tokens,
@@ -118,7 +120,7 @@ def run_slot(slot: Slot, question: Any, runtime: Any, model: Any, contract: scor
         "cost_usd": round(meter.cost_usd, 6), "latency_s": record["latency_s"],
         "error_class": record["error_class"], "answer": record["answer"],
         "response_excerpt": None if record["sql"] else _excerpt(meter.last_reply),
-        "earliest_failure_stage": _earliest_stage(record, meter, outcome),
+        "earliest_failure_stage": _earliest_stage(record, applied, outcome),
         "request_estimates": meter.request_estimates,
     }  # fmt: skip
 
@@ -147,8 +149,13 @@ def _slot_fields(slot: Slot) -> dict[str, Any]:
             "question_id": slot.question_id, "rep": slot.rep}  # fmt: skip
 
 
-def _classify(record: dict[str, Any], meter: Meter, contract: scorer.Contract,
-              row_limit: int) -> tuple[str, scorer.Verdict | None]:  # fmt: skip
+def _classify(
+    record: dict[str, Any],
+    meter: Meter,
+    applied: tuple[ru.FindingLike, ...],
+    contract: scorer.Contract,
+    row_limit: int,
+) -> tuple[str, scorer.Verdict | None]:
     if meter.overflow or record["outcome"] == "context_overflow":
         return "overflow", None
     executed = record["outcome"] in ("correct", "wrong") and record["error_class"] is None
@@ -157,15 +164,17 @@ def _classify(record: dict[str, Any], meter: Meter, contract: scorer.Contract,
     rows = meter.last_execution.rows
     complete = bool(record["complete"]) and len(rows) < row_limit
     verdict = scorer.score(contract, rows, complete=complete)
-    if verdict.strict and meter.findings:
+    if verdict.strict and applied:
         return "context_incomplete", verdict
     return ("correct" if verdict.strict else "wrong"), verdict
 
 
-def _earliest_stage(record: dict[str, Any], meter: Meter, outcome: str) -> str | None:
+def _earliest_stage(
+    record: dict[str, Any], applied: tuple[ru.FindingLike, ...], outcome: str
+) -> str | None:
     if outcome == "correct":
         return None
-    stages = {"context"} if meter.findings or outcome == "overflow" else set()
+    stages = {"context"} if applied or outcome == "overflow" else set()
     errors = [a.get("error_class") for a in record["attempts"]] + [record["error_class"]]
     for error in filter(None, errors):
         stages.add("generation" if error in GENERATION_ERRORS

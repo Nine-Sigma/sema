@@ -11,6 +11,7 @@ import hashlib
 import importlib
 import json
 import math
+import re
 import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -49,6 +50,21 @@ class SContextLike(Protocol):
 class Prices:
     input_usd_per_1m: float
     output_usd_per_1m: float
+
+
+def applied_findings(
+    findings: tuple[FindingLike, ...], sql: str | None
+) -> tuple[FindingLike, ...]:
+    """The findings that count against a slot: column-less ones, and those whose column
+    the final SQL reads."""
+    # shortcut: identifier match on the SQL text, no parser; a same-named alias, literal or
+    # comment also counts. Upgrade to a SQL parser if a false hit shows in receipts.
+    return tuple(
+        f
+        for f in findings
+        if f.column is None
+        or re.search(rf"(?<!\w){re.escape(f.column)}(?!\w)", sql or "", re.IGNORECASE)
+    )
 
 
 def estimate_tokens_from_chars(chars: int, messages: int, chars_per_token: float) -> int:
