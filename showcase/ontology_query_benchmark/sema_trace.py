@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from showcase.ontology_query_benchmark.profile import Profile, load_profile
+from showcase.ontology_query_benchmark.profile import Limits, Profile, load_profile
 from showcase.ontology_query_benchmark.routing import require_clean_process
 from showcase.ontology_query_benchmark.sema_bindings import (
     load_products,
@@ -67,7 +67,9 @@ def open_live_provider(
     receipt: Path,
     *,
     concept_spec: Path | None = None,
+    limits: Limits | None = None,
 ) -> Iterator[SContextProvider]:
+    """Open S on the profile; pass the run's limits when they differ from the profile's."""
     from sema.pipeline.retrieval import RetrievalEngine, RetrievalScope
     from showcase.ontology_query_benchmark import sema_live
 
@@ -88,6 +90,7 @@ def open_live_provider(
         yield SContextProvider(
             engine, sidecar, products, resolve_bindings(sidecar, products, catalog), facts,
             graph_identity=manifest.graph_identity, conventions=load_conventions(sidecar),
+            limits=limits or profile.limits,
         )
 
 

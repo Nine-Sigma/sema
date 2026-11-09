@@ -32,6 +32,7 @@ RID = "rid_L1"
 CONVENTIONS = ("People means distinct rids.", "A distinct event is two keys.")
 ID_SUFFIX = ".r2"
 BINDING_NOTE = "Each governed column holds a member id; its companions hold label and kind."
+PROMPT_FRAME_CHARS = 1_500
 
 
 def _pass_through(
@@ -207,7 +208,7 @@ def write_fixture(tmp_path: Path) -> Path:
         "binding_note": BINDING_NOTE,
         "hierarchy_heading": "TOY HIERARCHY REFERENCE",
         "hierarchy_reference": ["concept_ancestor: ancestor_concept_id is broader."],
-        "context_char_budget": 16000,
+        "prompt_frame_chars": PROMPT_FRAME_CHARS,
         "value_list_limit": 40,
     }
     sidecar_path = tmp_path / "sidecar.json"

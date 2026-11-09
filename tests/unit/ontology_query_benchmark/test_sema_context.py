@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import math
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -15,8 +17,8 @@ from showcase.ontology_query_benchmark.sema_bindings import (
     load_sidecar,
     resolve_bindings,
 )
-from showcase.ontology_query_benchmark import sema_live, sema_trace
-from showcase.ontology_query_benchmark.profile import Profile
+from showcase.ontology_query_benchmark import runner_utils, sema_live, sema_trace
+from showcase.ontology_query_benchmark.profile import Limits, Profile
 from showcase.ontology_query_benchmark.routing import RoutingError
 from showcase.ontology_query_benchmark.sema_build import BuildManifest, write_manifest
 from showcase.ontology_query_benchmark.sema_build_utils import import_library_facts
@@ -33,6 +35,7 @@ from tests.unit.ontology_query_benchmark.test_sema_bindings import (
     EVENTS,
     ID_SUFFIX,
     PEOPLE,
+    PROMPT_FRAME_CHARS,
     RID,
     catalog_fixture,
     facts_fixture,
@@ -95,21 +98,33 @@ def _provider(
     candidates: list[dict[str, Any]],
     *,
     conventions: tuple[str, ...] = CONVENTIONS,
-    budget: int | None = None,
+    limits: Limits | None = None,
     list_limit: int | None = None,
     graph_identity: str = "graph-1",
 ) -> SContextProvider:
     sidecar = load_sidecar(write_fixture(tmp_path), tmp_path)
-    if budget is not None:
-        sidecar = dataclasses.replace(sidecar, context_char_budget=budget)
     if list_limit is not None:
         sidecar = dataclasses.replace(sidecar, value_list_limit=list_limit)
     resolution = resolve_bindings(sidecar, load_products(sidecar), catalog_fixture())
     return SContextProvider(
         _Retriever(candidates), sidecar, load_products(sidecar), resolution,
         facts_fixture(tmp_path), graph_identity=graph_identity,
-        conventions=conventions,
+        conventions=conventions, limits=limits or LIMITS,
     )
+
+
+LIMITS = Limits(
+    input_ceiling=16_000, repair_reserve=2_066, output_ceiling=8_192, guard_chars_per_token=2.334,
+    conservative_chars_per_token=2.08, row_limit=1_000, max_repairs=2,
+)
+
+
+def _first_prompt(tokens: int) -> Limits:
+    return LIMITS.model_copy(update={"input_ceiling": tokens + LIMITS.repair_reserve})
+
+
+def _overflows(findings: tuple[str, ...]) -> bool:
+    return any(f.startswith("overflow:") for f in findings)
 
 
 def test_context_renders_assets_bindings_and_complete_values(tmp_path: Path) -> None:
@@ -184,10 +199,29 @@ def test_absent_library_elements_are_findings(tmp_path: Path) -> None:
 
 def test_overflow_is_reported_without_truncating(tmp_path: Path) -> None:
     full = _provider(tmp_path / "a", [PEOPLE_ENTITY, *PEOPLE_VALUES])(QUESTION)
-    tight = _provider(tmp_path / "b", [PEOPLE_ENTITY, *PEOPLE_VALUES], budget=200)(QUESTION)
+    tight = _provider(tmp_path / "b", [PEOPLE_ENTITY, *PEOPLE_VALUES],
+                      limits=_first_prompt(100))(QUESTION)
     assert tight.text == full.text
-    assert any("overflow" in f for f in tight.findings)
-    assert not any("overflow" in f for f in full.findings)
+    assert _overflows(tight.findings)
+    assert not _overflows(full.findings)
+
+
+def test_the_context_budget_follows_the_first_prompt_limit(tmp_path: Path) -> None:
+    """The budget fills the first-prompt limit, less the prompt frame and the question."""
+    candidates = [PEOPLE_ENTITY, *PEOPLE_VALUES]
+    size = len(_provider(tmp_path / "a", candidates)(QUESTION).text)
+    needed = (size + PROMPT_FRAME_CHARS + len(QUESTION)) / LIMITS.conservative_chars_per_token
+    roomy = _provider(tmp_path / "b", candidates, limits=_first_prompt(math.ceil(needed) + 1))
+    tight = _provider(tmp_path / "c", candidates, limits=_first_prompt(math.floor(needed) - 1))
+    assert not _overflows(roomy(QUESTION).findings)
+    assert _overflows(tight(QUESTION).findings)
+
+
+def test_an_over_budget_context_reaches_the_harness_as_overflow(
+    tmp_path: Path, harness: SimpleNamespace
+) -> None:
+    provider = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES], limits=_first_prompt(100))
+    assert runner_utils.SArmContext(harness, provider, 1_000)(QUESTION).overflow
 
 
 def test_conventions_are_referenced_not_paraphrased(tmp_path: Path) -> None:

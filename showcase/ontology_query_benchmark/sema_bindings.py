@@ -73,7 +73,7 @@ class Sidecar:
     binding_note: str
     hierarchy_heading: str
     hierarchy_reference: tuple[str, ...]
-    context_char_budget: int
+    prompt_frame_chars: int
     value_list_limit: int
 
     def relation(self, table: str) -> str:
@@ -161,7 +161,7 @@ def load_sidecar(path: Path, harness_root: Path) -> Sidecar:
         binding_note=raw["binding_note"],
         hierarchy_heading=raw["hierarchy_heading"],
         hierarchy_reference=tuple(raw["hierarchy_reference"]),
-        context_char_budget=int(raw["context_char_budget"]),
+        prompt_frame_chars=int(raw["prompt_frame_chars"]),
         value_list_limit=int(raw["value_list_limit"]),
     )
 

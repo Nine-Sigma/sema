@@ -61,7 +61,7 @@
  "hierarchy_reference": [
   "concept_ancestor: ancestor_concept_id is broader."
  ],
- "context_char_budget": 16000,
+ "prompt_frame_chars": 1500,
  "value_list_limit": 40,
  "attribution": "supplied"
 }
