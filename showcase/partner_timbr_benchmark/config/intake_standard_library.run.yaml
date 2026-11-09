@@ -1,5 +1,6 @@
 # Role-neutral discovery input: locations only. No role map, binding, rule or gold.
 # release is the refresh date both selected views report in TEST catalog metadata.
+# relations is the warehouse Land allowlist; the workload projection file holds exactly these.
 id: partner-sl-timbr-bench
 identity_system: partner
 release: "2026-11-09"
