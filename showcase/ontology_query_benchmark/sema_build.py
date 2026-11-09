@@ -1,7 +1,7 @@
 """Build arm S's isolated, scoped retrieval graph from supplied product-spec bindings.
 
 The projection reuses SEMA's target-retrieval path (`build_target_retrieval_graph`)
-and `EmbeddingEngine`; this module only adapts the CPD specs and library facts
+and `EmbeddingEngine`; this module only adapts the product specs and library facts
 into those inputs and records a manifest that pins every input by hash.
 """
 

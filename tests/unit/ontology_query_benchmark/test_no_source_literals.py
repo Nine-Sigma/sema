@@ -27,7 +27,8 @@ DENYLIST = tuple(
         r"(?<![a-z])partner", "prtcc", "partner-workspace", "timbr-partner", "timbr_poc", "standard_library",
         "omop", "tumor", "r3_platinum", "cancer_registry", "demographics", "cpd_v2",
         "v3_20261021", "w4s", "feedface", "deadbeef", "000000000000000",
-        "databricks-claude", "databricks-bge",
+        "databricks-claude", "databricks-bge", "naaccr", "vb_vocabulary", r"\bCPD\b",
+        "partner_wh", "concept_athena_id",
     )
 ) + (re.compile(r"\bQ14\b"),)
 
@@ -65,6 +66,16 @@ def test_the_guard_reports_a_planted_literal_with_its_line(tmp_path: Path) -> No
     planted.write_text('HOST = "generic"\nWAREHOUSE = "feedface00000000"\n')
     hits = literal_hits([planted])
     assert len(hits) == 1 and hits[0].endswith("planted.py:2: feedface")
+
+
+@pytest.mark.parametrize("literal", [
+    "naaccr_sequence_number_UNV00001374", "vb_vocabulary_test_2026_09_25_candidate_ancestor",
+    "adapts the CPD product spec", "partner_wh", "concept_athena_id",
+])
+def test_the_guard_reports_each_known_source_identifier(tmp_path: Path, literal: str) -> None:
+    planted = tmp_path / "planted.py"
+    planted.write_text(f"VALUE = {literal!r}\n")
+    assert len(literal_hits([planted])) == 1
 
 
 def test_generic_code_and_tests_name_no_source() -> None:
