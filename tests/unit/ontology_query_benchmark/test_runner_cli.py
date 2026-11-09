@@ -10,7 +10,7 @@ import pytest
 
 from showcase.ontology_query_benchmark import runner, runner_live_utils
 from showcase.ontology_query_benchmark.routing import RoutingError
-from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
+from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH, write_settings
 from tests.unit.ontology_query_benchmark.test_runner import (
     GOLD,
     R01_SQL,
@@ -25,13 +25,11 @@ S_INPUTS = (
     "--neo4j-uri", "bolt://localhost:1", "--s-manifest", "build.json",
     "--s-projection", "projection.json", "--s-projection-receipt", "receipt.json",
 )
-PRICES = {"input_usd_per_1m": 2.0, "output_usd_per_1m": 10.0}
 PINS = {"main.s.person": 7, "main.s.visit": 3}
 
 
 def _argv(frozen: Path, tmp_path: Path, arm: str) -> list[str]:
-    settings = tmp_path / "settings.json"
-    settings.write_text(json.dumps({"prices": PRICES, "max_cost_usd": 1.0, "max_wall_s": 60.0}))
+    settings = write_settings(tmp_path)
     return [
         "--profile", str(PROFILE_PATH), "--frozen", str(frozen), "--run-dir", str(tmp_path / "run"),
         "--arms", arm, "--ids", "R01", "--reps", "1", "--settings", str(settings),
@@ -210,3 +208,24 @@ def test_a_failed_version_read_after_a_paid_slot_keeps_its_receipt_and_stops(
     ]
     assert receipts[0]["cost_usd"] > 0 and "wall_s" in receipts[0]
     assert [len(model.calls) for model in events if isinstance(model, FakeModel)] == [1]
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [{"max_cost_usd": 2.0}, {"max_wall_s": 120.0},
+     {"prices": {"input_usd_per_1m": 2.0, "output_usd_per_1m": 1.0}}],
+)  # fmt: skip
+def test_a_resume_with_other_run_settings_is_refused(
+    frozen: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: dict[str, Any]
+) -> None:
+    events: list[Any] = []
+    monkeypatch.setattr(runner, "require_clean_process", lambda *_: None)
+    monkeypatch.setattr(runner, "live_clients", _record_clients(events))
+    argv = _argv(frozen, tmp_path, "A")
+    assert runner.main(argv) == 0 and runner.main(argv) == 0
+    settings = json.loads((tmp_path / "settings.json").read_text())
+    assert json.loads((tmp_path / "run/manifest.json").read_text())["settings"] == settings
+    (tmp_path / "settings.json").write_text(json.dumps(settings | changed))
+    with pytest.raises(ValueError, match="manifest.json"):
+        runner.main(argv)
+    assert [r["outcome"] for r in _receipts(tmp_path)] == ["correct"]

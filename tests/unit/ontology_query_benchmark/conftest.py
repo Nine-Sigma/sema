@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,6 +9,14 @@ from showcase.ontology_query_benchmark.profile import Profile, load_profile
 
 FIXTURES = Path(__file__).parents[2] / "fixtures" / "ontology_query_benchmark"
 PROFILE_PATH = FIXTURES / "profile.yaml"
+RUN_SETTINGS = {"prices": {"input_usd_per_1m": 2.0, "output_usd_per_1m": 10.0},
+                "max_cost_usd": 1.0, "max_wall_s": 60.0}  # fmt: skip
+
+
+def write_settings(directory: Path) -> Path:
+    path = directory / "settings.json"
+    path.write_text(json.dumps(RUN_SETTINGS))
+    return path
 
 
 @pytest.fixture(scope="session")

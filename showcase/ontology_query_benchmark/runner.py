@@ -1,12 +1,12 @@
 """Run the A/B/S benchmark matrix on a frozen harness with typed scoring.
 
 python -m showcase.ontology_query_benchmark.runner --profile <profile.yaml>
-    --frozen <closure dir> --run-dir <dir>
+    --frozen <closure dir> --run-dir <dir> --settings settings.json
     [--arms A B S] [--reps 3] [--ids ID1,ID2] [--dry-run]
     [--timbr-env <ontology engine env file>]
     [--neo4j-uri U --s-manifest M --s-projection P --s-projection-receipt R]  # arm S
     [--s-concept-spec C]   # arm S, default: the profile's concept spec
-    [--settings settings.json]   # {"prices": {...usd_per_1m}, "max_cost_usd": 60, "max_wall_s": 10800}
+    # settings.json: {"prices": {...usd_per_1m}, "max_cost_usd": 60, "max_wall_s": 10800}
     [--budget-tokens N] [--values-top-k K] [--description-cap-chars C]  # default: profile
     [--input-ceiling N] [--repair-reserve N]   # default: profile; frozen in manifest.json
 
@@ -250,15 +250,18 @@ def _write_slots(run_dir: Path, slots: Sequence[Slot]) -> None:
 
 
 def _write_manifest(
-    run_dir: Path, frozen: Path, knobs: Knobs, limits: Limits, pins: Mapping[str, int]
+    run_dir: Path, frozen: Path, knobs: Knobs, settings: RunSettings, pins: Mapping[str, int]
 ) -> None:
     manifest = {"closure_id": frozen.resolve().name, "knobs": knobs.model_dump(),
-                "limits": limits.model_dump(), "source_versions": dict(pins)}  # fmt: skip
+                "limits": settings.limits.model_dump(), "source_versions": dict(pins),
+                "settings": {"prices": dataclasses.asdict(settings.prices),
+                             "max_cost_usd": settings.max_cost_usd,
+                             "max_wall_s": settings.max_wall_s}}  # fmt: skip
     path = run_dir / "manifest.json"
     if path.is_file() and json.loads(path.read_text()) != manifest:
         raise ValueError(
-            f"{path} pins a different closure, knobs, limits or source versions; "
-            "use a fresh run dir"
+            f"{path} pins a different closure, knobs, limits, run settings or source "
+            "versions; use a fresh run dir"
         )
     path.write_text(json.dumps(manifest, indent=1, sort_keys=True))
 
@@ -273,7 +276,7 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--ids", default="")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--timbr-env", type=Path)
-    parser.add_argument("--settings", type=Path)
+    parser.add_argument("--settings", type=Path, required=True)
     ru.add_knob_args(parser)
     ru.add_limit_args(parser)
     add_s_args(parser)
@@ -291,13 +294,13 @@ def main(argv: list[str] | None = None) -> int:
     slots = schedule(ids, args.arms, args.reps)
     _write_slots(args.run_dir, slots)
     knobs, limits = ru.knobs_from(args, profile.knobs), ru.limits_from(args, profile.limits)
-    _write_manifest(args.run_dir, args.frozen, knobs, limits, profile.source_versions)
-    if args.dry_run:
-        print(f"{len(slots)} slots written to {args.run_dir / 'slots.jsonl'}; no calls made")
-        return 0
     raw = json.loads(args.settings.read_text())
     settings = RunSettings(limits, Prices(**raw["prices"]), float(raw["max_cost_usd"]),
                            float(raw["max_wall_s"]))
+    _write_manifest(args.run_dir, args.frozen, knobs, settings, profile.source_versions)
+    if args.dry_run:
+        print(f"{len(slots)} slots written to {args.run_dir / 'slots.jsonl'}; no calls made")
+        return 0
     s_open: AbstractContextManager[SContextProvider | None] = (
         open_s_provider(args, profile, limits) if "S" in args.arms else nullcontext()
     )

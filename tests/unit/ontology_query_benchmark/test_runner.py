@@ -13,7 +13,7 @@ import pytest
 from showcase.ontology_query_benchmark import runner, runner_utils, scorer
 from showcase.ontology_query_benchmark.profile import Limits, Profile
 from showcase.ontology_query_benchmark.routing import RoutingError
-from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
+from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH, write_settings
 
 pytestmark = pytest.mark.unit
 
@@ -90,7 +90,8 @@ def test_schedule_is_unique_deterministic_slots(frozen: Path, profile: Profile) 
 
 
 def test_dry_run_writes_the_slot_list_and_makes_no_calls(frozen: Path, tmp_path: Path) -> None:
-    base = ["--profile", str(PROFILE_PATH), "--frozen", str(frozen)]
+    base = ["--profile", str(PROFILE_PATH), "--frozen", str(frozen),
+            "--settings", str(write_settings(tmp_path))]  # fmt: skip
     code = runner.main([*base, "--run-dir", str(tmp_path), "--dry-run"])
     lines = (tmp_path / "slots.jsonl").read_text().splitlines()
     assert code == 0 and len(lines) == 27

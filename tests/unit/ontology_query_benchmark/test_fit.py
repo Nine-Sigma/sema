@@ -8,7 +8,7 @@ import pytest
 
 from showcase.ontology_query_benchmark import fit, freeze, runner, runner_utils
 from showcase.ontology_query_benchmark.profile import Knobs, Profile
-from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
+from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH, write_settings
 
 pytestmark = pytest.mark.unit
 
@@ -159,7 +159,7 @@ def test_run_manifest_pins_knobs_and_limits_and_refuses_a_different_resume(
     frozen: Path, tmp_path: Path
 ) -> None:
     args = ["--profile", str(PROFILE_PATH), "--frozen", str(frozen), "--run-dir", str(tmp_path),
-            "--dry-run"]  # fmt: skip
+            "--dry-run", "--settings", str(write_settings(tmp_path))]  # fmt: skip
     runner.main([*args, "--budget-tokens", "5000", "--input-ceiling", "36000"])
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert manifest["knobs"] == {"budget_tokens": 5000, "values_top_k": 5,
@@ -175,7 +175,8 @@ def test_run_manifest_pins_knobs_and_limits_and_refuses_a_different_resume(
 
 def test_profile_knobs_and_limits_are_the_cli_default(frozen: Path, tmp_path: Path) -> None:
     runner.main(["--profile", str(PROFILE_PATH), "--frozen", str(frozen), "--run-dir",
-                 str(tmp_path), "--dry-run"])  # fmt: skip
+                 str(tmp_path), "--dry-run",
+                 "--settings", str(write_settings(tmp_path))])  # fmt: skip
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert manifest["knobs"] == {"budget_tokens": 3000, "values_top_k": 5,
                                  "description_cap_chars": 160}  # fmt: skip
