@@ -104,9 +104,9 @@ def _provider(
     limits: Limits | None = None,
     list_limit: int | None = None,
     graph_identity: str = "graph-1",
-    events_identity: dict[str, Any] | None = None,
+    **fixture: Any,
 ) -> SContextProvider:
-    sidecar = load_sidecar(write_fixture(tmp_path, events_identity=events_identity), tmp_path)
+    sidecar = load_sidecar(write_fixture(tmp_path, **fixture), tmp_path)
     if list_limit is not None:
         sidecar = dataclasses.replace(sidecar, value_list_limit=list_limit)
     resolution = resolve_bindings(sidecar, load_products(sidecar), catalog_fixture())

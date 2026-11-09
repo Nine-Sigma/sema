@@ -17,13 +17,18 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
+
+from sqlglot.dialects.dialect import Dialect
 
 from showcase.ontology_query_benchmark.profile import Attribution
 from showcase.ontology_query_benchmark.product_spec import (
     CompanionRole,
+    IdentityOverlay,
     ProductSpecDoc,
     SpecField,
     parse_product_spec,
+    with_identity_overlay,
 )
 
 
@@ -51,6 +56,7 @@ class SpecPin:
     path: Path
     sha256: str
     attribution: Attribution
+    identity_overlay: IdentityOverlay | None = None
 
 
 @dataclass(frozen=True)
@@ -65,6 +71,7 @@ class Sidecar:
     concept_vocabulary: str
     catalog: str
     schema: str
+    sql_dialect: str
     specs: tuple[SpecPin, ...]
     conventions_path: Path
     conventions_file_sha256: str
@@ -159,11 +166,8 @@ def load_sidecar(path: Path, harness_root: Path) -> Sidecar:
         concept_vocabulary=raw["concept_vocabulary"],
         catalog=raw["physical"]["catalog"],
         schema=raw["physical"]["schema"],
-        specs=tuple(
-            SpecPin(s["product"], s["table"], root / s["path"], s["sha256"],
-                    Attribution(s["attribution"]))
-            for s in raw["specs"]
-        ),
+        sql_dialect=_sql_dialect(raw["physical"]["sql_dialect"]),
+        specs=tuple(_spec_pin(s, root) for s in raw["specs"]),
         conventions_path=root / raw["conventions"]["path"],
         conventions_file_sha256=raw["conventions"]["file_sha256"],
         conventions_sha256=raw["conventions"]["conventions_sha256"],
@@ -188,6 +192,23 @@ def load_sidecar(path: Path, harness_root: Path) -> Sidecar:
     )
 
 
+def _sql_dialect(name: str) -> str:
+    """The warehouse's SQL dialect as a sqlglot dialect name; there is no default."""
+    if not name:
+        raise ValueError("physical.sql_dialect must name the warehouse SQL dialect")
+    Dialect.get_or_raise(name)
+    return name
+
+
+def _spec_pin(raw: Mapping[str, Any], root: Path) -> SpecPin:
+    overlay = raw.get("entity_identity")
+    return SpecPin(
+        raw["product"], raw["table"], root / raw["path"], raw["sha256"],
+        Attribution(raw["attribution"]),
+        IdentityOverlay.model_validate(overlay) if overlay is not None else None,
+    )  # fmt: skip
+
+
 def load_products(sidecar: Sidecar) -> tuple[ProductSpec, ...]:
     products = []
     for pin in sidecar.specs:
@@ -197,7 +218,8 @@ def load_products(sidecar: Sidecar) -> tuple[ProductSpec, ...]:
             raise SpecPinError(
                 f"{pin.product} spec {pin.path} sha256 {actual} != pinned {pin.sha256}"
             )
-        products.append(ProductSpec(pin, parse_product_spec(data, pin.path)))
+        doc = with_identity_overlay(parse_product_spec(data, pin.path), pin.identity_overlay)
+        products.append(ProductSpec(pin, doc))
     return tuple(products)
 
 

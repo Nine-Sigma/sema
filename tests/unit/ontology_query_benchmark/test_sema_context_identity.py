@@ -47,21 +47,62 @@ def _entity_cte(text: str, entity: str) -> str:
     return lines[at + 1].strip()
 
 
-def test_a_declared_entity_identity_is_rendered_as_an_executable_cte(tmp_path: Path) -> None:
-    ctx = _provider(tmp_path, [EVENTS_ENTITY], events_identity=EVENT_IDENTITY)("How many events?")
-    assert f"  ENTITY event (executable; one row per {RID}, site_S1)" in ctx.text
+def _event_entities(cte: str) -> list[tuple[object, ...]]:
     con = duckdb.connect()
     con.execute("ATTACH ':memory:' AS cat")
     con.execute("CREATE SCHEMA cat.sch")
     con.execute(f"CREATE TABLE cat.sch.{EVENTS} (row_id VARCHAR, {RID} VARCHAR, site_S1 VARCHAR, "
                 "site_S1_label VARCHAR, site_S1_mapping_type VARCHAR, event_day INTEGER)")
     con.executemany(f"INSERT INTO cat.sch.{EVENTS} VALUES (?, ?, ?, ?, ?, ?)", EVENT_ROWS)
-    cte = _entity_cte(ctx.text, "event")
-    rows = con.execute(f"{cte} SELECT * FROM event ORDER BY ALL NULLS LAST").fetchall()
-    assert rows == [
+    return con.execute(f"{cte} SELECT * FROM event ORDER BY ALL NULLS LAST").fetchall()
+
+
+def test_a_declared_entity_identity_is_rendered_as_an_executable_cte(tmp_path: Path) -> None:
+    ctx = _provider(tmp_path, [EVENTS_ENTITY], events_identity=EVENT_IDENTITY)("How many events?")
+    assert f"  ENTITY event (executable; one row per {RID}, site_S1)" in ctx.text
+    assert _event_entities(_entity_cte(ctx.text, "event")) == [
         ("r1", "P1", "North a", 2), ("r1", "P2", "South y", 1),
         ("r1", None, None, 3), (None, "P1", "North p", 4),
     ]
+
+
+def test_an_overlay_identity_renders_the_same_executable_entity_as_the_spec(
+    tmp_path: Path,
+) -> None:
+    overlay = {"entity_id": "event", "identity": EVENT_IDENTITY}
+    spec = _provider(tmp_path / "spec", [EVENTS_ENTITY], events_identity=EVENT_IDENTITY)("q")
+    supplied = _provider(tmp_path / "overlay", [EVENTS_ENTITY], events_overlay=overlay)("q")
+    assert _entity_cte(supplied.text, "event") == _entity_cte(spec.text, "event")
+    assert _event_entities(_entity_cte(supplied.text, "event")) == [
+        ("r1", "P1", "North a", 2), ("r1", "P2", "South y", 1),
+        ("r1", None, None, 3), (None, "P1", "North p", 4),
+    ]
+
+
+UNSAFE_IDENTITY = {
+    "key_columns": [RID],
+    "attributes": [{"column": "event_day", "rule": "min", "name": "first day"}],
+}
+
+
+@pytest.mark.parametrize(("dialect", "quoted"), [
+    ("databricks", "`first day`"), ("spark", "`first day`"),
+    ("duckdb", '"first day"'), ("postgres", '"first day"'),
+])  # fmt: skip
+def test_an_unsafe_identifier_renders_with_the_warehouse_identifier_quote(
+    tmp_path: Path, dialect: str, quoted: str
+) -> None:
+    ctx = _provider(tmp_path, [EVENTS_ENTITY], events_identity=UNSAFE_IDENTITY,
+                    sql_dialect=dialect)("q")  # fmt: skip
+    cte = _entity_cte(ctx.text, "event")
+    assert f"AS {quoted}" in cte
+    assert ('"' if quoted.startswith("`") else "`") not in cte
+
+
+def test_a_duckdb_rendered_unsafe_identifier_executes_in_duckdb(tmp_path: Path) -> None:
+    ctx = _provider(tmp_path, [EVENTS_ENTITY], events_identity=UNSAFE_IDENTITY,
+                    sql_dialect="duckdb")("q")  # fmt: skip
+    assert _event_entities(_entity_cte(ctx.text, "event")) == [("r1", 1), (None, 4)]
 
 
 def test_an_entity_identity_outside_the_retrieved_tables_is_not_rendered(tmp_path: Path) -> None:

@@ -8,7 +8,8 @@ module reads a document only through ``parse_product_spec``. The keys read are:
 - ``entities[]``: ``entity_id``, ``grain`` (prose) and ``key_columns``; optionally an
   ``identity`` block (core ``EntityIdentity``: key columns, null-key policy and per-attribute
   resolution rules) that compiles to an executable entity. At most one entity per product
-  declares one.
+  declares one. A source whose spec it cannot change declares the identity in its sidecar
+  instead (``IdentityOverlay``); a spec identity that differs from the overlay is an error.
 - ``fields[]``: ``column_id`` (the library's id for the column), ``column_name`` (the
   physical column), ``physical_type`` and ``strategy``; optionally ``de_id`` (the library
   element id), ``concept_name``, ``label_column`` and ``mapping_type_column``. Strategy
@@ -101,6 +102,39 @@ class ProductSpecDoc(_Doc):
         if sum(e.identity is not None for e in self.entities) > 1:
             raise ValueError("a product declares at most one entity identity")
         return self
+
+
+class IdentityOverlay(BaseModel):
+    """An entity identity a source declares beside a product spec it cannot change."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    entity_id: str
+    identity: EntityIdentity
+
+
+def with_identity_overlay(doc: ProductSpecDoc, overlay: IdentityOverlay | None) -> ProductSpecDoc:
+    """The spec with ``overlay`` applied; a spec identity that differs from it is an error."""
+    if overlay is None:
+        return doc
+    declared = doc.identity_entity
+    if declared is not None:
+        if (declared.entity_id, declared.identity) != (overlay.entity_id, overlay.identity):
+            raise ProductSpecError(
+                f"product {doc.product_id}: identity overlay on {overlay.entity_id!r} "
+                f"conflicts with the spec identity on {declared.entity_id!r}"
+            )
+        return doc
+    if overlay.entity_id not in {e.entity_id for e in doc.entities}:
+        raise ProductSpecError(
+            f"product {doc.product_id}: identity overlay names no entity {overlay.entity_id!r}"
+        )
+    entities = tuple(
+        e.model_copy(update={"identity": overlay.identity})
+        if e.entity_id == overlay.entity_id else e
+        for e in doc.entities
+    )  # fmt: skip
+    return doc.model_copy(update={"entities": entities})
 
 
 def parse_product_spec(data: bytes, source: Path) -> ProductSpecDoc:

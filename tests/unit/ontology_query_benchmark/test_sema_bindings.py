@@ -179,8 +179,18 @@ def facts_fixture(tmp_path: Path, assistance: str = "supplied") -> LibraryFacts:
     )
 
 
-def write_fixture(tmp_path: Path, *, events_identity: dict[str, Any] | None = None) -> Path:
-    """Write a two-product sidecar; return its path."""
+def write_fixture(
+    tmp_path: Path,
+    *,
+    events_identity: dict[str, Any] | None = None,
+    events_overlay: dict[str, Any] | None = None,
+    sql_dialect: str | None = "duckdb",
+) -> Path:
+    """Write a two-product sidecar; return its path.
+
+    ``events_overlay`` is the sidecar's identity overlay for the events product;
+    ``sql_dialect=None`` leaves the warehouse dialect undeclared.
+    """
     tmp_path.mkdir(parents=True, exist_ok=True)
     pins = []
     for product, table, spec, attribution in (
@@ -192,13 +202,18 @@ def write_fixture(tmp_path: Path, *, events_identity: dict[str, Any] | None = No
         pins.append({"product": product, "table": table, "path": path.name,
                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                      "attribution": attribution})
+    if events_overlay is not None:
+        pins[1]["entity_identity"] = events_overlay
+    physical = {"catalog": "cat", "schema": "sch"}
+    if sql_dialect is not None:
+        physical["sql_dialect"] = sql_dialect
     sidecar = {
         "schema_version": 1, "sidecar_version": "t-1",
         "authority": "Spec test authority", "attribution": "supplied",
         "approval_policy": {"kind": "supplied_approved",
                             "executable_strategies": ["scalar", "pass_through"]},
         "model_role": "BENCH_S", "concept_vocabulary": "lib",
-        "physical": {"catalog": "cat", "schema": "sch"},
+        "physical": physical,
         "specs": pins,
         "conventions": {"path": "rules.json", "file_sha256": "x",
                         "conventions_sha256": hashlib.sha256(
@@ -334,3 +349,4 @@ def test_an_entity_identity_is_read_from_the_spec(tmp_path: Path) -> None:
     assert entity.identity is not None
     assert entity.identity.key_columns == (RID, "site_S1")
     assert entity.identity.exclude_null_keys is True
+

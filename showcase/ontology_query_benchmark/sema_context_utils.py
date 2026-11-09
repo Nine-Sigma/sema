@@ -197,7 +197,8 @@ def _executable_entity(entity: SpecEntity, product: ProductSpec, sidecar: Sideca
         return []
     name = entity.entity_id or product.pin.product
     keys = ", ".join(entity.identity.key_columns)
-    cte = identity_cte_sql(name, sidecar.relation(product.pin.table), entity.identity)
+    relation = sidecar.relation(product.pin.table)
+    cte = identity_cte_sql(name, relation, entity.identity, dialect=sidecar.sql_dialect)
     return [f"  ENTITY {name} (executable; one row per {keys}):", f"    {cte}"]
 
 
