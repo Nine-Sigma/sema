@@ -19,8 +19,8 @@ run can overshoot a ceiling by at most one slot (three generations). Each receip
 its slot's ``wall_s``; elapsed time is the wall time earlier invocations recorded plus the
 time since this invocation started.
 
-Every source relation the profile pins must be at its pinned Delta version, read through
-arm A's (else arm S's) SQL executor: a mismatch refuses the run before the first slot, and
+Every source relation the profile pins must be at its pinned version, read with the
+profile's version query through arm A's (else arm S's) SQL executor: a mismatch refuses the run before the first slot, and
 a change seen after any slot writes every remaining slot ``unrun`` with ``source_drift``, and
 a failed read after a slot (its receipt already written) does the same with
 ``source_check_failed``.
@@ -315,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("source versions are read through arm A or S; include one in --arms")
         summary = run(slots, questions, runtimes, model, contracts, harness, settings,
                       args.run_dir / "receipts.jsonl", pins=profile.source_versions,
-                      read_version=ru.version_reader(sql))
+                      read_version=ru.version_reader(sql, profile.sources))
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0
 

@@ -73,23 +73,32 @@ def test_s_inputs_named_by_the_profile_load_and_pin() -> None:
     assert load_conventions(sidecar) == ("People means distinct rid values.",)
 
 
-def test_sources_pin_each_relation_to_a_delta_version(tmp_path: Path) -> None:
-    sources = [{"relation": "cat.s.person", "version": 7}, {"relation": "cat.s.visit", "version": 0}]
-    profile = load_profile(_variant(tmp_path, {"sources": sources}))
+def test_sources_pin_each_relation_to_a_version(tmp_path: Path) -> None:
+    pins = [{"relation": "cat.s.person", "version": 7}, {"relation": "cat.s.visit", "version": 0}]
+    profile = load_profile(_variant(tmp_path, {"sources.pins": pins}))
     assert profile.source_versions == {"cat.s.person": 7, "cat.s.visit": 0}
 
 
 @pytest.mark.parametrize(
-    ("sources", "refusal"),
+    ("pins", "refusal"),
     [
-        ([{"relation": "cat.s.person"}], r"sources\.0\.version"),
-        ([{"relation": "cat.s.person", "version": None}], r"sources\.0\.version"),
-        ([{"relation": "person", "version": 7}], r"sources\.0\.relation"),
+        ([{"relation": "cat.s.person"}], r"sources\.pins\.0\.version"),
+        ([{"relation": "cat.s.person", "version": None}], r"sources\.pins\.0\.version"),
+        ([{"relation": "person", "version": 7}], r"sources\.pins\.0\.relation"),
         ([], "at least 1"),
     ],
 )
 def test_an_unpinned_or_unqualified_source_is_refused(
-    tmp_path: Path, sources: list[dict[str, object]], refusal: str
+    tmp_path: Path, pins: list[dict[str, object]], refusal: str
 ) -> None:
     with pytest.raises(ValidationError, match=refusal):
-        load_profile(_variant(tmp_path, {"sources": sources}))
+        load_profile(_variant(tmp_path, {"sources.pins": pins}))
+
+
+@pytest.mark.parametrize(
+    "version_sql",
+    ["SELECT 1 FROM history", "SELECT v FROM {relation} WHERE {other}", "SELECT {} FROM {relation}"],
+)
+def test_a_version_query_must_template_exactly_the_relation(tmp_path: Path, version_sql: str) -> None:
+    with pytest.raises(ValidationError, match=r"sources\.version_sql"):
+        load_profile(_variant(tmp_path, {"sources.version_sql": version_sql}))

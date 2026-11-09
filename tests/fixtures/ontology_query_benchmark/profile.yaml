@@ -68,5 +68,8 @@ sema:
   concept_spec_attribution: assisted
 
 sources:
-  - {relation: main.s.person, version: 7}
-  - {relation: main.s.visit, version: 3}
+  version_sql: "SELECT v, at FROM toy_versions WHERE name = '{relation}' ORDER BY v DESC"
+  version_column: v
+  pins:
+    - {relation: main.s.person, version: 7}
+    - {relation: main.s.visit, version: 3}

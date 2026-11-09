@@ -7,6 +7,7 @@ pinned source versions only from a loaded profile. Relative paths resolve agains
 from __future__ import annotations
 
 import itertools
+import string
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal
@@ -153,10 +154,26 @@ class Sema(_Frozen):
 
 
 class Source(_Frozen):
-    """A fully qualified relation the arms read and the Delta version the run is pinned to."""
+    """A fully qualified relation the arms read and the version the run is pinned to."""
 
     relation: str = Field(pattern=r"^\w+\.\w+\.\w+$")
     version: int = Field(ge=0)
+
+
+class Sources(_Frozen):
+    """The pinned relations and the warehouse's own query for a relation's current version."""
+
+    version_sql: str
+    version_column: str
+    pins: tuple[Source, ...] = Field(min_length=1)
+
+    @field_validator("version_sql")
+    @classmethod
+    def _templates_the_relation(cls, sql: str) -> str:
+        fields = {name for _, name, _, _ in string.Formatter().parse(sql) if name is not None}
+        if fields != {"relation"}:
+            raise ValueError(f"must template exactly {{relation}}, found {sorted(fields)}")
+        return sql
 
 
 class Profile(_Frozen):
@@ -170,11 +187,11 @@ class Profile(_Frozen):
     sweep: Sweep
     extract: Extract
     sema: Sema
-    sources: tuple[Source, ...] = Field(min_length=1)
+    sources: Sources
 
     @property
     def source_versions(self) -> dict[str, int]:
-        return {source.relation: source.version for source in self.sources}
+        return {pin.relation: pin.version for pin in self.sources.pins}
 
 
 def load_profile(path: Path) -> Profile:

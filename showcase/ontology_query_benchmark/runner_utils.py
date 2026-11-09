@@ -18,7 +18,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Protocol
 
-from showcase.ontology_query_benchmark.profile import Harness, Knobs, Limits, Timbr
+from showcase.ontology_query_benchmark.profile import Harness, Knobs, Limits, Sources, Timbr
 from showcase.ontology_query_benchmark.routing import require_mcp_tool
 
 HARNESS_MODULES = ("benchmark_models", "benchmark_workflow", "benchmark_clients",
@@ -322,14 +322,14 @@ class SourceVersionError(RuntimeError):
     """A pinned source relation is unreadable or no longer at its pinned version."""
 
 
-def version_reader(executor: Any) -> Callable[[str], int]:
-    """A relation's current Delta version, read through an arm's SQL executor."""
+def version_reader(executor: Any, sources: Sources) -> Callable[[str], int]:
+    """A relation's current version, read with the profile's query through an arm's executor."""
 
     def read(relation: str) -> int:
-        execution = executor.execute(f"DESCRIBE HISTORY {relation} LIMIT 1", 1)
+        execution = executor.execute(sources.version_sql.format(relation=relation), 1)
         if not execution.ok or not execution.rows:
             raise SourceVersionError(f"cannot read the version of {relation}: {execution.message}")
-        return int(execution.rows[0][execution.columns.index("version")])
+        return int(execution.rows[0][execution.columns.index(sources.version_column)])
 
     return read
 

@@ -39,19 +39,19 @@ def _argv(frozen: Path, tmp_path: Path, arm: str) -> list[str]:
 
 
 class HistoryExecutor(FakeExecutor):
-    """Answers DESCRIBE HISTORY with the version ``versions`` gives; None is a denied read."""
+    """Answers the profile's version query with ``versions``; None is a denied read."""
 
     def __init__(self, harness: SimpleNamespace, versions: Callable[[str], int | None]) -> None:
         super().__init__(harness, ((GOLD,),))
         self.versions = versions
 
     def execute(self, sql: str, row_limit: int) -> Any:
-        if not sql.startswith("DESCRIBE HISTORY "):
+        if not sql.startswith("SELECT v, at FROM toy_versions WHERE name = "):
             return super().execute(sql, row_limit)
-        version, execution = self.versions(sql.split()[2]), self.harness.models.Execution
+        version, execution = self.versions(sql.split("'")[1]), self.harness.models.Execution
         if version is None:
             return execution(False, (), (), 0.01, "permission", "denied")
-        return execution(True, ("version", "timestamp"), ((version, "t"),), 0.01)
+        return execution(True, ("at", "v"), (("t", version),), 0.01)
 
 
 def _record_clients(
