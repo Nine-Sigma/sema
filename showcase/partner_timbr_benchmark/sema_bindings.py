@@ -58,7 +58,7 @@ class Sidecar:
     surrogate_row_id: str
     membership_relation: str
     hierarchy_reference: tuple[str, ...]
-    context_budget_tokens: int
+    context_char_budget: int
     value_list_limit: int
 
     def relation(self, table: str) -> str:
@@ -134,7 +134,7 @@ def load_sidecar(path: Path = SIDECAR_PATH) -> Sidecar:
         surrogate_row_id=grain["surrogate_row_id"],
         membership_relation=raw["membership_relation"],
         hierarchy_reference=tuple(raw["hierarchy_reference"]),
-        context_budget_tokens=int(raw["context_budget_tokens"]),
+        context_char_budget=int(raw["context_char_budget"]),
         value_list_limit=int(raw["value_list_limit"]),
     )
 

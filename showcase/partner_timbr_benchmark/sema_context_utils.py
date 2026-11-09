@@ -55,14 +55,26 @@ def render(
 ) -> Rendering:
     if not rendering.tables:
         rendering.findings.append("retrieval returned no physical asset for the question")
-    _add_tables_and_columns(rendering.parts, rendering.sco)
-    _add_join_section(rendering.parts, rendering.sco)
     selected = [b for b in resolution.approved() if b.table in rendering.tables]
+    _add_tables_and_columns(rendering.parts, _without_companions(rendering.sco, selected))
+    _add_join_section(rendering.parts, rendering.sco)
     _add_bindings(rendering.parts, selected, sidecar, facts)
     _add_values(rendering, selected, _retrieved_values(candidates), sidecar, facts)
     _add_grain(rendering.parts, rendering.tables, products, sidecar)
     _add_rules(rendering.parts, sidecar)
     return rendering
+
+
+def _without_companions(
+    sco: SemanticContextObject, selected: list[SuppliedBinding]
+) -> SemanticContextObject:
+    """Drop V_label / V_mapping_type columns; the bindings header names the pattern."""
+    implied = {(b.table, c) for b in selected for c in b.companions}
+    assets = [
+        a.model_copy(update={"columns": [c for c in a.columns if (a.table, c) not in implied]})
+        for a in sco.physical_assets
+    ]
+    return sco.model_copy(update={"physical_assets": assets})
 
 
 def _add_bindings(
@@ -118,12 +130,16 @@ def _add_values(
     governed = [b for b in selected if b.strategy == "pass_through" and b.de_id]
     if not governed:
         return
-    rendering.parts.append("\nGOVERNED VALUES (complete lists only; code = label):")
+    template = MEMBERSHIP_SQL.format(relation=sidecar.membership_relation, de_id="E")
+    rendering.parts.append(
+        "\nGOVERNED VALUES (complete lists only; code = label). Unlisted sets: "
+        f"membership query E = {template}"
+    )
     for b in governed:
         de_id = str(b.de_id)
         element = facts.elements.get(de_id)
         got = retrieved.get((b.table, b.column), {})
-        reference = MEMBERSHIP_SQL.format(relation=sidecar.membership_relation, de_id=de_id)
+        reference = f"membership query {de_id}"
         if element is None:
             rendering.findings.append(
                 f"value set unloaded: {de_id} ({b.column}) is absent from {facts.release}"
@@ -131,8 +147,8 @@ def _add_values(
             rendering.parts.append(f"  {b.column}: no governed value set loaded ({de_id})")
         elif element.members is not None and len(element.members) > sidecar.value_list_limit:
             rendering.parts.append(
-                f"  {b.column}: {element.pv_count} members, above the listing limit. "
-                f"Executable membership: {reference}"
+                f"  {b.column}: {element.pv_count} members, above the listing limit "
+                f"({reference})"
             )
         elif element.members is not None and set(got) == {c for c, _ in element.members}:
             listing = "; ".join(f"{code} = {got[code]}" for code, _ in element.members)
@@ -145,8 +161,7 @@ def _add_values(
                     f"members for {de_id} ({b.column}); listing withheld"
                 )
             rendering.parts.append(
-                f"  {b.column}: {element.pv_count} members, not listed. "
-                f"Executable membership: {reference}"
+                f"  {b.column}: {element.pv_count} members, not listed ({reference})"
             )
 
 

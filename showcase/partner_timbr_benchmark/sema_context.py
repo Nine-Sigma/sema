@@ -14,7 +14,6 @@ import json
 from dataclasses import dataclass
 from typing import Protocol
 
-from sema.llm_client_utils import approx_tokens
 from sema.models.context import SemanticCandidateSet
 from sema.pipeline.context import prune_to_sco
 from showcase.partner_timbr_benchmark.sema_bindings import (
@@ -27,6 +26,11 @@ from showcase.partner_timbr_benchmark.sema_bindings import (
 from showcase.partner_timbr_benchmark.sema_build import BuildManifest
 from showcase.partner_timbr_benchmark.sema_build_utils import LibraryFacts
 from showcase.partner_timbr_benchmark.sema_context_utils import Rendering, render
+
+
+FIRST_PROMPT_TOKEN_LIMIT = 13_934
+CHARS_PER_TOKEN = 2.08
+HARNESS_OVERHEAD_CHARS = 2_900
 
 
 class ManifestMismatchError(RuntimeError):
@@ -117,10 +121,9 @@ class SContextProvider:
                 "conventions differ from the pinned workload conventions "
                 f"(sha256 {self._sidecar.conventions_sha256[:12]})"
             )
-        tokens = approx_tokens(len(text))
-        if tokens > self._sidecar.context_budget_tokens:
+        if len(text) > self._sidecar.context_char_budget:
             findings.append(
-                f"context overflow: about {tokens} tokens exceed the "
-                f"{self._sidecar.context_budget_tokens}-token context budget"
+                f"context overflow: {len(text)} chars exceed the "
+                f"{self._sidecar.context_char_budget}-char context budget"
             )
         return findings

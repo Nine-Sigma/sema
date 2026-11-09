@@ -85,7 +85,7 @@ def _provider(
     sidecar_path, facts_path = write_fixture(tmp_path)
     sidecar = load_sidecar(sidecar_path)
     if budget is not None:
-        sidecar = dataclasses.replace(sidecar, context_budget_tokens=budget)
+        sidecar = dataclasses.replace(sidecar, context_char_budget=budget)
     if list_limit is not None:
         sidecar = dataclasses.replace(sidecar, value_list_limit=list_limit)
     resolution = resolve_bindings(sidecar, load_products(sidecar), catalog_fixture())
@@ -103,27 +103,27 @@ def test_context_renders_assets_bindings_and_complete_values(tmp_path: Path) -> 
     assert "PRT8532 = Female" in ctx.text and "PRT8507 = Male" in ctx.text
     assert "PRT1 = Alive" in ctx.text
     assert "CPD test authority" in ctx.text
-    assert "gender_G1_label" in ctx.text
+    assert "V_label holds its label" in ctx.text
 
 
 def test_incompletely_retrieved_value_set_is_not_listed(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [DEMO_ENTITY, *DEMO_VALUES[1:]])(Q01)
     assert "PRT8507 = Male" not in ctx.text
-    assert "data_element_prt_id = 'G1'" in ctx.text
+    assert "membership query G1" in ctx.text
     assert any("G1" in f and "incomplete" in f for f in ctx.findings)
 
 
 def test_large_value_set_points_at_membership_relation(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [TUMOR_ENTITY])("How many tumors by site?")
     assert "lib.sl.data_element" in ctx.text
-    assert "data_element_prt_id = 'S1'" in ctx.text and "331" in ctx.text
+    assert "membership query S1" in ctx.text and "331" in ctx.text
     assert not any("S1" in f for f in ctx.findings)
 
 
 def test_value_list_limit_switches_to_membership_reference(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [DEMO_ENTITY, *DEMO_VALUES], list_limit=1)(Q01)
     assert "PRT8532 = Female" not in ctx.text
-    assert "data_element_prt_id = 'G1'" in ctx.text
+    assert "membership query G1" in ctx.text
     assert not any("G1" in f for f in ctx.findings)
 
 
@@ -135,6 +135,30 @@ def test_catalog_companion_is_rendered_as_unsupplied(tmp_path: Path) -> None:
     assert "not in CPD" in line and "site_S1_concept_code" in line
 
 
+def test_pattern_companions_are_not_listed_twice(tmp_path: Path) -> None:
+    ctx = _provider(tmp_path, [DEMO_ENTITY, *DEMO_VALUES])(Q01)
+    assert "gender_G1_label" not in ctx.text
+    table_line = next(x for x in ctx.text.splitlines() if x.startswith(f"  cat.sch.{DEMO}: "))
+    assert "gender_G1" in table_line and MRN in table_line
+
+
+def test_membership_query_template_is_stated_once(tmp_path: Path) -> None:
+    ctx = _provider(tmp_path, [DEMO_ENTITY, *DEMO_VALUES], list_limit=1)(Q01)
+    assert ctx.text.count("SELECT permissible_value_prt_id") == 1
+    assert "membership query G1" in ctx.text and "membership query V1" in ctx.text
+
+
+def test_committed_budget_fits_the_first_prompt_limit() -> None:
+    from showcase.partner_timbr_benchmark.sema_bindings import load_sidecar as load
+    from showcase.partner_timbr_benchmark.sema_context import (
+        CHARS_PER_TOKEN,
+        FIRST_PROMPT_TOKEN_LIMIT,
+        HARNESS_OVERHEAD_CHARS,
+    )
+    budget = load().context_char_budget
+    assert budget + HARNESS_OVERHEAD_CHARS <= FIRST_PROMPT_TOKEN_LIMIT * CHARS_PER_TOKEN
+
+
 def test_unloaded_value_set_is_a_finding(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [DEMO_ENTITY, *DEMO_VALUES])(Q01)
     assert any("C1" in f and "unloaded" in f for f in ctx.findings)
@@ -142,7 +166,7 @@ def test_unloaded_value_set_is_a_finding(tmp_path: Path) -> None:
 
 def test_overflow_is_reported_without_truncating(tmp_path: Path) -> None:
     full = _provider(tmp_path / "a", [DEMO_ENTITY, *DEMO_VALUES])(Q01)
-    tight = _provider(tmp_path / "b", [DEMO_ENTITY, *DEMO_VALUES], budget=20)(Q01)
+    tight = _provider(tmp_path / "b", [DEMO_ENTITY, *DEMO_VALUES], budget=200)(Q01)
     assert tight.text == full.text
     assert any("overflow" in f for f in tight.findings)
     assert not any("overflow" in f for f in full.findings)

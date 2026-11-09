@@ -147,7 +147,7 @@ def write_fixture(tmp_path: Path) -> tuple[Path, Path]:
                         "surrogate_row_id": "row_id"},
         "membership_relation": "lib.sl.data_element",
         "hierarchy_reference": ["concept_ancestor: ancestor_concept_id is broader."],
-        "context_budget_tokens": 4000,
+        "context_char_budget": 16000,
         "value_list_limit": 40,
     }
     sidecar_path = tmp_path / "sidecar.json"
