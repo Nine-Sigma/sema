@@ -16,6 +16,7 @@ from sema.models.config import ModelPrice
 TOKENS_PER_PRICE_UNIT = 1000
 RECORDING_MANIFEST = "recording.json"
 AGREEMENT_FIELD = "agreement"
+EMBEDDINGS_FIELD = "embeddings"
 
 
 def read_recording(recordings_dir: Path | None, key: str) -> dict[str, Any] | None:
@@ -29,14 +30,24 @@ def read_recording(recordings_dir: Path | None, key: str) -> dict[str, Any] | No
     return record
 
 
-def recorded_agreement(recordings_dir: Path) -> bool:
-    """The agreement flag a recording was made with; a manifest without it, or no
-    manifest, predates agreement and replays with one ask."""
+def _recorded_flag(recordings_dir: Path, field: str) -> bool:
     path = recordings_dir / RECORDING_MANIFEST
     if not path.is_file():
         return False
     manifest: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    return bool(manifest.get(AGREEMENT_FIELD, False))
+    return bool(manifest.get(field, False))
+
+
+def recorded_agreement(recordings_dir: Path) -> bool:
+    """The agreement flag a recording was made with; a manifest without it, or no
+    manifest, predates agreement and replays with one ask."""
+    return _recorded_flag(recordings_dir, AGREEMENT_FIELD)
+
+
+def recorded_embeddings(recordings_dir: Path) -> bool:
+    """Whether a recording was made with an embedder; without the flag it was not, so a
+    replay builds none."""
+    return _recorded_flag(recordings_dir, EMBEDDINGS_FIELD)
 
 
 def total_tokens(stats: InvocationStats) -> int:
