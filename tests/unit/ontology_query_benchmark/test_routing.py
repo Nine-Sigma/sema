@@ -67,6 +67,8 @@ def test_loaded_dotenv_is_refused(profile: Profile) -> None:
         ("OPENAI_API_KEY", "sk-x"),
         ("ANTHROPIC_BASE_URL", "https://api.anthropic.com"),
         ("LLM_BASE_URL", "https://gateway.example.com"),
+        ("EMBEDDING_BASE_URL", "https://gateway.example.com"),
+        ("EMBEDDING_API_KEY", "sk-x"),
         ("LLM_PROVIDER", "openrouter"),
         ("INTAKE_MODEL_PROVIDER", "custom"),
         ("EMBEDDING_PROVIDER", "openai"),
