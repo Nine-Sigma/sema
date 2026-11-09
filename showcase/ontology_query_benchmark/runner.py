@@ -21,7 +21,9 @@ time since this invocation started.
 
 Every source relation the profile pins must be at its pinned Delta version, read through
 arm A's (else arm S's) SQL executor: a mismatch refuses the run before the first slot, and
-a change seen after any slot writes every remaining slot ``unrun`` with ``source_drift``.
+a change seen after any slot writes every remaining slot ``unrun`` with ``source_drift``, and
+a failed read after a slot (its receipt already written) does the same with
+``source_check_failed``.
 """
 
 import argparse
@@ -187,6 +189,7 @@ def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[s
     done, spent, prior_wall = recorded(receipts)
     start = clock()
     stopped: str | None = None
+    source_stop: str | None = None
     outcomes: Counter[str] = Counter()
     receipts.parent.mkdir(parents=True, exist_ok=True)
     with receipts.open("a") as handle:
@@ -194,9 +197,7 @@ def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[s
             if slot.slot_id in done:
                 continue
             began = clock()
-            stopped = "source_drift" if drift else _stop_reason(
-                spent, prior_wall + began - start, settings
-            )
+            stopped = source_stop or _stop_reason(spent, prior_wall + began - start, settings)
             if stopped:
                 entry = {**_slot_fields(slot), "outcome": "unrun", "reason": stopped}
             else:
@@ -204,19 +205,31 @@ def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[s
                                  contracts[slot.question_id], harness, settings)  # fmt: skip
                 spent += entry["cost_usd"]
                 entry["wall_s"] = round(clock() - began, 6)
-                drift = ru.source_drift(pins, read_version)
-                if drift:
-                    logger.warning("source drift after {}: {}", slot.slot_id, drift)
             outcomes[entry["outcome"]] += 1
             handle.write(json.dumps(entry, sort_keys=True, default=str) + "\n")
             handle.flush()
             logger.info("{} {} spent=${:.4f}", slot.slot_id, entry["outcome"], spent)
+            if not stopped:
+                source_stop, drift = _source_check(pins, read_version)
+                if drift:
+                    logger.warning("{} after {}: {}", source_stop, slot.slot_id, drift)
     return {
         "outcomes": dict(outcomes),
         "spent_usd": round(spent, 6),
         "stopped": stopped,
         "source_drift": drift,
     }
+
+
+def _source_check(
+    pins: Mapping[str, int], read_version: Callable[[str], int]
+) -> tuple[str | None, str | None]:
+    """The stop reason and its detail after a slot: a changed or an unreadable source."""
+    try:
+        drift = ru.source_drift(pins, read_version)
+    except ru.SourceVersionError as exc:
+        return "source_check_failed", str(exc)
+    return ("source_drift" if drift else None), drift
 
 
 def _stop_reason(spent: float, elapsed: float, settings: RunSettings) -> str | None:

@@ -188,3 +188,25 @@ def test_the_manifest_records_the_source_versions_the_run_read(
     manifest = json.loads((tmp_path / "run/manifest.json").read_text())
     assert manifest["source_versions"] == PINS
     assert [r["outcome"] for r in _receipts(tmp_path)] == ["correct"]
+
+
+def test_a_failed_version_read_after_a_paid_slot_keeps_its_receipt_and_stops(
+    frozen: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reads = itertools.count()
+
+    def versions(relation: str) -> int | None:
+        return PINS[relation] if next(reads) < len(PINS) else None
+
+    events: list[Any] = []
+    monkeypatch.setattr(runner, "require_clean_process", lambda *_: None)
+    monkeypatch.setattr(runner, "live_clients", _record_clients(events, versions))
+    assert runner.main([*_argv(frozen, tmp_path, "A"), "--reps", "3"]) == 0
+    receipts = _receipts(tmp_path)
+    slots = (tmp_path / "run/slots.jsonl").read_text().splitlines()
+    assert len(receipts) == len(slots) == 3
+    assert [(r["outcome"], r.get("reason")) for r in receipts] == [
+        ("correct", None), ("unrun", "source_check_failed"), ("unrun", "source_check_failed")
+    ]
+    assert receipts[0]["cost_usd"] > 0 and "wall_s" in receipts[0]
+    assert [len(model.calls) for model in events if isinstance(model, FakeModel)] == [1]
