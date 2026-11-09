@@ -1,0 +1,55 @@
+# assistance: supplied (assisted). Authored 2026-11-09 by benchmark worker S, not
+# produced by intake discovery. Adapted from the reviewed Standard Library oracle
+# spec (tests/fixtures/intake/partner_sl/standard_library.spec.yaml) to the two
+# relations of the scoped workload projection (runs/<run_id>/source/
+# workload_projection.duckdb, staging schema standard_library). Sections the
+# projection does not hold (relationships, authored bindings, value mappings)
+# are omitted. The coordinator may replace this file with the intake-assembled
+# spec; sema_build takes the spec path as a parameter.
+concept_source:
+  spec_version: 2
+  id: partner-standard-library-workload
+  identity_system: partner
+  release: "2026-11-09"
+  default_provider: staging
+  scheme:
+    qualified_name: prt_standard_library.workload
+    description: "partner Standard Library data elements named by the benchmark products"
+  concepts:
+    relation: standard_library.standard_library_data_element
+    group_by: data_element_prt_id
+    roles:
+      concept_id: data_element_prt_id
+      name: data_element_prt_preferred_label
+      title: data_element_title
+      definition: data_element_definition
+      data_type: data_element_data_type_id
+      sensitive: data_element_phi
+      synonyms: data_element_synonym_name
+  value_sets:
+    relation: standard_library.standard_library_data_element
+    roles:
+      concept_id: data_element_prt_id
+      code: permissible_value_prt_id
+      display: permissible_value_prt_preferred_label
+      display_fallback: permissible_value_title
+      vocabulary_id: permissible_value_vocabulary_id
+      concept_code: permissible_value_concept_code
+      synonyms: permissible_value_synonym_name
+  concept_details:
+    relation: standard_library.standard_library_concept
+    on: [data_element_prt_id, concept_prt_id]
+    roles:
+      external_refs:
+        - system: omop
+          column: concept_athena_id
+        - system: "{vocabulary_id}"
+          column: concept_code
+  term_details:
+    relation: standard_library.standard_library_concept
+    on: [permissible_value_prt_id, concept_prt_id]
+    roles:
+      definition: definition
+      external_refs:
+        - system: omop
+          column: concept_athena_id

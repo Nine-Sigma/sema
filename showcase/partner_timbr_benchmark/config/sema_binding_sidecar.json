@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "sidecar_version": "partner-bench-s-1",
+  "authority": "partner CPD product spec v2 (Timbr POC harness ab-mcp-genie cafebabe), supplied governed binding",
+  "approval_policy": {
+    "kind": "supplied_approved",
+    "executable_strategies": ["scalar", "pass_through"],
+    "note": "Supplied by the operator, not discovered. A binding is executable only when its strategy is listed here and its column and companions exist in the catalog with a matching type."
+  },
+  "model_role": "PARTNER_BENCH_S",
+  "concept_vocabulary": "prt_standard_library",
+  "physical": {"catalog": "partner_dev", "schema": "partner_provenance"},
+  "harness_root": "/path/to/partner-harness",
+  "specs": [
+    {
+      "product": "demographics",
+      "table": "pb_demographics_person_r3_platinum",
+      "path": "config/demographics_product_spec_cpd_v2.json",
+      "sha256": "d7c947b48d332064edc5164f4400f2e6959641af1599e26f5f1c809362678ede"
+    },
+    {
+      "product": "cancer_registry",
+      "table": "pb_cancer_registry_primary_tumor_r3_platinum",
+      "path": "config/cancer_registry_product_spec_cpd_v2.json",
+      "sha256": "3a5667e0aa8214d474d79a129b6a50afae02278f0c24ecc5ca7cd063a528c295"
+    }
+  ],
+  "conventions": {
+    "path": "config/benchmark/cancer_plus_demographics_v2_bench_L_W4S.json",
+    "file_sha256": "8aceaaa82885c7e9d17595904687d17356f2f220b903baae6ef3a86f1766d36f",
+    "conventions_sha256": "39dd89c276fbf3084cb4b393ff1f1c99f06b5ab5b33ddd2d547d7e1f906c6340"
+  },
+  "tumor_grain": {
+    "product": "cancer_registry",
+    "columns": [
+      "medical_record_number_PRT4161822",
+      "naaccr_sequence_number_UNV00001374",
+      "date_of_diagnosis_PRT4160852",
+      "site_of_primary_tumor_icdo3_PRTL2140001985",
+      "histologic_type_icdo3_PRT4154129",
+      "laterality_of_primary_site_PRT35918306"
+    ],
+    "surrogate_row_id": "unified_dataset_row_surrogate_id"
+  },
+  "membership_relation": "partner_library_test.standard_library.standard_library_data_element",
+  "hierarchy_reference": [
+    "Ancestor relation: partner_dev.partner_provenance.vb_vocabulary_test_2026_09_25_omop_ancestor (ancestor_concept_id, descendant_concept_id, min_levels_of_separation, max_levels_of_separation); a view over vb_vocabulary_test_2026_09_25_candidate_ancestor at Delta version 0. Direction: ancestor_concept_id is the broader concept.",
+    "Self policy: the relation holds level-0 self rows (ancestor_concept_id = descendant_concept_id, min_levels_of_separation = 0).",
+    "Concept relation: partner_dev.partner_provenance.vb_vocabulary_test_2026_09_25_omop_concept (concept_id, concept_name, domain_id, vocabulary_id, concept_class_id, standard_concept, concept_code).",
+    "Library-to-OMOP relation: partner_library_test.standard_library.standard_library_concept (concept_prt_id = permissible-value id, concept_athena_id = OMOP concept_id).",
+    "Excluded: OMOP 'Maps to' relationships are mappings, not ancestry."
+  ],
+  "context_char_budget": 26000,
+  "context_budget_note": "Coordinator limit 2026-11-09: first prompt <= 13934 tokens at 2.08 chars/token (28982 chars). Harness system, W4S conventions, SQL rules and a 160-char question measured 2458 chars; 2900 is reserved for overhead and longer questions, leaving 26000 chars of context.",
+  "value_list_limit": 30
+}

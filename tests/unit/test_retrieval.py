@@ -377,3 +377,50 @@ class TestExpandFromEntitiesCharacterization:
             assert "property" in v
             assert "column" in v
             assert "table" in v
+
+
+class TestGovernedValuesReachContext:
+    def test_entity_value_set_survives_visibility_policy(
+        self, mock_driver, mock_embedder,
+    ):
+        driver, session = mock_driver
+
+        def row(data):
+            r = MagicMock()
+            r.data.return_value = data
+            return r
+
+        def run_side_effect(query, **params):
+            if "db.index.vector.queryNodes" in query:
+                if "entity" in query:
+                    return [row({"node": {"name": "Patient"}, "score": 0.9})]
+                return []
+            if "ENTITY_ON_TABLE" in query:
+                return [row({
+                    "table_name": "patient", "schema_name": "s",
+                    "catalog": "c", "columns": [{
+                        "property": "Sex", "column": "sex_cd",
+                        "data_type": "STRING",
+                        "semantic_type": "categorical",
+                    }],
+                })]
+            if "HAS_VALUE_SET" in query and "MEMBER_OF" in query:
+                return [row({"code": "F", "label": "Female",
+                             "vocabulary_name": None})]
+            return []
+
+        session.run.side_effect = run_side_effect
+        engine = RetrievalEngine(driver=driver, embedder=mock_embedder)
+        sco = prune_to_sco(engine.retrieve("female patients", top_k=5))
+
+        assert [(g.column, g.values) for g in sco.governed_values] == [
+            ("sex_cd", [{"code": "F", "label": "Female"}]),
+        ]
+
+    def test_rejected_entity_values_stay_hidden(self):
+        candidate_set = SemanticCandidateSet(query="q", candidates=[{
+            "type": "value", "property_name": "Sex", "column": "sex_cd",
+            "table": "patient", "code": "F", "label": "Female",
+            "status": "rejected", "confidence": 1.0,
+        }])
+        assert prune_to_sco(candidate_set).governed_values == []
