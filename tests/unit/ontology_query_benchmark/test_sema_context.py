@@ -107,8 +107,11 @@ def _provider(
     list_limit: int | None = None,
     graph_identity: str = "graph-1",
     denied: Mapping[str, tuple[str, ...]] | None = None,
+    grain_note: str | None = None,
 ) -> SContextProvider:
     sidecar = load_sidecar(write_fixture(tmp_path), tmp_path)
+    if grain_note is not None:
+        sidecar = dataclasses.replace(sidecar, grain_note=grain_note)
     if list_limit is not None:
         sidecar = dataclasses.replace(sidecar, value_list_limit=list_limit)
     products = load_products(sidecar)

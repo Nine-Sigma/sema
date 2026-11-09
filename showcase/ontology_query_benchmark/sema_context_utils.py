@@ -260,7 +260,10 @@ def _add_grain(
                 columns=", ".join(sidecar.grain_columns),
                 surrogate_row_id=sidecar.surrogate_row_id,
             )
-            names = [(table, c) for c in (*sidecar.grain_columns, sidecar.surrogate_row_id)]
+            named = (*sidecar.grain_columns, sidecar.surrogate_row_id)
+            if "{surrogate_row_id}" not in sidecar.grain_note:
+                named = sidecar.grain_columns
+            names = [(table, c) for c in named]
             lines.append((f"  {note}", names, "grain note"))
         rendering.parts.extend(
             text for text, names, kind in lines

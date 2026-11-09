@@ -84,6 +84,16 @@ def test_a_grain_note_naming_a_denied_column_is_withheld_not_rewritten(
     assert any(f.column == "row_id" and "note" in f.message for f in ctx.findings)
 
 
+def test_a_grain_note_that_does_not_name_a_denied_column_is_kept(
+    tmp_path: Path, harness: SimpleNamespace
+) -> None:
+    note = "Event grain columns (supplied): {columns}."
+    provider = _provider(tmp_path, [EVENTS_ENTITY], grain_note=note)
+    ctx = provider(EVENTS_QUESTION, _policy(harness, "row_id").is_denied)
+    assert "Event grain columns (supplied):" in ctx.text
+    assert "row_id" not in ctx.text
+
+
 def test_without_a_cross_product_denied_name_the_context_is_unchanged(
     tmp_path: Path, harness: SimpleNamespace
 ) -> None:
