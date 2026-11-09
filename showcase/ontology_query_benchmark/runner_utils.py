@@ -109,6 +109,7 @@ class Meter:
     failed_stage: str | None = None
     findings: tuple[str, ...] = ()
     last_execution: Any = None
+    last_reply: str | None = None
     request_estimates: list[list[int]] = field(default_factory=list)
 
 
@@ -252,6 +253,7 @@ class GuardedModel:
             raise TokenOverflow(f"request certainly exceeds {ceiling}: estimate {lenient}")
         self.meter.generation_calls += 1
         generation = self.inner.complete(messages)
+        self.meter.last_reply = generation.text
         prompt, completion = generation.prompt_tokens, generation.completion_tokens
         if prompt is None or completion is None:
             self.meter.usage_reported = False

@@ -140,6 +140,27 @@ def test_completeness_findings_withhold_credit(
     assert receipt["raw_match"] is True and receipt["earliest_failure_stage"] == "context"
 
 
+def test_a_reply_without_sql_is_kept_as_a_bounded_excerpt(
+    harness: SimpleNamespace, frozen: Path, profile: Profile
+) -> None:
+    reply = "UNSUPPORTED: the value set lists no label for the asked value. " + "x" * 5_000
+    model, executor = FakeModel(harness, [reply]), FakeExecutor(harness, ((GOLD,),))
+    receipt = run_r01(harness, frozen, profile, model, executor, s_provider())
+    assert (receipt["outcome"], receipt["final_sql"]) == ("unsupported", None)
+    excerpt = receipt.get("response_excerpt") or ""
+    assert excerpt.startswith("UNSUPPORTED: the value set lists no label")
+    assert reply.startswith(excerpt) and len(excerpt) < len(reply)
+
+
+def test_a_reply_with_sql_keeps_no_excerpt(
+    harness: SimpleNamespace, frozen: Path, profile: Profile
+) -> None:
+    model, executor = FakeModel(harness, [R01_SQL]), FakeExecutor(harness, ((GOLD,),))
+    receipt = run_r01(harness, frozen, profile, model, executor, s_provider())
+    assert receipt["final_sql"] and "response_excerpt" in receipt
+    assert receipt["response_excerpt"] is None
+
+
 def test_truncated_transport_is_not_credited(
     harness: SimpleNamespace, frozen: Path, profile: Profile
 ) -> None:

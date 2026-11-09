@@ -58,6 +58,7 @@ STAGES = ("context", "generation", "validation", "execution", "scoring")
 GENERATION_ERRORS = frozenset({"model_error", "no_sql"})
 EXECUTION_ERRORS = frozenset({"sql_error", "infrastructure", "permission", "timeout"})
 OUTCOME_STAGES = {"unsupported": "generation", "refusal": "generation", "wrong": "scoring"}
+RESPONSE_EXCERPT_CHARS = 1000
 
 
 @dataclass(frozen=True)
@@ -116,9 +117,14 @@ def run_slot(slot: Slot, question: Any, runtime: Any, model: Any, contract: scor
         "overflow": meter.overflow or ("context" if outcome == "overflow" else None),
         "cost_usd": round(meter.cost_usd, 6), "latency_s": record["latency_s"],
         "error_class": record["error_class"], "answer": record["answer"],
+        "response_excerpt": None if record["sql"] else _excerpt(meter.last_reply),
         "earliest_failure_stage": _earliest_stage(record, meter, outcome),
         "request_estimates": meter.request_estimates,
     }  # fmt: skip
+
+
+def _excerpt(reply: str | None) -> str | None:
+    return reply[:RESPONSE_EXCERPT_CHARS] if reply is not None else None
 
 
 def _runner_error(slot: Slot, meter: Meter, message: str) -> dict[str, Any]:

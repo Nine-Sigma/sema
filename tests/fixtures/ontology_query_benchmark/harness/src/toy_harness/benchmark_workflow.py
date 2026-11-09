@@ -49,6 +49,8 @@ def run_question(question: Any, runtime: ArmRuntime, model: Any, rep: int = 1) -
             generation = model.complete(messages)
         except Exception:  # noqa: BLE001 - a model failure is an outcome
             return {**record, "outcome": "infrastructure_failure", "error_class": "model_error"}
+        if generation.text.strip().upper().startswith("UNSUPPORTED"):
+            return {**record, "outcome": "unsupported"}
         found = FENCE.search(generation.text)
         entry["sql"] = record["sql"] = found.group(1) if found else ""
         if record["sql"].upper().startswith("SELECT"):
