@@ -61,21 +61,31 @@ def test_tolerant_flag_accepts_within_one_percent_only() -> None:
     assert (far.strict, far.tolerant) == (False, False)
 
 
+def verdict(entry: dict[str, Any], rows: list[tuple[Any, ...]]) -> tuple[bool, bool]:
+    result = scorer.score(scorer.contract_for(entry), rows, complete=True)
+    return result.strict, result.tolerant
+
+
 def test_arbitrary_category_renaming_is_rejected() -> None:
     entry = item("table_unordered", Q02_GOLD, category_columns=["value"])
-    good = [("grade ii", 126746), (None, 322871), ("Grade III", 113305)]
-    assert strict(entry, good)
+    exact = [(" Grade II ", 126746), (None, 322871), ("Grade III", 113305)]
+    assert verdict(entry, exact) == (True, True)
+    recased = [("grade ii", 126746), (None, 322871), ("Grade III", 113305)]
+    assert verdict(entry, recased) == (False, True)
     renamed = [("Category A", 126746), (None, 322871), ("Category B", 113305)]
-    assert not strict(entry, renamed)
+    assert verdict(entry, renamed) == (False, False)
     swapped = [("Grade III", 126746), (None, 322871), ("Grade II", 113305)]
-    assert not strict(entry, swapped)
+    assert verdict(entry, swapped) == (False, False)
 
 
-def test_category_label_may_carry_the_author_wording_inside_it() -> None:
+def test_label_containment_counts_only_toward_the_tolerant_flag() -> None:
     gold = [{"age_group": "1: <50", "tumors": "22070"}, {"age_group": "2: 50-64", "tumors": "3"}]
     entry = item("table_unordered", gold, category_columns=["age_group"])
-    assert strict(entry, [("<50", 22070), ("50-64", 3)])
-    assert not strict(entry, [("under fifty", 22070), ("50-64", 3)])
+    assert verdict(entry, [("<50", 22070), ("50-64", 3)]) == (False, True)
+    assert verdict(entry, [("under fifty", 22070), ("50-64", 3)]) == (False, False)
+    race = item("table_unordered", [{"race": "Asian", "n": "72475"}], category_columns=["race"])
+    assert verdict(race, [("Asian Indian", 72475)]) == (False, True)
+    assert verdict(race, [("Asian", 72475)]) == (True, True)
 
 
 def test_null_replaced_by_a_label_is_rejected() -> None:

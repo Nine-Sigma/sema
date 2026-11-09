@@ -234,8 +234,8 @@ def arm_runtimes(harness: SimpleNamespace, frozen: Path, executors: Mapping[str,
 
 
 def _with_knobs(config: Any, knobs: Knobs) -> Any:
-    if knobs.values_top_k is not None and not 0 < knobs.values_top_k <= config.values_top_k:
-        raise ValueError(f"values_top_k {knobs.values_top_k} is outside 1..{config.values_top_k}, "
+    if knobs.values_top_k is not None and not 0 <= knobs.values_top_k <= config.values_top_k:
+        raise ValueError(f"values_top_k {knobs.values_top_k} is outside 0..{config.values_top_k}, "
                          "the frozen values cache")  # fmt: skip
     changes = {"budget_tokens": knobs.budget_tokens,
                "description_cap_chars": knobs.description_cap_chars}  # fmt: skip

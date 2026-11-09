@@ -76,6 +76,32 @@ def test_values_top_k_cannot_exceed_the_frozen_cache(harness: SimpleNamespace,
         runner_utils.arm_runtimes(harness, frozen, {"A": None}, None, knobs=Knobs(values_top_k=26))
 
 
+def test_values_top_k_zero_drops_the_a_values_block(harness: SimpleNamespace,
+                                                    frozen: Path) -> None:  # fmt: skip
+    runtime = runner_utils.arm_runtimes(harness, frozen, {"A": None}, None,
+                                        knobs=Knobs(values_top_k=0))["A"]  # fmt: skip
+    text = runtime.context("q").text
+    assert "TABLE " in text and "\nVALUES " not in text
+
+
+def test_sweep_reports_fit_counts_per_arm_for_each_grid_point(harness: SimpleNamespace,
+                                                              frozen: Path) -> None:  # fmt: skip
+    grid = [Knobs(16_000, 25, 160), Knobs(6_000, 0, 80)]
+    rows = fit.sweep(harness, frozen, grid, chars_per_token=2.0, repair_reserve=1_000)
+    assert [r["knobs"] for r in rows] == [
+        {"budget_tokens": 16_000, "values_top_k": 25, "description_cap_chars": 160},
+        {"budget_tokens": 6_000, "values_top_k": 0, "description_cap_chars": 80},
+    ]
+    report = fit.fit_report(harness, frozen, grid[1], chars_per_token=2.0,
+                            repair_reserve=1_000, s_provider=None)  # fmt: skip
+    for arm in ("A", "B"):
+        expected = report["arms"][arm]
+        got = rows[1]["arms"][arm]
+        assert (got["fits_first"], got["fits_two_repairs"]) == (
+            expected["fits_first"], expected["fits_two_repairs"])
+        assert got["max_tokens"] == expected["estimated_tokens"]["max"]
+
+
 def test_fit_report_covers_every_arm_question_pair_with_the_guard_estimate(
     harness: SimpleNamespace, frozen: Path
 ) -> None:
@@ -89,6 +115,15 @@ def test_fit_report_covers_every_arm_question_pair_with_the_guard_estimate(
     assert q01["fits_first"] == (q01["estimated_tokens"] <= 16_000)
     assert q01["fits_two_repairs"] == (q01["estimated_tokens"] + 2_000 <= 16_000)
     assert report["arms"]["A"]["questions"] == 49
+
+
+def test_an_overflowing_context_never_counts_as_fitting(harness: SimpleNamespace,
+                                                        frozen: Path) -> None:  # fmt: skip
+    report = fit.fit_report(harness, frozen, Knobs(budget_tokens=2_000), chars_per_token=2.0,
+                            repair_reserve=0, s_provider=None)  # fmt: skip
+    a_rows = [r for r in report["rows"] if r["arm"] == "A"]
+    assert all(r["context_overflow"] for r in a_rows)
+    assert not any(r["fits_first"] or r["fits_two_repairs"] for r in a_rows)
 
 
 def test_fit_report_includes_s_when_a_provider_is_given(harness: SimpleNamespace,
