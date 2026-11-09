@@ -45,3 +45,25 @@ def test_the_sema_cli_does_not_apply_a_dotenv_file(
     assert CliRunner().invoke(cli, ["target", "--help"]).exit_code == 0
 
     assert "EMBEDDING_PROVIDER" not in os.environ
+
+
+def test_the_databricks_sdk_reads_no_profile_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import databricks.sdk.config
+    from databricks.sdk.core import Config
+
+    profiles = "[DEFAULT]\nhost = https://foreign.example.test\ntoken = fake-token\n"
+    (tmp_path / ".databrickscfg").write_text(profiles, encoding="utf-8")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    reached: list[str] = []
+
+    def _refuse(host: str) -> None:
+        reached.append(host)
+        raise ConnectionRefusedError(host)
+
+    monkeypatch.setattr(databricks.sdk.config, "get_host_metadata", _refuse)
+
+    with pytest.raises(ValueError, match="default auth"):
+        Config()
+    assert reached == []
