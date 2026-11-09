@@ -317,7 +317,6 @@ def read_env_keys(path: Path, keys: tuple[str, ...]) -> dict[str, str]:
     return values
 
 
-
 class SourceVersionError(RuntimeError):
     """A pinned source relation is unreadable or no longer at its pinned version."""
 
