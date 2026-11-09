@@ -140,8 +140,15 @@ def test_run_manifest_pins_knobs_and_refuses_a_different_resume(
     args = ["--frozen", str(frozen), "--run-dir", str(tmp_path), "--dry-run"]
     runner.main([*args, "--budget-tokens", "5000"])
     manifest = json.loads((tmp_path / "manifest.json").read_text())
-    assert manifest["knobs"] == {"budget_tokens": 5000, "values_top_k": None,
-                                 "description_cap_chars": None}  # fmt: skip
+    assert manifest["knobs"] == {"budget_tokens": 5000, "values_top_k": 5,
+                                 "description_cap_chars": 160}  # fmt: skip
     assert manifest["closure_id"] == frozen.name
     with pytest.raises(ValueError, match="manifest"):
         runner.main([*args, "--budget-tokens", "6000"])
+
+
+def test_frozen_benchmark_knobs_are_the_cli_default(frozen: Path, tmp_path: Path) -> None:
+    runner.main(["--frozen", str(frozen), "--run-dir", str(tmp_path), "--dry-run"])
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    assert manifest["knobs"] == {"budget_tokens": 6000, "values_top_k": 5,
+                                 "description_cap_chars": 160}  # fmt: skip

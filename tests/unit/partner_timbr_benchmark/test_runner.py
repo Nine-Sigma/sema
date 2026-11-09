@@ -122,13 +122,15 @@ def test_truncated_transport_is_not_credited(harness: SimpleNamespace, frozen: P
     assert receipt["outcome"] == "wrong" and receipt["score_reason"] == "incomplete"
 
 
-def test_pre_call_estimate_over_the_ceiling_fails_closed(
+def test_repair_request_over_the_ceiling_fails_closed_before_the_call(
     harness: SimpleNamespace, frozen: Path
 ) -> None:
-    model, executor = FakeModel(harness, [Q01_SQL]), FakeExecutor(harness, ((939376,),))
-    receipt = run_q01(harness, frozen, model, executor, s_provider(text="x" * 40_000))
+    long_invalid = "```sql\nDELETE FROM main.s.person\n```\n" + "y" * 40_000
+    model = FakeModel(harness, [long_invalid])
+    executor = FakeExecutor(harness, ((939376,),))
+    receipt = run_q01(harness, frozen, model, executor, s_provider())
     assert (receipt["outcome"], receipt["overflow"]) == ("overflow", "pre_call")
-    assert model.calls == [] and receipt["generation_calls"] == 0
+    assert len(model.calls) == receipt["generation_calls"] == 1
 
 
 @pytest.mark.parametrize(("prompt", "completion"), [(16_001, 40), (900, 8_193)])
@@ -211,9 +213,55 @@ def test_b_executor_refuses_timbr_side_llm_tools() -> None:
 def test_timbr_env_file_is_read_without_touching_the_environment(tmp_path: Path) -> None:
     env = tmp_path / "poc.env"
     lines = ("TIMBR_TOKEN='tok'", "DATABRICKS_HOST=https://elsewhere", "# c",
-             "TIMBR_VERIFY_SSL=false")
+             "TIMBR_VERIFY_SSL=false  # local CA")
     env.write_text("\n".join(lines) + "\n")
     before = dict(os.environ)
     values = runner_utils.read_env_keys(env, ("TIMBR_TOKEN", "TIMBR_VERIFY_SSL", "TIMBR_CA_BUNDLE"))
     assert values == {"TIMBR_TOKEN": "tok", "TIMBR_VERIFY_SSL": "false"}
     assert dict(os.environ) == before
+
+
+class RaisingExecutor(FakeExecutor):
+    def execute(self, sql: str, row_limit: int) -> Any:
+        self.sqls.append(sql)
+        raise ConnectionError("warehouse unreachable")
+
+
+def test_a_raising_context_provider_becomes_a_runner_error_receipt(
+    harness: SimpleNamespace, frozen: Path, tmp_path: Path
+) -> None:
+    def broken(question: str) -> FakeSContext:
+        raise RuntimeError("index not loaded")
+
+    slots = runner.schedule(["Q01"], ("S",), 2)
+    runtimes = runner_utils.arm_runtimes(harness, frozen, {"S": FakeExecutor(harness, ())}, broken)
+    questions = {q.id: q for q in runner_utils.public_questions(harness, frozen, ("Q01",))}
+    contracts = scorer.load_contracts(runner_utils.question_paths(frozen))
+    out = tmp_path / "receipts.jsonl"
+    model = FakeModel(harness, [Q01_SQL])
+    runner.run(slots, questions, runtimes, model, contracts, harness, settings(), out)
+    receipts = _receipts(out)
+    assert [r["outcome"] for r in receipts] == ["runner_error", "runner_error"]
+    assert {r["earliest_failure_stage"] for r in receipts} == {"context"}
+    assert "index not loaded" in receipts[0]["error_message"] and model.calls == []
+
+
+def test_a_raising_executor_becomes_a_runner_error_at_execution(
+    harness: SimpleNamespace, frozen: Path
+) -> None:
+    model, executor = FakeModel(harness, [Q01_SQL]), RaisingExecutor(harness, ())
+    receipt = run_q01(harness, frozen, model, executor, s_provider())
+    assert (receipt["outcome"], receipt["earliest_failure_stage"]) == ("runner_error", "execution")
+    assert (receipt["generation_calls"], receipt["sql_executions"]) == (1, 1)
+
+
+def test_first_prompt_over_the_repair_reserved_limit_is_a_context_overflow(
+    harness: SimpleNamespace, frozen: Path
+) -> None:
+    limits = runner_utils.Limits()
+    assert limits.first_prompt_ceiling == 13_934
+    text = "x" * int(14_800 * limits.chars_per_token)
+    model, executor = FakeModel(harness, [Q01_SQL]), FakeExecutor(harness, ((939376,),))
+    receipt = run_q01(harness, frozen, model, executor, s_provider(text=text))
+    assert (receipt["outcome"], receipt["overflow"]) == ("overflow", "context")
+    assert model.calls == [] and receipt["earliest_failure_stage"] == "context"

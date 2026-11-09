@@ -63,6 +63,8 @@ class Limits:
     chars_per_token: float = 2.08
     row_limit: int = 1_000
     max_repairs: int = 2
+    # 16,000 minus two repair turns of 1,033 tokens (largest Oct 21 repair, fit.calibrate).
+    first_prompt_ceiling: int = 13_934
 
 
 @dataclass(frozen=True)
@@ -78,13 +80,19 @@ class Knobs:
     description_cap_chars: int | None = None
 
 
+# Frozen by the coordinator in run-settings.md; Knobs() keeps the Oct 21 W4S values.
+BENCHMARK_KNOBS = Knobs(budget_tokens=6_000, values_top_k=5, description_cap_chars=160)
+
+
 def estimate_tokens_from_chars(chars: int, messages: int, chars_per_token: float) -> int:
     return math.ceil(chars / chars_per_token) + 4 * messages
 
 
 def add_knob_args(parser: argparse.ArgumentParser) -> None:
-    for name in ("budget-tokens", "values-top-k", "description-cap-chars"):
-        parser.add_argument(f"--{name}", type=int, help="common W4S override for every arm")
+    for name, default in zip(("budget-tokens", "values-top-k", "description-cap-chars"),
+                             dataclasses.astuple(BENCHMARK_KNOBS), strict=True):  # fmt: skip
+        parser.add_argument(f"--{name}", type=int, default=default,
+                            help=f"common override for every arm (default {default})")
 
 
 def knobs_from(args: argparse.Namespace) -> Knobs:
@@ -120,6 +128,7 @@ class Meter:
     cost_usd: float = 0.0
     overflow: str | None = None
     context_identity: str | None = None
+    failed_stage: str | None = None
     findings: tuple[str, ...] = ()
     last_execution: Any = None
 
@@ -255,9 +264,11 @@ class GuardedModel:
 
     def complete(self, messages: list[dict[str, Any]]) -> Any:
         estimate = estimate_request_tokens(messages, self.limits.chars_per_token)
-        if estimate > self.limits.input_ceiling:
-            self.meter.overflow = "pre_call"
-            raise TokenOverflow(f"request estimate {estimate} > {self.limits.input_ceiling}")
+        first = self.meter.generation_calls == 0
+        ceiling = self.limits.first_prompt_ceiling if first else self.limits.input_ceiling
+        if estimate > ceiling:
+            self.meter.overflow = "context" if first else "pre_call"
+            raise TokenOverflow(f"request estimate {estimate} > {ceiling}")
         self.meter.generation_calls += 1
         generation = self.inner.complete(messages)
         prompt, completion = generation.prompt_tokens, generation.completion_tokens
@@ -282,14 +293,18 @@ class MeteredExecutor:
 
     def execute(self, sql: str, row_limit: int) -> Any:
         self.meter.sql_executions += 1
+        self.meter.failed_stage = "execution"
         execution = self.inner.execute(sql, row_limit)
+        self.meter.failed_stage = None
         self.meter.last_execution = execution
         return execution
 
 
 def metered_context(context: Callable[[str], Any], meter: Meter) -> Callable[[str], Any]:
     def build(question: str) -> Any:
+        meter.failed_stage = "context"
         built = context(question)
+        meter.failed_stage = None
         supplied: SContextLike | None = getattr(context, "last", None)
         if supplied is None:
             meter.context_identity = hashlib.sha256(built.text.encode()).hexdigest()
@@ -325,7 +340,7 @@ def read_env_keys(path: Path, keys: tuple[str, ...]) -> dict[str, str]:
     for line in Path(path).read_text().splitlines():
         name, sep, value = line.strip().removeprefix("export ").partition("=")
         if sep and name.strip() in keys:
-            values[name.strip()] = value.strip().strip("'\"")
+            values[name.strip()] = value.split(" #", 1)[0].strip().strip("'\"")
     return values
 
 

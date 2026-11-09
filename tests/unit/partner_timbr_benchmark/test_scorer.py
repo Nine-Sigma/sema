@@ -46,11 +46,28 @@ def test_lucky_correct_count_in_an_extra_column_is_rejected() -> None:
     assert not strict(item("scalar", ["939376"]), [(939376,), (939376,)])
 
 
-def test_multi_value_scalar_matches_in_any_column_order_within_tolerance() -> None:
+def test_multi_value_scalar_matches_within_tolerance_in_gold_numeric_order() -> None:
     entry = item("scalar", {"median_days": "41.0", "tumors": "153790"}, precision=None,
                  tolerance=1.0)  # fmt: skip
-    assert strict(entry, [(153790, 41.8)])
-    assert not strict(entry, [(153790, 42.5)])
+    assert strict(entry, [(41.8, 153790)])
+    assert not strict(entry, [(42.5, 153790)])
+
+
+def test_swapped_numeric_columns_get_no_strict_credit() -> None:
+    entry = item("table_unordered", {"tumors": "341861", "patients": "324530"}, precision=None)
+    assert verdict(entry, [(341861, 324530)]) == (True, True)
+    assert verdict(entry, [(324530, 341861)]) == (False, True)
+    labelled = item("table_unordered", [{"stage": "Localized", "patients": "32977",
+                                         "deaths": "519"}])  # fmt: skip
+    assert verdict(labelled, [(32977, 519, "Localized")]) == (True, True)
+    assert verdict(labelled, [(519, 32977, "Localized")]) == (False, True)
+
+
+def test_label_variants_fail_strict_in_both_directions() -> None:
+    gold = item("table_unordered", [{"race": "Asian Indian", "n": "9"}], category_columns=["race"])
+    assert verdict(gold, [("Asian", 9)])[0] is False
+    white = item("table_unordered", [{"race": "White", "n": "9"}], category_columns=["race"])
+    assert verdict(white, [("Non-Hispanic White", 9)])[0] is False
 
 
 def test_tolerant_flag_accepts_within_one_percent_only() -> None:

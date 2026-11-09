@@ -2,10 +2,11 @@
 
 Each question's declared result_shape, category_columns, precision and tolerance become a
 result contract. A result must have exactly the gold width (a ranked result may add one
-rank column); columns may appear in any order. Gold cells that are canonical decimal text
-compare as numbers, anything else (for example code '001') compares as exact text. NULL
-equals only NULL, and '' is not NULL. Strict labels, category columns included, are equal
-after trimming surrounding whitespace only. Ranked results keep gold order except among
+rank column). Columns may appear in any order, except that strict credit keeps the gold
+relative order of numeric columns (swapped counts never pass strict). Gold cells that are
+canonical decimal text compare as numbers, anything else (for example code '001') compares
+as exact text. NULL equals only NULL, and '' is not NULL. Strict labels, category columns
+included, are equal after trimming surrounding whitespace only. Ranked results keep gold order except among
 tied rows and have exactly the gold top-N rows. Incomplete transport never scores.
 Strict uses the declared tolerance. The secondary tolerant flag also accepts numbers
 within 1% of gold and a category label that contains the gold wording or is contained in
@@ -121,12 +122,19 @@ def _matches(contract: Contract, rows: Sequence[Sequence[Any]], relative: Decima
     orders: Iterable[tuple[int, ...]] = (
         itertools.permutations(range(width)) if width <= MAX_PERMUTED_WIDTH else identity
     )
+    if not relative:
+        orders = [o for o in orders if _numeric_order_kept(contract, o)]
     candidates = _width_candidates(contract, [tuple(r) for r in rows])
     return any(
         _compare(contract, [tuple(row[i] for i in order) for row in result], relative)
         for order in list(orders)
         for result in candidates
     )
+
+
+def _numeric_order_kept(contract: Contract, order: tuple[int, ...]) -> bool:
+    placed = [order[i] for i, numeric in enumerate(contract.numeric) if numeric]
+    return placed == sorted(placed)
 
 
 def _width_candidates(contract: Contract, rows: list[Row]) -> list[list[Row]]:

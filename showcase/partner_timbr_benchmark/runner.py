@@ -8,7 +8,10 @@ python -m showcase.partner_timbr_benchmark.runner --frozen <closure dir> --run-d
 
 Slots run in a fixed order (rep, question, arm). Each slot appends one receipt to
 receipts.jsonl; a slot whose latest receipt has an outcome other than ``unrun`` is never
-run again. When spend reaches the cost ceiling every remaining slot is written ``unrun``.
+run again. An exception from a context provider or executor becomes a ``runner_error``
+receipt and the run continues. Spend is checked before each slot: when it reaches the cost
+ceiling every remaining slot is written ``unrun``, so a run can overshoot the ceiling by
+at most one slot (three generations).
 """
 
 import argparse
@@ -69,11 +72,15 @@ def run_slot(slot: Slot, question: Any, runtime: Any, model: Any, contract: scor
         executor=ru.MeteredExecutor(runtime.executor, meter),
     )
     guarded = ru.GuardedModel(model, meter, settings.limits, settings.prices)
-    record = harness.workflow.run_question(question, metered, guarded, rep=slot.rep)
+    try:
+        record = harness.workflow.run_question(question, metered, guarded, rep=slot.rep)
+    except Exception as exc:  # noqa: BLE001 - a failing provider or executor ends only its slot
+        logger.warning("{} runner_error: {}", slot.slot_id, type(exc).__name__)
+        return _runner_error(slot, meter, harness.workflow.sanitize_message(str(exc)))
     outcome, verdict = _classify(record, meter, contract, settings.limits.row_limit)
     attempts = record["attempts"]
     return {
-        **_slot_fields(slot), "outcome": outcome, "harness_outcome": record["outcome"],
+        **_slot_fields(slot), "outcome": outcome,
         "strict": bool(verdict and verdict.strict and outcome == "correct"),
         "tolerant": bool(verdict and verdict.tolerant and not meter.findings),
         "raw_match": verdict.strict if verdict else None,
@@ -89,6 +96,16 @@ def run_slot(slot: Slot, question: Any, runtime: Any, model: Any, contract: scor
         "error_class": record["error_class"], "answer": record["answer"],
         "earliest_failure_stage": _earliest_stage(record, meter, outcome),
     }  # fmt: skip
+
+
+def _runner_error(slot: Slot, meter: Meter, message: str) -> dict[str, Any]:
+    return {**_slot_fields(slot), "outcome": "runner_error", "strict": False, "tolerant": False,
+            "error_message": message, "earliest_failure_stage": meter.failed_stage or "runner",
+            "context_identity": meter.context_identity, "findings": list(meter.findings),
+            "generation_calls": meter.generation_calls, "sql_executions": meter.sql_executions,
+            "prompt_tokens": meter.prompt_tokens, "completion_tokens": meter.completion_tokens,
+            "usage_reported": meter.usage_reported, "overflow": meter.overflow,
+            "cost_usd": round(meter.cost_usd, 6)}  # fmt: skip
 
 
 def _slot_fields(slot: Slot) -> dict[str, Any]:
