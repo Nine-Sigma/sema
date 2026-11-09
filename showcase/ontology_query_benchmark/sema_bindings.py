@@ -128,6 +128,10 @@ class SuppliedBinding:
     def companion_columns(self) -> tuple[str, ...]:
         return tuple(column for _, column in self.companions)
 
+    @property
+    def columns(self) -> tuple[str, ...]:
+        return (self.column, *self.companion_columns, *self.catalog_companions)
+
 
 @dataclass(frozen=True)
 class BindingResolution:

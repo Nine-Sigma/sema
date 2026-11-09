@@ -183,11 +183,34 @@ def test_catalog_companion_is_rendered_as_unsupplied(tmp_path: Path) -> None:
     assert "not in SPEC" in line and "site_S1_concept_code" in line
 
 
-def test_pattern_companions_are_not_listed_twice(tmp_path: Path) -> None:
+def _table_line(text: str, table: str) -> str:
+    return next(x for x in text.splitlines() if x.startswith(f"  cat.sch.{table}: "))
+
+
+def _unbound_line(text: str, table: str) -> str:
+    return next(x for x in text.splitlines() if x.startswith(f"  cat.sch.{table} no governed"))
+
+
+def test_declared_companion_columns_are_listed(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES])(QUESTION)
-    assert "gender_G1_text" not in ctx.text
-    table_line = next(x for x in ctx.text.splitlines() if x.startswith(f"  cat.sch.{PEOPLE}: "))
-    assert "gender_G1" in table_line and RID in table_line
+    assert "gender_G1_text" in _table_line(ctx.text, PEOPLE)
+    assert "no governed binding" not in ctx.text
+
+
+def test_an_unbound_catalog_column_is_listed_and_marked(tmp_path: Path) -> None:
+    event = _entity(EVENTS, [*EVENTS_ENTITY["columns"], _col("ended_on", "temporal")])
+    ctx = _provider(tmp_path, [event])("How long after the event did it end?")
+    assert "ended_on (temporal)" in _table_line(ctx.text, EVENTS)
+    assert _unbound_line(ctx.text, EVENTS).endswith(": ended_on")
+
+
+def test_unbound_columns_leave_the_binding_lines_unchanged(tmp_path: Path) -> None:
+    unbound = _entity(EVENTS, [*EVENTS_ENTITY["columns"], _col("ended_on")])
+    with_unbound = _provider(tmp_path, [unbound])("Events by site?").text
+    without = _provider(tmp_path, [EVENTS_ENTITY])("Events by site?").text
+    def bindings(text: str) -> str:
+        return text[text.index("\nAPPROVED BINDINGS"):]
+    assert bindings(with_unbound) == bindings(without)
 
 
 def test_membership_query_template_is_stated_once(tmp_path: Path) -> None:

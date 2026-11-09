@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import sys
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -39,6 +40,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     import_library_facts,
     property_text,
     target_model,
+    unbound_columns,
 )
 
 BUILD_VERSION = "sema-build-1"
@@ -71,8 +73,9 @@ def build_scoped_graph(
     embedder_model: str,
 ) -> BuildManifest:
     products = load_products(sidecar)
-    resolution = resolve_bindings(sidecar, products, read_catalog(catalog_source, sidecar))
-    model, binding = target_model(sidecar, products, resolution)
+    catalog = read_catalog(catalog_source, sidecar)
+    resolution = resolve_bindings(sidecar, products, catalog)
+    model, binding = target_model(sidecar, products, resolution, catalog)
     fields = concept_fields(sidecar, resolution.approved(), facts)
     build_target_retrieval_graph(
         loader, model, binding, catalog_source,
@@ -81,7 +84,9 @@ def build_scoped_graph(
         concept_fields=fields, value_bridges=(),
         bridge_source_schema=sidecar.schema, load_ancestors=False,
     )
-    embedded = _embed(loader, embedder, dimensions, sidecar, products, resolution, facts)
+    embedded = _embed(
+        loader, embedder, dimensions, sidecar, products, resolution, facts, catalog
+    )
     counts = {
         "approved_bindings": len(resolution.approved()),
         "refused_bindings": len(resolution.bindings) - len(resolution.approved()),
@@ -128,6 +133,7 @@ def _embed(
     products: tuple[ProductSpec, ...],
     resolution: BindingResolution,
     facts: LibraryFacts,
+    catalog: Mapping[str, Mapping[str, str]],
 ) -> dict[str, int]:
     engine = EmbeddingEngine(model=embedder, loader=loader)
     engine.create_all_indexes(dimensions=dimensions)
@@ -135,10 +141,15 @@ def _embed(
         {"name": p.pin.table, "text": f"{p.pin.product} {_grain(p)}"} for p in products
     ]
     engine.embed_and_store("Entity", "name", entities, lambda e: str(e["text"]))
+    approved = resolution.approved()
     props = [
         {"name": col, "entity_name": b.table, "text": property_text(sidecar, b, col, facts)}
-        for b in resolution.approved()
-        for col in (b.column, *b.companion_columns, *b.catalog_companions)
+        for b in approved
+        for col in b.columns
+    ] + [
+        {"name": col, "entity_name": p.pin.table, "text": property_text(sidecar, None, col, facts)}
+        for p in products
+        for col in unbound_columns(approved, p, catalog[p.pin.table])
     ]
     engine.embed_and_store("Property", "name", props, lambda p: str(p["text"]))
     return {"embedded_entities": len(entities), "embedded_properties": len(props)}

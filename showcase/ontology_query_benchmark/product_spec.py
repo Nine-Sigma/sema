@@ -13,6 +13,7 @@ module reads a document only through ``parse_product_spec``. The keys read are:
   declared companions hold that member's label and mapping type.
 - ``relationships[]``: ``target_product_id``, ``source_columns``, ``target_columns`` and
   ``cardinality``.
+- ``exposure.denied_columns``: physical columns the product never exposes.
 
 Other keys are ignored. A document that breaks this shape is refused at load.
 """
@@ -78,11 +79,16 @@ class SpecRelationship(_Doc):
     cardinality: str
 
 
+class SpecExposure(_Doc):
+    denied_columns: tuple[str, ...] = ()
+
+
 class ProductSpecDoc(_Doc):
     product_id: str
     entities: tuple[SpecEntity, ...] = ()
     fields: tuple[SpecField, ...]
     relationships: tuple[SpecRelationship, ...] = ()
+    exposure: SpecExposure = SpecExposure()
 
 
 def parse_product_spec(data: bytes, source: Path) -> ProductSpecDoc:

@@ -56,7 +56,8 @@ def render(
         rendering.findings.append(Finding("retrieval returned no physical asset for the question"))
     selected = [b for b in resolution.approved() if b.table in rendering.tables]
     rendering.findings.extend(absent_elements(tuple(selected), facts))
-    _add_tables_and_columns(rendering.parts, _without_companions(rendering.sco, selected))
+    _add_tables_and_columns(rendering.parts, rendering.sco)
+    _add_unbound(rendering.parts, rendering.sco, selected)
     _add_join_section(rendering.parts, rendering.sco)
     _add_bindings(rendering.parts, selected, sidecar, facts)
     _add_values(rendering, selected, _governed_values(rendering.sco), sidecar, facts)
@@ -65,16 +66,16 @@ def render(
     return rendering
 
 
-def _without_companions(
-    sco: SemanticContextObject, selected: list[SuppliedBinding]
-) -> SemanticContextObject:
-    """Drop declared companion columns; the sidecar's binding note describes them."""
-    implied = {(b.table, c) for b in selected for c in b.companion_columns}
-    assets = [
-        a.model_copy(update={"columns": [c for c in a.columns if (a.table, c) not in implied]})
-        for a in sco.physical_assets
-    ]
-    return sco.model_copy(update={"physical_assets": assets})
+def _add_unbound(
+    parts: list[str], sco: SemanticContextObject, selected: list[SuppliedBinding]
+) -> None:
+    bound = {(b.table, c) for b in selected for c in b.columns}
+    for a in sco.physical_assets:
+        unbound = [c for c in a.columns if (a.table, c) not in bound]
+        if unbound:
+            parts.append(
+                f"  {a.catalog}.{a.schema}.{a.table} no governed binding: {', '.join(unbound)}"
+            )
 
 
 def _add_bindings(

@@ -144,18 +144,42 @@ def test_projection_must_match_its_receipt(tmp_path: Path) -> None:
                              spec_attribution=Attribution.ASSISTED)
 
 
-def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
-    loader, _, _ = _build(tmp_path)
-    props = {
-        (p["entity_name"], p["name"]) for p in _cypher_params(loader)
+def _declared(loader: MagicMock) -> dict[tuple[str, str], str]:
+    return {
+        (p["entity_name"], p["name"]): p["semantic_type"] for p in _cypher_params(loader)
         if "semantic_type" in p
     }
-    assert (PEOPLE, "gender_G1") in props
-    assert (PEOPLE, "gender_G1_text") in props
-    assert (EVENTS, "site_S1") in props
-    assert not {name for _, name in props} & {"derived_x", "ghost_col", "age_years"}
+
+
+def test_every_exposed_catalog_column_is_declared(tmp_path: Path) -> None:
+    loader, _, _ = _build(tmp_path)
+    declared = _declared(loader)
+    exposed = {
+        (table, column) for table, cols in catalog_fixture().items() for column in cols
+    } - {(PEOPLE, "first_name")}
+    assert set(declared) == exposed
     roles = {p["model_role"] for p in _cypher_params(loader) if "model_role" in p}
     assert roles == {"BENCH_S"}
+
+
+def test_only_approved_governed_bindings_are_categorical(tmp_path: Path) -> None:
+    loader, _, _ = _build(tmp_path)
+    categorical = {k for k, t in _declared(loader).items() if t == "categorical"}
+    assert categorical == {
+        (PEOPLE, "gender_G1"), (PEOPLE, "vital_V1"), (PEOPLE, "city_C1"),
+        (EVENTS, "site_S1"),
+    }
+
+
+def test_unbound_columns_are_embedded_by_their_name(tmp_path: Path) -> None:
+    loader, embedder, _ = _build(tmp_path)
+    assert "ended on" in _embedded_texts(embedder)
+    matches = {
+        tuple(sorted(c.kwargs["match"].items()))
+        for c in loader.set_node_embedding.call_args_list if c.kwargs["label"] == "Property"
+    }
+    assert (("entity_name", EVENTS), ("name", "ended_on")) in matches
+    assert (("entity_name", PEOPLE), ("name", "first_name")) not in matches
 
 
 def test_value_sets_hold_every_imported_member(tmp_path: Path) -> None:

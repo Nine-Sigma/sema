@@ -180,6 +180,7 @@ def target_model(
     sidecar: Sidecar,
     products: tuple[ProductSpec, ...],
     resolution: BindingResolution,
+    catalog: Mapping[str, Mapping[str, str]],
 ) -> tuple[NormalizedTargetModel, PhysicalSchemaBinding]:
     entities = [
         TargetEntityDecl(
@@ -188,7 +189,7 @@ def target_model(
                 qualified_name=qualified_name(sidecar, p.pin.product),
                 kind=TargetArtifactKind.TABLE_ROW,
             ),
-            properties=_properties(resolution.approved(), p.pin.table),
+            properties=_properties(resolution.approved(), p, catalog[p.pin.table]),
             declared_joins=_declared_joins(sidecar, p),
         )
         for p in products
@@ -207,11 +208,13 @@ def target_model(
 
 
 def _properties(
-    approved: tuple[SuppliedBinding, ...], table: str
+    approved: tuple[SuppliedBinding, ...],
+    product: ProductSpec,
+    catalog_columns: Mapping[str, str],
 ) -> list[TargetPropertyDecl]:
     props: list[TargetPropertyDecl] = []
     for b in approved:
-        if b.table != table:
+        if b.table != product.pin.table:
             continue
         bound = b.de_id if b.governed else None
         props.append(TargetPropertyDecl(
@@ -221,7 +224,22 @@ def _properties(
             TargetPropertyDecl(name=c, type="STRING", nullable=True)
             for c in (*b.companion_columns, *b.catalog_companions)
         )
+    props.extend(
+        TargetPropertyDecl(name=c, type=t, nullable=True)
+        for c, t in unbound_columns(approved, product, catalog_columns).items()
+    )
     return props
+
+
+def unbound_columns(
+    approved: tuple[SuppliedBinding, ...],
+    product: ProductSpec,
+    catalog_columns: Mapping[str, str],
+) -> dict[str, str]:
+    """Exposed catalog columns no approved binding covers, with their physical type."""
+    hidden = {c for b in approved if b.table == product.pin.table for c in b.columns}
+    hidden.update(product.doc.exposure.denied_columns)
+    return {c: t for c, t in catalog_columns.items() if c not in hidden}
 
 
 def _declared_joins(sidecar: Sidecar, product: ProductSpec) -> list[DeclaredJoinDecl]:
@@ -264,8 +282,10 @@ def concept_fields(
 
 
 def property_text(
-    sidecar: Sidecar, binding: SuppliedBinding, column: str, facts: LibraryFacts
+    sidecar: Sidecar, binding: SuppliedBinding | None, column: str, facts: LibraryFacts
 ) -> str:
+    if binding is None:
+        return column.replace("-", " ").replace("_", " ")
     element = facts.elements.get(binding.de_id or "")
     base = element.label if element else binding.library_id.removesuffix(sidecar.library_id_suffix)
     base = base.replace("-", " ").replace("_", " ")
