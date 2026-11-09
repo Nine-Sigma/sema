@@ -1,6 +1,6 @@
-"""Live wiring for arm S on partner TEST: workspace, catalog, embedder, Neo4j.
+"""Live wiring for arm S on the profile's pinned workspace: catalog, embedder, Neo4j.
 
-Fails closed: the workspace must resolve to the TEST host, ambient
+Fails closed: the workspace must resolve to the pinned host, ambient
 DATABRICKS_HOST/DATABRICKS_TOKEN are removed first, and no .env file is read.
 Neo4j credentials come from NEO4J_USER/NEO4J_PASSWORD in the process env.
 """
@@ -11,30 +11,19 @@ import os
 from typing import Any
 
 from sema.graph.physical_catalog import PhysicalColumn
-
-TEST_PROFILE = "TEST"
-TEST_HOST = "https://partner-workspace.cloud.databricks.com"
-EMBEDDER_ENDPOINT = "databricks-bge-large-en"
+from showcase.ontology_query_benchmark.profile import Routing
+from showcase.ontology_query_benchmark.routing import require_embedding_endpoint, require_host
 
 
-class WrongWorkspaceError(RuntimeError):
-    """The resolved Databricks host is not the pinned TEST workspace."""
-
-
-def prt_test_workspace() -> Any:
+def pinned_workspace(routing: Routing) -> Any:
     from databricks.sdk import WorkspaceClient
 
     for key in ("DATABRICKS_HOST", "DATABRICKS_TOKEN"):
         os.environ.pop(key, None)
-    os.environ["DATABRICKS_CONFIG_PROFILE"] = TEST_PROFILE
-    workspace = WorkspaceClient(profile=TEST_PROFILE)
-    assert_test_host(str(workspace.config.host))
+    os.environ["DATABRICKS_CONFIG_PROFILE"] = routing.databricks_profile
+    workspace = WorkspaceClient(profile=routing.databricks_profile)
+    require_host(str(workspace.config.host), routing)
     return workspace
-
-
-def assert_test_host(host: str) -> None:
-    if host.rstrip("/") != TEST_HOST:
-        raise WrongWorkspaceError(f"resolved host {host!r} is not {TEST_HOST}")
 
 
 class UnityCatalogSource:
@@ -51,16 +40,17 @@ class UnityCatalogSource:
         ]
 
 
-def embedder(workspace: Any) -> Any:
+def embedder(workspace: Any, routing: Routing) -> Any:
     from databricks_langchain import DatabricksEmbeddings
     from mlflow.utils.databricks_utils import get_databricks_host_creds
 
-    assert_test_host(str(workspace.config.host))
+    require_host(str(workspace.config.host), routing)
     model = DatabricksEmbeddings(
-        endpoint=EMBEDDER_ENDPOINT, target_uri=f"databricks://{TEST_PROFILE}"
+        endpoint=require_embedding_endpoint(routing.embedding_endpoint, routing),
+        target_uri=f"databricks://{routing.databricks_profile}",
     )
     creds = get_databricks_host_creds(model.target_uri)  # type: ignore[no-untyped-call]
-    assert_test_host(str(creds.host))
+    require_host(str(creds.host), routing)
     return model
 
 

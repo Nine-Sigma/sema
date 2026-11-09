@@ -160,7 +160,7 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--receipts", type=Path)
     parser.add_argument("--s-context")
     parser.add_argument("--out", type=Path)
-    parser.add_argument("--sweep", action="store_true", help="report the profile sweep grid instead")
+    parser.add_argument("--sweep", action="store_true", help="report the profile sweep grid")
     ru.add_knob_args(parser)
     ru.add_limit_args(parser)
     return parser.parse_args(argv)

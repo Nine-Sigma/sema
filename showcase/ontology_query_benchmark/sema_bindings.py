@@ -1,4 +1,4 @@
-"""Supplied governed bindings for arm S, read from the partner CPD v2 product specs.
+"""Supplied governed bindings for arm S, read from the sidecar's pinned product specs.
 
 The specs are operator-supplied (assisted) inputs, never discovery output. Each
 binding keeps its library identity, spec provenance and authority. A binding is
@@ -17,10 +17,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
-
-SIDECAR_PATH = Path(__file__).parent / "config" / "sema_binding_sidecar.json"
-CONCEPT_CODE_SUFFIX = "_concept_code"
-
 
 class SpecPinError(RuntimeError):
     """A supplied product spec does not match its pinned sha256."""
@@ -53,10 +49,19 @@ class Sidecar:
     conventions_path: Path
     conventions_file_sha256: str
     conventions_sha256: str
-    tumor_product: str
-    tumor_grain: tuple[str, ...]
+    spec_name: str
+    target_model_id: str
+    target_namespace: str
+    target_display_name: str
+    grain_product: str
+    grain_columns: tuple[str, ...]
     surrogate_row_id: str
+    grain_note: str
+    rules_scope: str
     membership_relation: str
+    membership_sql: str
+    catalog_companion_suffix: str
+    hierarchy_heading: str
     hierarchy_reference: tuple[str, ...]
     context_char_budget: int
     value_list_limit: int
@@ -108,11 +113,11 @@ class BindingResolution:
         )
 
 
-def load_sidecar(path: Path = SIDECAR_PATH) -> Sidecar:
+def load_sidecar(path: Path, harness_root: Path) -> Sidecar:
+    """Parse the sidecar; spec and conventions paths are relative to ``harness_root``."""
     data = path.read_bytes()
     raw = json.loads(data)
-    root = Path(raw["harness_root"])
-    grain = raw["tumor_grain"]
+    root, grain, target = harness_root, raw["grain"], raw["target_model"]
     return Sidecar(
         version=raw["sidecar_version"],
         sha256=hashlib.sha256(data).hexdigest(),
@@ -129,10 +134,19 @@ def load_sidecar(path: Path = SIDECAR_PATH) -> Sidecar:
         conventions_path=root / raw["conventions"]["path"],
         conventions_file_sha256=raw["conventions"]["file_sha256"],
         conventions_sha256=raw["conventions"]["conventions_sha256"],
-        tumor_product=grain["product"],
-        tumor_grain=tuple(grain["columns"]),
+        spec_name=raw["spec_name"],
+        target_model_id=target["id"],
+        target_namespace=target["namespace"],
+        target_display_name=target["display_name"],
+        grain_product=grain["product"],
+        grain_columns=tuple(grain["columns"]),
         surrogate_row_id=grain["surrogate_row_id"],
+        grain_note=grain["note"],
+        rules_scope=raw["rules_scope"],
         membership_relation=raw["membership_relation"],
+        membership_sql=raw["membership_sql"],
+        catalog_companion_suffix=raw["catalog_companion_suffix"],
+        hierarchy_heading=raw["hierarchy_heading"],
         hierarchy_reference=tuple(raw["hierarchy_reference"]),
         context_char_budget=int(raw["context_char_budget"]),
         value_list_limit=int(raw["value_list_limit"]),
@@ -213,7 +227,7 @@ def _binding(
     reason: str,
     columns: Mapping[str, str],
 ) -> SuppliedBinding:
-    code_column = f"{field['column_name']}{CONCEPT_CODE_SUFFIX}"
+    code_column = f"{field['column_name']}{sidecar.catalog_companion_suffix}"
     return SuppliedBinding(
         library_id=field["column_id"],
         de_id=field.get("de_id"),

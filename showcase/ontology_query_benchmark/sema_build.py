@@ -1,4 +1,4 @@
-"""Build arm S's isolated, scoped retrieval graph from supplied CPD bindings.
+"""Build arm S's isolated, scoped retrieval graph from supplied product-spec bindings.
 
 The projection reuses SEMA's target-retrieval path (`build_target_retrieval_graph`)
 and `EmbeddingEngine`; this module only adapts the CPD specs and library facts
@@ -18,8 +18,8 @@ from sema.engine.embeddings import EmbeddingEngine
 from sema.graph.loader import GraphLoader
 from sema.graph.physical_catalog import PhysicalCatalogSource
 from sema.graph.target_graph_build import build_target_retrieval_graph
+from showcase.ontology_query_benchmark.profile import load_profile
 from showcase.ontology_query_benchmark.sema_bindings import (
-    SIDECAR_PATH,
     BindingResolution,
     ProductSpec,
     Sidecar,
@@ -28,7 +28,6 @@ from showcase.ontology_query_benchmark.sema_bindings import (
     resolve_bindings,
 )
 from showcase.ontology_query_benchmark.sema_build_utils import (
-    CONCEPT_SPEC_PATH,
     FactsConceptSource,
     LibraryFacts,
     absent_elements,
@@ -39,7 +38,6 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
 )
 
 BUILD_VERSION = "sema-build-1"
-EMBEDDER_MODEL = "databricks-bge-large-en"
 
 
 @dataclass(frozen=True)
@@ -65,12 +63,12 @@ def build_scoped_graph(
     embedder: Any,
     *,
     dimensions: int,
-    embedder_model: str = EMBEDDER_MODEL,
+    embedder_model: str,
 ) -> BuildManifest:
     products = load_products(sidecar)
     resolution = resolve_bindings(sidecar, products, read_catalog(catalog_source, sidecar))
     model, binding = target_model(sidecar, products, resolution)
-    fields = concept_fields(resolution.approved(), facts)
+    fields = concept_fields(sidecar, resolution.approved(), facts)
     build_target_retrieval_graph(
         loader, model, binding, catalog_source,
         concepts=FactsConceptSource(facts),
@@ -170,14 +168,18 @@ def main(argv: list[str] | None = None) -> None:
     from showcase.ontology_query_benchmark import sema_live
 
     args = _parser().parse_args(argv)
-    workspace = sema_live.prt_test_workspace()
+    profile = load_profile(args.profile)
+    routing = profile.routing
+    concept_spec = args.concept_spec or profile.sema.concept_spec
+    workspace = sema_live.pinned_workspace(routing)
     with sema_live.neo4j_driver(args.neo4j_uri) as driver:
         loader = GraphLoader(driver)
         manifest = build_scoped_graph(
             loader, sema_live.UnityCatalogSource(workspace),
-            load_sidecar(args.sidecar),
-            import_library_facts(args.concept_spec, args.projection, args.projection_receipt),
-            sema_live.embedder(workspace), dimensions=args.dimensions,
+            load_sidecar(profile.sema.sidecar, profile.harness.root),
+            import_library_facts(concept_spec, args.projection, args.projection_receipt),
+            sema_live.embedder(workspace, routing), dimensions=routing.embedding_dimensions,
+            embedder_model=routing.embedding_endpoint,
         )
     write_manifest(manifest, args.manifest)
     print(json.dumps({"graph_identity": manifest.graph_identity, **manifest.counts}))
@@ -185,13 +187,12 @@ def main(argv: list[str] | None = None) -> None:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build arm S scoped graph.")
+    parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--neo4j-uri", required=True)
     parser.add_argument("--projection", type=Path, required=True)
     parser.add_argument("--projection-receipt", type=Path, required=True)
-    parser.add_argument("--concept-spec", type=Path, default=CONCEPT_SPEC_PATH)
+    parser.add_argument("--concept-spec", type=Path, help="default: the profile's concept spec")
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--sidecar", type=Path, default=SIDECAR_PATH)
-    parser.add_argument("--dimensions", type=int, default=1024)
     return parser
 
 

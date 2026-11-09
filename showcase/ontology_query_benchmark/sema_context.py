@@ -28,11 +28,6 @@ from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts
 from showcase.ontology_query_benchmark.sema_context_utils import Rendering, render
 
 
-FIRST_PROMPT_TOKEN_LIMIT = 13_934
-CHARS_PER_TOKEN = 2.08
-HARNESS_OVERHEAD_CHARS = 2_900
-
-
 class ManifestMismatchError(RuntimeError):
     """The built graph was not made from these sidecar and facts inputs."""
 
@@ -53,7 +48,7 @@ def conventions_sha256(conventions: tuple[str, ...]) -> str:
 
 
 def load_conventions(sidecar: Sidecar) -> tuple[str, ...]:
-    """The W4S conventions every arm receives, read from the pinned harness file."""
+    """The conventions every arm receives, read from the pinned harness file."""
     data = sidecar.conventions_path.read_bytes()
     if hashlib.sha256(data).hexdigest() != sidecar.conventions_file_sha256:
         raise SpecPinError(f"conventions file {sidecar.conventions_path} changed")

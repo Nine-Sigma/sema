@@ -9,6 +9,8 @@ import yaml
 from pydantic import ValidationError
 
 from showcase.ontology_query_benchmark.profile import Knobs, load_profile
+from showcase.ontology_query_benchmark.sema_bindings import load_products, load_sidecar
+from showcase.ontology_query_benchmark.sema_context import load_conventions
 
 pytestmark = pytest.mark.unit
 
@@ -62,3 +64,10 @@ def test_sweep_grid_varies_the_input_ceiling_fastest() -> None:
 
 def test_timbr_mcp_url_joins_url_and_path() -> None:
     assert load_profile(PROFILE).timbr.mcp_url == "https://ontology.example.test/api/mcp"
+
+
+def test_s_inputs_named_by_the_profile_load_and_pin() -> None:
+    profile = load_profile(PROFILE)
+    sidecar = load_sidecar(profile.sema.sidecar, profile.harness.root)
+    assert [p.pin.product for p in load_products(sidecar)] == ["people", "events"]
+    assert load_conventions(sidecar) == ("People means distinct rid values.",)

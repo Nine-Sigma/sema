@@ -19,15 +19,15 @@ from showcase.ontology_query_benchmark.sema_build import (
     write_manifest,
 )
 from showcase.ontology_query_benchmark.sema_build_utils import (
-    CONCEPT_SPEC_PATH,
     FactsConceptSource,
     LibraryFacts,
     import_library_facts,
 )
 from tests.unit.ontology_query_benchmark.test_sema_bindings import (
-    DEMO,
+    CONCEPT_SPEC,
+    PEOPLE,
     ELEMENTS,
-    TUMOR,
+    EVENTS,
     catalog_fixture,
     facts_fixture,
     write_fixture,
@@ -53,8 +53,8 @@ def _embedder() -> MagicMock:
 def _build_with(tmp_path: Path, facts: LibraryFacts) -> tuple[MagicMock, MagicMock, BuildManifest]:
     loader, embedder = MagicMock(), _embedder()
     manifest = build_scoped_graph(
-        loader, _catalog(), load_sidecar(write_fixture(tmp_path)), facts, embedder,
-        dimensions=4,
+        loader, _catalog(), load_sidecar(write_fixture(tmp_path), tmp_path), facts, embedder,
+        dimensions=4, embedder_model="toy-embed",
     )
     return loader, embedder, manifest
 
@@ -70,13 +70,13 @@ def _cypher_params(loader: MagicMock) -> list[dict[str, Any]]:
 def test_library_facts_come_from_the_concept_source_import(tmp_path: Path) -> None:
     projection, receipt = write_projection(tmp_path)
     before = hashlib.sha256(projection.read_bytes()).hexdigest()
-    facts = import_library_facts(CONCEPT_SPEC_PATH, projection, receipt)
+    facts = import_library_facts(CONCEPT_SPEC, projection, receipt)
     gender = facts.elements["G1"]
     assert (gender.label, gender.definition) == ("Administrative gender", "Gender for billing.")
-    assert set(gender.members) == {("PRT8532", "Female"), ("PRT8507", "Male")}
+    assert set(gender.members) == {("L8532", "Female"), ("L8507", "Male")}
     assert set(facts.elements) == set(ELEMENTS)
-    assert "partner-standard-library-workload" in facts.release
-    detail = FactsConceptSource(facts).name_synonyms("PRT8532")
+    assert "toy-library-workload" in facts.release
+    detail = FactsConceptSource(facts).name_synonyms("L8532")
     assert detail is not None and detail.name == "Female"
     assert hashlib.sha256(projection.read_bytes()).hexdigest() == before
 
@@ -85,13 +85,13 @@ def test_projection_must_match_its_receipt(tmp_path: Path) -> None:
     projection, receipt = write_projection(tmp_path)
     receipt.write_text(json.dumps({"complete": True, "duckdb": {"sha256": "0" * 64}}))
     with pytest.raises(SpecPinError, match="projection"):
-        import_library_facts(CONCEPT_SPEC_PATH, projection, receipt)
+        import_library_facts(CONCEPT_SPEC, projection, receipt)
     receipt.write_text(json.dumps({
         "complete": False,
         "duckdb": {"sha256": hashlib.sha256(projection.read_bytes()).hexdigest()},
     }))
     with pytest.raises(SpecPinError, match="incomplete"):
-        import_library_facts(CONCEPT_SPEC_PATH, projection, receipt)
+        import_library_facts(CONCEPT_SPEC, projection, receipt)
 
 
 def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
@@ -100,9 +100,9 @@ def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
         (p["entity_name"], p["name"]) for p in _cypher_params(loader)
         if "semantic_type" in p
     }
-    assert (DEMO, "gender_G1") in props
-    assert (DEMO, "gender_G1_label") in props
-    assert (TUMOR, "site_S1") in props
+    assert (PEOPLE, "gender_G1") in props
+    assert (PEOPLE, "gender_G1_label") in props
+    assert (EVENTS, "site_S1") in props
     assert not {name for _, name in props} & {"derived_x", "ghost_col", "age_years"}
     roles = {p["model_role"] for p in _cypher_params(loader) if "model_role" in p}
     assert roles == {"BENCH_S"}
@@ -113,7 +113,7 @@ def test_value_sets_hold_every_imported_member(tmp_path: Path) -> None:
     anchored = {c.args[1] for c in loader.upsert_value_set.call_args_list}
     assert anchored == {"gender_G1", "vital_V1", "site_S1"}
     members = {c.args[0] for c in loader.add_term_to_value_set.call_args_list}
-    assert members == {"PRT8532", "PRT8507", "PRT1", "PRT2", "P1", "P2", "P3"}
+    assert members == {"L8532", "L8507", "L1", "L2", "P1", "P2", "P3"}
 
 
 def test_absent_library_elements_are_build_findings(tmp_path: Path) -> None:
@@ -132,8 +132,8 @@ def test_entities_and_properties_are_embedded_with_library_text(
         (c.kwargs["label"], tuple(sorted(c.kwargs["match"].items())))
         for c in loader.set_node_embedding.call_args_list
     }
-    assert ("Property", (("entity_name", DEMO), ("name", "gender_G1"))) in matches
-    assert ("Entity", (("name", TUMOR),)) in matches
+    assert ("Property", (("entity_name", PEOPLE), ("name", "gender_G1"))) in matches
+    assert ("Entity", (("name", EVENTS),)) in matches
     loader.create_vector_index.assert_any_call("property_embedding_index", "Property", 4)
 
 
@@ -141,7 +141,7 @@ def test_join_from_spec_relationship_is_materialized(tmp_path: Path) -> None:
     loader, _, _ = _build(tmp_path)
     loader.upsert_join_path.assert_called_once()
     predicates = str(loader.upsert_join_path.call_args)
-    assert "mrn_PRT1" in predicates and DEMO in predicates and TUMOR in predicates
+    assert "rid_L1" in predicates and PEOPLE in predicates and EVENTS in predicates
 
 
 def test_graph_identity_tracks_inputs(tmp_path: Path) -> None:
@@ -150,7 +150,7 @@ def test_graph_identity_tracks_inputs(tmp_path: Path) -> None:
     assert first.graph_identity == again.graph_identity
     fewer = {**ELEMENTS, "G1": (*ELEMENTS["G1"][:2], ELEMENTS["G1"][2][:1])}
     changed_facts = import_library_facts(
-        CONCEPT_SPEC_PATH, *write_projection(tmp_path / "b", fewer)
+        CONCEPT_SPEC, *write_projection(tmp_path / "b", fewer)
     )
     _, _, changed = _build_with(tmp_path / "a", changed_facts)
     assert changed.graph_identity != first.graph_identity

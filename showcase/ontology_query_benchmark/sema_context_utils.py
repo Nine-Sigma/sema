@@ -21,11 +21,6 @@ from showcase.ontology_query_benchmark.sema_bindings import (
 )
 from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts, absent_elements
 
-MEMBERSHIP_SQL = (
-    "SELECT permissible_value_prt_id, permissible_value_prt_preferred_label "
-    "FROM {relation} WHERE data_element_prt_id = '{de_id}'"
-)
-
 TableColumn = tuple[str, str]
 
 
@@ -94,18 +89,19 @@ def _add_bindings(
     for relation in dict.fromkeys(b.relation for b in selected):
         parts.append(f"  {relation}:")
         parts.extend(
-            f"    {_binding_line(b, facts)}" for b in selected if b.relation == relation
+            f"    {_binding_line(b, facts, sidecar)}" for b in selected if b.relation == relation
         )
 
 
-def _binding_line(b: SuppliedBinding, facts: LibraryFacts) -> str:
+def _binding_line(b: SuppliedBinding, facts: LibraryFacts, sidecar: Sidecar) -> str:
     element = facts.elements.get(b.de_id or "")
     label = element.label if element else b.library_id
     line = f"{b.column} <- {label} [{b.de_id or b.library_id}]"
     if element and element.definition:
         line += f": {element.definition}"
     if b.catalog_companions:
-        line += f" Catalog companion, not in CPD: {', '.join(b.catalog_companions)}."
+        companions = ", ".join(b.catalog_companions)
+        line += f" Catalog companion, not in {sidecar.spec_name}: {companions}."
     return line
 
 
@@ -127,7 +123,7 @@ def _add_values(
     governed = [b for b in selected if b.strategy == "pass_through" and b.de_id]
     if not governed:
         return
-    template = MEMBERSHIP_SQL.format(relation=sidecar.membership_relation, de_id="E")
+    template = sidecar.membership_sql.format(relation=sidecar.membership_relation, element_id="E")
     rendering.parts.append(
         "\nGOVERNED VALUES (complete lists only; code = label). Unlisted sets: "
         f"membership query E = {template}"
@@ -167,7 +163,7 @@ def _add_grain(
     chosen = [p for p in products if p.pin.table in tables]
     if not chosen:
         return
-    parts.append("\nGRAIN AND KEYS (CPD product specs):")
+    parts.append(f"\nGRAIN AND KEYS ({sidecar.spec_name} product specs):")
     for p in chosen:
         for entity in p.raw.get("entities", []):
             keys = ", ".join(entity.get("key_columns", []))
@@ -178,11 +174,12 @@ def _add_grain(
                 for s, t in zip(rel["source_columns"], rel["target_columns"])
             )
             parts.append(f"  join {pairs} ({rel['cardinality']})")
-        if p.pin.product == sidecar.tumor_product:
-            parts.append(
-                f"  Clinical tumor grain columns (supplied): {', '.join(sidecar.tumor_grain)}. "
-                f"{sidecar.surrogate_row_id} is the surrogate source-row id, not the tumor grain."
+        if p.pin.product == sidecar.grain_product:
+            columns = ", ".join(sidecar.grain_columns)
+            note = sidecar.grain_note.format(
+                columns=columns, surrogate_row_id=sidecar.surrogate_row_id
             )
+            parts.append(f"  {note}")
 
 
 def _table_of(products: tuple[ProductSpec, ...], rel: Mapping[str, str]) -> str:
@@ -195,8 +192,8 @@ def _table_of(products: tuple[ProductSpec, ...], rel: Mapping[str, str]) -> str:
 def _add_rules(parts: list[str], sidecar: Sidecar) -> None:
     parts.append(
         "\nBUSINESS RULES: the workload conventions supplied with this request "
-        f"(sha256 {sidecar.conventions_sha256[:12]}) govern patient counting, tumor "
-        "identity, null handling and attribute resolution; they are not restated here."
+        f"(sha256 {sidecar.conventions_sha256[:12]}) govern {sidecar.rules_scope}; "
+        "they are not restated here."
     )
-    parts.append("\nOMOP HIERARCHY REFERENCE (supplied):")
+    parts.append(f"\n{sidecar.hierarchy_heading} (supplied):")
     parts.extend(f"  - {line}" for line in sidecar.hierarchy_reference)

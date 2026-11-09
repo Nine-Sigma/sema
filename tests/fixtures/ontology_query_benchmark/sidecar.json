@@ -1,0 +1,62 @@
+{
+ "schema_version": 1,
+ "sidecar_version": "t-1",
+ "authority": "Spec test authority",
+ "approval_policy": {
+  "kind": "supplied_approved",
+  "executable_strategies": [
+   "scalar",
+   "pass_through"
+  ]
+ },
+ "model_role": "BENCH_S",
+ "concept_vocabulary": "lib",
+ "physical": {
+  "catalog": "cat",
+  "schema": "sch"
+ },
+ "specs": [
+  {
+   "product": "people",
+   "table": "pt_people",
+   "path": "config/people_spec.json",
+   "sha256": "756664ecc940f7d7658948dfbe2c2a544bfc4a21367cfa73612faa7f98dc8b4a"
+  },
+  {
+   "product": "events",
+   "table": "pt_events",
+   "path": "config/events_spec.json",
+   "sha256": "586f15dccc2eb6d698c25f5b7bbea72c6a2b0d49b9acdd6cff7ed7c28298c1cb"
+  }
+ ],
+ "conventions": {
+  "path": "config/bench.json",
+  "file_sha256": "eaee86782ff30b08508b5faae5c2e75a7b6d03d1006473e7c2ed93908b2dd77c",
+  "conventions_sha256": "9e0affef98f78d1260ef37ee523472c83d93949a5a11a4d603c8e7e5801aaffb"
+ },
+ "spec_name": "SPEC",
+ "target_model": {
+  "id": "toy-s",
+  "namespace": "toy",
+  "display_name": "Toy arm S"
+ },
+ "grain": {
+  "product": "events",
+  "columns": [
+   "rid_L1",
+   "site_S1"
+  ],
+  "surrogate_row_id": "row_id",
+  "note": "Event grain columns (supplied): {columns}. {surrogate_row_id} is the surrogate row id, not the event grain."
+ },
+ "rules_scope": "people counting and null handling",
+ "membership_relation": "lib.sl.data_element",
+ "membership_sql": "SELECT member_id, member_label FROM {relation} WHERE element_id = '{element_id}'",
+ "catalog_companion_suffix": "_concept_code",
+ "hierarchy_heading": "TOY HIERARCHY REFERENCE",
+ "hierarchy_reference": [
+  "concept_ancestor: ancestor_concept_id is broader."
+ ],
+ "context_char_budget": 16000,
+ "value_list_limit": 40
+}

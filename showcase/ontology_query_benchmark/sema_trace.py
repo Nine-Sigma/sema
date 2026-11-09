@@ -1,7 +1,7 @@
 """Trace one question through arm S: library identity -> binding -> asset -> context.
 
 ``open_live_provider`` is the runner-facing factory; ``main`` prints the trace for
-one question (milestone A uses Q01) against the isolated Neo4j graph.
+one question against the isolated Neo4j graph.
 """
 
 from __future__ import annotations
@@ -13,17 +13,14 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from showcase.ontology_query_benchmark.profile import Profile, load_profile
 from showcase.ontology_query_benchmark.sema_bindings import (
-    SIDECAR_PATH,
     load_products,
     load_sidecar,
     resolve_bindings,
 )
 from showcase.ontology_query_benchmark.sema_build import read_catalog, read_manifest
-from showcase.ontology_query_benchmark.sema_build_utils import (
-    CONCEPT_SPEC_PATH,
-    import_library_facts,
-)
+from showcase.ontology_query_benchmark.sema_build_utils import import_library_facts
 from showcase.ontology_query_benchmark.sema_context import (
     SContext,
     SContextProvider,
@@ -31,9 +28,6 @@ from showcase.ontology_query_benchmark.sema_context import (
     load_conventions,
 )
 from showcase.ontology_query_benchmark.sema_context_utils import Rendering
-
-Q01 = "How many living patients are female (administrative gender)?"
-
 
 def trace(provider: SContextProvider, question: str) -> list[dict[str, Any]]:
     return trace_rows(provider, *provider.explain(question))
@@ -63,27 +57,27 @@ def trace_rows(
 
 @contextmanager
 def open_live_provider(
+    profile: Profile,
     neo4j_uri: str,
     manifest_path: Path,
     projection: Path,
     receipt: Path,
     *,
-    concept_spec: Path = CONCEPT_SPEC_PATH,
-    sidecar_path: Path = SIDECAR_PATH,
+    concept_spec: Path | None = None,
 ) -> Iterator[SContextProvider]:
     from sema.pipeline.retrieval import RetrievalEngine, RetrievalScope
     from showcase.ontology_query_benchmark import sema_live
 
-    sidecar = load_sidecar(sidecar_path)
-    facts = import_library_facts(concept_spec, projection, receipt)
+    sidecar = load_sidecar(profile.sema.sidecar, profile.harness.root)
+    facts = import_library_facts(concept_spec or profile.sema.concept_spec, projection, receipt)
     manifest = read_manifest(manifest_path)
     check_manifest(manifest, sidecar, facts)
-    workspace = sema_live.prt_test_workspace()
+    workspace = sema_live.pinned_workspace(profile.routing)
     products = load_products(sidecar)
     catalog = read_catalog(sema_live.UnityCatalogSource(workspace), sidecar)
     with sema_live.neo4j_driver(neo4j_uri) as driver:
         engine = RetrievalEngine(
-            driver, sema_live.embedder(workspace),
+            driver, sema_live.embedder(workspace, profile.routing),
             embedder_model_name=manifest.embedder_model,
             scope=RetrievalScope(model_role=sidecar.model_role),
         )
@@ -95,18 +89,18 @@ def open_live_provider(
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Trace one question through arm S.")
+    parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--neo4j-uri", required=True)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--projection", type=Path, required=True)
     parser.add_argument("--projection-receipt", type=Path, required=True)
-    parser.add_argument("--concept-spec", type=Path, default=CONCEPT_SPEC_PATH)
-    parser.add_argument("--sidecar", type=Path, default=SIDECAR_PATH)
-    parser.add_argument("--question", default=Q01)
+    parser.add_argument("--concept-spec", type=Path, help="default: the profile's concept spec")
+    parser.add_argument("--question", required=True)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)
     with open_live_provider(
-        args.neo4j_uri, args.manifest, args.projection, args.projection_receipt,
-        concept_spec=args.concept_spec, sidecar_path=args.sidecar,
+        load_profile(args.profile), args.neo4j_uri, args.manifest, args.projection,
+        args.projection_receipt, concept_spec=args.concept_spec,
     ) as p:
         context, rendering = p.explain(args.question)
         report = {"question": args.question, "identity": context.identity,

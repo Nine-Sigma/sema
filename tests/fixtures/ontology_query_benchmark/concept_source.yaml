@@ -1,0 +1,48 @@
+# Neutral concept source over the toy library projection (schema lib).
+concept_source:
+  spec_version: 2
+  id: toy-library-workload
+  identity_system: toy
+  release: "2026-01-01"
+  default_provider: staging
+  scheme:
+    qualified_name: toy_library.workload
+    description: "Toy library elements named by the test products"
+  concepts:
+    relation: lib.lib_element
+    group_by: element_id
+    roles:
+      concept_id: element_id
+      name: element_label
+      title: element_title
+      definition: element_definition
+      data_type: element_type
+      sensitive: element_sensitive
+      synonyms: element_synonyms
+  value_sets:
+    relation: lib.lib_element
+    roles:
+      concept_id: element_id
+      code: member_id
+      display: member_label
+      display_fallback: member_title
+      vocabulary_id: member_vocabulary
+      concept_code: member_code
+      synonyms: member_synonyms
+  concept_details:
+    relation: lib.lib_concept
+    on: [element_id, concept_id]
+    roles:
+      external_refs:
+        - system: ext
+          column: external_id
+        - system: "{vocabulary_id}"
+          column: concept_code
+  term_details:
+    relation: lib.lib_concept
+    on: [member_id, concept_id]
+    roles:
+      definition: definition
+      external_refs:
+        - system: ext
+          column: external_id

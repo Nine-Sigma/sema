@@ -1,4 +1,4 @@
-"""Library facts and the CPD-to-target-model adapter behind ``sema_build``.
+"""Library facts and the product-spec-to-target-model adapter behind ``sema_build``.
 
 Library facts come from SEMA's concept-source importer run over the scoped
 workload projection, never from a benchmark-only reader.
@@ -40,10 +40,6 @@ from showcase.ontology_query_benchmark.sema_bindings import (
     SpecPinError,
     SuppliedBinding,
 )
-
-_MODEL_ID = "partner-bench-s"
-CONCEPT_SPEC_PATH = Path(__file__).parent / "config" / "sema_concept_source.yaml"
-
 
 @dataclass(frozen=True)
 class ElementFacts:
@@ -139,8 +135,8 @@ def absent_elements(bindings: tuple[SuppliedBinding, ...], facts: LibraryFacts) 
     ]
 
 
-def qualified_name(product: str) -> str:
-    return f"partner_bench.{product}"
+def qualified_name(sidecar: Sidecar, product: str) -> str:
+    return f"{sidecar.target_namespace}.{product}"
 
 
 def target_model(
@@ -151,12 +147,12 @@ def target_model(
     entities = [
         TargetEntityDecl(
             ref=TargetEntityRef(
-                target_model_id=_MODEL_ID,
-                qualified_name=qualified_name(p.pin.product),
+                target_model_id=sidecar.target_model_id,
+                qualified_name=qualified_name(sidecar, p.pin.product),
                 kind=TargetArtifactKind.TABLE_ROW,
             ),
             properties=_properties(resolution.approved(), p.pin.table),
-            declared_joins=_declared_joins(p),
+            declared_joins=_declared_joins(sidecar, p),
         )
         for p in products
     ]
@@ -165,7 +161,7 @@ def target_model(
         catalog=sidecar.catalog,
         schema=sidecar.schema,
         entity_tables=tuple(
-            EntityTableBinding(qualified_name(p.pin.product), p.pin.table)
+            EntityTableBinding(qualified_name(sidecar, p.pin.product), p.pin.table)
             for p in products
         ),
         model_role=sidecar.model_role,
@@ -191,10 +187,10 @@ def _properties(
     return props
 
 
-def _declared_joins(product: ProductSpec) -> list[DeclaredJoinDecl]:
+def _declared_joins(sidecar: Sidecar, product: ProductSpec) -> list[DeclaredJoinDecl]:
     return [
         DeclaredJoinDecl(
-            referenced_entity=qualified_name(rel["target_product_id"]),
+            referenced_entity=qualified_name(sidecar, rel["target_product_id"]),
             join_keys=list(zip(rel["source_columns"], rel["target_columns"])),
             evidence="declared",
         )
@@ -204,9 +200,9 @@ def _declared_joins(product: ProductSpec) -> list[DeclaredJoinDecl]:
 
 def _descriptor(sidecar: Sidecar) -> TargetModelDescriptor:
     return TargetModelDescriptor(
-        target_model_id=_MODEL_ID,
+        target_model_id=sidecar.target_model_id,
         target_model_version=sidecar.version,
-        display_name="partner benchmark arm S scoped products",
+        display_name=sidecar.target_display_name,
         completeness=SemanticCompletenessAnnotations(
             structure=SemanticCompleteness.COMPLETE,
             obligations=SemanticCompleteness.NONE,
@@ -218,7 +214,7 @@ def _descriptor(sidecar: Sidecar) -> TargetModelDescriptor:
 
 
 def concept_fields(
-    approved: tuple[SuppliedBinding, ...], facts: LibraryFacts
+    sidecar: Sidecar, approved: tuple[SuppliedBinding, ...], facts: LibraryFacts
 ) -> list[ConceptFieldSpec]:
     """Value sets to materialize: every imported member of each pass-through element."""
     fields: list[ConceptFieldSpec] = []
@@ -226,7 +222,7 @@ def concept_fields(
         element = facts.elements.get(b.de_id or "")
         if b.strategy == "pass_through" and element is not None:
             codes = tuple(code for code, _ in element.members)
-            fields.append(ConceptFieldSpec(qualified_name(b.product), b.column, codes))
+            fields.append(ConceptFieldSpec(qualified_name(sidecar, b.product), b.column, codes))
     return fields
 
 
