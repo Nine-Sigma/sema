@@ -1,16 +1,16 @@
 """Fresh typed scorer for the partner benchmark; the historical harness scorer stays frozen.
 
 Each question's declared result_shape, category_columns, precision and tolerance become a
-result contract. A result must have exactly the gold width (a ranked result may add one
-rank column). Columns may appear in any order, except that strict credit keeps the gold
-relative order of numeric columns (swapped counts never pass strict). Gold cells that are
-canonical decimal text compare as numbers, anything else (for example code '001') compares
-as exact text. NULL equals only NULL, and '' is not NULL. Strict labels, category columns
-included, are equal after trimming surrounding whitespace only. Ranked results keep gold
-order except among tied rows and have exactly the gold top-N rows. Incomplete transport never scores.
-Strict uses the declared tolerance. The secondary tolerant flag also accepts numbers
-within 1% of gold and a category label that contains the gold wording or is contained in
-it, never an arbitrary renaming.
+result contract. A result must have exactly the gold width (a ranked result may add one rank
+column). Columns may appear in any order, except that strict credit keeps the gold relative
+order of numeric columns (swapped counts never pass strict). Gold cells that are canonical
+decimal text compare as numbers, anything else (for example code '001') compares as exact
+text. NULL equals only NULL, and '' is not NULL. Strict labels, category columns included,
+are equal after trimming surrounding whitespace only. Ranked results keep gold order except
+among tied rows and have exactly the gold top-N rows. Incomplete transport never scores.
+Strict uses the declared tolerance. The secondary tolerant flag also accepts numbers within
+1% of gold and a category label that contains the gold wording or is contained in it, never
+an arbitrary renaming.
 """
 
 import itertools
