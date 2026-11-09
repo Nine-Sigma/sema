@@ -2,6 +2,7 @@
  "schema_version": 1,
  "sidecar_version": "t-1",
  "authority": "Spec test authority",
+ "attribution": "supplied",
  "approval_policy": {
   "kind": "supplied_approved",
   "executable_strategies": [
@@ -20,13 +21,15 @@
    "product": "people",
    "table": "pt_people",
    "path": "config/people_spec.json",
-   "sha256": "756664ecc940f7d7658948dfbe2c2a544bfc4a21367cfa73612faa7f98dc8b4a"
+   "sha256": "4417312254ec94016d3437d09f91d05d9dbbab17293c8c5ebfb906ab0f4fbcd4",
+   "attribution": "supplied"
   },
   {
    "product": "events",
    "table": "pt_events",
    "path": "config/events_spec.json",
-   "sha256": "586f15dccc2eb6d698c25f5b7bbea72c6a2b0d49b9acdd6cff7ed7c28298c1cb"
+   "sha256": "eb08eea078dc97ce2fa822efcf95e8179004b224a6900daf8342576945123151",
+   "attribution": "supplied"
   }
  ],
  "conventions": {
@@ -53,10 +56,12 @@
  "membership_relation": "lib.sl.data_element",
  "membership_sql": "SELECT member_id, member_label FROM {relation} WHERE element_id = '{element_id}'",
  "catalog_companion_suffix": "_concept_code",
+ "library_id_suffix": ".r2",
+ "binding_note": "Each governed column holds a member id; its companions hold label and kind.",
  "hierarchy_heading": "TOY HIERARCHY REFERENCE",
  "hierarchy_reference": [
   "concept_ancestor: ancestor_concept_id is broader."
  ],
- "context_char_budget": 16000,
+ "prompt_frame_chars": 1500,
  "value_list_limit": 40
 }

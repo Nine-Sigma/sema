@@ -87,14 +87,27 @@ def _as_numpy_array(value: Any) -> Any:
     return np.array(value) if isinstance(value, list) else value
 
 
+def _field(column: str, de_id: str | None = None) -> dict[str, Any]:
+    field = {
+        "column_id": f"{column}-id", "column_name": column,
+        "physical_type": "STRING", "strategy": "scalar",
+    }
+    return field if de_id is None else {**field, "de_id": de_id}
+
+
+def _write_spec(path: Path, fields: list[dict[str, Any]]) -> Path:
+    path.write_text(json.dumps({"product_id": path.stem, "fields": fields}), encoding="utf-8")
+    return path
+
+
 def _specs(tmp_path: Path) -> list[Path]:
-    paths = []
-    for name, ids in (("people", ["L1", "L3"]), ("events", ["L2", "L4"])):
-        path = tmp_path / f"{name}_spec.json"
-        fields = [{"column_name": "rid"}] + [{"de_id": de_id} for de_id in ids + ["L1"]]
-        path.write_text(json.dumps({"fields": fields}), encoding="utf-8")
-        paths.append(path)
-    return paths
+    return [
+        _write_spec(
+            tmp_path / f"{name}_spec.json",
+            [_field("rid")] + [_field(f"c_{i}", i) for i in ids + ["L1"]],
+        )
+        for name, ids in (("people", ["L1", "L3"]), ("events", ["L2", "L4"]))
+    ]
 
 
 def _extract(tmp_path: Path, cursor: FakeCursor, **kwargs: Any) -> dict[str, Any]:
@@ -196,8 +209,7 @@ def test_an_incomplete_read_writes_no_database(
 
 
 def test_a_malformed_declared_id_is_refused_before_any_statement(tmp_path: Path) -> None:
-    spec = tmp_path / "spec.json"
-    spec.write_text(json.dumps({"fields": [{"de_id": "L1' OR '1'='1"}]}), encoding="utf-8")
+    spec = _write_spec(tmp_path / "spec.json", [_field("c", "L1' OR '1'='1")])
     cursor = FakeCursor()
 
     with pytest.raises(ValueError, match="de_id"):
@@ -229,10 +241,21 @@ def test_duplicate_order_keys_make_the_read_incomplete(tmp_path: Path) -> None:
 
 
 def test_no_declared_id_is_refused_before_any_statement(tmp_path: Path) -> None:
-    spec = tmp_path / "spec.json"
-    spec.write_text(json.dumps({"fields": [{"column_name": "rid"}]}), encoding="utf-8")
+    spec = _write_spec(tmp_path / "spec.json", [_field("rid")])
     cursor = FakeCursor()
 
     with pytest.raises(ValueError, match="no de_id"):
+        extract(lambda: cursor, SPEC, [spec], tmp_path / "out")
+    assert cursor.statements == []
+
+
+def test_a_spec_that_breaks_the_declared_format_is_refused_before_any_statement(
+    tmp_path: Path,
+) -> None:
+    spec = tmp_path / "spec.json"
+    spec.write_text(json.dumps({"fields": [{"de_id": "L1"}]}), encoding="utf-8")
+    cursor = FakeCursor()
+
+    with pytest.raises(ValueError, match="declared format"):
         extract(lambda: cursor, SPEC, [spec], tmp_path / "out")
     assert cursor.statements == []

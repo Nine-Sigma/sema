@@ -4,18 +4,21 @@
 and governed values; nothing is read from the candidates before pruning, so the
 visibility policy (rejected and superseded never shown) applies. Required evidence
 is never truncated: an over-budget context is returned whole with an overflow
-finding.
+finding. The budget is the run's first-prompt limit at the conservative chars-per-token
+ratio, less the harness prompt frame and the question.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from typing import Protocol
 
 from sema.models.context import SemanticCandidateSet
 from sema.pipeline.context import prune_to_sco
+from showcase.ontology_query_benchmark.profile import Limits
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     ProductSpec,
@@ -55,6 +58,11 @@ def load_conventions(sidecar: Sidecar) -> tuple[str, ...]:
     return tuple(json.loads(data)["conventions"])
 
 
+def context_char_budget(limits: Limits, sidecar: Sidecar, question: str) -> int:
+    whole = math.floor(limits.first_prompt_ceiling * limits.conservative_chars_per_token)
+    return whole - sidecar.prompt_frame_chars - len(question)
+
+
 def check_manifest(manifest: BuildManifest, sidecar: Sidecar, facts: LibraryFacts) -> None:
     if (manifest.sidecar_sha256, manifest.facts_sha256) != (sidecar.sha256, facts.sha256):
         raise ManifestMismatchError(
@@ -73,6 +81,7 @@ class SContextProvider:
         *,
         graph_identity: str,
         conventions: tuple[str, ...],
+        limits: Limits,
         top_k: int = 10,
     ) -> None:
         self._retriever = retriever
@@ -82,6 +91,7 @@ class SContextProvider:
         self._facts = facts
         self._graph_identity = graph_identity
         self._conventions = conventions
+        self._limits = limits
         self._top_k = top_k
 
     @property
@@ -105,20 +115,21 @@ class SContextProvider:
             f"bindings={self._sidecar.version} library={self._facts.release}"
         )
         text = f"{header}\n{rendering.text}"
-        findings = [*rendering.findings, *self._checks(text)]
+        findings = [*rendering.findings, *self._checks(text, question)]
         identity = hashlib.sha256(f"{text}\n{self._graph_identity}".encode()).hexdigest()
         return SContext(text, identity, tuple(findings)), rendering
 
-    def _checks(self, text: str) -> list[str]:
+    def _checks(self, text: str, question: str) -> list[str]:
         findings = []
         if conventions_sha256(self._conventions) != self._sidecar.conventions_sha256:
             findings.append(
                 "conventions differ from the pinned workload conventions "
                 f"(sha256 {self._sidecar.conventions_sha256[:12]})"
             )
-        if len(text) > self._sidecar.context_char_budget:
+        budget = context_char_budget(self._limits, self._sidecar, question)
+        if len(text) > budget:
             findings.append(
-                f"context overflow: {len(text)} chars exceed the "
-                f"{self._sidecar.context_char_budget}-char context budget"
+                f"overflow: {len(text)} context chars exceed the {budget}-char budget of the "
+                f"{self._limits.first_prompt_ceiling}-token first-prompt limit"
             )
         return findings

@@ -380,9 +380,7 @@ class TestExpandFromEntitiesCharacterization:
 
 
 class TestGovernedValuesReachContext:
-    def test_entity_value_set_survives_visibility_policy(
-        self, mock_driver, mock_embedder,
-    ):
+    def _patient_engine(self, mock_driver, mock_embedder):
         driver, session = mock_driver
 
         def row(data):
@@ -410,12 +408,31 @@ class TestGovernedValuesReachContext:
             return []
 
         session.run.side_effect = run_side_effect
-        engine = RetrievalEngine(driver=driver, embedder=mock_embedder)
+        return RetrievalEngine(driver=driver, embedder=mock_embedder)
+
+    def test_entity_value_set_survives_visibility_policy(
+        self, mock_driver, mock_embedder,
+    ):
+        engine = self._patient_engine(mock_driver, mock_embedder)
         sco = prune_to_sco(engine.retrieve("female patients", top_k=5))
 
         assert [(g.column, g.values) for g in sco.governed_values] == [
             ("sex_cd", [{"code": "F", "label": "Female"}]),
         ]
+
+    def test_expanded_values_carry_their_entity_status_and_confidence(
+        self, mock_driver, mock_embedder,
+    ):
+        engine = self._patient_engine(mock_driver, mock_embedder)
+        candidates = engine.retrieve("female patients", top_k=5).candidates
+        entity = next(c for c in candidates if c["type"] == "entity")
+        values = [c for c in candidates if c["type"] == "value"]
+
+        assert values
+        assert {(v["status"], v["confidence"]) for v in values} == {
+            (entity["status"], entity["confidence"]),
+        }
+        assert entity["confidence"] != 0.5
 
     def test_rejected_entity_values_stay_hidden(self):
         candidate_set = SemanticCandidateSet(query="q", candidates=[{

@@ -10,6 +10,7 @@ from typing import Any
 import duckdb
 import pytest
 
+from showcase.ontology_query_benchmark.profile import Attribution
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     BindingStatus,
@@ -30,16 +31,21 @@ PEOPLE = "pt_people"
 EVENTS = "pt_events"
 RID = "rid_L1"
 CONVENTIONS = ("People means distinct rids.", "A distinct event is two keys.")
+ID_SUFFIX = ".r2"
+BINDING_NOTE = "Each governed column holds a member id; its companions hold label and kind."
+PROMPT_FRAME_CHARS = 1_500
 
 
-def _pass_through(entity: str, name: str, de_id: str) -> dict[str, Any]:
+def _pass_through(
+    entity: str, name: str, de_id: str, label: str = "_label", kind: str = "_mapping_type"
+) -> dict[str, Any]:
     col = f"{name}_{de_id}"
     return {
-        "entity_id": entity, "column_id": f"{name}-v1", "column_name": col,
+        "entity_id": entity, "column_id": f"{name}{ID_SUFFIX}", "column_name": col,
         "physical_type": "STRING", "cardinality": "single",
         "strategy": "pass_through", "de_id": de_id, "concept_name": name,
-        "value_column": col, "label_column": f"{col}_label",
-        "mapping_type_column": f"{col}_mapping_type", "pv_id_column": col,
+        "value_column": col, "label_column": f"{col}{label}",
+        "mapping_type_column": f"{col}{kind}", "pv_id_column": col,
     }
 
 
@@ -56,15 +62,15 @@ def _people_spec() -> dict[str, Any]:
         "entities": [{"entity_id": "person", "grain": "one row per rid",
                       "key_columns": [RID]}],
         "fields": [
-            _scalar("person", "record-id-v1", RID, "STRING"),
-            _pass_through("person", "gender", "G1"),
+            _scalar("person", f"record-id{ID_SUFFIX}", RID, "STRING"),
+            _pass_through("person", "gender", "G1", "_text", "_how"),
             _pass_through("person", "vital", "V1"),
             _pass_through("person", "city", "C1"),
-            {**_scalar("person", "derived-v1", "derived_x", "STRING"),
+            {**_scalar("person", f"derived{ID_SUFFIX}", "derived_x", "STRING"),
              "strategy": "derived"},
-            _scalar("person", "ghost-v1", "ghost_col", "STRING"),
-            _scalar("person", "age-v1", "age_years", "BIGINT"),
-            {**_scalar("person", "birth-date-v1", "birth_date_N1", "DATE"), "de_id": "N1"},
+            _scalar("person", f"ghost{ID_SUFFIX}", "ghost_col", "STRING"),
+            _scalar("person", f"age{ID_SUFFIX}", "age_years", "BIGINT"),
+            {**_scalar("person", f"birth-date{ID_SUFFIX}", "birth_date_N1", "DATE"), "de_id": "N1"},
         ],
         "relationships": [],
         "exposure": {"denied_columns": ["first_name"]},
@@ -77,8 +83,8 @@ def _events_spec() -> dict[str, Any]:
         "entities": [{"entity_id": "event", "grain": "one row per event row",
                       "key_columns": ["row_id"]}],
         "fields": [
-            _scalar("event", "row-surrogate-id-v1", "row_id", "STRING"),
-            _scalar("event", "record-id-v1", RID, "STRING"),
+            _scalar("event", f"row-surrogate-id{ID_SUFFIX}", "row_id", "STRING"),
+            _scalar("event", f"record-id{ID_SUFFIX}", RID, "STRING"),
             _pass_through("event", "site", "S1"),
         ],
         "relationships": [{
@@ -134,7 +140,9 @@ _CONCEPT_DDL = (
 
 
 def write_projection(
-    tmp_path: Path, elements: dict[str, tuple[str, str, list[tuple[str, str]]]] = ELEMENTS
+    tmp_path: Path,
+    elements: dict[str, tuple[str, str, list[tuple[str, str]]]] = ELEMENTS,
+    assistance: str = "supplied",
 ) -> tuple[Path, Path]:
     """A scoped projection in the workload layout plus its extract receipt."""
     tmp_path.mkdir(parents=True, exist_ok=True)
@@ -155,30 +163,35 @@ def write_projection(
     receipt = tmp_path / "receipt.json"
     receipt.write_text(json.dumps({
         "complete": True,
+        "assistance": {"kind": assistance},
         "duckdb": {"sha256": hashlib.sha256(path.read_bytes()).hexdigest()},
     }))
     return path, receipt
 
 
-def facts_fixture(tmp_path: Path) -> LibraryFacts:
-    return import_library_facts(CONCEPT_SPEC, *write_projection(tmp_path))
+def facts_fixture(tmp_path: Path, assistance: str = "supplied") -> LibraryFacts:
+    return import_library_facts(
+        CONCEPT_SPEC, *write_projection(tmp_path, assistance=assistance),
+        spec_attribution=Attribution.ASSISTED,
+    )
 
 
 def write_fixture(tmp_path: Path) -> Path:
     """Write a two-product sidecar; return its path."""
     tmp_path.mkdir(parents=True, exist_ok=True)
     pins = []
-    for product, table, spec in (
-        ("people", PEOPLE, _people_spec()),
-        ("events", EVENTS, _events_spec()),
+    for product, table, spec, attribution in (
+        ("people", PEOPLE, _people_spec(), "supplied"),
+        ("events", EVENTS, _events_spec(), "assisted"),
     ):
         path = tmp_path / f"{product}.json"
         path.write_text(json.dumps(spec))
         pins.append({"product": product, "table": table, "path": path.name,
-                     "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+                     "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                     "attribution": attribution})
     sidecar = {
         "schema_version": 1, "sidecar_version": "t-1",
-        "authority": "Spec test authority",
+        "authority": "Spec test authority", "attribution": "supplied",
         "approval_policy": {"kind": "supplied_approved",
                             "executable_strategies": ["scalar", "pass_through"]},
         "model_role": "BENCH_S", "concept_vocabulary": "lib",
@@ -198,9 +211,11 @@ def write_fixture(tmp_path: Path) -> Path:
         "membership_sql": "SELECT member_id, member_label FROM {relation} "
                           "WHERE element_id = '{element_id}'",
         "catalog_companion_suffix": "_concept_code",
+        "library_id_suffix": ID_SUFFIX,
+        "binding_note": BINDING_NOTE,
         "hierarchy_heading": "TOY HIERARCHY REFERENCE",
         "hierarchy_reference": ["concept_ancestor: ancestor_concept_id is broader."],
-        "context_char_budget": 16000,
+        "prompt_frame_chars": PROMPT_FRAME_CHARS,
         "value_list_limit": 40,
     }
     sidecar_path = tmp_path / "sidecar.json"
@@ -219,9 +234,9 @@ def test_approved_binding_carries_library_identity_and_provenance(
     gender = resolution_fixture(tmp_path).by_column(PEOPLE, "gender_G1")
     assert gender is not None
     assert gender.status is BindingStatus.APPROVED
-    assert (gender.library_id, gender.de_id) == ("gender-v1", "G1")
+    assert (gender.library_id, gender.de_id) == (f"gender{ID_SUFFIX}", "G1")
     assert gender.relation == f"cat.sch.{PEOPLE}"
-    assert gender.companions == ("gender_G1_label", "gender_G1_mapping_type")
+    assert gender.companions == (("label", "gender_G1_text"), ("mapping_type", "gender_G1_how"))
     assert gender.spec.sha256 == hashlib.sha256(
         (tmp_path / "people.json").read_bytes()).hexdigest()
     assert gender.authority == "Spec test authority"
@@ -259,16 +274,21 @@ def test_spec_hash_mismatch_fails_closed(tmp_path: Path) -> None:
         load_products(load_sidecar(sidecar_path, tmp_path))
 
 
-def test_competing_bindings_for_one_column_are_ambiguous(tmp_path: Path) -> None:
+def _repin_people(tmp_path: Path, spec: dict[str, Any]) -> Path:
+    """Rewrite the people spec and its sidecar pin; return the sidecar path."""
     sidecar_path = write_fixture(tmp_path)
-    spec = _people_spec()
-    spec["fields"].append(_scalar("person", "other-v1", "gender_G1", "STRING"))
     path = tmp_path / "people.json"
     path.write_text(json.dumps(spec))
     raw = json.loads(sidecar_path.read_text())
     raw["specs"][0]["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     sidecar_path.write_text(json.dumps(raw))
-    sidecar = load_sidecar(sidecar_path, tmp_path)
+    return sidecar_path
+
+
+def test_competing_bindings_for_one_column_are_ambiguous(tmp_path: Path) -> None:
+    spec = _people_spec()
+    spec["fields"].append(_scalar("person", f"other{ID_SUFFIX}", "gender_G1", "STRING"))
+    sidecar = load_sidecar(_repin_people(tmp_path, spec), tmp_path)
     resolution = resolve_bindings(sidecar, load_products(sidecar), catalog_fixture())
     assert "gender_G1" not in {b.column for b in resolution.approved()}
     assert any("gender_G1" in f and "ambiguous" in f for f in resolution.findings)
@@ -280,5 +300,13 @@ def test_catalog_concept_code_column_is_a_marked_companion(tmp_path: Path) -> No
     gender = resolution.by_column(PEOPLE, "gender_G1")
     assert site is not None and gender is not None
     assert site.catalog_companions == ("site_S1_concept_code",)
-    assert site.companions == ("site_S1_label", "site_S1_mapping_type")
+    assert site.companion_columns == ("site_S1_label", "site_S1_mapping_type")
     assert gender.catalog_companions == ()
+
+
+def test_a_spec_that_breaks_the_declared_format_is_refused_at_load(tmp_path: Path) -> None:
+    spec = _people_spec()
+    del spec["fields"][1]["strategy"]
+    sidecar = load_sidecar(_repin_people(tmp_path, spec), tmp_path)
+    with pytest.raises(ValueError, match="people.json"):
+        load_products(sidecar)

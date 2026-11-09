@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from showcase.ontology_query_benchmark.profile import Profile, load_profile
+from showcase.ontology_query_benchmark.profile import Limits, Profile, load_profile
+from showcase.ontology_query_benchmark.routing import require_clean_process
 from showcase.ontology_query_benchmark.sema_bindings import (
     load_products,
     load_sidecar,
@@ -47,7 +50,7 @@ def trace_rows(
                         "spec_path": str(b.spec.path), "spec_sha256": b.spec.sha256,
                         "strategy": b.strategy},
             "physical": {"relation": b.relation, "column": b.column,
-                         "type": b.physical_type, "companions": list(b.companions)},
+                         "type": b.physical_type, "companions": dict(b.companions)},
             "context": {"retrieved": (b.table, b.column) in retrieved,
                         "rendered": f"    {b.column} <- " in context.text,
                         "values_listed": rendering.listed.get((b.table, b.column), 0)},
@@ -64,12 +67,18 @@ def open_live_provider(
     receipt: Path,
     *,
     concept_spec: Path | None = None,
+    limits: Limits | None = None,
 ) -> Iterator[SContextProvider]:
+    """Open S on the profile; pass the run's limits when they differ from the profile's."""
     from sema.pipeline.retrieval import RetrievalEngine, RetrievalScope
     from showcase.ontology_query_benchmark import sema_live
 
+    require_clean_process(os.environ, sys.modules, profile.routing)
     sidecar = load_sidecar(profile.sema.sidecar, profile.harness.root)
-    facts = import_library_facts(concept_spec or profile.sema.concept_spec, projection, receipt)
+    facts = import_library_facts(
+        concept_spec or profile.sema.concept_spec, projection, receipt,
+        spec_attribution=profile.sema.concept_spec_attribution,
+    )
     manifest = read_manifest(manifest_path)
     check_manifest(manifest, sidecar, facts)
     workspace = sema_live.pinned_workspace(profile.routing)
@@ -84,6 +93,7 @@ def open_live_provider(
         yield SContextProvider(
             engine, sidecar, products, resolve_bindings(sidecar, products, catalog), facts,
             graph_identity=manifest.graph_identity, conventions=load_conventions(sidecar),
+            limits=limits or profile.limits,
         )
 
 

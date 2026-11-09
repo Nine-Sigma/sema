@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -11,6 +13,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from sema.graph.physical_catalog import PhysicalColumn, StaticPhysicalCatalogSource
+from showcase.ontology_query_benchmark import sema_build, sema_live
+from showcase.ontology_query_benchmark.profile import Attribution
+from showcase.ontology_query_benchmark.routing import (
+    FORBIDDEN_ENV,
+    FORBIDDEN_ENV_PREFIXES,
+    PROVIDER_ENV,
+    RoutingError,
+)
 from showcase.ontology_query_benchmark.sema_bindings import SpecPinError, load_sidecar
 from showcase.ontology_query_benchmark.sema_build import (
     BuildManifest,
@@ -23,11 +33,13 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     LibraryFacts,
     import_library_facts,
 )
+from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
 from tests.unit.ontology_query_benchmark.test_sema_bindings import (
     CONCEPT_SPEC,
-    PEOPLE,
     ELEMENTS,
     EVENTS,
+    ID_SUFFIX,
+    PEOPLE,
     catalog_fixture,
     facts_fixture,
     write_fixture,
@@ -35,6 +47,36 @@ from tests.unit.ontology_query_benchmark.test_sema_bindings import (
 )
 
 pytestmark = pytest.mark.unit
+
+
+class ClientBuilt(Exception):
+    """A live client was about to be built."""
+
+
+def clean_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A process the routing check accepts: no dotenv module and no routing variable."""
+    routed = (*FORBIDDEN_ENV, *PROVIDER_ENV, "DATABRICKS_HOST", "DATABRICKS_CONFIG_PROFILE")
+    for name in list(os.environ):
+        if name in routed or name.startswith(FORBIDDEN_ENV_PREFIXES):
+            monkeypatch.delenv(name)
+    monkeypatch.delitem(sys.modules, "dotenv", raising=False)
+
+
+def no_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*_args: Any, **_kwargs: Any) -> Any:
+        raise ClientBuilt
+
+    monkeypatch.setattr(sema_live, "pinned_workspace", refuse)
+    monkeypatch.setattr(sema_live, "neo4j_driver", refuse)
+
+
+def build_args(tmp_path: Path) -> list[str]:
+    return [
+        "--profile", str(PROFILE_PATH), "--neo4j-uri", "bolt://unused",
+        "--projection", str(tmp_path / "projection.duckdb"),
+        "--projection-receipt", str(tmp_path / "receipt.json"),
+        "--manifest", str(tmp_path / "manifest.json"),
+    ]
 
 
 def _catalog() -> StaticPhysicalCatalogSource:
@@ -67,10 +109,16 @@ def _cypher_params(loader: MagicMock) -> list[dict[str, Any]]:
     return [c.kwargs for c in loader._run.call_args_list]
 
 
+def _embedded_texts(embedder: MagicMock) -> list[str]:
+    return [t for c in embedder.embed_documents.call_args_list for t in c.args[0]]
+
+
 def test_library_facts_come_from_the_concept_source_import(tmp_path: Path) -> None:
     projection, receipt = write_projection(tmp_path)
     before = hashlib.sha256(projection.read_bytes()).hexdigest()
-    facts = import_library_facts(CONCEPT_SPEC, projection, receipt)
+    facts = import_library_facts(
+        CONCEPT_SPEC, projection, receipt, spec_attribution=Attribution.ASSISTED
+    )
     gender = facts.elements["G1"]
     assert (gender.label, gender.definition) == ("Administrative gender", "Gender for billing.")
     assert set(gender.members) == {("L8532", "Female"), ("L8507", "Male")}
@@ -85,13 +133,15 @@ def test_projection_must_match_its_receipt(tmp_path: Path) -> None:
     projection, receipt = write_projection(tmp_path)
     receipt.write_text(json.dumps({"complete": True, "duckdb": {"sha256": "0" * 64}}))
     with pytest.raises(SpecPinError, match="projection"):
-        import_library_facts(CONCEPT_SPEC, projection, receipt)
+        import_library_facts(CONCEPT_SPEC, projection, receipt,
+                             spec_attribution=Attribution.ASSISTED)
     receipt.write_text(json.dumps({
         "complete": False,
         "duckdb": {"sha256": hashlib.sha256(projection.read_bytes()).hexdigest()},
     }))
     with pytest.raises(SpecPinError, match="incomplete"):
-        import_library_facts(CONCEPT_SPEC, projection, receipt)
+        import_library_facts(CONCEPT_SPEC, projection, receipt,
+                             spec_attribution=Attribution.ASSISTED)
 
 
 def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
@@ -101,7 +151,7 @@ def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
         if "semantic_type" in p
     }
     assert (PEOPLE, "gender_G1") in props
-    assert (PEOPLE, "gender_G1_label") in props
+    assert (PEOPLE, "gender_G1_text") in props
     assert (EVENTS, "site_S1") in props
     assert not {name for _, name in props} & {"derived_x", "ghost_col", "age_years"}
     roles = {p["model_role"] for p in _cypher_params(loader) if "model_role" in p}
@@ -126,7 +176,7 @@ def test_entities_and_properties_are_embedded_with_library_text(
     tmp_path: Path,
 ) -> None:
     loader, embedder, _ = _build(tmp_path)
-    texts = [t for c in embedder.embed_documents.call_args_list for t in c.args[0]]
+    texts = _embedded_texts(embedder)
     assert any(t.startswith("Administrative gender") for t in texts)
     matches = {
         (c.kwargs["label"], tuple(sorted(c.kwargs["match"].items())))
@@ -135,6 +185,22 @@ def test_entities_and_properties_are_embedded_with_library_text(
     assert ("Property", (("entity_name", PEOPLE), ("name", "gender_G1"))) in matches
     assert ("Entity", (("name", EVENTS),)) in matches
     loader.create_vector_index.assert_any_call("property_embedding_index", "Property", 4)
+
+
+def test_companions_are_embedded_by_their_declared_role(tmp_path: Path) -> None:
+    _, embedder, _ = _build(tmp_path)
+    texts = _embedded_texts(embedder)
+    assert "Administrative gender label text" in texts
+    assert "Administrative gender mapping type" in texts
+
+
+def test_an_absent_element_is_embedded_by_its_library_id_without_the_suffix(
+    tmp_path: Path,
+) -> None:
+    _, embedder, _ = _build(tmp_path)
+    texts = _embedded_texts(embedder)
+    assert "city" in texts and "city label text" in texts
+    assert not any(ID_SUFFIX in t for t in texts)
 
 
 def test_join_from_spec_relationship_is_materialized(tmp_path: Path) -> None:
@@ -150,10 +216,43 @@ def test_graph_identity_tracks_inputs(tmp_path: Path) -> None:
     assert first.graph_identity == again.graph_identity
     fewer = {**ELEMENTS, "G1": (*ELEMENTS["G1"][:2], ELEMENTS["G1"][2][:1])}
     changed_facts = import_library_facts(
-        CONCEPT_SPEC, *write_projection(tmp_path / "b", fewer)
+        CONCEPT_SPEC, *write_projection(tmp_path / "b", fewer),
+        spec_attribution=Attribution.ASSISTED,
     )
     _, _, changed = _build_with(tmp_path / "a", changed_facts)
     assert changed.graph_identity != first.graph_identity
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_manifest_records_each_input_file_with_its_attribution(tmp_path: Path) -> None:
+    _, _, manifest = _build(tmp_path)
+    recorded = {i.role: (i.attribution, i.sha256) for i in manifest.inputs}
+    assert recorded == {
+        "sidecar": ("supplied", _sha256(tmp_path / "sidecar.json")),
+        "product_spec:people": ("supplied", _sha256(tmp_path / "people.json")),
+        "product_spec:events": ("assisted", _sha256(tmp_path / "events.json")),
+        "concept_spec": ("assisted", _sha256(CONCEPT_SPEC)),
+        "projection": ("supplied", _sha256(tmp_path / "projection.duckdb")),
+    }
+
+
+def test_the_projection_attribution_is_the_receipt_assistance(tmp_path: Path) -> None:
+    _, _, manifest = _build_with(tmp_path, facts_fixture(tmp_path, "automatic"))
+    recorded = {i.role: i.attribution for i in manifest.inputs}
+    assert recorded["projection"] == "automatic"
+
+
+def test_a_receipt_without_assistance_is_refused(tmp_path: Path) -> None:
+    projection, receipt = write_projection(tmp_path)
+    raw = json.loads(receipt.read_text())
+    del raw["assistance"]
+    receipt.write_text(json.dumps(raw))
+    with pytest.raises(SpecPinError, match="assistance"):
+        import_library_facts(CONCEPT_SPEC, projection, receipt,
+                             spec_attribution=Attribution.ASSISTED)
 
 
 def test_manifest_round_trips(tmp_path: Path) -> None:
@@ -161,3 +260,22 @@ def test_manifest_round_trips(tmp_path: Path) -> None:
     path = tmp_path / "manifest.json"
     write_manifest(manifest, path)
     assert read_manifest(path) == manifest
+
+
+def test_build_entry_refuses_a_foreign_route_before_any_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clean_process(monkeypatch)
+    no_client(monkeypatch)
+    monkeypatch.setenv("OPENAI_API_KEY", "set")
+    with pytest.raises(RoutingError, match="OPENAI_API_KEY"):
+        sema_build.main(build_args(tmp_path))
+
+
+def test_build_entry_in_a_clean_process_goes_on_to_the_clients(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clean_process(monkeypatch)
+    no_client(monkeypatch)
+    with pytest.raises(ClientBuilt):
+        sema_build.main(build_args(tmp_path))

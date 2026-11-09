@@ -7,11 +7,20 @@ only from a loaded profile. Relative paths resolve against the profile file's di
 from __future__ import annotations
 
 import itertools
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
+
+
+class Attribution(StrEnum):
+    """How an input file came to be: discovered by code, supplied, or authored with help."""
+
+    AUTOMATIC = "automatic"
+    SUPPLIED = "supplied"
+    ASSISTED = "assisted"
 
 
 class _Frozen(BaseModel):
@@ -138,6 +147,7 @@ class Extract(_Frozen):
 class Sema(_Frozen):
     sidecar: Path
     concept_spec: Path
+    concept_spec_attribution: Attribution
 
     _paths = field_validator("sidecar", "concept_spec")(_resolved)
 
