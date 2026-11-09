@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 from showcase.ontology_query_benchmark.profile import Profile, load_profile
+from showcase.ontology_query_benchmark.routing import require_clean_process
 from showcase.ontology_query_benchmark.sema_bindings import (
     load_products,
     load_sidecar,
@@ -68,6 +71,7 @@ def open_live_provider(
     from sema.pipeline.retrieval import RetrievalEngine, RetrievalScope
     from showcase.ontology_query_benchmark import sema_live
 
+    require_clean_process(os.environ, sys.modules, profile.routing)
     sidecar = load_sidecar(profile.sema.sidecar, profile.harness.root)
     facts = import_library_facts(concept_spec or profile.sema.concept_spec, projection, receipt)
     manifest = read_manifest(manifest_path)

@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,7 @@ from sema.graph.loader import GraphLoader
 from sema.graph.physical_catalog import PhysicalCatalogSource
 from sema.graph.target_graph_build import build_target_retrieval_graph
 from showcase.ontology_query_benchmark.profile import load_profile
+from showcase.ontology_query_benchmark.routing import require_clean_process
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     ProductSpec,
@@ -171,6 +174,7 @@ def main(argv: list[str] | None = None) -> None:
     args = _parser().parse_args(argv)
     profile = load_profile(args.profile)
     routing = profile.routing
+    require_clean_process(os.environ, sys.modules, routing)
     concept_spec = args.concept_spec or profile.sema.concept_spec
     workspace = sema_live.pinned_workspace(routing)
     with sema_live.neo4j_driver(args.neo4j_uri) as driver:

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -11,6 +13,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from sema.graph.physical_catalog import PhysicalColumn, StaticPhysicalCatalogSource
+from showcase.ontology_query_benchmark import sema_build, sema_live
+from showcase.ontology_query_benchmark.routing import (
+    FORBIDDEN_ENV,
+    FORBIDDEN_ENV_PREFIXES,
+    PROVIDER_ENV,
+    RoutingError,
+)
 from showcase.ontology_query_benchmark.sema_bindings import SpecPinError, load_sidecar
 from showcase.ontology_query_benchmark.sema_build import (
     BuildManifest,
@@ -23,6 +32,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     LibraryFacts,
     import_library_facts,
 )
+from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
 from tests.unit.ontology_query_benchmark.test_sema_bindings import (
     CONCEPT_SPEC,
     ELEMENTS,
@@ -36,6 +46,36 @@ from tests.unit.ontology_query_benchmark.test_sema_bindings import (
 )
 
 pytestmark = pytest.mark.unit
+
+
+class ClientBuilt(Exception):
+    """A live client was about to be built."""
+
+
+def clean_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A process the routing check accepts: no dotenv module and no routing variable."""
+    routed = (*FORBIDDEN_ENV, *PROVIDER_ENV, "DATABRICKS_HOST", "DATABRICKS_CONFIG_PROFILE")
+    for name in list(os.environ):
+        if name in routed or name.startswith(FORBIDDEN_ENV_PREFIXES):
+            monkeypatch.delenv(name)
+    monkeypatch.delitem(sys.modules, "dotenv", raising=False)
+
+
+def no_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*_args: Any, **_kwargs: Any) -> Any:
+        raise ClientBuilt
+
+    monkeypatch.setattr(sema_live, "pinned_workspace", refuse)
+    monkeypatch.setattr(sema_live, "neo4j_driver", refuse)
+
+
+def build_args(tmp_path: Path) -> list[str]:
+    return [
+        "--profile", str(PROFILE_PATH), "--neo4j-uri", "bolt://unused",
+        "--projection", str(tmp_path / "projection.duckdb"),
+        "--projection-receipt", str(tmp_path / "receipt.json"),
+        "--manifest", str(tmp_path / "manifest.json"),
+    ]
 
 
 def _catalog() -> StaticPhysicalCatalogSource:
@@ -182,3 +222,22 @@ def test_manifest_round_trips(tmp_path: Path) -> None:
     path = tmp_path / "manifest.json"
     write_manifest(manifest, path)
     assert read_manifest(path) == manifest
+
+
+def test_build_entry_refuses_a_foreign_route_before_any_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clean_process(monkeypatch)
+    no_client(monkeypatch)
+    monkeypatch.setenv("OPENAI_API_KEY", "set")
+    with pytest.raises(RoutingError, match="OPENAI_API_KEY"):
+        sema_build.main(build_args(tmp_path))
+
+
+def test_build_entry_in_a_clean_process_goes_on_to_the_clients(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clean_process(monkeypatch)
+    no_client(monkeypatch)
+    with pytest.raises(ClientBuilt):
+        sema_build.main(build_args(tmp_path))
