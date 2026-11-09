@@ -73,7 +73,7 @@ def test_arm_s_runs_inside_the_provider_opened_from_explicit_inputs(
     @contextmanager
     def open_live_provider(
         profile: Any, neo4j_uri: str, manifest: Path, projection: Path, receipt: Path,
-        *, concept_spec: Path | None,
+        *, concept_spec: Path | None, limits: Any = None,
     ) -> Iterator[Any]:
         events.append((neo4j_uri, manifest.name, projection.name, receipt.name, concept_spec))
         yield s_provider()
@@ -89,3 +89,21 @@ def test_arm_s_runs_inside_the_provider_opened_from_explicit_inputs(
     assert [(r["outcome"], r["context_identity"]) for r in map(json.loads, receipts)] == [
         ("correct", "s-identity-1")
     ]
+
+
+def test_an_overriding_ceiling_sizes_the_s_provider_from_the_run_limits(
+    frozen: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    opened_with: list[Any] = []
+
+    @contextmanager
+    def open_live_provider(*_: Any, concept_spec: Path | None, limits: Any = None) -> Iterator[Any]:
+        opened_with.append(limits)
+        yield s_provider()
+
+    monkeypatch.setattr(runner_live_utils, "open_live_provider", open_live_provider)
+    monkeypatch.setattr(runner, "require_clean_process", lambda *_: None)
+    monkeypatch.setattr(runner, "live_clients", _record_clients([]))
+    argv = [*_argv(frozen, tmp_path, "S"), *S_INPUTS, "--input-ceiling", "36000"]
+    assert runner.main(argv) == 0
+    assert [limits.input_ceiling for limits in opened_with] == [36000]

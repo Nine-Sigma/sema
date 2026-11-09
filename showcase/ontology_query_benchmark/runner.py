@@ -259,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     settings = RunSettings(limits, Prices(**raw["prices"]), float(raw["max_cost_usd"]),
                            float(raw["max_wall_s"]))
     s_open: AbstractContextManager[SContextProvider | None] = (
-        open_s_provider(args, profile) if "S" in args.arms else nullcontext()
+        open_s_provider(args, profile, limits) if "S" in args.arms else nullcontext()
     )
     harness = ru.load_harness(args.frozen, layout)
     require_clean_process(os.environ, sys.modules, profile.routing)

@@ -207,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
     s_open: AbstractContextManager[SContextProvider | None] = nullcontext()
     if any(getattr(args, name) is not None for name in S_INPUTS):
         require_clean_process(os.environ, sys.modules, profile.routing)
-        s_open = open_s_provider(args, profile)
+        s_open = open_s_provider(args, profile, limits)
     ratio = calibration["ratio"]
     ratios = Ratios(ratio["min"], ratio["median"], ratio["max"])
     head = {"ratios": dataclasses.asdict(ratios), "limits": limits.model_dump(),

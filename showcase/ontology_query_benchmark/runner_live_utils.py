@@ -33,7 +33,7 @@ def add_s_args(parser: argparse.ArgumentParser) -> None:
 
 
 def open_s_provider(
-    args: argparse.Namespace, profile: Profile
+    args: argparse.Namespace, profile: Profile, limits: Limits
 ) -> AbstractContextManager[SContextProvider]:
     """Arm S's provider from explicit inputs; nothing is opened or called until entry."""
     missing = [f"--{name.replace('_', '-')}" for name in S_INPUTS if getattr(args, name) is None]
@@ -41,7 +41,7 @@ def open_s_provider(
         raise ValueError(f"arm S needs {' '.join(missing)}")
     return open_live_provider(
         profile, args.neo4j_uri, args.s_manifest, args.s_projection, args.s_projection_receipt,
-        concept_spec=args.s_concept_spec,
+        concept_spec=args.s_concept_spec, limits=limits,
     )
 
 
