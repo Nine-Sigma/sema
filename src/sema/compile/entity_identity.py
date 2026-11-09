@@ -1,7 +1,7 @@
 """Compile an :class:`EntityIdentity` into one CTE with one row per entity.
 
 Each attribute takes its value from the first row of a ``ROW_NUMBER`` ordering:
-preferred rows first, then the rule's ordering column with nulls last, then the
+preferred rows first, in their ranked order, then the rule's ordering column with nulls last, then the
 lowest attribute value when the rule orders by another column. Null ordering is a
 ``CASE`` term, so the SQL means the same in every dialect.
 """
@@ -46,8 +46,11 @@ def _lowest_value_breaks_ties(column: str) -> list[exp.Ordered]:
 def _preferred_first(prefer: PreferredValue | None) -> list[exp.Ordered]:
     if prefer is None:
         return []
-    matches = _col(prefer.column).eq(exp.convert(prefer.value))
-    return [exp.Ordered(this=_flag(matches, 0), desc=False)]
+    rank = exp.Case()
+    for position, value in enumerate(prefer.ranked):
+        rank = rank.when(_col(prefer.column).eq(exp.convert(value)), exp.Literal.number(position))
+    rank = rank.else_(exp.Literal.number(len(prefer.ranked)))
+    return [exp.Ordered(this=rank, desc=False)]
 
 
 def _ordering(attribute: ResolvedAttribute) -> list[exp.Ordered]:
@@ -79,28 +82,32 @@ def _first_ranked(attribute: ResolvedAttribute) -> exp.Expr:
     return exp.alias_(exp.Max(this=first), attribute.output_name)
 
 
-def _any_key_null(identity: EntityIdentity) -> exp.Expr:
-    return exp.or_(*(_col(k).is_(exp.null()) for k in identity.key_columns))
+def _null_key_rows_stand_alone(identity: EntityIdentity) -> bool:
+    return bool(identity.nullable_keys) and not identity.null_keys_group
 
 
 def _keyed_rows(relation: str, identity: EntityIdentity) -> exp.Expr:
     table = exp.to_table(relation)
-    if identity.exclude_null_keys:
-        keys_present = exp.and_(*(_col(k).is_(exp.null()).not_() for k in identity.key_columns))
-        return exp.select(exp.Star()).from_(table).where(keys_present).subquery("keyed")
-    if identity.null_keys_group:
+    alone = _null_key_rows_stand_alone(identity)
+    if not identity.non_null_keys and not alone:
         return table
-    own_row = exp.Window(this=exp.RowNumber())
-    each_alone = exp.alias_(exp.Case().when(_any_key_null(identity), own_row), NULL_KEY_ROW)
-    return exp.select(exp.Star(), each_alone).from_(table).subquery("keyed")
+    columns: list[exp.Expr] = [exp.Star()]
+    if alone:
+        any_null = exp.or_(*(_col(k).is_(exp.null()) for k in identity.nullable_keys))
+        own_row = exp.Case().when(any_null, exp.Window(this=exp.RowNumber()))
+        columns.append(exp.alias_(own_row, NULL_KEY_ROW))
+    rows = exp.select(*columns).from_(table)
+    if identity.non_null_keys:
+        rows = rows.where(exp.and_(*(_col(k).is_(exp.null()).not_()
+                                     for k in identity.non_null_keys)))  # fmt: skip
+    return rows.subquery("keyed")
 
 
 def identity_select(relation: str, identity: EntityIdentity) -> exp.Select:
     """One row per entity of ``relation``: its key columns and resolved attributes."""
     keys = [_col(k) for k in identity.key_columns]
-    groups = keys if identity.exclude_null_keys or identity.null_keys_group else [
-        *keys, _col(NULL_KEY_ROW)
-    ]
+    alone = _null_key_rows_stand_alone(identity)
+    groups = [*keys, _col(NULL_KEY_ROW)] if alone else keys
     rows = _keyed_rows(relation, identity)
     if not identity.attributes:
         return exp.select(*keys).from_(rows).group_by(*groups)

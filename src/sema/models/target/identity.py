@@ -1,9 +1,10 @@
 """EntityIdentity: how stored rows resolve to one row per entity.
 
 An entity whose grain differs from its stored rows declares its key columns, what a
-null key means, and one fixed aggregate rule per resolved attribute. This is not a
+null key means (for every key column or only the named ones), and one fixed aggregate
+rule per resolved attribute. This is not a
 rules engine: the rules are the four forms of :class:`ResolutionRule`, each with an
-optional preferred value.
+optional preferred value or ranked list of preferred values.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 
 class ResolutionRule(StrEnum):
@@ -23,16 +24,37 @@ class ResolutionRule(StrEnum):
 
 ORDERED_BY_ANOTHER_COLUMN = frozenset({ResolutionRule.MIN_BY, ResolutionRule.MAX_BY})
 
+Scalar = str | int | float | bool
+
 
 class _Frozen(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+def _distinct(values: tuple[object, ...], what: str) -> None:
+    if len(set(values)) < len(values):
+        raise ValueError(f"{what} repeat: {list(values)}")
+
+
 class PreferredValue(_Frozen):
-    """Rows where ``column`` equals ``value`` win before the rule orders the rest."""
+    """Rows where ``column`` equals ``value`` win before the rule orders the rest.
+
+    A list of values ranks them: rows matching the first win, then the second, and so on.
+    """
 
     column: str
-    value: str | int | float | bool
+    value: Scalar | tuple[Scalar, ...]
+
+    @property
+    def ranked(self) -> tuple[Scalar, ...]:
+        return self.value if isinstance(self.value, tuple) else (self.value,)
+
+    @model_validator(mode="after")
+    def _ranked_values(self) -> Self:
+        if not self.ranked:
+            raise ValueError("a preference ranks at least one value")
+        _distinct(self.ranked, "preferred values")
+        return self
 
 
 class ResolvedAttribute(_Frozen):
@@ -64,9 +86,20 @@ class ResolvedAttribute(_Frozen):
 
 class EntityIdentity(_Frozen):
     key_columns: tuple[str, ...] = Field(min_length=1)
-    exclude_null_keys: bool = False
+    exclude_null_keys: StrictBool | tuple[str, ...] = False
     null_keys_group: bool = True
     attributes: tuple[ResolvedAttribute, ...] = ()
+
+    @property
+    def non_null_keys(self) -> tuple[str, ...]:
+        """Key columns a row must have non-null to be kept; ``True`` names every key."""
+        if isinstance(self.exclude_null_keys, tuple):
+            return self.exclude_null_keys
+        return self.key_columns if self.exclude_null_keys else ()
+
+    @property
+    def nullable_keys(self) -> tuple[str, ...]:
+        return tuple(k for k in self.key_columns if k not in self.non_null_keys)
 
     @property
     def columns(self) -> tuple[str, ...]:
@@ -76,13 +109,22 @@ class EntityIdentity(_Frozen):
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
-        if len(set(self.key_columns)) < len(self.key_columns):
-            raise ValueError(f"key columns repeat: {list(self.key_columns)}")
+        _distinct(self.key_columns, "key columns")
+        self._check_non_null_keys()
         outputs = [a.output_name for a in self.attributes]
         if len(set(outputs)) < len(outputs):
             raise ValueError(f"attribute names repeat: {outputs}")
         if clash := set(outputs) & set(self.key_columns):
             raise ValueError(f"attribute names a key column: {sorted(clash)}")
-        if self.exclude_null_keys and "null_keys_group" in self.model_fields_set:
+        if not self.nullable_keys and "null_keys_group" in self.model_fields_set:
             raise ValueError("null_keys_group applies only when null keys are kept")
         return self
+
+    def _check_non_null_keys(self) -> None:
+        if not isinstance(self.exclude_null_keys, tuple):
+            return
+        if not self.exclude_null_keys:
+            raise ValueError("exclude_null_keys names at least one key column")
+        _distinct(self.exclude_null_keys, "exclude_null_keys columns")
+        if strays := set(self.exclude_null_keys) - set(self.key_columns):
+            raise ValueError(f"exclude_null_keys names {sorted(strays)}, not a key column")

@@ -79,6 +79,21 @@ def test_an_overlay_identity_renders_the_same_executable_entity_as_the_spec(
     ]
 
 
+def test_a_fixture_entity_excludes_named_null_keys_and_ranks_preferred_values(
+    tmp_path: Path,
+) -> None:
+    identity = {
+        "key_columns": [RID, "site_S1"], "exclude_null_keys": [RID],
+        "attributes": [{"column": "site_S1_label", "rule": "min_by", "by": "event_day",
+                        "prefer": {"column": "site_S1_mapping_type",
+                                   "value": ["other", "preferred"]}}],
+    }  # fmt: skip
+    ctx = _provider(tmp_path, [EVENTS_ENTITY], events_identity=identity)("q")
+    assert _event_entities(_entity_cte(ctx.text, "event")) == [
+        ("r1", "P1", "North a"), ("r1", "P2", "South x"), ("r1", None, None),
+    ]
+
+
 UNSAFE_IDENTITY = {
     "key_columns": [RID],
     "attributes": [{"column": "event_day", "rule": "min", "name": "first day"}],

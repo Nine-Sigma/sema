@@ -55,6 +55,34 @@ def test_each_row_with_a_null_key_is_its_own_entity() -> None:
     ]
 
 
+@pytest.mark.parametrize(("null_keys_group", "expected"), [
+    (True, [("v1", "a", 1), ("v1", None, 3)]),
+    (False, [("v1", "a", 1), ("v1", None, 3), ("v1", None, 6)]),
+])  # fmt: skip
+def test_only_the_named_key_columns_must_be_non_null(
+    null_keys_group: bool, expected: list[tuple[Any, ...]]
+) -> None:
+    identity = {"key_columns": ["visit_id", "site"], "exclude_null_keys": ["visit_id"],
+                "null_keys_group": null_keys_group, "attributes": FIRST_SEEN}  # fmt: skip
+    rows = [*NULL_KEY_ROWS, ("v1", None, 6, "w6", "x")]
+    assert _resolve(identity, VISITS, rows) == expected
+
+
+def test_ranked_preferred_values_win_in_order_before_the_rule() -> None:
+    identity = {"key_columns": ["visit_id"], "attributes": [
+        {"column": "ward", "rule": "min_by", "by": "seen_on",
+         "prefer": {"column": "ward_kind", "value": ["primary", "secondary"]}},
+    ]}  # fmt: skip
+    rows = [
+        ("v1", "a", 1, "w1", "other"), ("v1", "a", 4, "w4", "secondary"),
+        ("v1", "a", 5, "w5", "primary"),
+        ("v2", "a", 1, "w1", "other"), ("v2", "a", 3, "w3", "secondary"),
+        ("v2", "a", 2, "w2", "secondary"),
+        ("v3", "a", 2, "w2", None), ("v3", "a", 1, "w1", "other"),
+    ]
+    assert _resolve(identity, VISITS, rows) == [("v1", "w5"), ("v2", "w2"), ("v3", "w1")]
+
+
 def test_min_and_max_ignore_null_values() -> None:
     identity = {"key_columns": ["visit_id"], "attributes": [
         {"column": "seen_on", "rule": "min"},
@@ -119,6 +147,27 @@ def test_pums_person_rows_resolve_to_households() -> None:
     ]
     assert _resolve(identity, PUMS_PERSONS, persons) == [
         ("2024GQ03", 19, 19, 22), ("2024HU01", 46, 9, 46), ("2024HU02", 71, 71, 71),
+    ]
+
+
+PUMS_STATE_PERSONS = "SERIALNO VARCHAR, ST VARCHAR, SPORDER INTEGER, RELSHIPP VARCHAR, AGEP INTEGER"
+
+
+def test_pums_households_need_a_serial_and_rank_the_reference_person_then_spouse() -> None:
+    identity = {"key_columns": ["SERIALNO", "ST"], "exclude_null_keys": ["SERIALNO"],
+                "attributes": [
+        {"column": "AGEP", "rule": "min_by", "by": "SPORDER", "name": "anchor_age",
+         "prefer": {"column": "RELSHIPP", "value": ["20", "21"]}},
+    ]}  # fmt: skip
+    persons = [
+        ("2024HU01", "06", 1, "25", 9), ("2024HU01", "06", 2, "21", 44),
+        ("2024HU01", "06", 3, "20", 46),
+        ("2024HU02", "06", 1, "25", 12), ("2024HU02", "06", 2, "21", 40),
+        ("2024HU03", None, 1, "37", 19), ("2024HU03", None, 2, "38", 22),
+        (None, "06", 1, "20", 80),
+    ]
+    assert _resolve(identity, PUMS_STATE_PERSONS, persons) == [
+        ("2024HU01", "06", 46), ("2024HU02", "06", 40), ("2024HU03", None, 19),
     ]
 
 

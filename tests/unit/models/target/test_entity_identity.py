@@ -80,8 +80,37 @@ def _attr(**rule: Any) -> dict[str, Any]:
         ({"key_columns": ["visit_id"], "exclude_null_keys": True, "null_keys_group": True},
          "null_keys_group"),
         ({"key_columns": ["visit_id"], "grain": "one row per visit"}, "Extra inputs"),
+        ({"key_columns": ["visit_id"], "exclude_null_keys": ["ward"]}, "not a key column"),
+        ({"key_columns": ["visit_id"], "exclude_null_keys": []}, "at least one key"),
+        ({"key_columns": ["visit_id", "site"], "exclude_null_keys": ["site", "site"]},
+         "repeat"),
+        ({"key_columns": ["visit_id", "site"], "exclude_null_keys": ["site", "visit_id"],
+          "null_keys_group": False}, "null_keys_group"),
+        (_attr(rule="min", prefer={"column": "ward_kind", "value": []}), "at least one value"),
+        (_attr(rule="min", prefer={"column": "ward_kind", "value": ["a", "a"]}), "repeat"),
     ],
 )  # fmt: skip
 def test_an_invalid_identity_is_refused(identity: dict[str, Any], message: str) -> None:
     with pytest.raises(ValidationError, match=message):
         _decl(identity)
+
+
+def test_null_keys_are_excluded_by_named_key_columns() -> None:
+    identity = _decl({"key_columns": ["visit_id", "site"], "exclude_null_keys": ["visit_id"],
+                      "null_keys_group": False}).identity  # fmt: skip
+    assert identity is not None
+    assert (identity.non_null_keys, identity.nullable_keys) == (("visit_id",), ("site",))
+    every_key = _decl(IDENTITY).identity
+    assert every_key is not None
+    assert (every_key.non_null_keys, every_key.nullable_keys) == (("visit_id", "site"), ())
+
+
+def test_a_preference_may_rank_several_values() -> None:
+    identity = _decl(_attr(rule="min", prefer={"column": "ward_kind",
+                                               "value": ["primary", "secondary"]})).identity
+    assert identity is not None
+    prefer = identity.attributes[0].prefer
+    assert prefer is not None and prefer.ranked == ("primary", "secondary")
+    single = _decl(IDENTITY).identity
+    assert single is not None and single.attributes[1].prefer is not None
+    assert single.attributes[1].prefer.ranked == ("primary",)
