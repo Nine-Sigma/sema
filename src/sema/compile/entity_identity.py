@@ -101,7 +101,7 @@ def _null_key_rows_stand_alone(identity: EntityIdentity) -> bool:
 def _keyed_rows(relation: str, identity: EntityIdentity) -> exp.Expr:
     table = exp.to_table(relation)
     alone = _null_key_rows_stand_alone(identity)
-    if not identity.non_null_keys and not alone:
+    if not (identity.non_null_keys or alone or identity.attributes):
         return table
     columns: list[exp.Expr] = [_col(c) for c in identity.columns]
     if alone:
@@ -126,9 +126,8 @@ def identity_select(relation: str, identity: EntityIdentity) -> exp.Select:
     rows = _keyed_rows(relation, identity)
     if not identity.attributes:
         return exp.select(*keys).from_(rows).group_by(*groups)
-    read = [*(_col(c) for c in identity.columns), *own_row]
     ranks = [_rank(a, identity, groups) for a in identity.attributes]
-    ranked = exp.select(*read, *ranks).from_(rows).subquery("ranked")
+    ranked = exp.select(exp.Star(), *ranks).from_(rows).subquery("ranked")
     values = [_first_ranked(a, identity) for a in identity.attributes]
     return exp.select(*keys, *values).from_(ranked).group_by(*groups)
 
