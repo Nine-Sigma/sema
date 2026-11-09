@@ -16,13 +16,14 @@ import pytest
 
 from sema.graph.queries import CypherQueries
 from sema.models.config import HierarchyAnchorConfig
+from sema.models.context import SemanticCandidateSet
 from sema.pipeline.context import prune_to_sco
 from sema.pipeline.retrieval import RetrievalEngine
 
 pytestmark = pytest.mark.unit
 
 TermKey = tuple[str, str]
-ColumnKey = tuple[str, str]
+ColumnKey = tuple[str, ...]  # (table, column) or (table, column, schema)
 
 
 @dataclass
@@ -52,13 +53,13 @@ class FixtureGraph:
                 continue
             under = self.descendants(anchor, depth)
             bridged = {s for s, t in self.maps_to if t in under}
-            for (table, column), members in sorted(self.value_sets.items()):
+            for (table, column, *schema), members in sorted(self.value_sets.items()):
                 hit = sorted(code for _, code in members & (under | bridged))
                 if hit:
                     rows.append({
                         "anchor_code": anchor[1], "anchor_label": self.labels[anchor],
                         "anchor_vocabulary": anchor[0], "column_name": column,
-                        "table_name": table, "schema_name": "s",
+                        "table_name": table, "schema_name": schema[0] if schema else "s",
                         "member_count": len(hit),
                         "member_codes": hit[: params["member_cap"]],
                     })
@@ -188,3 +189,26 @@ def test_anchor_query_takes_bounds_as_parameters() -> None:
     assert "PARENT_OF*1..4" in query
     assert "$member_cap" in query
     assert "MAPS_TO_CONCEPT" in query
+
+
+def test_one_anchor_over_two_columns_keeps_both() -> None:
+    g = two_vocabulary_graph()
+    g.value_sets[("fleet_archive", "kind_code")] = {("SRC", "c1")}
+    g.value_sets[("fleet", "kind_code", "t")] = {("SRC", "c2")}
+
+    found = anchors(engine_over(g), "every vehicle")
+
+    assert sorted((a["schema"], a["table"], a["column"], a["member_count"]) for a in found) == [
+        ("s", "fleet", "kind_code", 2), ("s", "fleet_archive", "kind_code", 1),
+        ("t", "fleet", "kind_code", 1),
+    ]
+
+
+def test_an_anchor_carries_the_score_of_the_hit_that_found_it() -> None:
+    candidates = engine_over(two_vocabulary_graph()).retrieve("every vehicle").candidates
+
+    [term] = [c for c in candidates if c["type"] == "term" and c["code"] == "S100"]
+    [found] = [c for c in candidates if c["type"] == "hierarchy_anchor"]
+    assert term["score"] > 0 and found["score"] == term["score"]
+    [anchor] = prune_to_sco(SemanticCandidateSet(query="q", candidates=candidates)).hierarchy_anchors
+    assert anchor.score == term["score"]

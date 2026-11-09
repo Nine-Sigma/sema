@@ -219,6 +219,7 @@ def _build_hierarchy_anchors(
             schema_name=c.get("schema", ""),
             member_count=c.get("member_count", 0),
             member_codes=c.get("member_codes", []),
+            score=c.get("score", 0.0),
         )
         for c in candidate_set.candidates
         if c.get("type") == "hierarchy_anchor"

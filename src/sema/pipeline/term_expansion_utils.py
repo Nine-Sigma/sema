@@ -241,6 +241,7 @@ def _expand_term_for_vocab(
         })
     results.extend(_expand_hierarchy_anchor(
         engine, code, vocab, hit_status, hit_confidence,
+        score=hit.get("final_score", 0.0),
     ))
     return results
 
@@ -251,9 +252,12 @@ def _expand_hierarchy_anchor(
     vocabulary_name: str | None,
     status: str,
     confidence: float,
+    *,
+    score: float,
 ) -> list[dict[str, Any]]:
     """Walk down PARENT_OF from a matched term to the columns whose
-    value-set members sit under it, directly or through a value bridge."""
+    value-set members sit under it, directly or through a value bridge.
+    Each anchor carries the score of the hit that found it."""
     bounds = engine.hierarchy_anchor
     try:
         rows = engine._run_query(
@@ -277,6 +281,7 @@ def _expand_hierarchy_anchor(
             "schema": r.get("schema_name") or "",
             "member_count": r.get("member_count", 0),
             "member_codes": r.get("member_codes", []),
+            "score": score,
             "source": "retrieval_hierarchy_anchor",
             "status": status,
             "confidence": confidence,

@@ -101,6 +101,7 @@ class HierarchyAnchor(BaseModel):
     schema_name: str = ""
     member_count: int
     member_codes: list[str] = Field(default_factory=list)
+    score: float = 0.0
 
 
 class SemanticCandidateSet(BaseModel):

@@ -194,6 +194,7 @@ def _artifact_identity_key(
             art_type,
             art.get("vocabulary") or "",
             art.get("code", ""),
+            art.get("schema", ""),
             art.get("table", ""),
             art.get("column", ""),
         )
