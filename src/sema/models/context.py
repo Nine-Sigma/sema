@@ -90,6 +90,19 @@ class AncestryTerm(BaseModel):
     vocabulary: str | None = None
 
 
+class HierarchyAnchor(BaseModel):
+    """A matched term whose descendants are members of a column's value set."""
+
+    code: str
+    label: str
+    vocabulary: str | None = None
+    table: str
+    column: str
+    schema_name: str = ""
+    member_count: int
+    member_codes: list[str] = Field(default_factory=list)
+
+
 class SemanticCandidateSet(BaseModel):
     query: str
     candidates: list[dict[str, Any]] = Field(default_factory=list)
@@ -103,6 +116,9 @@ class SemanticContextObject(BaseModel):
     join_paths: list[JoinPath] = Field(default_factory=list)
     governed_values: list[GovernedValue] = Field(default_factory=list)
     ancestry: list[AncestryTerm] = Field(default_factory=list)
+    hierarchy_anchors: list[HierarchyAnchor] = Field(
+        default_factory=list, exclude_if=lambda anchors: not anchors,
+    )
     consumer: str = "nl2sql"
     retrieval_rationale: str | None = None
 

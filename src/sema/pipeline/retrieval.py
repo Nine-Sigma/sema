@@ -5,6 +5,7 @@ from typing import Any
 
 from sema.graph.queries import CypherQueries
 from sema.log import logger
+from sema.models.config import HierarchyAnchorConfig
 from sema.models.constants import MATCH_TYPE_BOOST
 from sema.models.context import SemanticCandidateSet
 from sema.pipeline.retrieval_utils import (
@@ -58,10 +59,12 @@ class RetrievalEngine:
         *,
         embedder_model_name: str = "<configured embedder>",
         scope: RetrievalScope | None = None,
+        hierarchy_anchor: HierarchyAnchorConfig | None = None,
     ) -> None:
         self._driver = driver
         self._embedder = embedder
         self._scope = scope or RetrievalScope()
+        self.hierarchy_anchor = hierarchy_anchor or HierarchyAnchorConfig()
         if embedder is not None:
             from sema.graph.vector_index_utils import (
                 assert_retrieval_dim_matches,

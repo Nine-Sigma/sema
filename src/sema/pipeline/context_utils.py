@@ -12,6 +12,7 @@ import json
 from sema.models.context import (
     AncestryTerm,
     GovernedValue,
+    HierarchyAnchor,
     JoinPath,
     JoinPredicate,
     PhysicalAsset,
@@ -202,6 +203,25 @@ def _build_ancestry(
             vocabulary=c.get("vocabulary"),
         )
         for c in ancestry_candidates
+    ]
+
+
+def _build_hierarchy_anchors(
+    candidate_set: SemanticCandidateSet,
+) -> list[HierarchyAnchor]:
+    return [
+        HierarchyAnchor(
+            code=c.get("code", ""),
+            label=c.get("label", ""),
+            vocabulary=c.get("vocabulary"),
+            table=c.get("table", ""),
+            column=c.get("column", ""),
+            schema_name=c.get("schema", ""),
+            member_count=c.get("member_count", 0),
+            member_codes=c.get("member_codes", []),
+        )
+        for c in candidate_set.candidates
+        if c.get("type") == "hierarchy_anchor"
     ]
 
 
