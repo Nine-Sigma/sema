@@ -1,12 +1,12 @@
-"""Project the Standard Library rows the declared workload needs into a DuckDB file.
+"""Project the library rows a declared workload needs into a DuckDB file.
 
-Rows are chosen by the data element ids in the CPD v2 product specs, so the projection
+Rows are chosen by the element ids the supplied product specs declare, so the projection
 is supplied assistance, not automatic discovery. A read that exceeds its row limit,
 returns other than the counted rows, or sees the source refresh is incomplete and
 writes no database file.
 
     uv run python -m showcase.ontology_query_benchmark.intake_extract \\
-      --spec DEMOGRAPHICS_SPEC --spec CANCER_REGISTRY_SPEC --out DIR
+      --profile PROFILE --spec PRODUCT_SPEC [--spec PRODUCT_SPEC ...] --out DIR
 """
 
 from __future__ import annotations
@@ -23,10 +23,6 @@ import duckdb
 
 from sema.ingest.duckdb_staging_utils import build_table_comment_sql, qualified, quote_ident
 from showcase.ontology_query_benchmark.intake_extract_utils import (
-    CONCEPT,
-    DATA_ELEMENT,
-    RELATIONS,
-    SCHEMA,
     columns_sql,
     count_sql,
     declared_de_ids,
@@ -37,16 +33,15 @@ from showcase.ontology_query_benchmark.intake_extract_utils import (
     sha256,
     tables_sql,
 )
+from showcase.ontology_query_benchmark.profile import Extract, Routing, load_profile
+from showcase.ontology_query_benchmark.routing import require_host
 
 DUCKDB_NAME = "workload_projection.duckdb"
 RECEIPT_NAME = "extract_receipt.json"
-DEFAULT_ROW_LIMIT = 10_000
-HOST = "https://partner-workspace.cloud.databricks.com"
-WAREHOUSE_ID = "feedface00000000"
 ASSISTANCE = {
     "kind": "supplied",
-    "reason": "rows are selected by the declared workload's data element ids from the "
-    "CPD v2 product specs; this projection is not automatic discovery",
+    "reason": "rows are selected by the element ids the declared workload's product specs "
+    "name; this projection is not automatic discovery",
 }
 
 
@@ -86,23 +81,25 @@ class _Relation:
 
 def extract(
     connect: Callable[[], Cursor],
+    spec: Extract,
     spec_paths: Sequence[Path],
     out_dir: Path,
     *,
-    row_limit: int = DEFAULT_ROW_LIMIT,
+    row_limit: int | None = None,
     origin: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    de_ids = declared_de_ids(spec_paths)
+    row_limit = spec.row_limit if row_limit is None else row_limit
+    de_ids = declared_de_ids(spec_paths, spec.id_pattern)
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / DUCKDB_NAME
     target.unlink(missing_ok=True)
     reader = _Reader(connect())
     try:
-        relations, incomplete = _read(reader, de_ids, row_limit)
+        relations, incomplete = _read(reader, spec, de_ids, row_limit)
     finally:
         reader.cursor.close()
     if not incomplete:
-        _write(target, relations)
+        _write(target, spec.schema_name, relations)
     receipt = {
         "assistance": ASSISTANCE,
         "origin": dict(origin or {}),
@@ -110,8 +107,8 @@ def extract(
         "row_limit": row_limit,
         "complete": not incomplete,
         "incomplete": incomplete,
-        "workload": _workload(spec_paths, de_ids, relations),
-        "relations": {r.name: _relation_entry(r) for r in relations},
+        "workload": _workload(spec, spec_paths, de_ids, relations),
+        "relations": {r.name: _relation_entry(spec, r) for r in relations},
         "statements": reader.statements,
         "duckdb": None if incomplete else {"path": str(target), "sha256": sha256(target)},
     }
@@ -120,41 +117,43 @@ def extract(
 
 
 def _read(
-    reader: _Reader, de_ids: Sequence[str], row_limit: int
+    reader: _Reader, spec: Extract, de_ids: Sequence[str], row_limit: int
 ) -> tuple[list[_Relation], list[str]]:
-    columns = _columns(reader.rows(columns_sql()))
-    before = {str(name): (when, comment) for name, when, comment in reader.rows(tables_sql())}
-    wheres = predicates(de_ids)
+    columns = _columns(reader.rows(columns_sql(spec)), spec.relations)
+    before = {str(name): (when, comment) for name, when, comment in reader.rows(tables_sql(spec))}
+    wheres = predicates(spec, de_ids)
     relations: list[_Relation] = []
     incomplete: list[str] = []
-    for name in RELATIONS:
-        expected = int(reader.rows(count_sql(name, wheres[name]))[0][0])
+    for name in spec.relations:
+        expected = int(reader.rows(count_sql(spec, name, wheres[name]))[0][0])
         rows = None
         if expected > row_limit:
             incomplete.append(f"{name}: {expected} counted rows exceed row_limit {row_limit}")
         else:
             names = [column for column, _, _ in columns[name]]
-            rows = tuple(reader.rows(select_sql(name, names, wheres[name], row_limit)))
+            rows = tuple(reader.rows(select_sql(spec, name, names, wheres[name], row_limit)))
             if len(rows) != expected:
                 incomplete.append(f"{name}: returned_rows {len(rows)} != counted {expected}")
         when, comment = before[name]
         relations.append(_Relation(name, columns[name], _iso(when), comment, expected, rows))
-    after = {str(name): when for name, when, _ in reader.rows(tables_sql())}
+    after = {str(name): when for name, when, _ in reader.rows(tables_sql(spec))}
     incomplete += [
         f"{name}: updated_at moved from {_iso(before[name][0])} to {_iso(after.get(name))}"
-        for name in RELATIONS
+        for name in spec.relations
         if after.get(name) != before[name][0]
     ]
     return relations, incomplete
 
 
-def _columns(rows: list[tuple[Any, ...]]) -> dict[str, tuple[tuple[str, str, str], ...]]:
+def _columns(
+    rows: list[tuple[Any, ...]], relations: Sequence[str]
+) -> dict[str, tuple[tuple[str, str, str], ...]]:
     found: dict[str, list[tuple[str, str, str]]] = {}
     for table, column, warehouse_type in rows:
         found.setdefault(str(table), []).append(
             (str(column), str(warehouse_type), duckdb_type(str(warehouse_type)))
         )
-    missing = sorted(set(RELATIONS) - set(found))
+    missing = sorted(set(relations) - set(found))
     if missing:
         raise ValueError(f"source relations not in the catalog: {missing}")
     return {name: tuple(columns) for name, columns in found.items()}
@@ -164,28 +163,32 @@ def _iso(when: Any) -> str:
     return when.isoformat() if isinstance(when, datetime) else str(when)
 
 
-def _write(target: Path, relations: Sequence[_Relation]) -> None:
+def _write(target: Path, schema: str, relations: Sequence[_Relation]) -> None:
     partial = target.with_suffix(".partial")
     partial.unlink(missing_ok=True)
     with duckdb.connect(str(partial)) as con:
-        con.execute(f"CREATE SCHEMA {quote_ident(SCHEMA)}")
+        con.execute(f"CREATE SCHEMA {quote_ident(schema)}")
         for relation in relations:
-            table = qualified(SCHEMA, relation.name)
+            table = qualified(schema, relation.name)
             listed = ", ".join(f"{quote_ident(n)} {t}" for n, _, t in relation.columns)
             con.execute(f"CREATE TABLE {table} ({listed})")
             marks = ", ".join("?" for _ in relation.columns)
             con.executemany(f"INSERT INTO {table} VALUES ({marks})", list(relation.rows or ()))
             if relation.comment:
-                con.execute(build_table_comment_sql(SCHEMA, relation.name, relation.comment))
+                con.execute(build_table_comment_sql(schema, relation.name, relation.comment))
     partial.replace(target)
 
 
 def _workload(
-    spec_paths: Sequence[Path], de_ids: Sequence[str], relations: Sequence[_Relation]
+    spec: Extract,
+    spec_paths: Sequence[Path],
+    de_ids: Sequence[str],
+    relations: Sequence[_Relation],
 ) -> dict[str, Any]:
     by_name = {relation.name: relation for relation in relations}
-    as_element = set(de_ids) & by_name[DATA_ELEMENT].ids("data_element_prt_id")
-    as_concept = (set(de_ids) & by_name[CONCEPT].ids("concept_prt_id")) - as_element
+    elements, members = spec.elements, spec.members
+    as_element = set(de_ids) & by_name[elements.relation].ids(elements.key)
+    as_concept = (set(de_ids) & by_name[members.relation].ids(members.key)) - as_element
     return {
         "spec_files": [{"path": str(p), "sha256": sha256(p)} for p in spec_paths],
         "de_ids_requested": list(de_ids),
@@ -195,9 +198,9 @@ def _workload(
     }
 
 
-def _relation_entry(relation: _Relation) -> dict[str, Any]:
+def _relation_entry(spec: Extract, relation: _Relation) -> dict[str, Any]:
     return {
-        "source": f"{SCHEMA}.{relation.name}",
+        "source": f"{spec.schema_name}.{relation.name}",
         "updated_at": relation.updated_at,
         "comment": relation.comment,
         "columns": [list(column) for column in relation.columns],
@@ -206,16 +209,17 @@ def _relation_entry(relation: _Relation) -> dict[str, Any]:
     }
 
 
-def _connect_test() -> Cursor:
+def _connect(routing: Routing) -> Cursor:
     from databricks import sql
     from databricks.sdk import WorkspaceClient
 
-    config = WorkspaceClient(profile="TEST").config
-    if (config.host or "").rstrip("/") != HOST or not config.token:
-        raise SystemExit(f"TEST profile must be a token profile on {HOST}; got {config.host}")
+    config = WorkspaceClient(profile=routing.databricks_profile).config
+    host = require_host(config.host or "", routing)
+    if not config.token:
+        raise SystemExit(f"profile {routing.databricks_profile} must be a token profile")
     connection = sql.connect(
-        server_hostname=HOST.removeprefix("https://"),
-        http_path=f"/sql/1.0/warehouses/{WAREHOUSE_ID}",
+        server_hostname=host.removeprefix("https://"),
+        http_path=f"/sql/1.0/warehouses/{routing.sql_warehouse_id}",
         access_token=config.token,
     )
     cursor: Cursor = connection.cursor()
@@ -224,13 +228,17 @@ def _connect_test() -> Cursor:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--spec", type=Path, action="append", required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--row-limit", type=int, default=DEFAULT_ROW_LIMIT)
+    parser.add_argument("--row-limit", type=int, help="default: the profile's extract row_limit")
     args = parser.parse_args(argv)
+    profile = load_profile(args.profile)
+    routing = profile.routing
     receipt = extract(
-        _connect_test, args.spec, args.out, row_limit=args.row_limit,
-        origin={"host": HOST, "warehouse_id": WAREHOUSE_ID},
+        lambda: _connect(routing), profile.extract, args.spec, args.out,
+        row_limit=args.row_limit,
+        origin={"host": routing.host, "warehouse_id": routing.sql_warehouse_id},
     )
     summary = {
         "complete": receipt["complete"],

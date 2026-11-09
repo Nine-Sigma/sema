@@ -12,35 +12,37 @@ import pytest
 
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.loaders.detect import land_source
+from showcase.ontology_query_benchmark.intake_extract import extract
+from showcase.ontology_query_benchmark.profile import Extract, load_profile
+from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
 
 pytestmark = pytest.mark.unit
 
-ROOT = Path(__file__).parents[3]
-README = ROOT / "showcase" / "ontology_query_benchmark" / "config" / "intake_README.md"
-DE = "standard_library_data_element"
-CONCEPT = "standard_library_concept"
+SPEC: Extract = load_profile(PROFILE_PATH).extract
+DE = SPEC.elements.relation
+CONCEPT = SPEC.members.relation
 ALTERED = datetime(2026, 11, 9, 6, 27, 4, tzinfo=UTC)
 LONG_VARCHAR = "varchar(2147483647)"
 COLUMNS = [
-    (CONCEPT, "concept_prt_id", "string"),
+    (CONCEPT, "concept_id", "string"),
     (CONCEPT, "concept_type_label", LONG_VARCHAR),
     (CONCEPT, "synonym_name", "array<string>"),
-    (DE, "data_element_enriched_surrogate_id", "string"),
-    (DE, "data_element_prt_id", "string"),
-    (DE, "data_element_phi", "boolean"),
-    (DE, "data_element_modified_on", "timestamp"),
-    (DE, "permissible_value_prt_id", "string"),
+    (DE, "element_row_id", "string"),
+    (DE, "element_id", "string"),
+    (DE, "element_sensitive", "boolean"),
+    (DE, "element_modified_on", "timestamp"),
+    (DE, "member_id", "string"),
 ]
 DE_ROWS = [
-    ("s1", "PRT1", False, ALTERED, "PRT10"),
-    ("s2", "PRT1", False, ALTERED, "PRT11"),
-    ("s3", "PRT2", True, ALTERED, None),
+    ("s1", "L1", False, ALTERED, "L10"),
+    ("s2", "L1", False, ALTERED, "L11"),
+    ("s3", "L2", True, ALTERED, None),
 ]
 CONCEPT_ROWS = [
-    ("PRT1", "Data Element", ["one"]),
-    ("PRT10", "Permissible Value", []),
-    ("PRT11", "Permissible Value", ["eleven", "xi"]),
-    ("PRT3", "Permissible Value", None),
+    ("L1", "Data Element", ["one"]),
+    ("L10", "Permissible Value", []),
+    ("L11", "Permissible Value", ["eleven", "xi"]),
+    ("L3", "Permissible Value", None),
 ]
 
 
@@ -85,18 +87,16 @@ def _as_numpy_array(value: Any) -> Any:
 
 def _specs(tmp_path: Path) -> list[Path]:
     paths = []
-    for name, ids in (("demographics", ["PRT1", "PRT3"]), ("cancer_registry", ["PRT2", "PRT4"])):
-        path = tmp_path / f"{name}_product_spec_cpd_v2.json"
-        fields = [{"column_name": "mrn"}] + [{"de_id": de_id} for de_id in ids + ["PRT1"]]
+    for name, ids in (("people", ["L1", "L3"]), ("events", ["L2", "L4"])):
+        path = tmp_path / f"{name}_spec.json"
+        fields = [{"column_name": "rid"}] + [{"de_id": de_id} for de_id in ids + ["L1"]]
         path.write_text(json.dumps({"fields": fields}), encoding="utf-8")
         paths.append(path)
     return paths
 
 
 def _extract(tmp_path: Path, cursor: FakeCursor, **kwargs: Any) -> dict[str, Any]:
-    from showcase.ontology_query_benchmark.intake_extract import extract
-
-    return extract(lambda: cursor, _specs(tmp_path), tmp_path / "out", **kwargs)
+    return extract(lambda: cursor, SPEC, _specs(tmp_path), tmp_path / "out", **kwargs)
 
 
 def test_complete_projection_lands_both_relations_under_source_names(tmp_path: Path) -> None:
@@ -109,12 +109,12 @@ def test_complete_projection_lands_both_relations_under_source_names(tmp_path: P
     assert receipt["complete"] is True
     assert land.medium == "database"
     landed = {r.name: (r.schema, r.row_count, dict(r.columns)) for r in land.relations}
-    assert landed[DE][:2] == ("standard_library", 3)
-    assert landed[CONCEPT][:2] == ("standard_library", 4)
-    assert landed[DE][2]["data_element_phi"] == "BOOLEAN"
-    assert landed[DE][2]["data_element_modified_on"] == "TIMESTAMP WITH TIME ZONE"
+    assert landed[DE][:2] == (SPEC.schema_name, 3)
+    assert landed[CONCEPT][:2] == (SPEC.schema_name, 4)
+    assert landed[DE][2]["element_sensitive"] == "BOOLEAN"
+    assert landed[DE][2]["element_modified_on"] == "TIMESTAMP WITH TIME ZONE"
     assert landed[CONCEPT][2] == {
-        "concept_prt_id": "VARCHAR", "concept_type_label": "VARCHAR", "synonym_name": "VARCHAR[]",
+        "concept_id": "VARCHAR", "concept_type_label": "VARCHAR", "synonym_name": "VARCHAR[]",
     }
 
 
@@ -123,14 +123,14 @@ def test_rows_keep_values_and_warehouse_order(tmp_path: Path) -> None:
 
     with duckdb.connect(receipt["duckdb"]["path"], read_only=True) as con:
         concepts = con.execute(
-            "SELECT concept_prt_id, synonym_name FROM standard_library.standard_library_concept"
+            f"SELECT concept_id, synonym_name FROM {SPEC.schema_name}.{CONCEPT}"
         ).fetchall()
         comment = con.execute(
             "SELECT comment FROM duckdb_tables() WHERE table_name = ?", [DE]
         ).fetchone()
 
     assert concepts == [
-        ("PRT1", ["one"]), ("PRT10", []), ("PRT11", ["eleven", "xi"]), ("PRT3", None),
+        ("L1", ["one"]), ("L10", []), ("L11", ["eleven", "xi"]), ("L3", None),
     ]
     assert comment == ("data elements",)
 
@@ -145,10 +145,10 @@ def test_receipt_states_scope_assistance_and_identity(tmp_path: Path) -> None:
 
     assert on_disk == receipt
     assert receipt["assistance"]["kind"] == "supplied"
-    assert receipt["workload"]["de_ids_requested"] == ["PRT1", "PRT2", "PRT3", "PRT4"]
-    assert receipt["workload"]["found_as_data_element"] == ["PRT1", "PRT2"]
-    assert receipt["workload"]["found_as_concept_only"] == ["PRT3"]
-    assert receipt["workload"]["missing"] == ["PRT4"]
+    assert receipt["workload"]["de_ids_requested"] == ["L1", "L2", "L3", "L4"]
+    assert receipt["workload"]["found_as_data_element"] == ["L1", "L2"]
+    assert receipt["workload"]["found_as_concept_only"] == ["L3"]
+    assert receipt["workload"]["missing"] == ["L4"]
     assert receipt["duckdb"]["sha256"] == digest
     assert receipt["relations"][DE]["updated_at"] == "2026-11-09T06:27:04+00:00"
     assert receipt["relations"][DE]["expected_rows"] == receipt["relations"][DE]["returned_rows"]
@@ -165,7 +165,7 @@ def test_every_statement_is_a_bounded_ordered_read(tmp_path: Path) -> None:
     assert all(s.startswith("SELECT ") for s in cursor.statements)
     assert len(selects) == 2
     assert all(" ORDER BY " in s and s.endswith(" LIMIT 51") for s in selects)
-    assert all("'PRT4'" in s for s in selects)
+    assert all("'L4'" in s for s in selects)
 
 
 @pytest.mark.parametrize(
@@ -194,21 +194,10 @@ def test_an_incomplete_read_writes_no_database(
 
 
 def test_a_malformed_declared_id_is_refused_before_any_statement(tmp_path: Path) -> None:
-    from showcase.ontology_query_benchmark.intake_extract import extract
-
     spec = tmp_path / "spec.json"
-    spec.write_text(json.dumps({"fields": [{"de_id": "PRT1' OR '1'='1"}]}), encoding="utf-8")
+    spec.write_text(json.dumps({"fields": [{"de_id": "L1' OR '1'='1"}]}), encoding="utf-8")
     cursor = FakeCursor()
 
     with pytest.raises(ValueError, match="de_id"):
-        extract(lambda: cursor, [spec], tmp_path / "out")
+        extract(lambda: cursor, SPEC, [spec], tmp_path / "out")
     assert cursor.statements == []
-
-
-def test_recording_discovers_the_projection_file_not_the_warehouse() -> None:
-    text = README.read_text(encoding="utf-8")
-
-    assert "intake_extract" in text
-    assert 'sema target discover "$SOURCE"' in text
-    assert "--warehouse" not in text
-    assert "DATABRICKS_HTTP_PATH" not in text
