@@ -49,8 +49,10 @@ CONCEPT_ROWS = [
 class FakeCursor:
     """Answers the projection's catalog, count and select statements from fixed rows."""
 
-    def __init__(self, *, counts: dict[str, int] | None = None, altered_after: datetime = ALTERED):
-        self.counts = counts or {DE: len(DE_ROWS), CONCEPT: len(CONCEPT_ROWS)}
+    def __init__(self, *, counts: dict[str, int] | None = None, altered_after: datetime = ALTERED,
+                 de_rows: list[tuple[Any, ...]] = DE_ROWS) -> None:  # fmt: skip
+        self.de_rows = de_rows
+        self.counts = counts or {DE: len(de_rows), CONCEPT: len(CONCEPT_ROWS)}
         self.altered = [ALTERED, altered_after]
         self.statements: list[str] = []
         self.closed = False
@@ -75,7 +77,7 @@ class FakeCursor:
         relation = CONCEPT if sql.split(" WHERE ")[0].endswith(CONCEPT) else DE
         if "COUNT(*)" in sql:
             return [(self.counts[relation],)]
-        rows = DE_ROWS if relation == DE else CONCEPT_ROWS
+        rows = self.de_rows if relation == DE else CONCEPT_ROWS
         return [tuple(_as_numpy_array(v) for v in row) for row in rows]
 
 
@@ -101,7 +103,7 @@ def _extract(tmp_path: Path, cursor: FakeCursor, **kwargs: Any) -> dict[str, Any
 
 def test_complete_projection_lands_both_relations_under_source_names(tmp_path: Path) -> None:
     receipt = _extract(tmp_path, FakeCursor())
-    duckdb_path = Path(receipt["duckdb"]["path"])
+    duckdb_path = tmp_path / "out" / receipt["duckdb"]["path"]
 
     with Staging(str(tmp_path / "staging.duckdb"), schemas=()) as staging:
         land = land_source(duckdb_path, staging, schema="ignored")
@@ -121,7 +123,7 @@ def test_complete_projection_lands_both_relations_under_source_names(tmp_path: P
 def test_rows_keep_values_and_warehouse_order(tmp_path: Path) -> None:
     receipt = _extract(tmp_path, FakeCursor())
 
-    with duckdb.connect(receipt["duckdb"]["path"], read_only=True) as con:
+    with duckdb.connect(str(tmp_path / "out" / receipt["duckdb"]["path"]), read_only=True) as con:
         concepts = con.execute(
             f"SELECT concept_id, synonym_name FROM {SPEC.schema_name}.{CONCEPT}"
         ).fetchall()
@@ -141,7 +143,7 @@ def test_receipt_states_scope_assistance_and_identity(tmp_path: Path) -> None:
     on_disk = json.loads((tmp_path / "out" / "extract_receipt.json").read_text(encoding="utf-8"))
     import hashlib
 
-    digest = hashlib.sha256(Path(receipt["duckdb"]["path"]).read_bytes()).hexdigest()
+    digest = hashlib.sha256((tmp_path / "out" / receipt["duckdb"]["path"]).read_bytes()).hexdigest()
 
     assert on_disk == receipt
     assert receipt["assistance"]["kind"] == "supplied"
@@ -199,5 +201,38 @@ def test_a_malformed_declared_id_is_refused_before_any_statement(tmp_path: Path)
     cursor = FakeCursor()
 
     with pytest.raises(ValueError, match="de_id"):
+        extract(lambda: cursor, SPEC, [spec], tmp_path / "out")
+    assert cursor.statements == []
+
+
+def test_receipt_names_each_source_with_its_catalog(tmp_path: Path) -> None:
+    receipt = _extract(tmp_path, FakeCursor())
+
+    sources = {name: entry["source"] for name, entry in receipt["relations"].items()}
+    assert sources == {name: f"{SPEC.catalog}.{SPEC.schema_name}.{name}" for name in (DE, CONCEPT)}
+
+
+def test_receipt_points_at_the_database_relative_to_itself(tmp_path: Path) -> None:
+    receipt = _extract(tmp_path, FakeCursor())
+
+    assert receipt["duckdb"]["path"] == "workload_projection.duckdb"
+    assert (tmp_path / "out" / receipt["duckdb"]["path"]).is_file()
+
+
+def test_duplicate_order_keys_make_the_read_incomplete(tmp_path: Path) -> None:
+    rows = [*DE_ROWS, DE_ROWS[0]]
+
+    receipt = _extract(tmp_path, FakeCursor(de_rows=rows))
+
+    assert receipt["complete"] is False and receipt["duckdb"] is None
+    assert any(f.startswith(f"{DE}: 1 duplicate order key") for f in receipt["incomplete"])
+
+
+def test_no_declared_id_is_refused_before_any_statement(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    spec.write_text(json.dumps({"fields": [{"column_name": "rid"}]}), encoding="utf-8")
+    cursor = FakeCursor()
+
+    with pytest.raises(ValueError, match="no de_id"):
         extract(lambda: cursor, SPEC, [spec], tmp_path / "out")
     assert cursor.statements == []

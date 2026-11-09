@@ -28,6 +28,8 @@ def declared_de_ids(spec_paths: Sequence[Path], id_pattern: str) -> tuple[str, .
     for path in spec_paths:
         fields = json.loads(path.read_text(encoding="utf-8"))["fields"]
         ids.update(str(field["de_id"]) for field in fields if field.get("de_id"))
+    if not ids:
+        raise ValueError(f"the product specs declare no de_id: {[str(p) for p in spec_paths]}")
     malformed = sorted(i for i in ids if not re.fullmatch(id_pattern, i))
     if malformed:
         raise ValueError(f"declared de_id values do not match {id_pattern!r}: {malformed}")
@@ -102,3 +104,10 @@ def select_sql(
 
 def order_keys(spec: Extract, relation: str) -> tuple[str, ...]:
     return next(r.order_keys for r in (spec.elements, spec.members) if r.relation == relation)
+
+
+def duplicate_keys(rows: Sequence[Sequence[Any]], columns: Sequence[str],
+                   keys: Sequence[str]) -> int:  # fmt: skip
+    """Rows beyond the first per order-key tuple; any makes the ordered read ambiguous."""
+    index = [list(columns).index(key) for key in keys]
+    return len(rows) - len({tuple(row[i] for i in index) for row in rows})

@@ -27,6 +27,8 @@ from showcase.ontology_query_benchmark.intake_extract_utils import (
     count_sql,
     declared_de_ids,
     duckdb_type,
+    duplicate_keys,
+    order_keys,
     plain,
     predicates,
     select_sql,
@@ -110,7 +112,7 @@ def extract(
         "workload": _workload(spec, spec_paths, de_ids, relations),
         "relations": {r.name: _relation_entry(spec, r) for r in relations},
         "statements": reader.statements,
-        "duckdb": None if incomplete else {"path": str(target), "sha256": sha256(target)},
+        "duckdb": None if incomplete else {"path": target.name, "sha256": sha256(target)},
     }
     (out_dir / RECEIPT_NAME).write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     return receipt
@@ -134,6 +136,9 @@ def _read(
             rows = tuple(reader.rows(select_sql(spec, name, names, wheres[name], row_limit)))
             if len(rows) != expected:
                 incomplete.append(f"{name}: returned_rows {len(rows)} != counted {expected}")
+            keys = order_keys(spec, name)
+            if duplicates := duplicate_keys(rows, names, keys):
+                incomplete.append(f"{name}: {duplicates} duplicate order key rows over {keys}")
         when, comment = before[name]
         relations.append(_Relation(name, columns[name], _iso(when), comment, expected, rows))
     after = {str(name): when for name, when, _ in reader.rows(tables_sql(spec))}
@@ -200,7 +205,7 @@ def _workload(
 
 def _relation_entry(spec: Extract, relation: _Relation) -> dict[str, Any]:
     return {
-        "source": f"{spec.schema_name}.{relation.name}",
+        "source": f"{spec.catalog}.{spec.schema_name}.{relation.name}",
         "updated_at": relation.updated_at,
         "comment": relation.comment,
         "columns": [list(column) for column in relation.columns],
