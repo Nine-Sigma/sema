@@ -24,7 +24,11 @@ _DESCENDING = frozenset({ResolutionRule.MAX, ResolutionRule.MAX_BY})
 
 
 def _col(name: str) -> exp.Column:
-    return exp.column(name)
+    return exp.column(name, quoted=True)
+
+
+def _as(expression: exp.Expr, name: str) -> exp.Alias:
+    return exp.alias_(expression, name, quoted=True)
 
 
 def _flag(condition: exp.Expr, when_true: int) -> exp.Case:
@@ -72,14 +76,14 @@ def _rank(attribute: ResolvedAttribute, partition: list[exp.Column]) -> exp.Expr
         partition_by=partition,
         order=exp.Order(expressions=_ordering(attribute)),
     )
-    return exp.alias_(window, _rank_name(attribute))
+    return _as(window, _rank_name(attribute))
 
 
 def _first_ranked(attribute: ResolvedAttribute) -> exp.Expr:
     first = exp.Case().when(
         _col(_rank_name(attribute)).eq(exp.Literal.number(1)), _col(attribute.column)
     )
-    return exp.alias_(exp.Max(this=first), attribute.output_name)
+    return _as(exp.Max(this=first), attribute.output_name)
 
 
 def _null_key_rows_stand_alone(identity: EntityIdentity) -> bool:
@@ -95,7 +99,7 @@ def _keyed_rows(relation: str, identity: EntityIdentity) -> exp.Expr:
     if alone:
         any_null = exp.or_(*(_col(k).is_(exp.null()) for k in identity.nullable_keys))
         own_row = exp.Case().when(any_null, exp.Window(this=exp.RowNumber()))
-        columns.append(exp.alias_(own_row, NULL_KEY_ROW))
+        columns.append(_as(own_row, NULL_KEY_ROW))
     rows = exp.select(*columns).from_(table)
     if identity.non_null_keys:
         rows = rows.where(exp.and_(*(_col(k).is_(exp.null()).not_()
