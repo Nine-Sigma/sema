@@ -98,7 +98,9 @@ def _keyed_rows(relation: str, identity: EntityIdentity) -> exp.Expr:
     columns: list[exp.Expr] = [exp.Star()]
     if alone:
         any_null = exp.or_(*(_col(k).is_(exp.null()) for k in identity.nullable_keys))
-        own_row = exp.Case().when(any_null, exp.Window(this=exp.RowNumber()))
+        each_row = [exp.Ordered(this=_col(c)) for c in identity.columns]
+        numbered = exp.Window(this=exp.RowNumber(), order=exp.Order(expressions=each_row))
+        own_row = exp.Case().when(any_null, numbered)
         columns.append(_as(own_row, NULL_KEY_ROW))
     rows = exp.select(*columns).from_(table)
     if identity.non_null_keys:
