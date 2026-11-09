@@ -66,3 +66,7 @@ sema:
   sidecar: sidecar.json
   concept_spec: concept_source.yaml
   concept_spec_attribution: assisted
+
+sources:
+  - {relation: main.s.person, version: 7}
+  - {relation: main.s.visit, version: 3}

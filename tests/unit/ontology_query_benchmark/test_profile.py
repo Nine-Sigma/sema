@@ -71,3 +71,25 @@ def test_s_inputs_named_by_the_profile_load_and_pin() -> None:
     sidecar = load_sidecar(profile.sema.sidecar, profile.harness.root)
     assert [p.pin.product for p in load_products(sidecar)] == ["people", "events"]
     assert load_conventions(sidecar) == ("People means distinct rid values.",)
+
+
+def test_sources_pin_each_relation_to_a_delta_version(tmp_path: Path) -> None:
+    sources = [{"relation": "cat.s.person", "version": 7}, {"relation": "cat.s.visit", "version": 0}]
+    profile = load_profile(_variant(tmp_path, {"sources": sources}))
+    assert profile.source_versions == {"cat.s.person": 7, "cat.s.visit": 0}
+
+
+@pytest.mark.parametrize(
+    ("sources", "refusal"),
+    [
+        ([{"relation": "cat.s.person"}], r"sources\.0\.version"),
+        ([{"relation": "cat.s.person", "version": None}], r"sources\.0\.version"),
+        ([{"relation": "person", "version": 7}], r"sources\.0\.relation"),
+        ([], "at least 1"),
+    ],
+)
+def test_an_unpinned_or_unqualified_source_is_refused(
+    tmp_path: Path, sources: list[dict[str, object]], refusal: str
+) -> None:
+    with pytest.raises(ValidationError, match=refusal):
+        load_profile(_variant(tmp_path, {"sources": sources}))

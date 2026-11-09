@@ -1,7 +1,7 @@
 """A benchmark source profile: every source-specific value, parsed once and frozen.
 
-Code reads hosts, endpoints, harness layout, limits, knobs, extract relations and S inputs
-only from a loaded profile. Relative paths resolve against the profile file's directory.
+Code reads hosts, endpoints, harness layout, limits, knobs, extract relations, S inputs and
+pinned source versions only from a loaded profile. Relative paths resolve against the profile file's directory.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 
 class Attribution(StrEnum):
@@ -152,6 +152,13 @@ class Sema(_Frozen):
     _paths = field_validator("sidecar", "concept_spec")(_resolved)
 
 
+class Source(_Frozen):
+    """A fully qualified relation the arms read and the Delta version the run is pinned to."""
+
+    relation: str = Field(pattern=r"^\w+\.\w+\.\w+$")
+    version: int = Field(ge=0)
+
+
 class Profile(_Frozen):
     profile_version: Literal[1]
     name: str
@@ -163,6 +170,11 @@ class Profile(_Frozen):
     sweep: Sweep
     extract: Extract
     sema: Sema
+    sources: tuple[Source, ...] = Field(min_length=1)
+
+    @property
+    def source_versions(self) -> dict[str, int]:
+        return {source.relation: source.version for source in self.sources}
 
 
 def load_profile(path: Path) -> Profile:
