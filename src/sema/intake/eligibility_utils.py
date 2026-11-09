@@ -185,7 +185,7 @@ class RunDescriptor(BaseModel):
     scheme: SchemeSpec | None = None
     term_storage: TermStorageSpec | None = None
     entity_case: Literal["preserve", "lower"] | None = None
-    relations: tuple[str, ...] | None = None
+    relations: tuple[str, ...] | None = Field(default=None, min_length=1)
 
 
 class DocumentEmbedder(Protocol):

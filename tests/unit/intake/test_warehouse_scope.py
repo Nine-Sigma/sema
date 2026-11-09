@@ -95,3 +95,15 @@ def test_descriptor_relations_scope_a_warehouse_run(tmp_path: Path) -> None:
     excluded = re.compile(rf"\b({GROUPS_TABLE}|{GROUP_VALUES_TABLE})\b")
     assert not [q for q in connector.queries if excluded.search(q)]
     assert sorted(run.artifact("land_scope")["excluded"]) == [GROUP_VALUES_TABLE, GROUPS_TABLE]
+
+
+def test_an_empty_allowlist_is_refused() -> None:
+    from pydantic import ValidationError
+
+    from sema.intake.eligibility_utils import RunDescriptor
+
+    stated = {"id": "d", "identity_system": "s", "release": "1"}
+
+    with pytest.raises(ValidationError, match="relations"):
+        RunDescriptor.model_validate({**stated, "relations": []})
+    assert RunDescriptor.model_validate(stated).relations is None
