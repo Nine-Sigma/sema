@@ -70,18 +70,20 @@ def upsert_target_entity(
     table_ref: str,
     model_role: str,
     source_schema: str,
+    identity: str | None = None,
 ) -> None:
     """MERGE a target `:Entity` keyed on name+schema+model_role (D5-a).
 
     A wider key than the source loader's ``{name}`` so a target entity never
     collapses into a same-named source entity; retrieval then scopes by
-    model_role/schema (M6/S2-07).
+    model_role/schema (M6/S2-07). ``identity`` is the entity's identity block as
+    JSON; ``None`` leaves the node without one.
     """
     loader._run(
         "MERGE (e:Entity {name: $name, schema_name: $schema_name, "
         "model_role: $model_role}) "
         "ON CREATE SET e.id = $id "
-        "SET e.source_id = $source_schema "
+        "SET e.source_id = $source_schema, e.identity = $identity "
         "WITH e "
         "MERGE (t:Table {name: $table, schema_name: $schema_name, "
         "catalog: $catalog}) "
@@ -95,6 +97,7 @@ def upsert_target_entity(
         table=table,
         catalog=catalog,
         table_ref=table_ref,
+        identity=identity,
     )
 
 

@@ -135,6 +135,19 @@ class TestSemanticNodes:
         )
         assert e.embedding_updated_at is None
 
+    def test_entity_reads_its_identity_node_property(self):
+        e = Entity(
+            id="ent-4", name="Visit", source="test", confidence=0.9, source_id="test",
+            identity='{"key_columns": ["visit_id"], "exclude_null_keys": true}',
+        )
+        assert e.identity is not None
+        assert e.identity.key_columns == ("visit_id",)
+        assert e.identity.exclude_null_keys is True
+
+    def test_entity_identity_default_none(self):
+        e = Entity(id="ent-5", name="Test", source="test", confidence=0.9, source_id="test")
+        assert getattr(e, "identity", "absent") is None
+
     def test_property_has_id(self):
         p = Property(
             id="prop-1",
