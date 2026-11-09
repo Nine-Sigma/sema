@@ -75,3 +75,18 @@ def require_clean_process(
         raise RoutingError(
             f"DATABRICKS_CONFIG_PROFILE={profile!r} is not {routing.databricks_profile}"
         )
+
+
+def intake_env(environ: Mapping[str, str], routing: Routing) -> dict[str, str]:
+    """The variables that pin SEMA intake's model and embedding calls to the profile."""
+    embedder_off = environ.get("EMBEDDING_PROVIDER", "databricks").strip() == ""
+    return {
+        "PYTHON_DOTENV_DISABLED": "1",
+        "DATABRICKS_HOST": routing.host,
+        "DATABRICKS_CONFIG_PROFILE": routing.databricks_profile,
+        "INTAKE_MODEL_PROVIDER": "databricks",
+        "INTAKE_MODEL_MODEL": routing.chat_endpoint,
+        # An explicit empty provider is the zero-call replay's embedder off switch.
+        "EMBEDDING_PROVIDER": "" if embedder_off else "databricks",
+        "EMBEDDING_MODEL": routing.embedding_endpoint,
+    }
