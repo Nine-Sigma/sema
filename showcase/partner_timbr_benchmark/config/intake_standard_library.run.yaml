@@ -1,0 +1,8 @@
+# Role-neutral discovery input: locations only. No role map, binding, rule or gold.
+# release is the refresh date both selected views report in TEST catalog metadata.
+id: partner-sl-timbr-bench
+identity_system: partner
+release: "2026-11-09"
+relations:
+  - standard_library_data_element
+  - standard_library_concept
