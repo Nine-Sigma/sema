@@ -22,6 +22,7 @@ from typing import Any, Protocol
 import duckdb
 
 from sema.ingest.duckdb_staging_utils import build_table_comment_sql, qualified, quote_ident
+from showcase.ontology_query_benchmark.intake_extract_hierarchy import SCHEMA, read_hierarchy
 from showcase.ontology_query_benchmark.intake_extract_utils import (
     columns_sql,
     count_sql,
@@ -75,6 +76,12 @@ class _Relation:
     comment: str | None
     expected: int
     rows: tuple[tuple[Any, ...], ...] | None
+    schema: str | None = None
+    source: str | None = None
+
+    @property
+    def key(self) -> str:
+        return f"{self.schema}.{self.name}" if self.schema else self.name
 
     def ids(self, column: str) -> set[str]:
         index = [name for name, _, _ in self.columns].index(column)
@@ -110,7 +117,7 @@ def extract(
         "complete": not incomplete,
         "incomplete": incomplete,
         "workload": _workload(spec, spec_paths, de_ids, relations),
-        "relations": {r.name: _relation_entry(spec, r) for r in relations},
+        "relations": {r.key: _relation_entry(spec, r) for r in relations},
         "statements": reader.statements,
         "duckdb": None if incomplete else {"path": target.name, "sha256": sha256(target)},
     }
@@ -147,6 +154,13 @@ def _read(
         for name in spec.relations
         if after.get(name) != before[name][0]
     ]
+    if spec.concept_hierarchy is not None:
+        elements = next(r for r in relations if r.name == spec.elements.relation)
+        members = elements.ids(spec.elements.member_key)
+        slices, short = read_hierarchy(reader.rows, spec.concept_hierarchy, members, row_limit)
+        relations += [_Relation(s.name, s.columns, s.updated_at, s.comment, s.expected, s.rows,
+                                SCHEMA, s.source) for s in slices]  # fmt: skip
+        incomplete += short
     return relations, incomplete
 
 
@@ -172,15 +186,18 @@ def _write(target: Path, schema: str, relations: Sequence[_Relation]) -> None:
     partial = target.with_suffix(".partial")
     partial.unlink(missing_ok=True)
     with duckdb.connect(str(partial)) as con:
-        con.execute(f"CREATE SCHEMA {quote_ident(schema)}")
         for relation in relations:
-            table = qualified(schema, relation.name)
+            con.execute(f"CREATE SCHEMA IF NOT EXISTS {quote_ident(relation.schema or schema)}")
+            table = qualified(relation.schema or schema, relation.name)
             listed = ", ".join(f"{quote_ident(n)} {t}" for n, _, t in relation.columns)
             con.execute(f"CREATE TABLE {table} ({listed})")
             marks = ", ".join("?" for _ in relation.columns)
             con.executemany(f"INSERT INTO {table} VALUES ({marks})", list(relation.rows or ()))
             if relation.comment:
-                con.execute(build_table_comment_sql(schema, relation.name, relation.comment))
+                comment = build_table_comment_sql(
+                    relation.schema or schema, relation.name, relation.comment
+                )
+                con.execute(comment)
     partial.replace(target)
 
 
@@ -205,7 +222,7 @@ def _workload(
 
 def _relation_entry(spec: Extract, relation: _Relation) -> dict[str, Any]:
     return {
-        "source": f"{spec.catalog}.{spec.schema_name}.{relation.name}",
+        "source": relation.source or f"{spec.catalog}.{spec.schema_name}.{relation.name}",
         "updated_at": relation.updated_at,
         "comment": relation.comment,
         "columns": [list(column) for column in relation.columns],

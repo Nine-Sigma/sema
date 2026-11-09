@@ -53,6 +53,13 @@ class LLMConfig(BaseSettings):
     request_timeout: int = 120
 
 
+class HierarchyAnchorConfig(BaseModel):
+    """Bounds for walking down from a matched anchor term to governed columns."""
+
+    max_depth: int = Field(default=3, ge=1)
+    member_cap: int = Field(default=200, ge=1)
+
+
 class ModelPrice(BaseModel):
     input_per_1k: float = Field(ge=0)
     output_per_1k: float = Field(ge=0)
@@ -251,6 +258,7 @@ class QueryConfig(BaseSettings):
     operation: str = "plan"
     verbose: bool = False
     session_id: str | None = None
+    hierarchy_anchor: HierarchyAnchorConfig = Field(default_factory=HierarchyAnchorConfig)
 
     neo4j: Neo4jConfig = Field(default_factory=Neo4jConfig)
     databricks: DatabricksConfig = Field(default_factory=DatabricksConfig)

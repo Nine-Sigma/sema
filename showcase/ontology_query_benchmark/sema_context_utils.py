@@ -19,6 +19,7 @@ from sema.compile.entity_identity import identity_cte_sql
 from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
 from sema.models.context import SemanticContextObject
 from showcase.ontology_query_benchmark.product_spec import SpecEntity, SpecRelationship
+from showcase.ontology_query_benchmark.profile import ConceptHierarchy
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     ProductSpec,
@@ -30,6 +31,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     LibraryFacts,
     absent_elements,
 )
+from showcase.ontology_query_benchmark.sema_hierarchy_sql import add_hierarchy, named_columns
 
 TableColumn = tuple[str, str]
 
@@ -72,6 +74,8 @@ def render(
     resolution: BindingResolution,
     facts: LibraryFacts,
     is_denied: Callable[[str], bool] = nothing_denied,
+    *,
+    readable: Mapping[str, bool] | None = None,
 ) -> Rendering:
     exposure = Exposure(
         frozenset((p.pin.table, c) for p in products for c in p.doc.exposure.denied_columns),
@@ -91,8 +95,24 @@ def render(
     _add_bindings(rendering.parts, selected, sidecar, facts)
     _add_values(rendering, selected, _governed_values(rendering.sco), sidecar, facts)
     _add_grain(rendering, products, sidecar, exposure)
-    _add_rules(rendering.parts, sidecar)
+    hierarchy: list[str] = []
+    add_hierarchy(hierarchy, rendering.findings, selected, facts, readable,
+                  rendering.sco.hierarchy_anchors)  # fmt: skip
+    _add_rules(rendering.parts, sidecar, hierarchy_prose=not hierarchy)
+    spec = facts.hierarchy.spec if facts.hierarchy else None
+    if hierarchy and spec and _hierarchy_kept(rendering, exposure, spec):
+        rendering.parts.extend(hierarchy)
     return rendering
+
+
+def _hierarchy_kept(rendering: Rendering, exposure: Exposure, spec: ConceptHierarchy) -> bool:
+    """A withheld section still stands in for the prose reference, which names its columns."""
+    names = named_columns(spec)
+    kept = [
+        _kept(rendering, exposure, [n for n in names if n[0] == r], r, "concept hierarchy")
+        for r in dict.fromkeys(r for r, _ in names)
+    ]
+    return all(kept)
 
 
 def _without_denied(rendering: Rendering, exposure: Exposure) -> SemanticContextObject:
@@ -311,11 +331,14 @@ def _table_of(products: tuple[ProductSpec, ...], rel: SpecRelationship) -> str:
     )
 
 
-def _add_rules(parts: list[str], sidecar: Sidecar) -> None:
+def _add_rules(parts: list[str], sidecar: Sidecar, *, hierarchy_prose: bool) -> None:
+    """The supplied hierarchy prose is withheld when the structured section renders,
+    so the context offers one hierarchy route."""
     parts.append(
         "\nBUSINESS RULES: the workload conventions supplied with this request "
         f"(sha256 {sidecar.conventions_sha256[:12]}) govern {sidecar.rules_scope}; "
         "they are not restated here."
     )
-    parts.append(f"\n{sidecar.hierarchy_heading} (supplied):")
-    parts.extend(f"  - {line}" for line in sidecar.hierarchy_reference)
+    if hierarchy_prose:
+        parts.append(f"\n{sidecar.hierarchy_heading} (supplied):")
+        parts.extend(f"  - {line}" for line in sidecar.hierarchy_reference)

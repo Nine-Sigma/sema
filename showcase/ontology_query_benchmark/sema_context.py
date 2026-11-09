@@ -17,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
+from sema.models.config import HierarchyAnchorConfig
 from sema.models.context import SemanticCandidateSet
 from sema.pipeline.context import prune_to_sco
 from showcase.ontology_query_benchmark.profile import Limits
@@ -68,6 +69,18 @@ def context_char_budget(limits: Limits, sidecar: Sidecar, question: str) -> int:
     return whole - sidecar.prompt_frame_chars - len(question)
 
 
+# Bounds the variable-length PARENT_OF walk whatever depth a slice reports.
+ANCHOR_DEPTH_CEILING = 20
+
+
+def anchor_bounds(manifest: BuildManifest) -> HierarchyAnchorConfig | None:
+    """Walk as deep as the built slice; without a hierarchy keep the core default."""
+    depth = manifest.counts.get("hierarchy_depth")
+    if not depth:
+        return None
+    return HierarchyAnchorConfig(max_depth=min(depth, ANCHOR_DEPTH_CEILING))
+
+
 def check_manifest(manifest: BuildManifest, sidecar: Sidecar, facts: LibraryFacts) -> None:
     if (manifest.sidecar_sha256, manifest.facts_sha256) != (sidecar.sha256, facts.sha256):
         raise ManifestMismatchError(
@@ -88,6 +101,7 @@ class SContextProvider:
         conventions: tuple[str, ...],
         limits: Limits,
         top_k: int = 10,
+        hierarchy_relations: dict[str, bool] | None = None,
     ) -> None:
         self._retriever = retriever
         self._sidecar = sidecar
@@ -98,6 +112,7 @@ class SContextProvider:
         self._conventions = conventions
         self._limits = limits
         self._top_k = top_k
+        self._hierarchy_relations = hierarchy_relations
 
     @property
     def facts(self) -> LibraryFacts:
@@ -119,6 +134,7 @@ class SContextProvider:
         rendering = render(
             Rendering(prune_to_sco(candidates)), self._sidecar,
             self._products, self._resolution, self._facts, is_denied,
+            readable=self._hierarchy_relations,
         )
         header = (
             f"SEMA CONTEXT graph={self._graph_identity[:12]} "

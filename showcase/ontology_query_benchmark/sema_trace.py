@@ -27,6 +27,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import import_library_fa
 from showcase.ontology_query_benchmark.sema_context import (
     SContext,
     SContextProvider,
+    anchor_bounds,
     check_manifest,
     load_conventions,
 )
@@ -78,6 +79,7 @@ def open_live_provider(
     facts = import_library_facts(
         concept_spec or profile.sema.concept_spec, projection, receipt,
         spec_attribution=profile.sema.concept_spec_attribution,
+        hierarchy=profile.extract.concept_hierarchy,
     )
     manifest = read_manifest(manifest_path)
     check_manifest(manifest, sidecar, facts)
@@ -89,11 +91,13 @@ def open_live_provider(
             driver, sema_live.embedder(workspace, profile.routing),
             embedder_model_name=manifest.embedder_model,
             scope=RetrievalScope(model_role=sidecar.model_role),
+            hierarchy_anchor=anchor_bounds(manifest),
         )
         yield SContextProvider(
             engine, sidecar, products, resolve_bindings(sidecar, products, catalog), facts,
             graph_identity=manifest.graph_identity, conventions=load_conventions(sidecar),
             limits=limits or profile.limits,
+            hierarchy_relations=manifest.hierarchy_relations,
         )
 
 
