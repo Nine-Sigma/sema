@@ -1,4 +1,4 @@
-"""Fresh typed scorer for the partner benchmark; the historical harness scorer stays frozen.
+"""Fresh typed scorer for the benchmark; the historical harness scorer stays frozen.
 
 Each question's declared result_shape, category_columns, precision and tolerance become a
 result contract. A result must have exactly the gold width (a ranked result may add one rank
@@ -35,7 +35,6 @@ from showcase.ontology_query_benchmark.scorer_utils import (
 
 SHAPE_KINDS = {"scalar": "scalar", "set": "set", "multiset": "bag", "ranked_list": "ranked",
                "table_unordered": "table"}  # fmt: skip
-RETIRED = frozenset({"Q14"})
 TOLERANT_SHARE = Decimal("0.01")
 MAX_PERMUTED_WIDTH = 6
 
@@ -63,9 +62,9 @@ class Verdict:
     reason: str
 
 
-def contract_for(entry: Mapping[str, Any]) -> Contract:
+def contract_for(entry: Mapping[str, Any], retired: frozenset[str] = frozenset()) -> Contract:
     qid = str(entry["id"])
-    if qid in RETIRED:
+    if qid in retired:
         raise ValueError(f"{qid} is retired")
     kind = SHAPE_KINDS.get(entry.get("result_shape", ""))
     if kind is None:
@@ -88,13 +87,15 @@ def contract_for(entry: Mapping[str, Any]) -> Contract:
                     Decimal(str(entry.get("tolerance") or 0)), ties)  # fmt: skip
 
 
-def load_contracts(paths: Iterable[Path]) -> dict[str, Contract]:
+def load_contracts(
+    paths: Iterable[Path], retired: frozenset[str] = frozenset()
+) -> dict[str, Contract]:
     """Read question files (the only gold reader) into contracts keyed by question id."""
     contracts: dict[str, Contract] = {}
     for path in paths:
         raw = json.loads(Path(path).read_text())
         for entry in raw["questions"] if isinstance(raw, dict) else raw:
-            contract = contract_for(entry)
+            contract = contract_for(entry, retired)
             if contract.question_id in contracts:
                 raise ValueError(f"duplicate question {contract.question_id}")
             contracts[contract.question_id] = contract

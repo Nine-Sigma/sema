@@ -1,11 +1,12 @@
-"""Run the A/B/S benchmark matrix on the frozen Timbr harness with typed scoring.
+"""Run the A/B/S benchmark matrix on a frozen harness with typed scoring.
 
-python -m showcase.ontology_query_benchmark.runner --frozen <closure dir> --run-dir <dir>
-    [--arms A B S] [--reps 3] [--ids Q01,Q02] [--dry-run]
-    [--s-context module:function] [--timbr-env <original POC env file>]
+python -m showcase.ontology_query_benchmark.runner --profile <profile.yaml>
+    --frozen <closure dir> --run-dir <dir>
+    [--arms A B S] [--reps 3] [--ids ID1,ID2] [--dry-run]
+    [--s-context module:function] [--timbr-env <ontology engine env file>]
     [--settings settings.json]   # {"prices": {...usd_per_1m}, "max_cost_usd": 60}
-    [--budget-tokens N] [--values-top-k K] [--description-cap-chars C]  # common to all arms
-    [--input-ceiling 16000] [--repair-reserve 2066]   # frozen in manifest.json
+    [--budget-tokens N] [--values-top-k K] [--description-cap-chars C]  # default: profile
+    [--input-ceiling N] [--repair-reserve N]   # default: profile; frozen in manifest.json
 
 Slots run in a fixed order (rep, question, arm). Each slot appends one receipt to
 receipts.jsonl; a slot whose latest receipt has an outcome other than ``unrun`` is never
@@ -32,7 +33,8 @@ from showcase.ontology_query_benchmark import runner_utils as ru
 from showcase.ontology_query_benchmark import scorer
 from showcase.ontology_query_benchmark.routing import require_clean_process
 from showcase.ontology_query_benchmark.runner_live_utils import live_clients
-from showcase.ontology_query_benchmark.runner_utils import Limits, Meter, Prices
+from showcase.ontology_query_benchmark.profile import Knobs, Limits, load_profile
+from showcase.ontology_query_benchmark.runner_utils import Meter, Prices
 
 ARMS = ("A", "B", "S")
 STAGES = ("context", "generation", "validation", "execution", "scoring")
@@ -191,9 +193,9 @@ def _write_slots(run_dir: Path, slots: Sequence[Slot]) -> None:
     path.write_text(text)
 
 
-def _write_manifest(run_dir: Path, frozen: Path, knobs: ru.Knobs, limits: Limits) -> None:
-    manifest = {"closure_id": frozen.resolve().name, "knobs": dataclasses.asdict(knobs),
-                "limits": dataclasses.asdict(limits)}  # fmt: skip
+def _write_manifest(run_dir: Path, frozen: Path, knobs: Knobs, limits: Limits) -> None:
+    manifest = {"closure_id": frozen.resolve().name, "knobs": knobs.model_dump(),
+                "limits": limits.model_dump()}  # fmt: skip
     path = run_dir / "manifest.json"
     if path.is_file() and json.loads(path.read_text()) != manifest:
         raise ValueError(f"{path} pins a different closure, knobs or limits; use a fresh run dir")
@@ -202,6 +204,7 @@ def _write_manifest(run_dir: Path, frozen: Path, knobs: ru.Knobs, limits: Limits
 
 def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--frozen", type=Path, required=True)
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--arms", nargs="+", choices=ARMS, default=list(ARMS))
@@ -218,26 +221,30 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse(argv)
+    profile = load_profile(args.profile)
+    layout = profile.harness
     wanted = tuple(i.strip() for i in args.ids.split(",") if i.strip())
-    ids = [i for i in ru.question_ids(args.frozen) if not wanted or i in wanted]
+    ids = [i for i in ru.question_ids(args.frozen, layout) if not wanted or i in wanted]
     if set(wanted) - set(ids):
         raise ValueError(f"unknown question ids: {sorted(set(wanted) - set(ids))}")
     slots = schedule(ids, args.arms, args.reps)
     _write_slots(args.run_dir, slots)
-    knobs, limits = ru.knobs_from(args), ru.limits_from(args)
+    knobs, limits = ru.knobs_from(args, profile.knobs), ru.limits_from(args, profile.limits)
     _write_manifest(args.run_dir, args.frozen, knobs, limits)
     if args.dry_run:
         print(f"{len(slots)} slots written to {args.run_dir / 'slots.jsonl'}; no calls made")
         return 0
     raw = json.loads(args.settings.read_text())
     settings = RunSettings(limits, Prices(**raw["prices"]), float(raw["max_cost_usd"]))
-    harness = ru.load_harness(args.frozen)
+    harness = ru.load_harness(args.frozen, layout)
     provider = ru.load_s_provider(args.s_context) if "S" in args.arms else None
-    model, executors = live_clients(harness, args.arms, args.timbr_env, settings.limits)
-    require_clean_process(os.environ, sys.modules)
-    runtimes = ru.arm_runtimes(harness, args.frozen, executors, provider, settings.limits, knobs)
-    questions = {q.id: q for q in ru.public_questions(harness, args.frozen, tuple(ids))}
-    contracts = scorer.load_contracts(ru.question_paths(args.frozen))
+    model, executors = live_clients(harness, args.arms, args.timbr_env, settings.limits, profile)
+    require_clean_process(os.environ, sys.modules, profile.routing)
+    runtimes = ru.arm_runtimes(harness, args.frozen, layout, executors, provider,
+                               settings.limits, knobs)  # fmt: skip
+    questions = {q.id: q for q in ru.public_questions(harness, args.frozen, layout, tuple(ids))}
+    contracts = scorer.load_contracts(ru.question_paths(args.frozen, layout),
+                                      layout.retired_questions)  # fmt: skip
     summary = run(slots, questions, runtimes, model, contracts, harness, settings,
                   args.run_dir / "receipts.jsonl")  # fmt: skip
     print(json.dumps(summary, indent=2, sort_keys=True))

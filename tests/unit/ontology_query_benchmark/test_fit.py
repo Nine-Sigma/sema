@@ -1,3 +1,4 @@
+import functools
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -6,14 +7,22 @@ from typing import Any
 import pytest
 
 from showcase.ontology_query_benchmark import fit, freeze, runner, runner_utils
-from showcase.ontology_query_benchmark.runner_utils import Knobs, Limits
+from showcase.ontology_query_benchmark.profile import Knobs, Profile
+from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
 
 pytestmark = pytest.mark.unit
 
-def first_prompt_chars(harness: SimpleNamespace, frozen: Path, arm: str, qid: str,
-                       knobs: Knobs = Knobs()) -> int:  # fmt: skip
-    runtime = runner_utils.arm_runtimes(harness, frozen, {arm: None}, None, knobs=knobs)[arm]
-    question = runner_utils.public_questions(harness, frozen, (qid,))[0]
+
+def runtime_for(harness: SimpleNamespace, frozen: Path, profile: Profile, arm: str,
+                knobs: Knobs = Knobs()) -> Any:  # fmt: skip
+    return runner_utils.arm_runtimes(harness, frozen, profile.harness, {arm: None}, None,
+                                     profile.limits, knobs)[arm]  # fmt: skip
+
+
+def first_prompt_chars(harness: SimpleNamespace, frozen: Path, profile: Profile, arm: str,
+                       qid: str, knobs: Knobs = Knobs()) -> int:  # fmt: skip
+    runtime = runtime_for(harness, frozen, profile, arm, knobs)
+    question = runner_utils.public_questions(harness, frozen, profile.harness, (qid,))[0]
     context = runtime.context(question.question)
     messages = harness.workflow.build_messages(
         context, question.question, runtime.conventions, runtime.sql_rules
@@ -21,17 +30,18 @@ def first_prompt_chars(harness: SimpleNamespace, frozen: Path, arm: str, qid: st
     return sum(len(m["content"]) for m in messages)
 
 
-def write_shard(root: Path, frozen: Path, arm: str, records: list[dict[str, Any]],
-                config_hash: str | None = None) -> None:  # fmt: skip
-    cache = frozen / runner_utils.CACHE_DIR
+def write_shard(root: Path, frozen: Path, profile: Profile, arm: str,
+                records: list[dict[str, Any]], config_hash: str | None = None) -> None:  # fmt: skip
+    layout = profile.harness
+    cache = frozen / layout.cache_dir
     shard = root / "regular_live" / "shards" / f"arm_{arm}_0"
     shard.mkdir(parents=True)
     manifest = {
         "arm": arm,
-        "config_sha256": config_hash or freeze.sha256_file(frozen / runner_utils.W4S_CONFIG),
-        "questions_sha256": freeze.sha256_file(runner_utils.question_paths(frozen)[0]),
+        "config_sha256": config_hash or freeze.sha256_file(frozen / layout.config),
+        "questions_sha256": freeze.sha256_file(runner_utils.question_paths(frozen, layout)[0]),
         "context_cache_sha256": freeze.sha256_file(
-            cache / ("schema.json" if arm == "A" else runner_utils.KG_CACHE)
+            cache / ("schema.json" if arm == "A" else layout.kg_cache)
         ),
     }
     (shard / "summary.json").write_text(json.dumps({"manifest": manifest}))
@@ -44,12 +54,12 @@ def record(qid: str, prompts: list[int]) -> dict[str, Any]:
 
 
 def test_calibration_divides_rebuilt_prompt_chars_by_endpoint_tokens(
-    harness: SimpleNamespace, frozen: Path, tmp_path: Path
+    harness: SimpleNamespace, frozen: Path, profile: Profile, tmp_path: Path
 ) -> None:
-    write_shard(tmp_path, frozen, "A", [record("Q01", [17_000, 21_000, 24_500])])
-    write_shard(tmp_path, frozen, "B", [record("Q01", [28_000])], config_hash="stale")
-    result = fit.calibrate(harness, frozen, tmp_path)
-    chars = first_prompt_chars(harness, frozen, "A", "Q01")
+    write_shard(tmp_path, frozen, profile, "A", [record("R01", [17_000, 21_000, 24_500])])
+    write_shard(tmp_path, frozen, profile, "B", [record("R01", [28_000])], config_hash="stale")
+    result = fit.calibrate(harness, frozen, profile.harness, tmp_path, profile.limits)
+    chars = first_prompt_chars(harness, frozen, profile, "A", "R01")
     assert result["ratio"]["min"] == result["ratio"]["max"] == pytest.approx(chars / 17_000)
     assert result["records"] == 1 and result["skipped_shards"] == 1
     assert result["repair_turn_tokens"]["max"] == 4_000
@@ -57,30 +67,28 @@ def test_calibration_divides_rebuilt_prompt_chars_by_endpoint_tokens(
 
 
 def test_common_knobs_reshape_contexts_through_the_harness_builders(
-    harness: SimpleNamespace, frozen: Path
+    harness: SimpleNamespace, frozen: Path, profile: Profile
 ) -> None:
-    base_a = first_prompt_chars(harness, frozen, "A", "Q01")
-    base_b = first_prompt_chars(harness, frozen, "B", "Q01")
-    assert first_prompt_chars(harness, frozen, "A", "Q01", Knobs(values_top_k=3)) < base_a
-    assert first_prompt_chars(harness, frozen, "B", "Q01", Knobs(budget_tokens=4_000)) < base_b
-    small_cap = Knobs(description_cap_chars=40)
-    assert first_prompt_chars(harness, frozen, "B", "Q01", small_cap) < base_b
-    runtime = runner_utils.arm_runtimes(harness, frozen, {"A": None}, None,
-                                        knobs=Knobs(budget_tokens=2_000))["A"]  # fmt: skip
+    chars = functools.partial(first_prompt_chars, harness, frozen, profile)
+    base_a, base_b = chars("A", "R01"), chars("B", "R01")
+    assert chars("A", "R01", Knobs(values_top_k=3)) < base_a
+    assert chars("B", "R01", Knobs(budget_tokens=100)) < base_b
+    assert chars("B", "R01", Knobs(description_cap_chars=40)) < base_b
+    runtime = runtime_for(harness, frozen, profile, "A", Knobs(budget_tokens=20))
     assert runtime.context("q").overflow is True
 
 
-def test_values_top_k_cannot_exceed_the_frozen_cache(harness: SimpleNamespace,
-                                                     frozen: Path) -> None:  # fmt: skip
+def test_values_top_k_cannot_exceed_the_frozen_cache(
+    harness: SimpleNamespace, frozen: Path, profile: Profile
+) -> None:
     with pytest.raises(ValueError, match="values_top_k"):
-        runner_utils.arm_runtimes(harness, frozen, {"A": None}, None, knobs=Knobs(values_top_k=26))
+        runtime_for(harness, frozen, profile, "A", Knobs(values_top_k=26))
 
 
-def test_values_top_k_zero_drops_the_a_values_block(harness: SimpleNamespace,
-                                                    frozen: Path) -> None:  # fmt: skip
-    runtime = runner_utils.arm_runtimes(harness, frozen, {"A": None}, None,
-                                        knobs=Knobs(values_top_k=0))["A"]  # fmt: skip
-    text = runtime.context("q").text
+def test_values_top_k_zero_drops_the_a_values_block(
+    harness: SimpleNamespace, frozen: Path, profile: Profile
+) -> None:
+    text = runtime_for(harness, frozen, profile, "A", Knobs(values_top_k=0)).context("q").text
     assert "TABLE " in text and "\nVALUES " not in text
 
 
@@ -88,15 +96,17 @@ RATIOS = fit.Ratios(conservative=2.0, median=2.2, lenient=2.3)
 
 
 def test_sweep_reports_fit_counts_per_arm_for_each_knob_and_ceiling(
-    harness: SimpleNamespace, frozen: Path
+    harness: SimpleNamespace, frozen: Path, profile: Profile
 ) -> None:
-    grid = [(Knobs(16_000, 25, 160), 16_000), (Knobs(6_000, 0, 80), 36_000)]
-    rows = fit.sweep(harness, frozen, grid, ratios=RATIOS, limits=Limits())
+    grid = [(Knobs(budget_tokens=16_000, values_top_k=25, description_cap_chars=160), 16_000),
+            (Knobs(budget_tokens=6_000, values_top_k=0, description_cap_chars=80), 36_000)]
+    rows = fit.sweep(harness, frozen, profile.harness, grid, ratios=RATIOS,
+                     limits=profile.limits)  # fmt: skip
     assert [(r["knobs"]["budget_tokens"], r["input_ceiling"]) for r in rows] == [
         (16_000, 16_000), (6_000, 36_000)]  # fmt: skip
-    wide = Limits(input_ceiling=36_000)
-    report = fit.fit_report(harness, frozen, grid[1][0], ratios=RATIOS, limits=wide,
-                            s_provider=None)  # fmt: skip
+    wide = profile.limits.model_copy(update={"input_ceiling": 36_000})
+    report = fit.fit_report(harness, frozen, profile.harness, grid[1][0], ratios=RATIOS,
+                            limits=wide, s_provider=None)  # fmt: skip
     keys = ("fits_first", "fits_two_repairs", "certain_overflow", "likely_fits")
     for arm in ("A", "B"):
         assert {k: rows[1]["arms"][arm][k] for k in keys} == {
@@ -104,14 +114,14 @@ def test_sweep_reports_fit_counts_per_arm_for_each_knob_and_ceiling(
 
 
 def test_fit_report_reads_three_estimates_against_the_ceiling(
-    harness: SimpleNamespace, frozen: Path
+    harness: SimpleNamespace, frozen: Path, profile: Profile
 ) -> None:
-    report = fit.fit_report(harness, frozen, Knobs(), ratios=RATIOS, limits=Limits(),
-                            s_provider=None)  # fmt: skip
+    report = fit.fit_report(harness, frozen, profile.harness, Knobs(), ratios=RATIOS,
+                            limits=profile.limits, s_provider=None)  # fmt: skip
     rows = report["rows"]
-    assert {r["arm"] for r in rows} == {"A", "B"} and len(rows) == 98
-    q01 = next(r for r in rows if r["arm"] == "A" and r["question_id"] == "Q01")
-    chars = first_prompt_chars(harness, frozen, "A", "Q01")
+    assert {r["arm"] for r in rows} == {"A", "B"} and len(rows) == 6
+    q01 = next(r for r in rows if r["arm"] == "A" and r["question_id"] == "R01")
+    chars = first_prompt_chars(harness, frozen, profile, "A", "R01")
 
     def tokens(ratio: float) -> int:
         return runner_utils.estimate_tokens_from_chars(chars, 2, ratio)
@@ -123,30 +133,33 @@ def test_fit_report_reads_three_estimates_against_the_ceiling(
     assert q01["fits_two_repairs"] == (tokens(2.0) <= limit)
     assert q01["certain_overflow"] == (tokens(2.3) > limit)
     assert q01["likely_fits"] == (tokens(2.2) <= limit)
-    assert report["arms"]["A"]["questions"] == 49
+    assert report["arms"]["A"]["questions"] == 3
 
 
-def test_an_overflowing_context_never_counts_as_fitting(harness: SimpleNamespace,
-                                                        frozen: Path) -> None:  # fmt: skip
-    report = fit.fit_report(harness, frozen, Knobs(budget_tokens=2_000), ratios=RATIOS,
-                            limits=Limits(), s_provider=None)  # fmt: skip
+def test_an_overflowing_context_never_counts_as_fitting(
+    harness: SimpleNamespace, frozen: Path, profile: Profile
+) -> None:
+    report = fit.fit_report(harness, frozen, profile.harness, Knobs(budget_tokens=20),
+                            ratios=RATIOS, limits=profile.limits, s_provider=None)  # fmt: skip
     a_rows = [r for r in report["rows"] if r["arm"] == "A"]
     assert all(r["context_overflow"] and r["certain_overflow"] for r in a_rows)
     assert not any(r["fits_first"] or r["fits_two_repairs"] or r["likely_fits"] for r in a_rows)
 
 
-def test_fit_report_includes_s_when_a_provider_is_given(harness: SimpleNamespace,
-                                                         frozen: Path) -> None:  # fmt: skip
+def test_fit_report_includes_s_when_a_provider_is_given(
+    harness: SimpleNamespace, frozen: Path, profile: Profile
+) -> None:
     provider = lambda q: SimpleNamespace(text="T" * 100, identity="i", findings=())  # noqa: E731
-    report = fit.fit_report(harness, frozen, Knobs(), ratios=RATIOS, limits=Limits(),
-                            s_provider=provider)  # fmt: skip
-    assert report["arms"]["S"]["questions"] == 49
+    report = fit.fit_report(harness, frozen, profile.harness, Knobs(), ratios=RATIOS,
+                            limits=profile.limits, s_provider=provider)  # fmt: skip
+    assert report["arms"]["S"]["questions"] == 3
 
 
 def test_run_manifest_pins_knobs_and_limits_and_refuses_a_different_resume(
     frozen: Path, tmp_path: Path
 ) -> None:
-    args = ["--frozen", str(frozen), "--run-dir", str(tmp_path), "--dry-run"]
+    args = ["--profile", str(PROFILE_PATH), "--frozen", str(frozen), "--run-dir", str(tmp_path),
+            "--dry-run"]  # fmt: skip
     runner.main([*args, "--budget-tokens", "5000", "--input-ceiling", "36000"])
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert manifest["knobs"] == {"budget_tokens": 5000, "values_top_k": 5,
@@ -157,14 +170,14 @@ def test_run_manifest_pins_knobs_and_limits_and_refuses_a_different_resume(
     with pytest.raises(ValueError, match="manifest"):
         runner.main([*args, "--budget-tokens", "5000", "--input-ceiling", "16000"])
     with pytest.raises(ValueError, match="manifest"):
-        runner.main([*args, "--budget-tokens", "6000", "--input-ceiling", "36000"])
+        runner.main([*args, "--budget-tokens", "3000", "--input-ceiling", "36000"])
 
 
-def test_frozen_benchmark_knobs_and_limits_are_the_cli_default(frozen: Path,
-                                                               tmp_path: Path) -> None:  # fmt: skip
-    runner.main(["--frozen", str(frozen), "--run-dir", str(tmp_path), "--dry-run"])
+def test_profile_knobs_and_limits_are_the_cli_default(frozen: Path, tmp_path: Path) -> None:
+    runner.main(["--profile", str(PROFILE_PATH), "--frozen", str(frozen), "--run-dir",
+                 str(tmp_path), "--dry-run"])  # fmt: skip
     manifest = json.loads((tmp_path / "manifest.json").read_text())
-    assert manifest["knobs"] == {"budget_tokens": 6000, "values_top_k": 5,
+    assert manifest["knobs"] == {"budget_tokens": 3000, "values_top_k": 5,
                                  "description_cap_chars": 160}  # fmt: skip
     assert (manifest["limits"]["input_ceiling"], manifest["limits"]["repair_reserve"]) == (
         16_000, 2_066)  # fmt: skip

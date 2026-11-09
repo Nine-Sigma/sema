@@ -18,17 +18,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Protocol
 
+from showcase.ontology_query_benchmark.profile import Harness, Knobs, Limits, Timbr
 from showcase.ontology_query_benchmark.routing import require_mcp_tool
 
-HARNESS_PACKAGE = "timbr_demographics_poc"
 HARNESS_MODULES = ("benchmark_models", "benchmark_workflow", "benchmark_clients",
                    "benchmark_config_utils", "benchmark_context_utils",
                    "benchmark_kg_slice_utils")  # fmt: skip
-W4S_CONFIG = "config/benchmark/cancer_plus_demographics_v2_bench_L_W4S.json"
-QUESTION_DIR = "runs/v3_20261021_rw/ab_questions"
-QUESTION_FILES = ("regular_live.json", "temporal_live.json", "hierarchy_live.json")
-CACHE_DIR = "runs/v3_20261021_rw/ab_w4s/cache"
-KG_CACHE = "kg_cancer_plus_demographics_v2.json"
 PUBLIC_QUESTION_KEYS = ("id", "class", "question", "result_shape", "needs", "precision",
                         "tolerance", "category_columns")  # fmt: skip
 OVERFLOW_FINDING = "overflow"
@@ -44,67 +39,42 @@ class SContextLike(Protocol):
 
 
 @dataclass(frozen=True)
-class Limits:
-    """Frozen per run (manifest.json); input_ceiling and repair_reserve come from the CLI."""
-
-    input_ceiling: int = 16_000
-    # Two repair turns of 1,033 tokens, the largest Oct 21 repair (fit.calibrate).
-    repair_reserve: int = 2_066
-    output_ceiling: int = 8_192
-    # Highest and lowest chars/prompt_tokens over 186 matched Oct 21 first attempts. The
-    # guard refuses only a certain overflow (fewest tokens); the other is recorded.
-    guard_chars_per_token: float = 2.334
-    conservative_chars_per_token: float = 2.08
-    row_limit: int = 1_000
-    max_repairs: int = 2
-
-    @property
-    def first_prompt_ceiling(self) -> int:
-        return self.input_ceiling - self.repair_reserve
-
-
-@dataclass(frozen=True)
 class Prices:
     input_usd_per_1m: float
     output_usd_per_1m: float
-
-
-@dataclass(frozen=True)
-class Knobs:
-    budget_tokens: int | None = None
-    values_top_k: int | None = None
-    description_cap_chars: int | None = None
-
-
-# Frozen by the coordinator in run-settings.md; Knobs() keeps the Oct 21 W4S values.
-BENCHMARK_KNOBS = Knobs(budget_tokens=6_000, values_top_k=5, description_cap_chars=160)
 
 
 def estimate_tokens_from_chars(chars: int, messages: int, chars_per_token: float) -> int:
     return math.ceil(chars / chars_per_token) + 4 * messages
 
 
+KNOB_ARGS = ("budget_tokens", "values_top_k", "description_cap_chars")
+LIMIT_ARGS = ("input_ceiling", "repair_reserve")
+
+
 def add_knob_args(parser: argparse.ArgumentParser) -> None:
-    for name, default in zip(("budget-tokens", "values-top-k", "description-cap-chars"),
-                             dataclasses.astuple(BENCHMARK_KNOBS), strict=True):  # fmt: skip
-        parser.add_argument(f"--{name}", type=int, default=default,
-                            help=f"common override for every arm (default {default})")
+    for name in KNOB_ARGS:
+        parser.add_argument(f"--{name.replace('_', '-')}", type=int,
+                            help="common override for every arm (default: the profile knobs)")
 
 
-def knobs_from(args: argparse.Namespace) -> Knobs:
-    return Knobs(args.budget_tokens, args.values_top_k, args.description_cap_chars)
+def knobs_from(args: argparse.Namespace, profile_knobs: Knobs) -> Knobs:
+    return profile_knobs.model_copy(update=_given(args, KNOB_ARGS))
 
 
 def add_limit_args(parser: argparse.ArgumentParser) -> None:
-    defaults = Limits()
-    parser.add_argument("--input-ceiling", type=int, default=defaults.input_ceiling,
-                        help="whole-request input ceiling for every arm")
-    parser.add_argument("--repair-reserve", type=int, default=defaults.repair_reserve,
-                        help="tokens kept free for two repairs on the first prompt")
+    parser.add_argument("--input-ceiling", type=int,
+                        help="whole-request input ceiling for every arm (default: profile)")
+    parser.add_argument("--repair-reserve", type=int,
+                        help="tokens kept free for two repairs (default: profile)")
 
 
-def limits_from(args: argparse.Namespace) -> Limits:
-    return Limits(input_ceiling=args.input_ceiling, repair_reserve=args.repair_reserve)
+def limits_from(args: argparse.Namespace, profile_limits: Limits) -> Limits:
+    return profile_limits.model_copy(update=_given(args, LIMIT_ARGS))
+
+
+def _given(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, int]:
+    return {name: getattr(args, name) for name in names if getattr(args, name) is not None}
 
 
 def cap_values(values: dict[str, Any], top_k: int) -> dict[str, Any]:
@@ -142,11 +112,11 @@ class Meter:
     request_estimates: list[list[int]] = field(default_factory=list)
 
 
-def load_harness(frozen: Path) -> SimpleNamespace:
+def load_harness(frozen: Path, layout: Harness) -> SimpleNamespace:
     src = str(frozen / "src")
     if src not in sys.path:
         sys.path.insert(0, src)
-    modules = {n: importlib.import_module(f"{HARNESS_PACKAGE}.{n}") for n in HARNESS_MODULES}
+    modules = {n: importlib.import_module(f"{layout.package}.{n}") for n in HARNESS_MODULES}
     loaded_from = Path(modules["benchmark_workflow"].__file__ or "").resolve()
     if not loaded_from.is_relative_to(Path(src).resolve()):
         raise RuntimeError(f"harness imported from {loaded_from}, not the frozen copy {src}")
@@ -157,28 +127,28 @@ def load_harness(frozen: Path) -> SimpleNamespace:
     )  # fmt: skip
 
 
-def question_paths(frozen: Path) -> list[Path]:
-    return [frozen / QUESTION_DIR / name for name in QUESTION_FILES]
+def question_paths(frozen: Path, layout: Harness) -> list[Path]:
+    return [frozen / layout.question_dir / name for name in layout.question_files]
 
 
-def _question_entries(frozen: Path) -> list[dict[str, Any]]:
+def _question_entries(frozen: Path, layout: Harness) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
-    for path in question_paths(frozen):
+    for path in question_paths(frozen, layout):
         raw = json.loads(path.read_text())
         for entry in raw["questions"]:
             entries.append({k: entry[k] for k in PUBLIC_QUESTION_KEYS if k in entry})
     return entries
 
 
-def question_ids(frozen: Path) -> list[str]:
-    return [str(entry["id"]) for entry in _question_entries(frozen)]
+def question_ids(frozen: Path, layout: Harness) -> list[str]:
+    return [str(entry["id"]) for entry in _question_entries(frozen, layout)]
 
 
 def public_questions(
-    harness: SimpleNamespace, frozen: Path, ids: tuple[str, ...] = ()
+    harness: SimpleNamespace, frozen: Path, layout: Harness, ids: tuple[str, ...] = ()
 ) -> list[Any]:
     """Harness Question records in file order with gold_answer None and no gold SQL."""
-    chosen = [e for e in _question_entries(frozen) if not ids or e["id"] in ids]
+    chosen = [e for e in _question_entries(frozen, layout) if not ids or e["id"] in ids]
     missing = set(ids) - {e["id"] for e in chosen}
     if missing:
         raise ValueError(f"unknown question ids: {', '.join(sorted(missing))}")
@@ -214,24 +184,24 @@ class SArmContext:
         )
 
 
-def arm_runtimes(harness: SimpleNamespace, frozen: Path, executors: Mapping[str, Any],
-                 s_provider: Callable[[str], SContextLike] | None,
-                 limits: Limits = Limits(), knobs: Knobs = Knobs()) -> dict[str, Any]:  # fmt: skip
-    """One ArmRuntime per arm in ``executors``, all with W4S rules and matched limits."""
-    config = _with_knobs(harness.config.load_bench_config(frozen / W4S_CONFIG), knobs)
+def arm_runtimes(harness: SimpleNamespace, frozen: Path, layout: Harness,
+                 executors: Mapping[str, Any], s_provider: Callable[[str], SContextLike] | None,
+                 limits: Limits, knobs: Knobs = Knobs()) -> dict[str, Any]:  # fmt: skip
+    """One ArmRuntime per arm in ``executors``, all with the config rules and matched limits."""
+    config = _with_knobs(harness.config.load_bench_config(frozen / layout.config), knobs)
     policy, budget = config.policy, config.budget_tokens
     contexts: dict[str, Callable[[str], Any]] = {}
     known: dict[str, tuple[str, ...]] = {"A": (), "S": ()}
     if "A" in executors:
-        schema = harness.config.load_json(frozen / CACHE_DIR / "schema.json")
-        values = harness.config.load_json(frozen / CACHE_DIR / "values.json")
+        schema = harness.config.load_json(frozen / layout.cache_dir / "schema.json")
+        values = harness.config.load_json(frozen / layout.cache_dir / "values.json")
         if knobs.values_top_k is not None:
             values = cap_values(values, knobs.values_top_k)
         contexts["A"] = lambda _q: harness.context.arm_a_context(
             schema, config.relations, policy, budget, values
         )
     if "B" in executors:
-        kg = harness.config.load_json(frozen / CACHE_DIR / KG_CACHE)
+        kg = harness.config.load_json(frozen / layout.cache_dir / layout.kg_cache)
         contexts["B"] = lambda q: harness.kg.arm_b_context(
             kg, q, row_concepts=config.row_concepts, always_concepts=config.always_concepts,
             policy=policy, budget=budget, description_cap=config.description_cap_chars,
@@ -334,12 +304,12 @@ def load_s_provider(spec: str) -> Callable[[str], SContextLike]:
     return provider
 
 
-def guard_mcp_tools(executor: Any) -> Any:
-    """Route every Timbr tools/call through the arm B allowlist."""
+def guard_mcp_tools(executor: Any, timbr: Timbr) -> Any:
+    """Route every MCP tools/call through the profile's arm B allowlist."""
     call_tool = executor.call_tool
 
     def guarded(tool: str, arguments: dict[str, Any]) -> Any:
-        return call_tool(require_mcp_tool(tool), arguments)
+        return call_tool(require_mcp_tool(tool, timbr), arguments)
 
     executor.call_tool = guarded
     return executor

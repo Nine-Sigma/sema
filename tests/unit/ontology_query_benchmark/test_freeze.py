@@ -9,25 +9,27 @@ from showcase.ontology_query_benchmark import freeze
 
 pytestmark = pytest.mark.unit
 
+PATTERNS = ("src/toy/*.py", "pyproject.toml", "uv.lock", "config/bench.json",
+            "config/*_spec.json", "questions/*.json", "gold.json", "cache/*")
 CLOSURE_FILES = (
-    "src/timbr_demographics_poc/__init__.py",
-    "src/timbr_demographics_poc/benchmark_workflow.py",
+    "src/toy/__init__.py",
+    "src/toy/workflow.py",
     "pyproject.toml",
     "uv.lock",
-    "config/benchmark/cancer_plus_demographics_v2_bench_L_W4S.json",
-    "config/demographics_product_spec_cpd_v2.json",
-    "config/cancer_registry_product_spec_cpd_v2.json",
-    "runs/v3_20261021_rw/ab_questions/regular_live.json",
-    "runs/v3_20261021_rw/ab_questions/temporal_live.json",
-    "runs/v3_20261021_rw/ab_questions/hierarchy_live.json",
-    "runs/v3_20261021_rw/gold_live.json",
-    "runs/v3_20261021_rw/ab_w4s/cache/schema.json",
-    "runs/v3_20261021_rw/ab_w4s/cache/kg_cancer_plus_demographics_v2.json",
+    "config/bench.json",
+    "config/people_spec.json",
+    "config/events_spec.json",
+    "questions/regular.json",
+    "questions/temporal.json",
+    "questions/hierarchy.json",
+    "gold.json",
+    "cache/schema.json",
+    "cache/kg.json",
 )
 OUTSIDE_CLOSURE = (
-    "config/benchmark/cancer_plus_demographics_v2_bench_L_W4.json",
-    "src/timbr_demographics_poc/__pycache__/x.cpython-312.pyc",
-    "runs/v3_20261021_rw/ab_w4s/regular_live/report.json",
+    "config/bench_old.json",
+    "src/toy/__pycache__/x.cpython-312.pyc",
+    "runs/report.json",
 )
 
 
@@ -49,7 +51,7 @@ def _git(root: Path, *args: str) -> None:
 
 def test_freeze_copies_exactly_the_declared_closure_with_hashes(tmp_path: Path) -> None:
     source = _harness(tmp_path / "harness")
-    target = freeze.freeze(source, tmp_path / "frozen")
+    target = freeze.freeze(source, tmp_path / "frozen", PATTERNS)
     closure = json.loads((target / "closure.json").read_text())
     assert sorted(closure["files"]) == sorted(CLOSURE_FILES)
     for rel, digest in closure["files"].items():
@@ -61,17 +63,17 @@ def test_freeze_copies_exactly_the_declared_closure_with_hashes(tmp_path: Path) 
 
 def test_freeze_is_content_addressed_and_idempotent(tmp_path: Path) -> None:
     source = _harness(tmp_path / "harness")
-    first = freeze.freeze(source, tmp_path / "frozen")
-    assert freeze.freeze(source, tmp_path / "frozen") == first
+    first = freeze.freeze(source, tmp_path / "frozen", PATTERNS)
+    assert freeze.freeze(source, tmp_path / "frozen", PATTERNS) == first
     (source / "uv.lock").write_text("changed\n")
-    assert freeze.freeze(source, tmp_path / "frozen") != first
+    assert freeze.freeze(source, tmp_path / "frozen", PATTERNS) != first
 
 
 def test_freeze_fails_when_a_declared_input_is_missing(tmp_path: Path) -> None:
     source = _harness(tmp_path / "harness")
-    (source / "runs/v3_20261021_rw/gold_live.json").unlink()
-    with pytest.raises(freeze.FreezeError, match="gold_live.json"):
-        freeze.freeze(source, tmp_path / "frozen")
+    (source / "gold.json").unlink()
+    with pytest.raises(freeze.FreezeError, match="gold.json"):
+        freeze.freeze(source, tmp_path / "frozen", PATTERNS)
 
 
 def test_freeze_fails_when_a_source_changes_during_the_copy(
@@ -88,7 +90,7 @@ def test_freeze_fails_when_a_source_changes_during_the_copy(
 
     monkeypatch.setattr(freeze.shutil, "copy2", copy_then_edit)
     with pytest.raises(freeze.FreezeError, match="source changed.*uv.lock"):
-        freeze.freeze(source, tmp_path / "frozen")
+        freeze.freeze(source, tmp_path / "frozen", PATTERNS)
     assert not list((tmp_path / "frozen").glob("*/closure.json"))
 
 
@@ -104,7 +106,7 @@ def test_freeze_fails_when_a_copy_differs(tmp_path: Path, monkeypatch: pytest.Mo
 
     monkeypatch.setattr(freeze.shutil, "copy2", corrupt)
     with pytest.raises(freeze.FreezeError, match="copy differs.*pyproject.toml"):
-        freeze.freeze(source, tmp_path / "frozen")
+        freeze.freeze(source, tmp_path / "frozen", PATTERNS)
 
 
 def test_freeze_records_git_head_and_dirty_files(tmp_path: Path) -> None:
@@ -113,7 +115,7 @@ def test_freeze_records_git_head_and_dirty_files(tmp_path: Path) -> None:
     _git(source, "add", "-A")
     _git(source, "commit", "-q", "-m", "base")
     (source / "pyproject.toml").write_text("dirty\n")
-    target = freeze.freeze(source, tmp_path / "frozen")
+    target = freeze.freeze(source, tmp_path / "frozen", PATTERNS)
     closure = json.loads((target / "closure.json").read_text())
     assert len(closure["git_head"]) == 40
     assert any(line.endswith("pyproject.toml") for line in closure["git_dirty"])

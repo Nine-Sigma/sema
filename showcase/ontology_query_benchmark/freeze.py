@@ -1,6 +1,7 @@
-"""Copy the corrected Timbr harness runtime closure into a content-addressed directory.
+"""Copy a profile's harness runtime closure into a content-addressed directory.
 
-python -m showcase.ontology_query_benchmark.freeze --out <dir> [--source <harness root>]
+python -m showcase.ontology_query_benchmark.freeze --profile <profile.yaml> --out <dir>
+    [--source <harness root>]
 """
 
 import argparse
@@ -8,23 +9,10 @@ import hashlib
 import json
 import shutil
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
-HARNESS_ROOT = Path(
-    "/Users/deanb/dev/partner/partnerplatform/partner-harness/capabilities/ontology/"
-    "databricks-timbr/poc/timbr-demographics-poc"
-)
-CLOSURE_PATTERNS = (
-    "src/timbr_demographics_poc/*.py",
-    "pyproject.toml",
-    "uv.lock",
-    "config/benchmark/cancer_plus_demographics_v2_bench_L_W4S.json",
-    "config/*_product_spec_cpd_v2.json",
-    "runs/v3_20261021_rw/ab_questions/*_live.json",
-    "runs/v3_20261021_rw/gold_live.json",
-    "runs/v3_20261021_rw/ab_w4s/cache/*",
-)
-
+from showcase.ontology_query_benchmark.profile import load_profile
 
 class FreezeError(RuntimeError):
     pass
@@ -34,9 +22,9 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def closure_files(source: Path) -> list[str]:
+def closure_files(source: Path, patterns: Sequence[str]) -> list[str]:
     files: set[str] = set()
-    for pattern in CLOSURE_PATTERNS:
+    for pattern in patterns:
         matched = [p for p in source.glob(pattern) if p.is_file()]
         if not matched:
             raise FreezeError(f"declared input missing: {pattern}")
@@ -44,9 +32,9 @@ def closure_files(source: Path) -> list[str]:
     return sorted(files)
 
 
-def freeze(source: Path, out_root: Path) -> Path:
+def freeze(source: Path, out_root: Path, patterns: Sequence[str]) -> Path:
     """Copy the closure to ``out_root/<closure id>``; reuse an identical earlier freeze."""
-    before = {rel: sha256_file(source / rel) for rel in closure_files(source)}
+    before = {rel: sha256_file(source / rel) for rel in closure_files(source, patterns)}
     closure_id = hashlib.sha256(
         "".join(f"{rel}\0{digest}\n" for rel, digest in before.items()).encode()
     ).hexdigest()
@@ -94,10 +82,12 @@ def _git_state(source: Path) -> dict[str, object]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--profile", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--source", type=Path, default=HARNESS_ROOT)
+    parser.add_argument("--source", type=Path, help="default: the profile's harness root")
     args = parser.parse_args(argv)
-    print(freeze(args.source, args.out))
+    harness = load_profile(args.profile).harness
+    print(freeze(args.source or harness.root, args.out, harness.closure))
     return 0
 
 
