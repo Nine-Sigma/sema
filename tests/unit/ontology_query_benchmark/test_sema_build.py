@@ -40,6 +40,7 @@ from tests.unit.ontology_query_benchmark.test_sema_bindings import (
     EVENTS,
     ID_SUFFIX,
     PEOPLE,
+    RID,
     catalog_fixture,
     facts_fixture,
     write_fixture,
@@ -279,3 +280,16 @@ def test_build_entry_in_a_clean_process_goes_on_to_the_clients(
     no_client(monkeypatch)
     with pytest.raises(ClientBuilt):
         sema_build.main(build_args(tmp_path))
+
+
+def test_a_spec_entity_identity_reaches_the_entity_node(tmp_path: Path) -> None:
+    identity = {"key_columns": [RID, "site_S1"], "exclude_null_keys": True}
+    loader = MagicMock()
+    build_scoped_graph(
+        loader, _catalog(),
+        load_sidecar(write_fixture(tmp_path, events_identity=identity), tmp_path),
+        facts_fixture(tmp_path), _embedder(), dimensions=4, embedder_model="toy-embed",
+    )
+    projected = {p["name"]: p["identity"] for p in _cypher_params(loader) if "identity" in p}
+    assert projected[PEOPLE] is None
+    assert json.loads(projected[EVENTS])["key_columns"] == [RID, "site_S1"]

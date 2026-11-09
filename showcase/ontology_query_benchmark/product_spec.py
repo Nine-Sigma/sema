@@ -5,7 +5,10 @@ in its sidecar; the library extract reads the element ids the documents declare.
 module reads a document only through ``parse_product_spec``. The keys read are:
 
 - ``product_id``: the product's id; other products' relationships name it.
-- ``entities[]``: ``grain`` (prose) and ``key_columns``.
+- ``entities[]``: ``entity_id``, ``grain`` (prose) and ``key_columns``; optionally an
+  ``identity`` block (core ``EntityIdentity``: key columns, null-key policy and per-attribute
+  resolution rules) that compiles to an executable entity. At most one entity per product
+  declares one.
 - ``fields[]``: ``column_id`` (the library's id for the column), ``column_name`` (the
   physical column), ``physical_type`` and ``strategy``; optionally ``de_id`` (the library
   element id), ``concept_name``, ``label_column`` and ``mapping_type_column``. Strategy
@@ -21,8 +24,11 @@ from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import Path
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
+
+from sema.models.target.identity import EntityIdentity
 
 GOVERNED_STRATEGY = "pass_through"
 
@@ -67,8 +73,10 @@ class SpecField(_Doc):
 
 
 class SpecEntity(_Doc):
+    entity_id: str | None = None
     grain: str = ""
     key_columns: tuple[str, ...] = ()
+    identity: EntityIdentity | None = None
 
 
 class SpecRelationship(_Doc):
@@ -83,6 +91,16 @@ class ProductSpecDoc(_Doc):
     entities: tuple[SpecEntity, ...] = ()
     fields: tuple[SpecField, ...]
     relationships: tuple[SpecRelationship, ...] = ()
+
+    @property
+    def identity_entity(self) -> SpecEntity | None:
+        return next((e for e in self.entities if e.identity is not None), None)
+
+    @model_validator(mode="after")
+    def _one_identity(self) -> Self:
+        if sum(e.identity is not None for e in self.entities) > 1:
+            raise ValueError("a product declares at most one entity identity")
+        return self
 
 
 def parse_product_spec(data: bytes, source: Path) -> ProductSpecDoc:

@@ -1,0 +1,81 @@
+"""Arm S context: a declared entity identity renders as an executable CTE."""
+
+from __future__ import annotations
+
+import math
+from pathlib import Path
+
+import duckdb
+import pytest
+
+from tests.unit.ontology_query_benchmark.test_sema_bindings import EVENTS, PROMPT_FRAME_CHARS, RID
+from tests.unit.ontology_query_benchmark.test_sema_context import (
+    EVENTS_ENTITY,
+    LIMITS,
+    PEOPLE_ENTITY,
+    QUESTION,
+    _first_prompt,
+    _overflows,
+    _provider,
+)
+
+pytestmark = pytest.mark.unit
+
+
+EVENT_IDENTITY = {
+    "key_columns": [RID, "site_S1"],
+    "attributes": [
+        {"column": "site_S1_label", "rule": "min_by", "by": "event_day",
+         "prefer": {"column": "site_S1_mapping_type", "value": "preferred"}},
+        {"column": "event_day", "rule": "min", "name": "first_day"},
+    ],
+}  # fmt: skip
+EVENT_ROWS = [
+    ("e1", "r1", "P1", "North b", "other", 2),
+    ("e2", "r1", "P1", "North a", "other", 2),
+    ("e3", "r1", "P2", "South x", "other", 1),
+    ("e4", "r1", "P2", "South y", "preferred", 5),
+    ("e5", "r1", None, None, None, 3),
+    ("e6", None, "P1", "North p", "other", 4),
+    ("e7", None, "P1", "North q", "other", 6),
+]
+
+
+def _entity_cte(text: str, entity: str) -> str:
+    lines = text.splitlines()
+    (at,) = [i for i, line in enumerate(lines) if line.startswith(f"  ENTITY {entity} (executable")]
+    return lines[at + 1].strip()
+
+
+def test_a_declared_entity_identity_is_rendered_as_an_executable_cte(tmp_path: Path) -> None:
+    ctx = _provider(tmp_path, [EVENTS_ENTITY], events_identity=EVENT_IDENTITY)("How many events?")
+    assert f"  ENTITY event (executable; one row per {RID}, site_S1)" in ctx.text
+    con = duckdb.connect()
+    con.execute("ATTACH ':memory:' AS cat")
+    con.execute("CREATE SCHEMA cat.sch")
+    con.execute(f"CREATE TABLE cat.sch.{EVENTS} (row_id VARCHAR, {RID} VARCHAR, site_S1 VARCHAR, "
+                "site_S1_label VARCHAR, site_S1_mapping_type VARCHAR, event_day INTEGER)")
+    con.executemany(f"INSERT INTO cat.sch.{EVENTS} VALUES (?, ?, ?, ?, ?, ?)", EVENT_ROWS)
+    cte = _entity_cte(ctx.text, "event")
+    rows = con.execute(f"{cte} SELECT * FROM event ORDER BY ALL NULLS LAST").fetchall()
+    assert rows == [
+        ("r1", "P1", "North a", 2), ("r1", "P2", "South y", 1),
+        ("r1", None, None, 3), (None, "P1", "North p", 4),
+    ]
+
+
+def test_an_entity_identity_outside_the_retrieved_tables_is_not_rendered(tmp_path: Path) -> None:
+    ctx = _provider(tmp_path, [PEOPLE_ENTITY], events_identity=EVENT_IDENTITY)(QUESTION)
+    assert "ENTITY event" not in ctx.text
+
+
+def test_an_entity_cte_counts_toward_the_context_budget(tmp_path: Path) -> None:
+    plain = len(_provider(tmp_path / "a", [EVENTS_ENTITY])("q").text)
+    needed = (plain + PROMPT_FRAME_CHARS + 1) / LIMITS.conservative_chars_per_token
+    limits = _first_prompt(math.ceil(needed) + 1)
+    fits = _provider(tmp_path / "b", [EVENTS_ENTITY], limits=limits)("q")
+    grown = _provider(tmp_path / "c", [EVENTS_ENTITY], limits=limits,
+                      events_identity=EVENT_IDENTITY)("q")  # fmt: skip
+    assert not _overflows(fits.findings)
+    assert "ENTITY event (executable" in grown.text
+    assert _overflows(grown.findings)
