@@ -1,0 +1,160 @@
+"""A benchmark source profile: every source-specific value, parsed once and frozen.
+
+Code reads hosts, endpoints, harness layout, limits, knobs, extract relations and S inputs
+only from a loaded profile. Relative paths resolve against the profile file's directory.
+"""
+
+from __future__ import annotations
+
+import itertools
+from pathlib import Path
+from typing import Literal
+
+import yaml
+from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
+
+
+class _Frozen(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+def _resolved(value: Path, info: ValidationInfo) -> Path:
+    base = (info.context or {}).get("base")
+    return value if value.is_absolute() or base is None else Path(base) / value
+
+
+class Routing(_Frozen):
+    databricks_profile: str
+    host: str
+    sql_warehouse_id: str
+    chat_endpoint: str
+    embedding_endpoint: str
+    embedding_dimensions: int
+    model_timeout_s: float
+
+    @field_validator("host")
+    @classmethod
+    def _normalized(cls, host: str) -> str:
+        if host != host.lower().rstrip("/") or not host.startswith("https://"):
+            raise ValueError(f"host {host!r} must be lowercase https:// without a trailing /")
+        return host
+
+
+class EnvKeys(_Frozen):
+    token: str
+    ca_bundle: str
+    verify_ssl: str
+
+
+class Timbr(_Frozen):
+    url: str
+    mcp_path: str
+    ontology: str
+    allowed_tools: frozenset[str]
+    env_keys: EnvKeys
+
+    @property
+    def mcp_url(self) -> str:
+        return f"{self.url.rstrip('/')}{self.mcp_path}"
+
+
+class Harness(_Frozen):
+    root: Path
+    package: str
+    config: str
+    question_dir: str
+    question_files: tuple[str, ...]
+    cache_dir: str
+    kg_cache: str
+    receipts: str
+    closure: tuple[str, ...]
+    retired_questions: frozenset[str] = frozenset()
+
+    _root = field_validator("root")(_resolved)
+
+
+class Limits(_Frozen):
+    """Frozen per run (manifest.json); input_ceiling and repair_reserve may come from the CLI."""
+
+    input_ceiling: int
+    repair_reserve: int
+    output_ceiling: int
+    guard_chars_per_token: float
+    conservative_chars_per_token: float
+    row_limit: int
+    max_repairs: int
+
+    @property
+    def first_prompt_ceiling(self) -> int:
+        return self.input_ceiling - self.repair_reserve
+
+
+class Knobs(_Frozen):
+    """Common context knobs; None keeps the harness config value."""
+
+    budget_tokens: int | None = None
+    values_top_k: int | None = None
+    description_cap_chars: int | None = None
+
+
+class Sweep(_Frozen):
+    budget_tokens: tuple[int, ...]
+    values_top_k: tuple[int, ...]
+    description_cap_chars: tuple[int, ...]
+    input_ceiling: tuple[int, ...]
+
+    def grid(self) -> list[tuple[Knobs, int]]:
+        points = itertools.product(self.budget_tokens, self.values_top_k,
+                                   self.description_cap_chars, self.input_ceiling)  # fmt: skip
+        return [(Knobs(budget_tokens=b, values_top_k=k, description_cap_chars=c), ceiling)
+                for b, k, c, ceiling in points]  # fmt: skip
+
+
+class ExtractRelation(_Frozen):
+    relation: str
+    key: str
+    order_keys: tuple[str, ...]
+
+
+class ElementRelation(ExtractRelation):
+    member_key: str
+
+
+class Extract(_Frozen):
+    """The scoped library projection: element rows by declared id, then their members."""
+
+    catalog: str
+    schema_name: str
+    id_pattern: str
+    elements: ElementRelation
+    members: ExtractRelation
+    row_limit: int
+
+    @property
+    def relations(self) -> tuple[str, str]:
+        return self.elements.relation, self.members.relation
+
+
+class Sema(_Frozen):
+    sidecar: Path
+    concept_spec: Path
+
+    _paths = field_validator("sidecar", "concept_spec")(_resolved)
+
+
+class Profile(_Frozen):
+    profile_version: Literal[1]
+    name: str
+    routing: Routing
+    timbr: Timbr
+    harness: Harness
+    limits: Limits
+    knobs: Knobs
+    sweep: Sweep
+    extract: Extract
+    sema: Sema
+
+
+def load_profile(path: Path) -> Profile:
+    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    return Profile.model_validate(raw, context={"base": Path(path).resolve().parent})

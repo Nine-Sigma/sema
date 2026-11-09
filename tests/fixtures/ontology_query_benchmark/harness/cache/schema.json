@@ -1,0 +1,36 @@
+{
+ "relations": {
+  "main.s.person": {
+   "columns": [
+    [
+     "rid",
+     "string"
+    ],
+    [
+     "status",
+     "string"
+    ],
+    [
+     "region",
+     "string"
+    ]
+   ]
+  },
+  "main.s.visit": {
+   "columns": [
+    [
+     "visit_id",
+     "string"
+    ],
+    [
+     "rid",
+     "string"
+    ],
+    [
+     "kind",
+     "string"
+    ]
+   ]
+  }
+ }
+}
