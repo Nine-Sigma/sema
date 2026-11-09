@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import dataclasses
 import re
+import string
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
 from sema.models.context import SemanticContextObject
-from showcase.ontology_query_benchmark.product_spec import SpecRelationship
+from showcase.ontology_query_benchmark.product_spec import SpecEntity, SpecRelationship
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     ProductSpec,
@@ -243,9 +244,9 @@ def _add_grain(
         table, relation = p.pin.table, sidecar.relation(p.pin.table)
         lines: list[tuple[str, list[TableColumn], str]] = []
         for entity in p.doc.entities:
-            keys = ", ".join(entity.key_columns)
-            names = [(table, k) for k in entity.key_columns]
-            lines.append((f"  {relation}: {entity.grain}; key {keys}", names, "grain line"))
+            units = _grain_units(rendering, exposure, table, relation, entity)
+            if units:
+                lines.append((f"  {relation}: {'; '.join(units)}", [], "grain line"))
         for rel in p.doc.relationships:
             target = _table_of(products, rel)
             pairs = " AND ".join(
@@ -260,8 +261,9 @@ def _add_grain(
                 columns=", ".join(sidecar.grain_columns),
                 surrogate_row_id=sidecar.surrogate_row_id,
             )
+            fields = {f for _, f, _, _ in string.Formatter().parse(sidecar.grain_note) if f}
             named = (*sidecar.grain_columns, sidecar.surrogate_row_id)
-            if "{surrogate_row_id}" not in sidecar.grain_note:
+            if "surrogate_row_id" not in fields:
                 named = sidecar.grain_columns
             names = [(table, c) for c in named]
             lines.append((f"  {note}", names, "grain note"))
@@ -269,6 +271,20 @@ def _add_grain(
             text for text, names, kind in lines
             if _kept(rendering, exposure, names, relation, kind)
         )
+
+
+def _grain_units(
+    rendering: Rendering, exposure: Exposure, table: str, relation: str, entity: SpecEntity
+) -> list[str]:
+    """The grain sentence and its key clause are withheld separately, never rewritten."""
+    words = [(table, w) for w in re.findall(r"\w+", entity.grain)]
+    keys = [(table, k) for k in entity.key_columns]
+    units = []
+    if _kept(rendering, exposure, words, relation, "grain sentence"):
+        units.append(entity.grain)
+    if _kept(rendering, exposure, keys, relation, "grain key"):
+        units.append(f"key {', '.join(entity.key_columns)}")
+    return units
 
 
 def _table_of(products: tuple[ProductSpec, ...], rel: SpecRelationship) -> str:

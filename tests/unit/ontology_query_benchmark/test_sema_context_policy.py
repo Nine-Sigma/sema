@@ -94,6 +94,35 @@ def test_a_grain_note_that_does_not_name_a_denied_column_is_kept(
     assert "row_id" not in ctx.text
 
 
+def test_a_denied_key_drops_only_the_key_clause_and_keeps_the_grain_sentence(
+    tmp_path: Path, harness: SimpleNamespace
+) -> None:
+    policy = _policy(harness, "row_id")
+    ctx = _provider(tmp_path, [EVENTS_ENTITY])(EVENTS_QUESTION, policy.is_denied)
+    assert f"  cat.sch.{EVENTS}: one row per event row\n" in ctx.text
+    assert "row_id" not in ctx.text
+    assert (f"cat.sch.{EVENTS}", "row_id") in [(f.relation, f.column) for f in ctx.findings]
+
+
+def test_a_grain_sentence_naming_a_denied_column_is_withheld_and_its_key_kept(
+    tmp_path: Path, harness: SimpleNamespace
+) -> None:
+    ctx = _provider(tmp_path, [PEOPLE_ENTITY])(QUESTION, _policy(harness, "rid").is_denied)
+    assert "one row per rid" not in ctx.text
+    assert f"  cat.sch.{PEOPLE}: key {RID}" in ctx.text
+    assert any(f.column == "rid" and "grain sentence" in f.message for f in ctx.findings)
+
+
+@pytest.mark.parametrize("field", ["{surrogate_row_id!s}", "{surrogate_row_id:>10}"])
+def test_a_grain_note_field_with_a_conversion_or_format_is_still_checked(
+    tmp_path: Path, harness: SimpleNamespace, field: str
+) -> None:
+    provider = _provider(tmp_path, [EVENTS_ENTITY], grain_note=f"Grain: {{columns}}. {field}.")
+    ctx = provider(EVENTS_QUESTION, _policy(harness, "row_id").is_denied)
+    assert "row_id" not in ctx.text
+    assert any(f.column == "row_id" and "note" in f.message for f in ctx.findings)
+
+
 def test_without_a_cross_product_denied_name_the_context_is_unchanged(
     tmp_path: Path, harness: SimpleNamespace
 ) -> None:
