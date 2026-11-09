@@ -2,7 +2,8 @@
 
 python -m showcase.ontology_query_benchmark.fit --profile <profile.yaml> --frozen <closure dir>
     [--receipts <dir>] [--budget-tokens N]   # receipts default: the profile's harness receipts
-    [--values-top-k K] [--description-cap-chars C] [--s-context module:function] [--out f]
+    [--values-top-k K] [--description-cap-chars C] [--out f]
+    [--neo4j-uri U --s-manifest M --s-projection P --s-projection-receipt R]  # adds arm S (live)
     [--input-ceiling N] [--repair-reserve N]   # default: profile
     [--sweep]   # every profile sweep point (knobs x ceiling) instead of one setting
 
@@ -16,16 +17,32 @@ first-prompt limit. A repair turn is the prompt_tokens growth between consecutiv
 import argparse
 import dataclasses
 import json
-from dataclasses import dataclass
+import os
 import statistics
+import sys
 from collections.abc import Callable, Iterable
+from contextlib import AbstractContextManager, nullcontext
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 from showcase.ontology_query_benchmark import runner_utils as ru
 from showcase.ontology_query_benchmark.freeze import sha256_file
-from showcase.ontology_query_benchmark.profile import Harness, Knobs, Limits, load_profile
+from showcase.ontology_query_benchmark.profile import (
+    Harness,
+    Knobs,
+    Limits,
+    Profile,
+    load_profile,
+)
+from showcase.ontology_query_benchmark.routing import require_clean_process
+from showcase.ontology_query_benchmark.runner_live_utils import (
+    S_INPUTS,
+    add_s_args,
+    open_s_provider,
+)
+from showcase.ontology_query_benchmark.sema_context import SContextProvider
 
 
 @dataclass(frozen=True)
@@ -158,12 +175,23 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--frozen", type=Path, required=True)
     parser.add_argument("--receipts", type=Path)
-    parser.add_argument("--s-context")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--sweep", action="store_true", help="report the profile sweep grid")
     ru.add_knob_args(parser)
     ru.add_limit_args(parser)
+    add_s_args(parser)
     return parser.parse_args(argv)
+
+
+def _body(args: argparse.Namespace, harness: SimpleNamespace, profile: Profile,
+          ratios: Ratios, limits: Limits, provider: SContextProvider | None) -> dict[str, Any]:
+    layout = profile.harness
+    if args.sweep:
+        return {"sweep": sweep(harness, args.frozen, layout, profile.sweep.grid(), ratios=ratios,
+                               limits=limits, s_provider=provider)}
+    report = fit_report(harness, args.frozen, layout, ru.knobs_from(args, profile.knobs),
+                        ratios=ratios, limits=limits, s_provider=provider)
+    return {"knobs": report["knobs"], "arms": report["arms"], "rows": report["rows"]}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -176,20 +204,17 @@ def main(argv: list[str] | None = None) -> int:
     calibration = calibrate(harness, args.frozen, layout, receipts, limits)
     if not calibration["records"]:
         raise ValueError("no recorded receipt matches the frozen inputs; cannot calibrate")
-    provider = ru.load_s_provider(args.s_context) if args.s_context else None
+    s_open: AbstractContextManager[SContextProvider | None] = nullcontext()
+    if any(getattr(args, name) is not None for name in S_INPUTS):
+        require_clean_process(os.environ, sys.modules, profile.routing)
+        s_open = open_s_provider(args, profile)
     ratio = calibration["ratio"]
     ratios = Ratios(ratio["min"], ratio["median"], ratio["max"])
     head = {"ratios": dataclasses.asdict(ratios), "limits": limits.model_dump(),
             "calibration": {k: calibration[k] for k in ("ratio", "records", "skipped_shards",
                                                          "repair_turn_tokens")}}  # fmt: skip
-    if args.sweep:
-        body: dict[str, Any] = {"sweep": sweep(harness, args.frozen, layout,
-                                               profile.sweep.grid(), ratios=ratios,
-                                               limits=limits, s_provider=provider)}  # fmt: skip
-    else:
-        report = fit_report(harness, args.frozen, layout, ru.knobs_from(args, profile.knobs),
-                            ratios=ratios, limits=limits, s_provider=provider)  # fmt: skip
-        body = {"knobs": report["knobs"], "arms": report["arms"], "rows": report["rows"]}
+    with s_open as provider:
+        body = _body(args, harness, profile, ratios, limits, provider)
     result = head | body | {"receipt_files": calibration["receipt_files"]}
     if args.out:
         args.out.write_text(json.dumps(result, indent=1, sort_keys=True, default=str))

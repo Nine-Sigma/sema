@@ -3,17 +3,20 @@
 python -m showcase.ontology_query_benchmark.runner --profile <profile.yaml>
     --frozen <closure dir> --run-dir <dir>
     [--arms A B S] [--reps 3] [--ids ID1,ID2] [--dry-run]
-    [--s-context module:function] [--timbr-env <ontology engine env file>]
-    [--settings settings.json]   # {"prices": {...usd_per_1m}, "max_cost_usd": 60}
+    [--timbr-env <ontology engine env file>]
+    [--neo4j-uri U --s-manifest M --s-projection P --s-projection-receipt R]  # arm S
+    [--s-concept-spec C]   # arm S, default: the profile's concept spec
+    [--settings settings.json]   # {"prices": {...usd_per_1m}, "max_cost_usd": 60, "max_wall_s": 10800}
     [--budget-tokens N] [--values-top-k K] [--description-cap-chars C]  # default: profile
     [--input-ceiling N] [--repair-reserve N]   # default: profile; frozen in manifest.json
 
 Slots run in a fixed order (rep, question, arm). Each slot appends one receipt to
 receipts.jsonl; a slot whose latest receipt has an outcome other than ``unrun`` is never
 run again. An exception from a context provider or executor becomes a ``runner_error``
-receipt and the run continues. Spend is checked before each slot: when it reaches the cost
-ceiling every remaining slot is written ``unrun``, so a run can overshoot the ceiling by
-at most one slot (three generations).
+receipt and the run continues. Spend and elapsed time are checked before each slot: when
+either reaches its ceiling every remaining slot is written ``unrun`` with the reason, so a
+run can overshoot a ceiling by at most one slot (three generations). Elapsed time counts
+from the start of this invocation.
 """
 
 import argparse
@@ -21,8 +24,10 @@ import dataclasses
 import json
 import os
 import sys
+import time
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -32,7 +37,12 @@ from sema.log import logger
 from showcase.ontology_query_benchmark import runner_utils as ru
 from showcase.ontology_query_benchmark import scorer
 from showcase.ontology_query_benchmark.routing import require_clean_process
-from showcase.ontology_query_benchmark.runner_live_utils import live_clients
+from showcase.ontology_query_benchmark.runner_live_utils import (
+    add_s_args,
+    live_clients,
+    open_s_provider,
+)
+from showcase.ontology_query_benchmark.sema_context import SContextProvider
 from showcase.ontology_query_benchmark.profile import Knobs, Limits, load_profile
 from showcase.ontology_query_benchmark.runner_utils import Meter, Prices
 
@@ -60,6 +70,7 @@ class RunSettings:
     limits: Limits
     prices: Prices
     max_cost_usd: float
+    max_wall_s: float
 
 
 def schedule(ids: Sequence[str], arms: Sequence[str], reps: int) -> tuple[Slot, ...]:
@@ -161,8 +172,10 @@ def recorded(receipts: Path) -> tuple[set[str], float]:
 
 def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[str, Any],
         model: Any, contracts: Mapping[str, scorer.Contract], harness: SimpleNamespace,
-        settings: RunSettings, receipts: Path) -> dict[str, Any]:  # fmt: skip
+        settings: RunSettings, receipts: Path,
+        clock: Callable[[], float] = time.monotonic) -> dict[str, Any]:  # fmt: skip
     done, spent = recorded(receipts)
+    start = clock()
     stopped: str | None = None
     outcomes: Counter[str] = Counter()
     receipts.parent.mkdir(parents=True, exist_ok=True)
@@ -170,8 +183,8 @@ def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[s
         for slot in slots:
             if slot.slot_id in done:
                 continue
-            if spent >= settings.max_cost_usd:
-                stopped = "cost_ceiling"
+            stopped = _stop_reason(spent, clock() - start, settings)
+            if stopped:
                 entry = {**_slot_fields(slot), "outcome": "unrun", "reason": stopped}
             else:
                 entry = run_slot(slot, questions[slot.question_id], runtimes[slot.arm], model,
@@ -182,6 +195,14 @@ def run(slots: Sequence[Slot], questions: Mapping[str, Any], runtimes: Mapping[s
             handle.flush()
             logger.info("{} {} spent=${:.4f}", slot.slot_id, entry["outcome"], spent)
     return {"outcomes": dict(outcomes), "spent_usd": round(spent, 6), "stopped": stopped}
+
+
+def _stop_reason(spent: float, elapsed: float, settings: RunSettings) -> str | None:
+    if spent >= settings.max_cost_usd:
+        return "cost_ceiling"
+    if elapsed >= settings.max_wall_s:
+        return "time_ceiling"
+    return None
 
 
 def _write_slots(run_dir: Path, slots: Sequence[Slot]) -> None:
@@ -211,11 +232,11 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--reps", type=int, default=3)
     parser.add_argument("--ids", default="")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--s-context")
     parser.add_argument("--timbr-env", type=Path)
     parser.add_argument("--settings", type=Path)
     ru.add_knob_args(parser)
     ru.add_limit_args(parser)
+    add_s_args(parser)
     return parser.parse_args(argv)
 
 
@@ -235,18 +256,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{len(slots)} slots written to {args.run_dir / 'slots.jsonl'}; no calls made")
         return 0
     raw = json.loads(args.settings.read_text())
-    settings = RunSettings(limits, Prices(**raw["prices"]), float(raw["max_cost_usd"]))
+    settings = RunSettings(limits, Prices(**raw["prices"]), float(raw["max_cost_usd"]),
+                           float(raw["max_wall_s"]))
+    s_open: AbstractContextManager[SContextProvider | None] = (
+        open_s_provider(args, profile) if "S" in args.arms else nullcontext()
+    )
     harness = ru.load_harness(args.frozen, layout)
-    provider = ru.load_s_provider(args.s_context) if "S" in args.arms else None
-    model, executors = live_clients(harness, args.arms, args.timbr_env, settings.limits, profile)
     require_clean_process(os.environ, sys.modules, profile.routing)
-    runtimes = ru.arm_runtimes(harness, args.frozen, layout, executors, provider,
-                               settings.limits, knobs)  # fmt: skip
     questions = {q.id: q for q in ru.public_questions(harness, args.frozen, layout, tuple(ids))}
     contracts = scorer.load_contracts(ru.question_paths(args.frozen, layout),
-                                      layout.retired_questions)  # fmt: skip
-    summary = run(slots, questions, runtimes, model, contracts, harness, settings,
-                  args.run_dir / "receipts.jsonl")  # fmt: skip
+                                      layout.retired_questions)
+    with s_open as provider:
+        model, executors = live_clients(harness, args.arms, args.timbr_env, limits, profile)
+        runtimes = ru.arm_runtimes(harness, args.frozen, layout, executors, provider, limits,
+                                   knobs)
+        summary = run(slots, questions, runtimes, model, contracts, harness, settings,
+                      args.run_dir / "receipts.jsonl")
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0
 

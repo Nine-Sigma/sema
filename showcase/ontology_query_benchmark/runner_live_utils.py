@@ -4,6 +4,8 @@ Every host, endpoint, URL and tool is checked against the profile's pinned routi
 nothing here is exercised by unit tests because each path opens a network client.
 """
 
+import argparse
+from contextlib import AbstractContextManager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -16,6 +18,31 @@ from showcase.ontology_query_benchmark.routing import (
     require_timbr_mcp_url,
 )
 from showcase.ontology_query_benchmark.runner_utils import guard_mcp_tools, read_env_keys
+from showcase.ontology_query_benchmark.sema_context import SContextProvider
+from showcase.ontology_query_benchmark.sema_trace import open_live_provider
+
+S_INPUTS = ("neo4j_uri", "s_manifest", "s_projection", "s_projection_receipt")
+
+
+def add_s_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--neo4j-uri", help="arm S: the isolated graph")
+    parser.add_argument("--s-manifest", type=Path, help="arm S: the graph build manifest")
+    parser.add_argument("--s-projection", type=Path, help="arm S: the library projection")
+    parser.add_argument("--s-projection-receipt", type=Path, help="arm S: its receipt")
+    parser.add_argument("--s-concept-spec", type=Path, help="arm S (default: the profile's)")
+
+
+def open_s_provider(
+    args: argparse.Namespace, profile: Profile
+) -> AbstractContextManager[SContextProvider]:
+    """Arm S's provider from explicit inputs; nothing is opened or called until entry."""
+    missing = [f"--{name.replace('_', '-')}" for name in S_INPUTS if getattr(args, name) is None]
+    if missing:
+        raise ValueError(f"arm S needs {' '.join(missing)}")
+    return open_live_provider(
+        profile, args.neo4j_uri, args.s_manifest, args.s_projection, args.s_projection_receipt,
+        concept_spec=args.s_concept_spec,
+    )
 
 
 def live_clients(harness: SimpleNamespace, arms: list[str], timbr_env: Path | None,

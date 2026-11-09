@@ -1,3 +1,5 @@
+import dataclasses
+import itertools
 import json
 import os
 from collections.abc import Callable
@@ -26,8 +28,8 @@ class FakeSContext:
 
 
 class FakeModel:
-    def __init__(self, harness: SimpleNamespace, replies: list[str], prompt: int = 900,
-                 completion: int = 40) -> None:  # fmt: skip
+    def __init__(self, harness: SimpleNamespace, replies: list[str], prompt: int | None = 900,
+                 completion: int | None = 40) -> None:  # fmt: skip
         self.harness, self.replies = harness, replies
         self.prompt, self.completion = prompt, completion
         self.calls: list[list[dict[str, Any]]] = []
@@ -52,10 +54,12 @@ def s_provider(findings: tuple[str, ...] = (), text: str = "TABLE main.s.person\
     return lambda question: FakeSContext(text, "s-identity-1", findings)
 
 
+PRICES = runner_utils.Prices(input_usd_per_1m=2.0, output_usd_per_1m=10.0)
+
+
 def settings(profile: Profile, max_cost: float = 100.0,
              limits: Limits | None = None) -> runner.RunSettings:  # fmt: skip
-    prices = runner_utils.Prices(input_usd_per_1m=2.0, output_usd_per_1m=10.0)
-    return runner.RunSettings(limits or profile.limits, prices, max_cost)
+    return runner.RunSettings(limits or profile.limits, PRICES, max_cost, max_wall_s=3600.0)
 
 
 def runtimes_for(harness: SimpleNamespace, frozen: Path, profile: Profile,
@@ -190,13 +194,17 @@ def test_a_and_b_contexts_build_from_the_frozen_caches(
     assert {r.row_limit for r in runtimes.values()} == {1000}
 
 
-def _run(harness: SimpleNamespace, frozen: Path, profile: Profile, out: Path, model: FakeModel,
-         run_settings: runner.RunSettings) -> dict[str, Any]:  # fmt: skip
+def _run(
+    harness: SimpleNamespace, frozen: Path, profile: Profile, out: Path, model: FakeModel,
+    run_settings: runner.RunSettings, **clock: Callable[[], float],
+) -> dict[str, Any]:
     slots = runner.schedule(["R01"], ("S",), 3)
     executors = {"S": FakeExecutor(harness, ((GOLD,),))}
     runtimes = runtimes_for(harness, frozen, profile, executors, s_provider())
     questions, contracts = _questions_and_contracts(harness, frozen, profile)
-    return runner.run(slots, questions, runtimes, model, contracts, harness, run_settings, out)
+    return runner.run(
+        slots, questions, runtimes, model, contracts, harness, run_settings, out, **clock
+    )
 
 
 def _questions_and_contracts(
@@ -232,6 +240,19 @@ def test_cost_ceiling_stops_and_marks_the_rest_unrun(
     outcomes = [r["outcome"] for r in _receipts(out)]
     assert outcomes == ["correct", "unrun", "unrun"] and len(model.calls) == 1
     assert summary["stopped"] == "cost_ceiling"
+
+
+def test_time_ceiling_stops_and_marks_the_rest_unrun(
+    harness: SimpleNamespace, frozen: Path, profile: Profile, tmp_path: Path
+) -> None:
+    out, ticks = tmp_path / "receipts.jsonl", itertools.count(0.0, 6.0)
+    model = FakeModel(harness, [R01_SQL])
+    run_settings = dataclasses.replace(settings(profile), max_wall_s=10.0)
+    summary = _run(harness, frozen, profile, out, model, run_settings, clock=lambda: next(ticks))
+    receipts = _receipts(out)
+    assert [r["outcome"] for r in receipts] == ["correct", "unrun", "unrun"]
+    assert [r.get("reason") for r in receipts[1:]] == ["time_ceiling"] * 2
+    assert summary["stopped"] == "time_ceiling" and len(model.calls) == 1
 
 
 def test_b_executor_refuses_engine_side_llm_tools(profile: Profile) -> None:
@@ -322,3 +343,40 @@ def test_a_wider_frozen_ceiling_admits_a_larger_first_prompt(
     provider = s_provider(text="x" * 40_000)
     receipt = run_r01(harness, frozen, profile, model, executor, provider, wide)
     assert len(model.calls) == 1 and receipt["outcome"] == "correct"
+
+
+def test_a_repair_may_use_the_whole_input_ceiling(harness: SimpleNamespace, profile: Profile) -> None:
+    limits = profile.limits
+    large = [{"role": "user", "content": "x" * int(15_000 * limits.guard_chars_per_token)}]
+    lenient = runner_utils.estimate_request_tokens(large, limits.guard_chars_per_token)
+    assert limits.first_prompt_ceiling < lenient <= limits.input_ceiling
+    model, meter = FakeModel(harness, [R01_SQL]), runner_utils.Meter()
+    guarded = runner_utils.GuardedModel(model, meter, limits, PRICES)
+    guarded.complete([{"role": "user", "content": "q"}])
+    guarded.complete(large)
+    assert len(model.calls) == 2 and meter.overflow is None
+    first_only = runner_utils.GuardedModel(model, runner_utils.Meter(), limits, PRICES)
+    with pytest.raises(runner_utils.TokenOverflow):
+        first_only.complete(large)
+
+
+def test_first_call_usage_under_the_ceiling_is_not_overflow(
+    harness: SimpleNamespace, frozen: Path, profile: Profile
+) -> None:
+    prompt = 15_000
+    assert profile.limits.first_prompt_ceiling < prompt <= profile.limits.input_ceiling
+    model, executor = FakeModel(harness, [R01_SQL], prompt=prompt), FakeExecutor(harness, ((GOLD,),))
+    receipt = run_r01(harness, frozen, profile, model, executor, s_provider())
+    assert (receipt["outcome"], receipt["overflow"]) == ("correct", None)
+
+
+def test_unreported_usage_is_charged_at_the_conservative_estimate_and_output_ceiling(
+    harness: SimpleNamespace, frozen: Path, profile: Profile
+) -> None:
+    model = FakeModel(harness, [R01_SQL], prompt=None, completion=None)
+    executor = FakeExecutor(harness, ((GOLD,),))
+    receipt = run_r01(harness, frozen, profile, model, executor, s_provider())
+    conservative, output = receipt["request_estimates"][0][1], profile.limits.output_ceiling
+    assert receipt["usage_reported"] is False
+    assert (receipt["prompt_tokens"], receipt["completion_tokens"]) == (conservative, output)
+    assert receipt["cost_usd"] == round((conservative * 2.0 + output * 10.0) / 1e6, 6)

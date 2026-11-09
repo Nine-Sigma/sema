@@ -296,14 +296,6 @@ def metered_context(context: Callable[[str], Any], meter: Meter) -> Callable[[st
     return build
 
 
-def load_s_provider(spec: str) -> Callable[[str], SContextLike]:
-    module, _, function = spec.partition(":")
-    if not module or not function:
-        raise ValueError(f"S context provider must be module:function, got {spec!r}")
-    provider: Callable[[str], SContextLike] = getattr(importlib.import_module(module), function)
-    return provider
-
-
 def guard_mcp_tools(executor: Any, timbr: Timbr) -> Any:
     """Route every MCP tools/call through the profile's arm B allowlist."""
     call_tool = executor.call_tool
