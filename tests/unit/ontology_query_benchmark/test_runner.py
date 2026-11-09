@@ -61,7 +61,7 @@ class FakeExecutor:
 def s_provider(
     findings: tuple[FakeFinding, ...] = (), text: str = "TABLE main.s.person\n  rid string"
 ):
-    return lambda question: FakeSContext(text, "s-identity-1", findings)
+    return lambda question, is_denied: FakeSContext(text, "s-identity-1", findings)
 
 
 PRICES = runner_utils.Prices(input_usd_per_1m=2.0, output_usd_per_1m=10.0)
@@ -369,7 +369,7 @@ class RaisingExecutor(FakeExecutor):
 def test_a_raising_context_provider_becomes_a_runner_error_receipt(
     harness: SimpleNamespace, frozen: Path, profile: Profile, tmp_path: Path
 ) -> None:
-    def broken(question: str) -> FakeSContext:
+    def broken(question: str, is_denied: Any) -> FakeSContext:
         raise RuntimeError("index not loaded")
 
     slots = runner.schedule(["R01"], ("S",), 2)

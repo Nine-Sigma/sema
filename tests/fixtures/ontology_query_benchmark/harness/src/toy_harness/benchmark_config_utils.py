@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from toy_harness.benchmark_models import BenchConfig
+from toy_harness.benchmark_models import BenchConfig, ColumnPolicy
 
 
 def load_json(path: Path) -> Any:
@@ -11,6 +11,7 @@ def load_json(path: Path) -> Any:
 
 def load_bench_config(path: Path) -> BenchConfig:
     raw = load_json(path)
+    raw["policy"] = ColumnPolicy(**{k: tuple(v) for k, v in raw["policy"].items()})
     return BenchConfig(**{k: tuple(v) if isinstance(v, list) else v for k, v in raw.items()})
 
 

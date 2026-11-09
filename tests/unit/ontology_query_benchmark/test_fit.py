@@ -149,7 +149,7 @@ def test_an_overflowing_context_never_counts_as_fitting(
 def test_fit_report_includes_s_when_a_provider_is_given(
     harness: SimpleNamespace, frozen: Path, profile: Profile
 ) -> None:
-    provider = lambda q: SimpleNamespace(text="T" * 100, identity="i", findings=())  # noqa: E731
+    provider = lambda q, d: SimpleNamespace(text="T" * 100, identity="i", findings=())  # noqa: E731
     report = fit.fit_report(harness, frozen, profile.harness, Knobs(), ratios=RATIOS,
                             limits=profile.limits, s_provider=provider)  # fmt: skip
     assert report["arms"]["S"]["questions"] == 3

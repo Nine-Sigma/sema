@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -28,7 +29,11 @@ from showcase.ontology_query_benchmark.sema_bindings import (
 )
 from showcase.ontology_query_benchmark.sema_build import BuildManifest
 from showcase.ontology_query_benchmark.sema_build_utils import Finding, LibraryFacts
-from showcase.ontology_query_benchmark.sema_context_utils import Rendering, render
+from showcase.ontology_query_benchmark.sema_context_utils import (
+    Rendering,
+    nothing_denied,
+    render,
+)
 
 
 class ManifestMismatchError(RuntimeError):
@@ -101,14 +106,19 @@ class SContextProvider:
     def approved_in(self, tables: tuple[str, ...]) -> tuple[SuppliedBinding, ...]:
         return tuple(b for b in self._resolution.approved() if b.table in tables)
 
-    def __call__(self, question: str) -> SContext:
-        return self.explain(question)[0]
+    def __call__(
+        self, question: str, is_denied: Callable[[str], bool] = nothing_denied
+    ) -> SContext:
+        return self.explain(question, is_denied)[0]
 
-    def explain(self, question: str) -> tuple[SContext, Rendering]:
+    def explain(
+        self, question: str, is_denied: Callable[[str], bool] = nothing_denied
+    ) -> tuple[SContext, Rendering]:
+        """``is_denied`` is the run's column policy, the one the shared SQL validator enforces."""
         candidates = self._retriever.retrieve(question, top_k=self._top_k)
         rendering = render(
             Rendering(prune_to_sco(candidates)), self._sidecar,
-            self._products, self._resolution, self._facts,
+            self._products, self._resolution, self._facts, is_denied,
         )
         header = (
             f"SEMA CONTEXT graph={self._graph_identity[:12]} "

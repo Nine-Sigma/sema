@@ -46,6 +46,10 @@ class SContextLike(Protocol):
     def findings(self) -> tuple[FindingLike, ...]: ...
 
 
+# The question and the run's column deny policy, the one every arm's validator enforces.
+SProvider = Callable[[str, Callable[[str], bool]], SContextLike]
+
+
 @dataclass(frozen=True)
 class Prices:
     input_usd_per_1m: float
@@ -193,13 +197,14 @@ def public_questions(
 class SArmContext:
     """Adapt the S provider's SContext to the harness ArmContext; keep the last one."""
 
-    def __init__(self, harness: SimpleNamespace, provider: Callable[[str], SContextLike],
-                 budget: int) -> None:  # fmt: skip
+    def __init__(self, harness: SimpleNamespace, provider: SProvider, budget: int,
+                 is_denied: Callable[[str], bool]) -> None:  # fmt: skip
         self.harness, self.provider, self.budget = harness, provider, budget
+        self.is_denied = is_denied
         self.last: SContextLike | None = None
 
     def __call__(self, question: str) -> Any:
-        supplied = self.provider(question)
+        supplied = self.provider(question, self.is_denied)
         self.last = supplied
         overflow = any(f.message.split(":")[0] == OVERFLOW_FINDING for f in supplied.findings)
         tokens = self.harness.context.estimate_tokens(supplied.text)
@@ -209,7 +214,7 @@ class SArmContext:
 
 
 def arm_runtimes(harness: SimpleNamespace, frozen: Path, layout: Harness,
-                 executors: Mapping[str, Any], s_provider: Callable[[str], SContextLike] | None,
+                 executors: Mapping[str, Any], s_provider: SProvider | None,
                  limits: Limits, knobs: Knobs = Knobs()) -> dict[str, Any]:  # fmt: skip
     """One ArmRuntime per arm in ``executors``, all with the config rules and matched limits."""
     config = _with_knobs(harness.config.load_bench_config(frozen / layout.config), knobs)
@@ -234,7 +239,7 @@ def arm_runtimes(harness: SimpleNamespace, frozen: Path, layout: Harness,
     if "S" in executors:
         if s_provider is None:
             raise ValueError("arm S needs an S context provider")
-        contexts["S"] = SArmContext(harness, s_provider, budget)
+        contexts["S"] = SArmContext(harness, s_provider, budget, policy.is_denied)
     return {
         arm: harness.workflow.ArmRuntime(
             arm, contexts[arm], executor, policy, known[arm], limits.row_limit,

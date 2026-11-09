@@ -288,7 +288,8 @@ def test_an_over_budget_context_reaches_the_harness_as_overflow(
     tmp_path: Path, harness: SimpleNamespace
 ) -> None:
     provider = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES], limits=_first_prompt(100))
-    assert runner_utils.SArmContext(harness, provider, 1_000)(QUESTION).overflow
+    deny_nothing = harness.models.ColumnPolicy().is_denied
+    assert runner_utils.SArmContext(harness, provider, 1_000, deny_nothing)(QUESTION).overflow
 
 
 def test_conventions_are_referenced_not_paraphrased(tmp_path: Path) -> None:

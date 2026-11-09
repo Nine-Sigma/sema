@@ -47,6 +47,20 @@ class Execution:
 
 
 @dataclass(frozen=True)
+class ColumnPolicy:
+    """Bare-name, case-insensitive column denial on any table, as the frozen harness has it."""
+
+    denied: tuple[str, ...] = ()
+    deny_patterns: tuple[str, ...] = ()
+
+    def is_denied(self, name: str) -> bool:
+        key = name.lower()
+        return key in {d.lower() for d in self.denied} or any(
+            p.lower() in key for p in self.deny_patterns
+        )
+
+
+@dataclass(frozen=True)
 class BenchConfig:
     relations: tuple[str, ...]
     row_concepts: tuple[str, ...]

@@ -20,7 +20,7 @@ import json
 import os
 import statistics
 import sys
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
@@ -112,7 +112,7 @@ def calibrate(harness: SimpleNamespace, frozen: Path, layout: Harness, receipts:
 
 def fit_report(harness: SimpleNamespace, frozen: Path, layout: Harness, knobs: Knobs, *,
                ratios: Ratios, limits: Limits,
-               s_provider: Callable[[str], Any] | None) -> dict[str, Any]:  # fmt: skip
+               s_provider: ru.SProvider | None) -> dict[str, Any]:  # fmt: skip
     """Per arm and question: first-prompt estimates at the three ratios against the limits.
 
     certain_overflow mirrors the runner guard (lenient estimate over the first-prompt limit,
@@ -155,7 +155,7 @@ def _arm_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def sweep(harness: SimpleNamespace, frozen: Path, layout: Harness,
           grid: Iterable[tuple[Knobs, int]], *, ratios: Ratios, limits: Limits,
-          s_provider: Callable[[str], Any] | None = None) -> list[dict[str, Any]]:  # fmt: skip
+          s_provider: ru.SProvider | None = None) -> list[dict[str, Any]]:  # fmt: skip
     """Per (knobs, input ceiling) point and arm: the fit counts and the largest estimates."""
     rows = []
     for knobs, ceiling in grid:

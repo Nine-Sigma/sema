@@ -9,7 +9,8 @@ hierarchy relation facts. Business rules are referenced by hash, never restated.
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Mapping
+import re
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
@@ -28,6 +29,21 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
 )
 
 TableColumn = tuple[str, str]
+
+
+def nothing_denied(_name: str) -> bool:
+    return False
+
+
+@dataclass(frozen=True)
+class Exposure:
+    """Each product's denials on its own table, plus the run's name-global deny policy."""
+
+    spec_denied: frozenset[TableColumn]
+    is_denied: Callable[[str], bool]
+
+    def hides(self, table: str, column: str) -> bool:
+        return (table, column) in self.spec_denied or self.is_denied(column)
 
 
 @dataclass
@@ -52,14 +68,18 @@ def render(
     products: tuple[ProductSpec, ...],
     resolution: BindingResolution,
     facts: LibraryFacts,
+    is_denied: Callable[[str], bool] = nothing_denied,
 ) -> Rendering:
-    denied = {(p.pin.table, c) for p in products for c in p.doc.exposure.denied_columns}
-    rendering.sco = _without_denied(rendering.sco, denied)
+    exposure = Exposure(
+        frozenset((p.pin.table, c) for p in products for c in p.doc.exposure.denied_columns),
+        is_denied,
+    )
+    rendering.sco = _without_denied(rendering, exposure)
     if not rendering.tables:
         rendering.findings.append(Finding("retrieval returned no physical asset for the question"))
     selected = [
-        _without_denied_companions(b, denied) for b in resolution.approved()
-        if b.table in rendering.tables and (b.table, b.column) not in denied
+        _without_denied_companions(b, exposure) for b in resolution.approved()
+        if b.table in rendering.tables and not exposure.hides(b.table, b.column)
     ]
     rendering.findings.extend(absent_elements(tuple(selected), facts))
     _add_tables_and_columns(rendering.parts, rendering.sco)
@@ -67,28 +87,49 @@ def render(
     _add_join_section(rendering.parts, rendering.sco)
     _add_bindings(rendering.parts, selected, sidecar, facts)
     _add_values(rendering, selected, _governed_values(rendering.sco), sidecar, facts)
-    _add_grain(rendering.parts, rendering.tables, products, sidecar)
+    _add_grain(rendering, products, sidecar, exposure)
     _add_rules(rendering.parts, sidecar)
     return rendering
 
 
-def _without_denied(
-    sco: SemanticContextObject, denied: set[TableColumn]
-) -> SemanticContextObject:
-    """Apply the product exposure policy; the graph holds denied columns, S never shows them."""
+def _without_denied(rendering: Rendering, exposure: Exposure) -> SemanticContextObject:
+    """Apply the exposure policy; the graph holds denied columns, S never shows them."""
+    sco = rendering.sco
     assets = [
-        a.model_copy(update={"columns": [c for c in a.columns if (a.table, c) not in denied]})
+        a.model_copy(update={"columns": [c for c in a.columns if not exposure.hides(a.table, c)]})
         for a in sco.physical_assets
     ]
-    values = [g for g in sco.governed_values if (g.table, g.column) not in denied]
-    return sco.model_copy(update={"physical_assets": assets, "governed_values": values})
+    values = [g for g in sco.governed_values if not exposure.hides(g.table, g.column)]
+    joins = []
+    for jp in sco.join_paths:
+        names = [(p.left_table, p.left_column) for p in jp.join_predicates]
+        names += [(p.right_table, p.right_column) for p in jp.join_predicates]
+        names += [(jp.from_table, w) for w in re.findall(r"\w+", jp.sql_snippet or "")]
+        if _kept(rendering, exposure, names, jp.from_table, "join path"):
+            joins.append(jp)
+    return sco.model_copy(
+        update={"physical_assets": assets, "governed_values": values, "join_paths": joins}
+    )
 
 
-def _without_denied_companions(b: SuppliedBinding, denied: set[TableColumn]) -> SuppliedBinding:
+def _kept(
+    rendering: Rendering, exposure: Exposure, names: list[TableColumn], relation: str, line: str
+) -> bool:
+    """A line naming a denied column is withheld whole, never rewritten, and leaves a finding."""
+    hidden = dict.fromkeys(c for t, c in names if exposure.hides(t, c))
+    rendering.findings.extend(
+        Finding(f"{line} withheld: it names denied column {c}", relation, c) for c in hidden
+    )
+    return not hidden
+
+
+def _without_denied_companions(b: SuppliedBinding, exposure: Exposure) -> SuppliedBinding:
     return dataclasses.replace(
         b,
-        companions=tuple((r, c) for r, c in b.companions if (b.table, c) not in denied),
-        catalog_companions=tuple(c for c in b.catalog_companions if (b.table, c) not in denied),
+        companions=tuple((r, c) for r, c in b.companions if not exposure.hides(b.table, c)),
+        catalog_companions=tuple(
+            c for c in b.catalog_companions if not exposure.hides(b.table, c)
+        ),
     )
 
 
@@ -189,31 +230,42 @@ def _add_values(
 
 
 def _add_grain(
-    parts: list[str],
-    tables: tuple[str, ...],
+    rendering: Rendering,
     products: tuple[ProductSpec, ...],
     sidecar: Sidecar,
+    exposure: Exposure,
 ) -> None:
-    chosen = [p for p in products if p.pin.table in tables]
+    chosen = [p for p in products if p.pin.table in rendering.tables]
     if not chosen:
         return
-    parts.append(f"\nGRAIN AND KEYS ({sidecar.spec_name} product specs):")
+    rendering.parts.append(f"\nGRAIN AND KEYS ({sidecar.spec_name} product specs):")
     for p in chosen:
+        table, relation = p.pin.table, sidecar.relation(p.pin.table)
+        lines: list[tuple[str, list[TableColumn], str]] = []
         for entity in p.doc.entities:
             keys = ", ".join(entity.key_columns)
-            parts.append(f"  {sidecar.relation(p.pin.table)}: {entity.grain}; key {keys}")
+            names = [(table, k) for k in entity.key_columns]
+            lines.append((f"  {relation}: {entity.grain}; key {keys}", names, "grain line"))
         for rel in p.doc.relationships:
+            target = _table_of(products, rel)
             pairs = " AND ".join(
-                f"{p.pin.table}.{s} = {_table_of(products, rel)}.{t}"
+                f"{table}.{s} = {target}.{t}"
                 for s, t in zip(rel.source_columns, rel.target_columns)
             )
-            parts.append(f"  join {pairs} ({rel.cardinality})")
+            names = [(table, s) for s in rel.source_columns]
+            names += [(target, t) for t in rel.target_columns]
+            lines.append((f"  join {pairs} ({rel.cardinality})", names, "join line"))
         if p.pin.product == sidecar.grain_product:
-            columns = ", ".join(sidecar.grain_columns)
             note = sidecar.grain_note.format(
-                columns=columns, surrogate_row_id=sidecar.surrogate_row_id
+                columns=", ".join(sidecar.grain_columns),
+                surrogate_row_id=sidecar.surrogate_row_id,
             )
-            parts.append(f"  {note}")
+            names = [(table, c) for c in (*sidecar.grain_columns, sidecar.surrogate_row_id)]
+            lines.append((f"  {note}", names, "grain note"))
+        rendering.parts.extend(
+            text for text, names, kind in lines
+            if _kept(rendering, exposure, names, relation, kind)
+        )
 
 
 def _table_of(products: tuple[ProductSpec, ...], rel: SpecRelationship) -> str:
