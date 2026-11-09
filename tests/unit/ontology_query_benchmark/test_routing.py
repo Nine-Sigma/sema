@@ -1,3 +1,7 @@
+import os
+import subprocess
+import sys
+
 import pytest
 
 from showcase.ontology_query_benchmark import routing
@@ -80,3 +84,14 @@ def test_loaded_dotenv_is_refused(profile: Profile) -> None:
 def test_settings_that_route_elsewhere_are_refused(profile: Profile, name: str, value: str) -> None:
     with pytest.raises(RoutingError, match=name):
         routing.require_clean_process({name: value}, (), profile.routing)
+
+
+@pytest.mark.parametrize("entry", ["runner", "sema_trace", "fit", "sema_build"])
+def test_live_entry_modules_import_without_dotenv(entry: str) -> None:
+    probe = (
+        f"import sys, showcase.ontology_query_benchmark.{entry}; "
+        "sys.exit('dotenv' in sys.modules)"
+    )
+    env = {k: os.environ[k] for k in ("HOME", "PATH") if k in os.environ}
+    done = subprocess.run([sys.executable, "-c", probe], env=env, capture_output=True, timeout=120)
+    assert done.returncode == 0, f"{entry} loads python-dotenv on import"

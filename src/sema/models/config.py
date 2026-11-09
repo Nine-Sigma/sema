@@ -7,6 +7,8 @@ import yaml
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from sema.models.hierarchy_anchor import HierarchyAnchorConfig
+
 # Defaults differ by caller: build reads values (``full``), intake starts at ``metadata_only``.
 EvidenceTier = Literal["metadata_only", "bounded_values", "full"]
 
@@ -51,13 +53,6 @@ class LLMConfig(BaseSettings):
     base_url: str | None = None
     use_structured_output: str = "auto"
     request_timeout: int = 120
-
-
-class HierarchyAnchorConfig(BaseModel):
-    """Bounds for walking down from a matched anchor term to governed columns."""
-
-    max_depth: int = Field(default=3, ge=1)
-    member_cap: int = Field(default=200, ge=1)
 
 
 class ModelPrice(BaseModel):

@@ -17,7 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
-from sema.models.config import HierarchyAnchorConfig
+from sema.models.hierarchy_anchor import HierarchyAnchorConfig
 from sema.models.context import SemanticCandidateSet
 from sema.pipeline.context import prune_to_sco
 from showcase.ontology_query_benchmark.profile import Limits

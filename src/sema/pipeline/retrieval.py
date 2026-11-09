@@ -5,7 +5,7 @@ from typing import Any
 
 from sema.graph.queries import CypherQueries
 from sema.log import logger
-from sema.models.config import HierarchyAnchorConfig
+from sema.models.hierarchy_anchor import HierarchyAnchorConfig
 from sema.models.constants import MATCH_TYPE_BOOST
 from sema.models.context import SemanticCandidateSet
 from sema.pipeline.retrieval_utils import (
