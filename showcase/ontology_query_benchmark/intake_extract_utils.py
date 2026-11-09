@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from showcase.ontology_query_benchmark.product_spec import load_product_spec
 from showcase.ontology_query_benchmark.profile import Extract
 
 DUCKDB_TYPES = {
@@ -26,8 +26,7 @@ def sha256(path: Path) -> str:
 def declared_de_ids(spec_paths: Sequence[Path], id_pattern: str) -> tuple[str, ...]:
     ids: set[str] = set()
     for path in spec_paths:
-        fields = json.loads(path.read_text(encoding="utf-8"))["fields"]
-        ids.update(str(field["de_id"]) for field in fields if field.get("de_id"))
+        ids.update(f.de_id for f in load_product_spec(path).fields if f.de_id)
     if not ids:
         raise ValueError(f"the product specs declare no de_id: {[str(p) for p in spec_paths]}")
     malformed = sorted(i for i in ids if not re.fullmatch(id_pattern, i))

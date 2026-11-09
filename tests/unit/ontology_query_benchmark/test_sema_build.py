@@ -25,9 +25,10 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
 )
 from tests.unit.ontology_query_benchmark.test_sema_bindings import (
     CONCEPT_SPEC,
-    PEOPLE,
     ELEMENTS,
     EVENTS,
+    ID_SUFFIX,
+    PEOPLE,
     catalog_fixture,
     facts_fixture,
     write_fixture,
@@ -67,6 +68,10 @@ def _cypher_params(loader: MagicMock) -> list[dict[str, Any]]:
     return [c.kwargs for c in loader._run.call_args_list]
 
 
+def _embedded_texts(embedder: MagicMock) -> list[str]:
+    return [t for c in embedder.embed_documents.call_args_list for t in c.args[0]]
+
+
 def test_library_facts_come_from_the_concept_source_import(tmp_path: Path) -> None:
     projection, receipt = write_projection(tmp_path)
     before = hashlib.sha256(projection.read_bytes()).hexdigest()
@@ -101,7 +106,7 @@ def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
         if "semantic_type" in p
     }
     assert (PEOPLE, "gender_G1") in props
-    assert (PEOPLE, "gender_G1_label") in props
+    assert (PEOPLE, "gender_G1_text") in props
     assert (EVENTS, "site_S1") in props
     assert not {name for _, name in props} & {"derived_x", "ghost_col", "age_years"}
     roles = {p["model_role"] for p in _cypher_params(loader) if "model_role" in p}
@@ -126,7 +131,7 @@ def test_entities_and_properties_are_embedded_with_library_text(
     tmp_path: Path,
 ) -> None:
     loader, embedder, _ = _build(tmp_path)
-    texts = [t for c in embedder.embed_documents.call_args_list for t in c.args[0]]
+    texts = _embedded_texts(embedder)
     assert any(t.startswith("Administrative gender") for t in texts)
     matches = {
         (c.kwargs["label"], tuple(sorted(c.kwargs["match"].items())))
@@ -135,6 +140,22 @@ def test_entities_and_properties_are_embedded_with_library_text(
     assert ("Property", (("entity_name", PEOPLE), ("name", "gender_G1"))) in matches
     assert ("Entity", (("name", EVENTS),)) in matches
     loader.create_vector_index.assert_any_call("property_embedding_index", "Property", 4)
+
+
+def test_companions_are_embedded_by_their_declared_role(tmp_path: Path) -> None:
+    _, embedder, _ = _build(tmp_path)
+    texts = _embedded_texts(embedder)
+    assert "Administrative gender label text" in texts
+    assert "Administrative gender mapping type" in texts
+
+
+def test_an_absent_element_is_embedded_by_its_library_id_without_the_suffix(
+    tmp_path: Path,
+) -> None:
+    _, embedder, _ = _build(tmp_path)
+    texts = _embedded_texts(embedder)
+    assert "city" in texts and "city label text" in texts
+    assert not any(ID_SUFFIX in t for t in texts)
 
 
 def test_join_from_spec_relationship_is_materialized(tmp_path: Path) -> None:

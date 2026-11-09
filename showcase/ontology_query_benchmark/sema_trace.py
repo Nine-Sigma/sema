@@ -47,7 +47,7 @@ def trace_rows(
                         "spec_path": str(b.spec.path), "spec_sha256": b.spec.sha256,
                         "strategy": b.strategy},
             "physical": {"relation": b.relation, "column": b.column,
-                         "type": b.physical_type, "companions": list(b.companions)},
+                         "type": b.physical_type, "companions": dict(b.companions)},
             "context": {"retrieved": (b.table, b.column) in retrieved,
                         "rendered": f"    {b.column} <- " in context.text,
                         "values_listed": rendering.listed.get((b.table, b.column), 0)},

@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
 from sema.models.context import SemanticContextObject
+from showcase.ontology_query_benchmark.product_spec import SpecRelationship
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     ProductSpec,
@@ -63,8 +64,8 @@ def render(
 def _without_companions(
     sco: SemanticContextObject, selected: list[SuppliedBinding]
 ) -> SemanticContextObject:
-    """Drop V_label / V_mapping_type columns; the bindings header names the pattern."""
-    implied = {(b.table, c) for b in selected for c in b.companions}
+    """Drop declared companion columns; the sidecar's binding note describes them."""
+    implied = {(b.table, c) for b in selected for c in b.companion_columns}
     assets = [
         a.model_copy(update={"columns": [c for c in a.columns if (a.table, c) not in implied]})
         for a in sco.physical_assets
@@ -82,9 +83,7 @@ def _add_bindings(
         return
     pins = ", ".join(f"{p.product} spec sha256 {p.sha256[:12]}" for p in sidecar.specs)
     parts.append(
-        f"\nAPPROVED BINDINGS (supplied: {sidecar.authority}; {pins}). A governed value "
-        "column V holds the permissible-value id; V_label holds its label and "
-        "V_mapping_type its mapping type."
+        f"\nAPPROVED BINDINGS (supplied: {sidecar.authority}; {pins}). {sidecar.binding_note}"
     )
     for relation in dict.fromkeys(b.relation for b in selected):
         parts.append(f"  {relation}:")
@@ -120,7 +119,7 @@ def _add_values(
     sidecar: Sidecar,
     facts: LibraryFacts,
 ) -> None:
-    governed = [b for b in selected if b.strategy == "pass_through" and b.de_id]
+    governed = [b for b in selected if b.governed and b.de_id]
     if not governed:
         return
     template = sidecar.membership_sql.format(relation=sidecar.membership_relation, element_id="E")
@@ -165,15 +164,15 @@ def _add_grain(
         return
     parts.append(f"\nGRAIN AND KEYS ({sidecar.spec_name} product specs):")
     for p in chosen:
-        for entity in p.raw.get("entities", []):
-            keys = ", ".join(entity.get("key_columns", []))
-            parts.append(f"  {sidecar.relation(p.pin.table)}: {entity.get('grain')}; key {keys}")
-        for rel in p.raw.get("relationships", []):
+        for entity in p.doc.entities:
+            keys = ", ".join(entity.key_columns)
+            parts.append(f"  {sidecar.relation(p.pin.table)}: {entity.grain}; key {keys}")
+        for rel in p.doc.relationships:
             pairs = " AND ".join(
                 f"{p.pin.table}.{s} = {_table_of(products, rel)}.{t}"
-                for s, t in zip(rel["source_columns"], rel["target_columns"])
+                for s, t in zip(rel.source_columns, rel.target_columns)
             )
-            parts.append(f"  join {pairs} ({rel['cardinality']})")
+            parts.append(f"  join {pairs} ({rel.cardinality})")
         if p.pin.product == sidecar.grain_product:
             columns = ", ".join(sidecar.grain_columns)
             note = sidecar.grain_note.format(
@@ -182,10 +181,10 @@ def _add_grain(
             parts.append(f"  {note}")
 
 
-def _table_of(products: tuple[ProductSpec, ...], rel: Mapping[str, str]) -> str:
+def _table_of(products: tuple[ProductSpec, ...], rel: SpecRelationship) -> str:
     return next(
-        (p.pin.table for p in products if p.pin.product == rel["target_product_id"]),
-        rel["target_product_id"],
+        (p.pin.table for p in products if p.pin.product == rel.target_product_id),
+        rel.target_product_id,
     )
 
 

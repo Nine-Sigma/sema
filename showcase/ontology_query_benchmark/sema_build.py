@@ -76,7 +76,7 @@ def build_scoped_graph(
         concept_fields=fields, value_bridges=(),
         bridge_source_schema=sidecar.schema, load_ancestors=False,
     )
-    embedded = _embed(loader, embedder, dimensions, products, resolution, facts)
+    embedded = _embed(loader, embedder, dimensions, sidecar, products, resolution, facts)
     counts = {
         "approved_bindings": len(resolution.approved()),
         "refused_bindings": len(resolution.bindings) - len(resolution.approved()),
@@ -117,6 +117,7 @@ def _embed(
     loader: GraphLoader,
     embedder: Any,
     dimensions: int,
+    sidecar: Sidecar,
     products: tuple[ProductSpec, ...],
     resolution: BindingResolution,
     facts: LibraryFacts,
@@ -128,16 +129,16 @@ def _embed(
     ]
     engine.embed_and_store("Entity", "name", entities, lambda e: str(e["text"]))
     props = [
-        {"name": col, "entity_name": b.table, "text": property_text(b, col, facts)}
+        {"name": col, "entity_name": b.table, "text": property_text(sidecar, b, col, facts)}
         for b in resolution.approved()
-        for col in (b.column, *b.companions, *b.catalog_companions)
+        for col in (b.column, *b.companion_columns, *b.catalog_companions)
     ]
     engine.embed_and_store("Property", "name", props, lambda p: str(p["text"]))
     return {"embedded_entities": len(entities), "embedded_properties": len(props)}
 
 
 def _grain(product: ProductSpec) -> str:
-    return "; ".join(str(e.get("grain", "")) for e in product.raw.get("entities", []))
+    return "; ".join(e.grain for e in product.doc.entities)
 
 
 def _identity(

@@ -33,6 +33,7 @@ from sema.models.target.entity import TargetEntityDecl
 from sema.models.target.normalized import NormalizedTargetModel
 from sema.models.target.properties import TargetPropertyDecl
 from sema.models.target.refs import TargetEntityRef
+from showcase.ontology_query_benchmark.product_spec import CompanionRole
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     ProductSpec,
@@ -40,6 +41,12 @@ from showcase.ontology_query_benchmark.sema_bindings import (
     SpecPinError,
     SuppliedBinding,
 )
+
+COMPANION_TEXT = {
+    CompanionRole.LABEL: "label text",
+    CompanionRole.MAPPING_TYPE: "mapping type",
+}
+
 
 @dataclass(frozen=True)
 class ElementFacts:
@@ -176,13 +183,13 @@ def _properties(
     for b in approved:
         if b.table != table:
             continue
-        bound = b.de_id if b.strategy == "pass_through" else None
+        bound = b.de_id if b.governed else None
         props.append(TargetPropertyDecl(
             name=b.column, type=b.physical_type, nullable=True, vocabulary_binding=bound
         ))
         props.extend(
             TargetPropertyDecl(name=c, type="STRING", nullable=True)
-            for c in (*b.companions, *b.catalog_companions)
+            for c in (*b.companion_columns, *b.catalog_companions)
         )
     return props
 
@@ -190,11 +197,11 @@ def _properties(
 def _declared_joins(sidecar: Sidecar, product: ProductSpec) -> list[DeclaredJoinDecl]:
     return [
         DeclaredJoinDecl(
-            referenced_entity=qualified_name(sidecar, rel["target_product_id"]),
-            join_keys=list(zip(rel["source_columns"], rel["target_columns"])),
+            referenced_entity=qualified_name(sidecar, rel.target_product_id),
+            join_keys=list(zip(rel.source_columns, rel.target_columns)),
             evidence="declared",
         )
-        for rel in product.raw.get("relationships", [])
+        for rel in product.doc.relationships
     ]
 
 
@@ -220,20 +227,21 @@ def concept_fields(
     fields: list[ConceptFieldSpec] = []
     for b in approved:
         element = facts.elements.get(b.de_id or "")
-        if b.strategy == "pass_through" and element is not None:
+        if b.governed and element is not None:
             codes = tuple(code for code, _ in element.members)
             fields.append(ConceptFieldSpec(qualified_name(sidecar, b.product), b.column, codes))
     return fields
 
 
-def property_text(binding: SuppliedBinding, column: str, facts: LibraryFacts) -> str:
+def property_text(
+    sidecar: Sidecar, binding: SuppliedBinding, column: str, facts: LibraryFacts
+) -> str:
     element = facts.elements.get(binding.de_id or "")
-    base = element.label if element else binding.library_id.removesuffix("-v1")
+    base = element.label if element else binding.library_id.removesuffix(sidecar.library_id_suffix)
     base = base.replace("-", " ").replace("_", " ")
-    if column.endswith("_label"):
-        return f"{base} label text"
-    if column.endswith("_mapping_type"):
-        return f"{base} mapping type"
+    role = next((r for r, c in binding.companions if c == column), None)
+    if role is not None:
+        return f"{base} {COMPANION_TEXT[role]}"
     if column in binding.catalog_companions:
         return f"{base} vocabulary code"
     return f"{base}: {element.definition}" if element and element.definition else base

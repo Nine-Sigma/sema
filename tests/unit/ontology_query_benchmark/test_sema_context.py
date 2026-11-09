@@ -21,10 +21,12 @@ from showcase.ontology_query_benchmark.profile import Profile
 from showcase.ontology_query_benchmark.routing import RoutingError
 from showcase.ontology_query_benchmark.sema_trace import trace
 from tests.unit.ontology_query_benchmark.test_sema_bindings import (
+    BINDING_NOTE,
     CONVENTIONS,
+    EVENTS,
+    ID_SUFFIX,
     PEOPLE,
     RID,
-    EVENTS,
     catalog_fixture,
     facts_fixture,
     write_fixture,
@@ -53,7 +55,7 @@ def _value(table: str, column: str, code: str, label: str) -> dict[str, Any]:
 
 
 PEOPLE_ENTITY = _entity(PEOPLE, [
-    _col(RID), _col("gender_G1", "categorical"), _col("gender_G1_label"),
+    _col(RID), _col("gender_G1", "categorical"), _col("gender_G1_text"),
     _col("vital_V1", "categorical"), _col("city_C1", "categorical"),
 ])
 EVENTS_ENTITY = _entity(EVENTS, [_col("row_id"), _col(RID), _col("site_S1", "categorical")])
@@ -104,7 +106,12 @@ def test_context_renders_assets_bindings_and_complete_values(tmp_path: Path) -> 
     assert "L8532 = Female" in ctx.text and "L8507 = Male" in ctx.text
     assert "L1 = Alive" in ctx.text
     assert "Spec test authority" in ctx.text
-    assert "V_label holds its label" in ctx.text
+
+
+def test_the_binding_note_is_the_sidecar_text(tmp_path: Path) -> None:
+    ctx = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES])(QUESTION)
+    header = next(x for x in ctx.text.splitlines() if x.startswith("APPROVED BINDINGS"))
+    assert header.endswith(f"). {BINDING_NOTE}")
 
 
 def test_incompletely_retrieved_value_set_is_not_listed(tmp_path: Path) -> None:
@@ -145,7 +152,7 @@ def test_catalog_companion_is_rendered_as_unsupplied(tmp_path: Path) -> None:
 
 def test_pattern_companions_are_not_listed_twice(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES])(QUESTION)
-    assert "gender_G1_label" not in ctx.text
+    assert "gender_G1_text" not in ctx.text
     table_line = next(x for x in ctx.text.splitlines() if x.startswith(f"  cat.sch.{PEOPLE}: "))
     assert "gender_G1" in table_line and RID in table_line
 
@@ -204,7 +211,7 @@ def test_trace_links_library_binding_asset_and_context(tmp_path: Path) -> None:
     provider = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES])
     rows = {row["physical"]["column"]: row for row in trace(provider, QUESTION)}
     gender = rows["gender_G1"]
-    assert gender["library"] == {"de_id": "G1", "library_id": "gender-v1",
+    assert gender["library"] == {"de_id": "G1", "library_id": f"gender{ID_SUFFIX}",
                                  "label": "Administrative gender"}
     assert gender["binding"]["status"] == "approved_supplied"
     assert gender["binding"]["spec_sha256"]
