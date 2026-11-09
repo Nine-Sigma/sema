@@ -10,7 +10,7 @@ from typing import Any
 import duckdb
 import pytest
 
-from showcase.partner_timbr_benchmark.sema_bindings import (
+from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     BindingStatus,
     SpecPinError,
@@ -18,7 +18,7 @@ from showcase.partner_timbr_benchmark.sema_bindings import (
     load_sidecar,
     resolve_bindings,
 )
-from showcase.partner_timbr_benchmark.sema_build_utils import (
+from showcase.ontology_query_benchmark.sema_build_utils import (
     CONCEPT_SPEC_PATH,
     LibraryFacts,
     import_library_facts,

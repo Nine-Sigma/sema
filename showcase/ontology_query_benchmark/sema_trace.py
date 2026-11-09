@@ -13,24 +13,24 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from showcase.partner_timbr_benchmark.sema_bindings import (
+from showcase.ontology_query_benchmark.sema_bindings import (
     SIDECAR_PATH,
     load_products,
     load_sidecar,
     resolve_bindings,
 )
-from showcase.partner_timbr_benchmark.sema_build import read_catalog, read_manifest
-from showcase.partner_timbr_benchmark.sema_build_utils import (
+from showcase.ontology_query_benchmark.sema_build import read_catalog, read_manifest
+from showcase.ontology_query_benchmark.sema_build_utils import (
     CONCEPT_SPEC_PATH,
     import_library_facts,
 )
-from showcase.partner_timbr_benchmark.sema_context import (
+from showcase.ontology_query_benchmark.sema_context import (
     SContext,
     SContextProvider,
     check_manifest,
     load_conventions,
 )
-from showcase.partner_timbr_benchmark.sema_context_utils import Rendering
+from showcase.ontology_query_benchmark.sema_context_utils import Rendering
 
 Q01 = "How many living patients are female (administrative gender)?"
 
@@ -72,7 +72,7 @@ def open_live_provider(
     sidecar_path: Path = SIDECAR_PATH,
 ) -> Iterator[SContextProvider]:
     from sema.pipeline.retrieval import RetrievalEngine, RetrievalScope
-    from showcase.partner_timbr_benchmark import sema_live
+    from showcase.ontology_query_benchmark import sema_live
 
     sidecar = load_sidecar(sidecar_path)
     facts = import_library_facts(concept_spec, projection, receipt)

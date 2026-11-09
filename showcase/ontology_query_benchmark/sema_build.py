@@ -18,7 +18,7 @@ from sema.engine.embeddings import EmbeddingEngine
 from sema.graph.loader import GraphLoader
 from sema.graph.physical_catalog import PhysicalCatalogSource
 from sema.graph.target_graph_build import build_target_retrieval_graph
-from showcase.partner_timbr_benchmark.sema_bindings import (
+from showcase.ontology_query_benchmark.sema_bindings import (
     SIDECAR_PATH,
     BindingResolution,
     ProductSpec,
@@ -27,7 +27,7 @@ from showcase.partner_timbr_benchmark.sema_bindings import (
     load_sidecar,
     resolve_bindings,
 )
-from showcase.partner_timbr_benchmark.sema_build_utils import (
+from showcase.ontology_query_benchmark.sema_build_utils import (
     CONCEPT_SPEC_PATH,
     FactsConceptSource,
     LibraryFacts,
@@ -167,7 +167,7 @@ def read_manifest(path: Path) -> BuildManifest:
 
 
 def main(argv: list[str] | None = None) -> None:
-    from showcase.partner_timbr_benchmark import sema_live
+    from showcase.ontology_query_benchmark import sema_live
 
     args = _parser().parse_args(argv)
     workspace = sema_live.prt_test_workspace()

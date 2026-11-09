@@ -13,13 +13,13 @@ from dataclasses import dataclass, field
 
 from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
 from sema.models.context import SemanticContextObject
-from showcase.partner_timbr_benchmark.sema_bindings import (
+from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     ProductSpec,
     Sidecar,
     SuppliedBinding,
 )
-from showcase.partner_timbr_benchmark.sema_build_utils import LibraryFacts, absent_elements
+from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts, absent_elements
 
 MEMBERSHIP_SQL = (
     "SELECT permissible_value_prt_id, permissible_value_prt_preferred_label "

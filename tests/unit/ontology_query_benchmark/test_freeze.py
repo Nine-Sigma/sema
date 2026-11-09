@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from showcase.partner_timbr_benchmark import freeze
+from showcase.ontology_query_benchmark import freeze
 
 pytestmark = pytest.mark.unit
 

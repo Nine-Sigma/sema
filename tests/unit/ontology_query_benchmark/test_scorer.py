@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from showcase.partner_timbr_benchmark import scorer
+from showcase.ontology_query_benchmark import scorer
 
 pytestmark = pytest.mark.unit
 

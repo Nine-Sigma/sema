@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from showcase.partner_timbr_benchmark.routing import (
+from showcase.ontology_query_benchmark.routing import (
     SQL_WAREHOUSE_ID,
     TEST_PROFILE,
     TIMBR_MCP_URL,
@@ -18,7 +18,7 @@ from showcase.partner_timbr_benchmark.routing import (
     require_test_host,
     require_timbr_mcp_url,
 )
-from showcase.partner_timbr_benchmark.runner_utils import Limits, guard_mcp_tools, read_env_keys
+from showcase.ontology_query_benchmark.runner_utils import Limits, guard_mcp_tools, read_env_keys
 
 CHAT_ENDPOINT = "databricks-claude-sonnet-5"
 MODEL_TIMEOUT_S = 300.0

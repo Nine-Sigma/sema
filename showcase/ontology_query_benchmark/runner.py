@@ -1,6 +1,6 @@
 """Run the A/B/S benchmark matrix on the frozen Timbr harness with typed scoring.
 
-python -m showcase.partner_timbr_benchmark.runner --frozen <closure dir> --run-dir <dir>
+python -m showcase.ontology_query_benchmark.runner --frozen <closure dir> --run-dir <dir>
     [--arms A B S] [--reps 3] [--ids Q01,Q02] [--dry-run]
     [--s-context module:function] [--timbr-env <original POC env file>]
     [--settings settings.json]   # {"prices": {...usd_per_1m}, "max_cost_usd": 60}
@@ -28,11 +28,11 @@ from types import SimpleNamespace
 from typing import Any
 
 from sema.log import logger
-from showcase.partner_timbr_benchmark import runner_utils as ru
-from showcase.partner_timbr_benchmark import scorer
-from showcase.partner_timbr_benchmark.routing import require_clean_process
-from showcase.partner_timbr_benchmark.runner_live_utils import live_clients
-from showcase.partner_timbr_benchmark.runner_utils import Limits, Meter, Prices
+from showcase.ontology_query_benchmark import runner_utils as ru
+from showcase.ontology_query_benchmark import scorer
+from showcase.ontology_query_benchmark.routing import require_clean_process
+from showcase.ontology_query_benchmark.runner_live_utils import live_clients
+from showcase.ontology_query_benchmark.runner_utils import Limits, Meter, Prices
 
 ARMS = ("A", "B", "S")
 STAGES = ("context", "generation", "validation", "execution", "scoring")

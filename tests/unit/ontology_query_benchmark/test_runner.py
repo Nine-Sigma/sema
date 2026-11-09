@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
-from showcase.partner_timbr_benchmark import runner, runner_utils, scorer
-from showcase.partner_timbr_benchmark.routing import RoutingError
+from showcase.ontology_query_benchmark import runner, runner_utils, scorer
+from showcase.ontology_query_benchmark.routing import RoutingError
 
 pytestmark = pytest.mark.unit
 

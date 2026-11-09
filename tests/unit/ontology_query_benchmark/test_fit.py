@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from showcase.partner_timbr_benchmark import fit, freeze, runner, runner_utils
-from showcase.partner_timbr_benchmark.runner_utils import Knobs, Limits
+from showcase.ontology_query_benchmark import fit, freeze, runner, runner_utils
+from showcase.ontology_query_benchmark.runner_utils import Knobs, Limits
 
 pytestmark = pytest.mark.unit
 

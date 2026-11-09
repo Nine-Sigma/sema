@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from showcase.partner_timbr_benchmark import freeze, runner_utils
+from showcase.ontology_query_benchmark import freeze, runner_utils
 
 
 @pytest.fixture(scope="session")

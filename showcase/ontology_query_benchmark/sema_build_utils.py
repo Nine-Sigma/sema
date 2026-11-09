@@ -33,7 +33,7 @@ from sema.models.target.entity import TargetEntityDecl
 from sema.models.target.normalized import NormalizedTargetModel
 from sema.models.target.properties import TargetPropertyDecl
 from sema.models.target.refs import TargetEntityRef
-from showcase.partner_timbr_benchmark.sema_bindings import (
+from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     ProductSpec,
     Sidecar,

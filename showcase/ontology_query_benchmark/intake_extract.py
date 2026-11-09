@@ -5,7 +5,7 @@ is supplied assistance, not automatic discovery. A read that exceeds its row lim
 returns other than the counted rows, or sees the source refresh is incomplete and
 writes no database file.
 
-    uv run python -m showcase.partner_timbr_benchmark.intake_extract \\
+    uv run python -m showcase.ontology_query_benchmark.intake_extract \\
       --spec DEMOGRAPHICS_SPEC --spec CANCER_REGISTRY_SPEC --out DIR
 """
 
@@ -22,7 +22,7 @@ from typing import Any, Protocol
 import duckdb
 
 from sema.ingest.duckdb_staging_utils import build_table_comment_sql, qualified, quote_ident
-from showcase.partner_timbr_benchmark.intake_extract_utils import (
+from showcase.ontology_query_benchmark.intake_extract_utils import (
     CONCEPT,
     DATA_ELEMENT,
     RELATIONS,

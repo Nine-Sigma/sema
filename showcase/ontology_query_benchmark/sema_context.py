@@ -16,16 +16,16 @@ from typing import Protocol
 
 from sema.models.context import SemanticCandidateSet
 from sema.pipeline.context import prune_to_sco
-from showcase.partner_timbr_benchmark.sema_bindings import (
+from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     ProductSpec,
     Sidecar,
     SpecPinError,
     SuppliedBinding,
 )
-from showcase.partner_timbr_benchmark.sema_build import BuildManifest
-from showcase.partner_timbr_benchmark.sema_build_utils import LibraryFacts
-from showcase.partner_timbr_benchmark.sema_context_utils import Rendering, render
+from showcase.ontology_query_benchmark.sema_build import BuildManifest
+from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts
+from showcase.ontology_query_benchmark.sema_context_utils import Rendering, render
 
 
 FIRST_PROMPT_TOKEN_LIMIT = 13_934

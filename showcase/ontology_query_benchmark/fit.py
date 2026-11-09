@@ -1,6 +1,6 @@
 """Offline fit report: whole-request token estimates per arm and question, zero calls.
 
-python -m showcase.partner_timbr_benchmark.fit --frozen <closure dir>
+python -m showcase.ontology_query_benchmark.fit --frozen <closure dir>
     [--receipts <harness>/runs/v3_20261021_rw/ab_w4s] [--budget-tokens N]
     [--values-top-k K] [--description-cap-chars C] [--s-context module:function] [--out f]
     [--input-ceiling 16000] [--repair-reserve 2066]
@@ -24,9 +24,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from showcase.partner_timbr_benchmark import runner_utils as ru
-from showcase.partner_timbr_benchmark.freeze import HARNESS_ROOT, sha256_file
-from showcase.partner_timbr_benchmark.runner_utils import Knobs
+from showcase.ontology_query_benchmark import runner_utils as ru
+from showcase.ontology_query_benchmark.freeze import HARNESS_ROOT, sha256_file
+from showcase.ontology_query_benchmark.runner_utils import Knobs
 
 RECEIPTS = HARNESS_ROOT / "runs/v3_20261021_rw/ab_w4s"
 SWEEP_GRID = tuple(itertools.product((16_000, 8_000, 6_000, 5_000), (25, 10, 5, 0), (160, 80),

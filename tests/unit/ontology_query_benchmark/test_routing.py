@@ -1,7 +1,7 @@
 import pytest
 
-from showcase.partner_timbr_benchmark import routing
-from showcase.partner_timbr_benchmark.routing import RoutingError
+from showcase.ontology_query_benchmark import routing
+from showcase.ontology_query_benchmark.routing import RoutingError
 
 pytestmark = pytest.mark.unit
 

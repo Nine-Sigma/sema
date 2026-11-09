@@ -1,6 +1,6 @@
 """Copy the corrected Timbr harness runtime closure into a content-addressed directory.
 
-python -m showcase.partner_timbr_benchmark.freeze --out <dir> [--source <harness root>]
+python -m showcase.ontology_query_benchmark.freeze --out <dir> [--source <harness root>]
 """
 
 import argparse

@@ -21,7 +21,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from showcase.partner_timbr_benchmark.scorer_utils import (
+from showcase.ontology_query_benchmark.scorer_utils import (
     Row,
     as_text,
     bijection,

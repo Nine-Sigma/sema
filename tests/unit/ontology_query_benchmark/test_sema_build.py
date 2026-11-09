@@ -11,20 +11,20 @@ from unittest.mock import MagicMock
 import pytest
 
 from sema.graph.physical_catalog import PhysicalColumn, StaticPhysicalCatalogSource
-from showcase.partner_timbr_benchmark.sema_bindings import SpecPinError, load_sidecar
-from showcase.partner_timbr_benchmark.sema_build import (
+from showcase.ontology_query_benchmark.sema_bindings import SpecPinError, load_sidecar
+from showcase.ontology_query_benchmark.sema_build import (
     BuildManifest,
     build_scoped_graph,
     read_manifest,
     write_manifest,
 )
-from showcase.partner_timbr_benchmark.sema_build_utils import (
+from showcase.ontology_query_benchmark.sema_build_utils import (
     CONCEPT_SPEC_PATH,
     FactsConceptSource,
     LibraryFacts,
     import_library_facts,
 )
-from tests.unit.partner_timbr_benchmark.test_sema_bindings import (
+from tests.unit.ontology_query_benchmark.test_sema_bindings import (
     DEMO,
     ELEMENTS,
     TUMOR,

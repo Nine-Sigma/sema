@@ -13,7 +13,7 @@ from sema.intake.eligibility_utils import RunDescriptor
 
 pytestmark = pytest.mark.unit
 
-CONFIG = Path(__file__).parents[3] / "showcase" / "partner_timbr_benchmark" / "config"
+CONFIG = Path(__file__).parents[3] / "showcase" / "ontology_query_benchmark" / "config"
 DESCRIPTOR = CONFIG / "intake_standard_library.run.yaml"
 SELECTED = ("standard_library_data_element", "standard_library_concept")
 LOCATION_KEYS = {"id", "identity_system", "release", "relations"}

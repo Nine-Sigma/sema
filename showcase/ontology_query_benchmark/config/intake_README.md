@@ -2,7 +2,7 @@
 
 The benchmark's automatic path runs `sema target discover` over a DuckDB file that holds only the Standard Library rows the Timbr POC workload needs. Two inputs feed it, and they are reported apart:
 
-- **Supplied source projection.** `showcase/partner_timbr_benchmark/intake_extract.py` selects rows by the 45 data element ids declared in the two CPD v2 product specs and writes `workload_projection.duckdb` plus `extract_receipt.json`. The selection uses the declared workload, so the receipt labels it `assistance.kind: supplied`. Report it as supplied assistance, never as automatic discovery.
+- **Supplied source projection.** `showcase/ontology_query_benchmark/intake_extract.py` selects rows by the 45 data element ids declared in the two CPD v2 product specs and writes `workload_projection.duckdb` plus `extract_receipt.json`. The selection uses the declared workload, so the receipt labels it `assistance.kind: supplied`. Report it as supplied assistance, never as automatic discovery.
 - **Role-neutral descriptor.** `intake_standard_library.run.yaml` states locations only: the descriptor id, identity system, release, and the relation names. It holds no role map, binding, rule, authored spec or gold. Supplied CPD bindings and authored specs enter through the separately attributed assisted path.
 
 Everything intake does with the file (Land, Structure, Roles, the dry run and any model call) is automatic.
@@ -39,7 +39,7 @@ RUN_ID=<run_id>
 RUN=docs/poc/partner-timbr-benchmark/runs/$RUN_ID
 HARNESS=/path/to/partner-harness
 env -i HOME="$HOME" PATH="$PATH" PYTHON_DOTENV_DISABLED=1 \
-  uv run python -m showcase.partner_timbr_benchmark.intake_extract \
+  uv run python -m showcase.ontology_query_benchmark.intake_extract \
     --spec "$HARNESS/config/demographics_product_spec_cpd_v2.json" \
     --spec "$HARNESS/config/cancer_registry_product_spec_cpd_v2.json" \
     --out "$RUN/source"
@@ -50,7 +50,7 @@ Check `"complete": true` and the row counts above in the printed summary before 
 
 ## Recording command
 
-The `sema` root group calls `load_dotenv()`, which fills any variable the shell leaves unset from the nearest `.env`. Sema has no switch of its own. python-dotenv 1.2.2 (the locked version) skips loading when `PYTHON_DOTENV_DISABLED=1`; `tests/unit/partner_timbr_benchmark/test_intake_config.py` pins that behavior. The token comes from the `TEST` profile in `~/.databrickscfg` and is never echoed. The command also starts from `env -i`, so no inherited `OPENROUTER_*`, `LLM_*`, `INTAKE_MODEL_*` or `EMBEDDING_*` value applies. `DATABRICKS_HOST` and `DATABRICKS_TOKEN` serve the model and embedding endpoints only; the run reads no warehouse.
+The `sema` root group calls `load_dotenv()`, which fills any variable the shell leaves unset from the nearest `.env`. Sema has no switch of its own. python-dotenv 1.2.2 (the locked version) skips loading when `PYTHON_DOTENV_DISABLED=1`; `tests/unit/ontology_query_benchmark/test_intake_config.py` pins that behavior. The token comes from the `TEST` profile in `~/.databrickscfg` and is never echoed. The command also starts from `env -i`, so no inherited `OPENROUTER_*`, `LLM_*`, `INTAKE_MODEL_*` or `EMBEDDING_*` value applies. `DATABRICKS_HOST` and `DATABRICKS_TOKEN` serve the model and embedding endpoints only; the run reads no warehouse.
 
 ```bash
 TEST_TOKEN="$(python3 -c 'import configparser,os;c=configparser.ConfigParser();c.read(os.path.expanduser("~/.databrickscfg"));print(c["TEST"]["token"])')"
@@ -66,7 +66,7 @@ env -i HOME="$HOME" PATH="$PATH" \
   EMBEDDING_PROVIDER=databricks \
   EMBEDDING_MODEL=databricks-bge-large-en \
   uv run sema target discover "$SOURCE" \
-    --descriptor showcase/partner_timbr_benchmark/config/intake_standard_library.run.yaml \
+    --descriptor showcase/ontology_query_benchmark/config/intake_standard_library.run.yaml \
     --tier metadata_only --run-id "$RUN_ID" \
     --root "$RUN/intake" --out "$RUN/specs"
 ```
@@ -98,7 +98,7 @@ env -i HOME="$HOME" PATH="$PATH" \
   INTAKE_TRACING_BACKEND=none \
   EMBEDDING_PROVIDER= \
   uv run sema target discover "$SOURCE" \
-    --descriptor showcase/partner_timbr_benchmark/config/intake_standard_library.run.yaml \
+    --descriptor showcase/ontology_query_benchmark/config/intake_standard_library.run.yaml \
     --tier metadata_only --run-id "$RUN_ID-replay" \
     --root "$RUN/replay" --out "$RUN/replay-specs"
 ```

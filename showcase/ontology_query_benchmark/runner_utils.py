@@ -18,7 +18,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Protocol
 
-from showcase.partner_timbr_benchmark.routing import require_mcp_tool
+from showcase.ontology_query_benchmark.routing import require_mcp_tool
 
 HARNESS_PACKAGE = "timbr_demographics_poc"
 HARNESS_MODULES = ("benchmark_models", "benchmark_workflow", "benchmark_clients",

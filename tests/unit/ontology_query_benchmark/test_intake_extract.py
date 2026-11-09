@@ -16,7 +16,7 @@ from sema.intake.loaders.detect import land_source
 pytestmark = pytest.mark.unit
 
 ROOT = Path(__file__).parents[3]
-README = ROOT / "showcase" / "partner_timbr_benchmark" / "config" / "intake_README.md"
+README = ROOT / "showcase" / "ontology_query_benchmark" / "config" / "intake_README.md"
 DE = "standard_library_data_element"
 CONCEPT = "standard_library_concept"
 ALTERED = datetime(2026, 11, 9, 6, 27, 4, tzinfo=UTC)
@@ -94,7 +94,7 @@ def _specs(tmp_path: Path) -> list[Path]:
 
 
 def _extract(tmp_path: Path, cursor: FakeCursor, **kwargs: Any) -> dict[str, Any]:
-    from showcase.partner_timbr_benchmark.intake_extract import extract
+    from showcase.ontology_query_benchmark.intake_extract import extract
 
     return extract(lambda: cursor, _specs(tmp_path), tmp_path / "out", **kwargs)
 
@@ -194,7 +194,7 @@ def test_an_incomplete_read_writes_no_database(
 
 
 def test_a_malformed_declared_id_is_refused_before_any_statement(tmp_path: Path) -> None:
-    from showcase.partner_timbr_benchmark.intake_extract import extract
+    from showcase.ontology_query_benchmark.intake_extract import extract
 
     spec = tmp_path / "spec.json"
     spec.write_text(json.dumps({"fields": [{"de_id": "PRT1' OR '1'='1"}]}), encoding="utf-8")

@@ -10,16 +10,16 @@ from typing import Any
 import pytest
 
 from sema.models.context import SemanticCandidateSet
-from showcase.partner_timbr_benchmark.sema_bindings import (
+from showcase.ontology_query_benchmark.sema_bindings import (
     load_products,
     load_sidecar,
     resolve_bindings,
 )
-from showcase.partner_timbr_benchmark import sema_live
-from showcase.partner_timbr_benchmark.sema_context import SContextProvider
-from showcase.partner_timbr_benchmark.sema_live import WrongWorkspaceError, assert_test_host
-from showcase.partner_timbr_benchmark.sema_trace import trace
-from tests.unit.partner_timbr_benchmark.test_sema_bindings import (
+from showcase.ontology_query_benchmark import sema_live
+from showcase.ontology_query_benchmark.sema_context import SContextProvider
+from showcase.ontology_query_benchmark.sema_live import WrongWorkspaceError, assert_test_host
+from showcase.ontology_query_benchmark.sema_trace import trace
+from tests.unit.ontology_query_benchmark.test_sema_bindings import (
     CONVENTIONS,
     DEMO,
     MRN,
@@ -156,8 +156,8 @@ def test_membership_query_template_is_stated_once(tmp_path: Path) -> None:
 
 
 def test_committed_budget_fits_the_first_prompt_limit() -> None:
-    from showcase.partner_timbr_benchmark.sema_bindings import load_sidecar as load
-    from showcase.partner_timbr_benchmark.sema_context import (
+    from showcase.ontology_query_benchmark.sema_bindings import load_sidecar as load
+    from showcase.ontology_query_benchmark.sema_context import (
         CHARS_PER_TOKEN,
         FIRST_PROMPT_TOKEN_LIMIT,
         HARNESS_OVERHEAD_CHARS,
@@ -198,7 +198,7 @@ def test_tumor_grain_and_hierarchy_reference_are_rendered(tmp_path: Path) -> Non
 
 
 def test_committed_hierarchy_reference_holds_relation_facts_only() -> None:
-    from showcase.partner_timbr_benchmark.sema_bindings import load_sidecar as load
+    from showcase.ontology_query_benchmark.sema_bindings import load_sidecar as load
     text = "\n".join(load().hierarchy_reference)
     relation = "partner_dev.partner_provenance.vb_vocabulary_test_2026_09_25_omop_ancestor"
     assert relation in text and "Delta version 0" in text
