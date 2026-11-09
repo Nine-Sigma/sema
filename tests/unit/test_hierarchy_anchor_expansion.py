@@ -210,5 +210,6 @@ def test_an_anchor_carries_the_score_of_the_hit_that_found_it() -> None:
     [term] = [c for c in candidates if c["type"] == "term" and c["code"] == "S100"]
     [found] = [c for c in candidates if c["type"] == "hierarchy_anchor"]
     assert term["score"] > 0 and found["score"] == term["score"]
-    [anchor] = prune_to_sco(SemanticCandidateSet(query="q", candidates=candidates)).hierarchy_anchors
+    sco = prune_to_sco(SemanticCandidateSet(query="q", candidates=candidates))
+    [anchor] = sco.hierarchy_anchors
     assert anchor.score == term["score"]
