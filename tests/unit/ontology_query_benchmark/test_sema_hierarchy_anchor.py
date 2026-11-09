@@ -83,9 +83,11 @@ def context(tmp_path: Path, facts: LibraryFacts, readable: dict[str, bool] | Non
     return provider("Which events sit under a broader concept?", is_denied)
 
 
-def fragments(text: str, column: str) -> list[str]:
-    return [x.strip().removeprefix("WHERE ") for x in text.splitlines()
-            if x.strip().startswith(f"WHERE {column} IN")]  # fmt: skip
+def fragments(text: str, column: str, *, filled: bool = True) -> list[str]:
+    """The column's anchor-filled fragments, or with ``filled=False`` its template."""
+    lines = [x.strip().removeprefix("WHERE ") for x in text.splitlines()]
+    found = [x for x in lines if x.lstrip("(").startswith(f"{column} IN")]
+    return [f for f in found if ("{anchor_id}" in f) != filled]
 
 
 def members(con: duckdb.DuckDBPyConnection, source: str, fragment: str) -> set[str]:
@@ -103,7 +105,6 @@ def test_a_retrieved_anchor_fills_the_fragment_and_is_named(tmp_path: Path) -> N
     section = text[text.index("CONCEPT HIERARCHY"):]
     assert "Neoplasm" in section and "C1" in section and "std" in section
     assert "2 members" in section
-    assert "{anchor_id}" not in section
     [fragment] = fragments(text, "site_S1")
     assert members(warehouse(), EVENTS_SQL, fragment) == {"L10", "L11"}
 
@@ -123,7 +124,7 @@ def test_an_anchor_on_another_column_leaves_the_section_as_before(tmp_path: Path
     other = context(tmp_path, facts, READABLE, [anchor("C1", "Neoplasm", "std", 2, "dx")]).text
 
     assert other == plain
-    assert "{anchor_id}" in fragments(plain, "site_S1")[0]
+    assert fragments(plain, "site_S1", filled=False) and not fragments(plain, "site_S1")
 
 
 def test_an_acris_class_anchor_resolves_its_document_types(tmp_path: Path) -> None:

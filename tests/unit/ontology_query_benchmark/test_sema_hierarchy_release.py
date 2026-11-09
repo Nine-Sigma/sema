@@ -89,8 +89,8 @@ def test_a_shared_release_adds_no_release_finding(tmp_path: Path) -> None:
 
 def test_an_anchor_code_fills_the_ancestor_slot() -> None:
     con = warehouse()
-    text_ids = membership_sql(hierarchy(), "dx", anchor=ANCHOR)
-    typed_ids = membership_sql(typed_hierarchy(), "dx", anchor="1")
+    text_ids = membership_sql(hierarchy(), "dx", dialect="duckdb", anchor=ANCHOR)
+    typed_ids = membership_sql(typed_hierarchy(), "dx", dialect="duckdb", anchor="1")
 
     found = con.execute(f"SELECT DISTINCT dx FROM wh.data.events WHERE {text_ids}").fetchall()
     assert {row[0] for row in found} == {"L10", "L11"}
@@ -98,4 +98,4 @@ def test_an_anchor_code_fills_the_ancestor_slot() -> None:
         f"SELECT dx FROM (VALUES ('L10'), ('L11'), ('L12')) v(dx) WHERE {typed_ids}"
     ).fetchall()
     assert typed == [("L10",)]
-    assert "{anchor_id}" in membership_sql(hierarchy(), "dx")
+    assert "{anchor_id}" in membership_sql(hierarchy(), "dx", dialect="duckdb")

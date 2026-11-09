@@ -151,7 +151,8 @@ def _context(tmp_path: Path, facts: LibraryFacts, readable: dict[str, bool] | No
 
 
 def _fragment(text: str, column: str) -> str:
-    line = next(x for x in text.splitlines() if x.strip().startswith(f"WHERE {column} IN"))
+    line = next(x for x in text.splitlines()
+                if x.strip().removeprefix("WHERE ").lstrip("(").startswith(f"{column} IN"))  # fmt: skip
     return line.strip().removeprefix("WHERE ")
 
 
@@ -194,7 +195,7 @@ def test_without_a_hierarchy_the_context_has_no_hierarchy_section(tmp_path: Path
 
 
 def test_a_declared_target_type_casts_text_mapping_targets() -> None:
-    sql = membership_sql(typed_hierarchy(), "dx").replace("{anchor_id}", "1")
+    sql = membership_sql(typed_hierarchy(), "dx", dialect="duckdb").replace("{anchor_id}", "1")
 
     found = add_typed_vocabulary(warehouse()).execute(
         f"SELECT dx FROM (VALUES ('L10'), ('L11'), ('L12')) v(dx) WHERE {sql}"

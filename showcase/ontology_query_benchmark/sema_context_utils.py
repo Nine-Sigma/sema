@@ -76,6 +76,7 @@ def render(
     is_denied: Callable[[str], bool] = nothing_denied,
     *,
     readable: Mapping[str, bool] | None = None,
+    question: str,
 ) -> Rendering:
     exposure = Exposure(
         frozenset((p.pin.table, c) for p in products for c in p.doc.exposure.denied_columns),
@@ -97,7 +98,8 @@ def render(
     _add_grain(rendering, products, sidecar, exposure)
     hierarchy: list[str] = []
     add_hierarchy(hierarchy, rendering.findings, selected, facts, readable,
-                  rendering.sco.hierarchy_anchors)  # fmt: skip
+                  rendering.sco.hierarchy_anchors, question=question,
+                  dialect=sidecar.sql_dialect)  # fmt: skip
     _add_rules(rendering.parts, sidecar, hierarchy_prose=not hierarchy)
     spec = facts.hierarchy.spec if facts.hierarchy else None
     if hierarchy and spec and _hierarchy_kept(rendering, exposure, spec):

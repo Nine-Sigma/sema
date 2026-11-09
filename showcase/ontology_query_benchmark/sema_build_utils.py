@@ -91,7 +91,8 @@ def import_library_facts(
             )
         finally:
             staging.close()
-        loaded = load_hierarchy(copy, hierarchy) if hierarchy else None
+        codes = {str(term["code"]) for term in imported.manifest["terms"]}
+        loaded = load_hierarchy(copy, hierarchy, codes) if hierarchy else None
     pinned = hierarchy.model_dump_json().encode() if hierarchy else b""
     identity = hashlib.sha256(spec_bytes + digest.encode() + pinned).hexdigest()
     inputs = (

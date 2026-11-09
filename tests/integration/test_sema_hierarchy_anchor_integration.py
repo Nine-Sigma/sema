@@ -72,7 +72,7 @@ def ask(driver: Any, tmp_path: Path, facts: LibraryFacts, manifest: BuildManifes
 
 
 def filled(text: str, code: str) -> str:
-    return next(f for f in fragments(text, "site_S1") if f.endswith(f"= '{code}')"))
+    return next(f for f in fragments(text, "site_S1") if f"= '{code}')" in f)
 
 
 def test_question_text_resolves_the_anchor_into_an_executable_fragment(

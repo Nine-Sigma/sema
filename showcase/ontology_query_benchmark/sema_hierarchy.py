@@ -7,7 +7,7 @@ reads the declared warehouse relations, each checked readable once at build.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -42,7 +42,11 @@ class HierarchyFacts:
         return any(source == member for source, _ in self.bridges)
 
 
-def load_hierarchy(projection: Path, spec: ConceptHierarchy) -> HierarchyFacts:
+def load_hierarchy(
+    projection: Path, spec: ConceptHierarchy, members: Collection[str]
+) -> HierarchyFacts:
+    """``members`` are the library's member ids; one that is a standard concept bridges
+    to itself even without a mapping row."""
     with duckdb.connect(str(projection), read_only=True) as con:
         held = con.execute("SELECT 1 FROM duckdb_schemas() WHERE schema_name = ?", [SCHEMA])
         if not held.fetchall():
@@ -59,7 +63,9 @@ def load_hierarchy(projection: Path, spec: ConceptHierarchy) -> HierarchyFacts:
     }
     names = {str(row[0]): str(row[1]) for row in concepts}
     targets = frozenset(str(row[1]) for row in mapping)
-    return HierarchyFacts(spec, names, edges, _bridges(spec, mapping, standard), targets)
+    own = {(m, m) for m in standard.intersection(members)} if spec.mapping else set()
+    bridges = tuple(sorted({*_bridges(spec, mapping, standard), *own}))
+    return HierarchyFacts(spec, names, edges, bridges, targets)
 
 
 def _rows(con: duckdb.DuckDBPyConnection, table: str) -> list[tuple[object, ...]]:

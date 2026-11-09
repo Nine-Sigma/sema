@@ -36,7 +36,8 @@ def read_hierarchy(
 ) -> tuple[list[Slice], list[str]]:
     before = {r: _altered(rows, r) for r in spec.relations}
     slices: list[Slice] = []
-    targets = members
+    c, k = spec.closure, spec.concepts
+    targets, own = members, None
     if (m := spec.mapping) is not None:
         mapped = f"{m.type_column} IN ({_in(m.mapping_types)})"
         first = f"{_member(m.source_column, members)} AND {mapped}"
@@ -48,15 +49,14 @@ def read_hierarchy(
         columns = (m.source_column, m.target_column, m.type_column)
         slices.append(_read(rows, "mapping", m.relation, columns, f"({first}){replaced}",
                             row_limit, before))  # fmt: skip
-        targets = slices[-1].values(1)
-    c, k = spec.closure, spec.concepts
+        targets, own = slices[-1].values(1), _own_ids(spec, members)
     ancestors = (f"IN (SELECT {c.ancestor_column} FROM {c.relation}"
-                 f" WHERE {_member(c.descendant_column, targets)})")  # fmt: skip
+                 f" WHERE {_target(c.descendant_column, targets, own)})")  # fmt: skip
     named = (k.id_column, k.name_column, *((k.standard_column,) if k.standard_column else ()))
-    concept = f"{_member(k.id_column, targets)} OR {k.id_column} {ancestors}"
+    concept = f"{_target(k.id_column, targets, own)} OR {k.id_column} {ancestors}"
     slices.append(_read(rows, "concept", k.relation, named, concept, row_limit, before))
     des = c.descendant_column
-    edge = f"{c.level_column} = 1 AND ({_member(des, targets)} OR {des} {ancestors})"
+    edge = f"{c.level_column} = 1 AND ({_target(des, targets, own)} OR {des} {ancestors})"
     slices.append(_read(rows, "edge", c.relation, (c.ancestor_column, des), edge,
                         row_limit, before))  # fmt: skip
     moved = [
@@ -113,6 +113,21 @@ def _altered(rows: Rows, relation: str) -> tuple[str, str | None]:
         raise ValueError(f"hierarchy relation not in the catalog: {relation}")
     when = found[0][1]
     return (when.isoformat() if hasattr(when, "isoformat") else str(when)), found[0][2]
+
+
+def _target(column: str, ids: Iterable[str], own: str | None) -> str:
+    """Mapping targets, plus with a mapping the members that are themselves concepts."""
+    found = _member(column, ids)
+    return f"({found} OR {column} IN ({own}))" if own else found
+
+
+def _own_ids(spec: ConceptHierarchy, members: Iterable[str]) -> str:
+    """Members whose own id is a standard concept: they reach the hierarchy unmapped."""
+    k = spec.concepts
+    found = f"SELECT {k.id_column} FROM {k.relation} WHERE {_member(k.id_column, members)}"
+    if k.standard_column:
+        found += f" AND {k.standard_column} IN ({_in(k.standard_values)})"
+    return found
 
 
 def _member(column: str, ids: Iterable[str]) -> str:

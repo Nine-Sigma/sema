@@ -139,7 +139,7 @@ class SContextProvider:
         rendering = render(
             Rendering(prune_to_sco(candidates)), self._sidecar,
             self._products, self._resolution, self._facts, is_denied,
-            readable=self._hierarchy_relations,
+            readable=self._hierarchy_relations, question=question,
         )
         header = (
             f"SEMA CONTEXT graph={self._graph_identity[:12]} "

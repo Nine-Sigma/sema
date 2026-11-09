@@ -1,45 +1,56 @@
 """One executable membership predicate per governed column a concept hierarchy reaches.
 
 The predicate's shape is fixed: value column, then the member-to-standard bridge
-(mapping types, then the declared replacement hop, standard concepts only), then the
-closure at ``ancestor = {anchor_id}``. Every relation and column name is profile data.
+(mapping types, then the declared replacement hop, standard concepts only, or the
+member's own id when it is a standard concept), then the closure at
+``ancestor = {anchor_id}``. Every relation and column name is profile data; every
+string literal is quoted in the warehouse's SQL dialect.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 
-from sema.connectors.databricks_utils import sql_string_literal
+from sqlglot import exp
+
 from sema.models.context import HierarchyAnchor
+from sema.pipeline.dedup_utils import tokenize_query
 from showcase.ontology_query_benchmark.profile import ConceptHierarchy
 from showcase.ontology_query_benchmark.sema_bindings import SuppliedBinding
 from showcase.ontology_query_benchmark.sema_build_utils import Finding, LibraryFacts
 
 ANCHOR = "{anchor_id}"
+ANCHORS_PER_COLUMN = 3
 
 
-def membership_sql(spec: ConceptHierarchy, column: str, anchor: str | None = None) -> str:
+def membership_sql(
+    spec: ConceptHierarchy, column: str, *, dialect: str, anchor: str | None = None
+) -> str:
     """With no ``anchor`` code the ancestor slot stays the {anchor_id} placeholder."""
     c, k, m = spec.closure, spec.concepts, spec.mapping
-    joins: list[str] = []
-    where: list[str] = []
-    key, source = f"a.{c.descendant_column}", f"{c.relation} a"
-    if m is not None:
-        key, source = f"m.{m.source_column}", f"{m.relation} m"
-        targets = [_typed(f"m.{m.target_column}", m.target_type)]
-        if m.replacement_types:
-            joins.append(f"LEFT JOIN {m.relation} r ON r.{m.source_column} = m.{m.target_column}"
-                         f" AND r.{m.type_column} IN ({_quoted(m.replacement_types)})")  # fmt: skip
-            targets.append(_typed(f"r.{m.target_column}", m.target_type))
-        joins.append(f"JOIN {c.relation} a ON a.{c.descendant_column} IN ({', '.join(targets)})")
-        where.append(f"m.{m.type_column} IN ({_quoted(m.mapping_types)})")
-    if k.standard_column:
-        joins.append(f"JOIN {k.relation} s ON s.{k.id_column} = a.{c.descendant_column}"
-                     f" AND s.{k.standard_column} IN ({_quoted(k.standard_values)})")  # fmt: skip
-    slot = ANCHOR if anchor is None else sql_string_literal(anchor)
-    where.append(f"a.{c.ancestor_column} = {slot}")
-    body = " ".join([f"SELECT {key} FROM {source}", *joins, "WHERE " + " AND ".join(where)])
-    return f"{column} IN ({body})"
+    slot = ANCHOR if anchor is None else _literal(anchor, dialect)
+    under = f"a.{c.ancestor_column} = {slot}"
+    standard = (
+        f" JOIN {k.relation} s ON s.{k.id_column} = a.{c.descendant_column}"
+        f" AND s.{k.standard_column} IN ({_quoted(k.standard_values, dialect)})"
+        if k.standard_column else ""
+    )
+    closure = f"SELECT a.{c.descendant_column} FROM {c.relation} a{standard} WHERE {under}"
+    if m is None:
+        return f"{column} IN ({closure})"
+    targets = [_typed(f"m.{m.target_column}", m.target_type)]
+    joins = []
+    if m.replacement_types:
+        replaced = _quoted(m.replacement_types, dialect)
+        joins.append(f"LEFT JOIN {m.relation} r ON r.{m.source_column} = m.{m.target_column}"
+                     f" AND r.{m.type_column} IN ({replaced})")  # fmt: skip
+        targets.append(_typed(f"r.{m.target_column}", m.target_type))
+    joins.append(f"JOIN {c.relation} a ON a.{c.descendant_column} IN ({', '.join(targets)})"
+                 + standard)  # fmt: skip
+    mapped = f"m.{m.type_column} IN ({_quoted(m.mapping_types, dialect)})"
+    bridged = " ".join([f"SELECT m.{m.source_column} FROM {m.relation} m", *joins,
+                        f"WHERE {mapped} AND {under}"])  # fmt: skip
+    return f"({column} IN ({bridged}) OR {_typed(column, m.target_type)} IN ({closure}))"
 
 
 def named_columns(spec: ConceptHierarchy) -> list[tuple[str, str]]:
@@ -60,6 +71,9 @@ def add_hierarchy(
     facts: LibraryFacts,
     readable: Mapping[str, bool] | None,
     anchors: Sequence[HierarchyAnchor] = (),
+    *,
+    question: str,
+    dialect: str,
 ) -> None:
     hierarchy = facts.hierarchy
     if hierarchy is None:
@@ -77,30 +91,41 @@ def add_hierarchy(
     if not columns:
         return
     spec = hierarchy.spec
-    found = {(b.table, b.column): [a for a in anchors if (a.table, a.column) == (b.table, b.column)]
-             for b in columns}  # fmt: skip
     parts.append(f"\nCONCEPT HIERARCHY ({spec.attribution.value}; each relation read at build):")
-    line = f"  {_route(spec)} {_direction(spec)}"
-    template = f"{line} Replace {ANCHOR} with the anchor concept id."
-    parts.append(line if all(found.values()) else template)
+    parts.append(f"  {_route(spec, dialect)} {_direction(spec)}"
+                 f" Replace {ANCHOR} with the anchor concept id.")  # fmt: skip
     kind = "source member ids" if spec.mapping else "concept ids of the hierarchy"
     for b in columns:
+        found = [a for a in anchors if (a.table, a.column) == (b.table, b.column)]
         parts.append(f"  {b.table}.{b.column} holds {kind}:")
-        parts.extend(_fragments(spec, b.column, found[(b.table, b.column)]))
+        parts.append(f"  WHERE {membership_sql(spec, b.column, dialect=dialect)}")
+        parts.extend(_filled(spec, b.column, ranked(found, question), dialect))
 
 
-def _fragments(
-    spec: ConceptHierarchy, column: str, anchors: Sequence[HierarchyAnchor]
+def ranked(anchors: Sequence[HierarchyAnchor], question: str) -> list[HierarchyAnchor]:
+    """By the share of the anchor label's words the question holds; ties keep retrieval
+    order, which is core's seed rank by vector and lexical score."""
+    asked = set(tokenize_query(question))
+
+    def coverage(a: HierarchyAnchor) -> float:
+        words = set(tokenize_query(a.label))
+        return len(words & asked) / len(words) if words else 0.0
+
+    return sorted(anchors, key=coverage, reverse=True)
+
+
+def _filled(
+    spec: ConceptHierarchy, column: str, anchors: Sequence[HierarchyAnchor], dialect: str
 ) -> list[str]:
-    """One filled predicate per retrieved anchor; without one, the {anchor_id} template."""
-    if not anchors:
-        return [f"  WHERE {membership_sql(spec, column)}"]
+    """A filled predicate for each of the first ``ANCHORS_PER_COLUMN`` anchors."""
     lines = []
-    for a in anchors:
+    for a in anchors[:ANCHORS_PER_COLUMN]:
         vocabulary = f" in {a.vocabulary}" if a.vocabulary else ""
         lines.append(f"  anchor {a.label} = id {a.code}{vocabulary}; "
                      f"{a.member_count} members of {column} sit under it:")  # fmt: skip
-        lines.append(f"  WHERE {membership_sql(spec, column, anchor=a.code)}")
+        lines.append(f"  WHERE {membership_sql(spec, column, dialect=dialect, anchor=a.code)}")
+    if (omitted := len(anchors) - ANCHORS_PER_COLUMN) > 0:
+        lines.append(f"  {omitted} more retrieved anchors on {column} are not shown.")
     return lines
 
 
@@ -110,19 +135,19 @@ def _reached(binding: SuppliedBinding, facts: LibraryFacts) -> bool:
     return bool(element and hierarchy and any(hierarchy.reaches(c) for c, _ in element.members))
 
 
-def _route(spec: ConceptHierarchy) -> str:
+def _route(spec: ConceptHierarchy, dialect: str) -> str:
     k, m = spec.concepts, spec.mapping
     route = ""
     if m is not None:
         route = (f"A member reaches a concept through {m.relation} where {m.type_column} in "
-                 f"({_quoted(m.mapping_types)})")  # fmt: skip
+                 f"({_quoted(m.mapping_types, dialect)})")  # fmt: skip
         if m.replacement_types:
-            replaced = _quoted(m.replacement_types)
+            replaced = _quoted(m.replacement_types, dialect)
             route += f", then its replacement where {m.type_column} in ({replaced})"
-        route += "."
+        route += ", or directly when its own id is a concept."
     if k.standard_column:
         route += (f" Only concepts with {k.relation}.{k.standard_column} in "
-                  f"({_quoted(k.standard_values)}) count.")  # fmt: skip
+                  f"({_quoted(k.standard_values, dialect)}) count.")  # fmt: skip
     return route.strip()
 
 
@@ -141,5 +166,9 @@ def _typed(column: str, target_type: str | None) -> str:
     return f"TRY_CAST({column} AS {target_type})" if target_type else column
 
 
-def _quoted(values: Iterable[str]) -> str:
-    return ", ".join(sql_string_literal(v) for v in values)
+def _quoted(values: Iterable[str], dialect: str) -> str:
+    return ", ".join(_literal(v, dialect) for v in values)
+
+
+def _literal(value: str, dialect: str) -> str:
+    return exp.Literal.string(value).sql(dialect=dialect)
