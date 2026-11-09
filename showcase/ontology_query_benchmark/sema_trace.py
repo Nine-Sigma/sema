@@ -75,7 +75,10 @@ def open_live_provider(
 
     require_clean_process(os.environ, sys.modules, profile.routing)
     sidecar = load_sidecar(profile.sema.sidecar, profile.harness.root)
-    facts = import_library_facts(concept_spec or profile.sema.concept_spec, projection, receipt)
+    facts = import_library_facts(
+        concept_spec or profile.sema.concept_spec, projection, receipt,
+        spec_attribution=profile.sema.concept_spec_attribution,
+    )
     manifest = read_manifest(manifest_path)
     check_manifest(manifest, sidecar, facts)
     workspace = sema_live.pinned_workspace(profile.routing)

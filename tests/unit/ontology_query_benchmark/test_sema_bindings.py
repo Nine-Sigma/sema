@@ -10,6 +10,7 @@ from typing import Any
 import duckdb
 import pytest
 
+from showcase.ontology_query_benchmark.profile import Attribution
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
     BindingStatus,
@@ -139,7 +140,9 @@ _CONCEPT_DDL = (
 
 
 def write_projection(
-    tmp_path: Path, elements: dict[str, tuple[str, str, list[tuple[str, str]]]] = ELEMENTS
+    tmp_path: Path,
+    elements: dict[str, tuple[str, str, list[tuple[str, str]]]] = ELEMENTS,
+    assistance: str = "supplied",
 ) -> tuple[Path, Path]:
     """A scoped projection in the workload layout plus its extract receipt."""
     tmp_path.mkdir(parents=True, exist_ok=True)
@@ -160,28 +163,32 @@ def write_projection(
     receipt = tmp_path / "receipt.json"
     receipt.write_text(json.dumps({
         "complete": True,
+        "assistance": {"kind": assistance},
         "duckdb": {"sha256": hashlib.sha256(path.read_bytes()).hexdigest()},
     }))
     return path, receipt
 
 
-def facts_fixture(tmp_path: Path) -> LibraryFacts:
-    return import_library_facts(CONCEPT_SPEC, *write_projection(tmp_path))
+def facts_fixture(tmp_path: Path, assistance: str = "supplied") -> LibraryFacts:
+    return import_library_facts(
+        CONCEPT_SPEC, *write_projection(tmp_path, assistance=assistance),
+        spec_attribution=Attribution.ASSISTED,
+    )
 
 
 def write_fixture(tmp_path: Path) -> Path:
     """Write a two-product sidecar; return its path."""
     tmp_path.mkdir(parents=True, exist_ok=True)
     pins = []
-    for product, table, spec in (
-        ("people", PEOPLE, _people_spec()),
-        ("events", EVENTS, _events_spec()),
+    for product, table, spec, attribution in (
+        ("people", PEOPLE, _people_spec(), "supplied"),
+        ("events", EVENTS, _events_spec(), "assisted"),
     ):
         path = tmp_path / f"{product}.json"
         path.write_text(json.dumps(spec))
         pins.append({"product": product, "table": table, "path": path.name,
                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-                     "attribution": "supplied"})
+                     "attribution": attribution})
     sidecar = {
         "schema_version": 1, "sidecar_version": "t-1",
         "authority": "Spec test authority", "attribution": "supplied",

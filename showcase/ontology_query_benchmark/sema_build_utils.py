@@ -34,8 +34,10 @@ from sema.models.target.normalized import NormalizedTargetModel
 from sema.models.target.properties import TargetPropertyDecl
 from sema.models.target.refs import TargetEntityRef
 from showcase.ontology_query_benchmark.product_spec import CompanionRole
+from showcase.ontology_query_benchmark.profile import Attribution
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
+    InputFile,
     ProductSpec,
     Sidecar,
     SpecPinError,
@@ -65,11 +67,14 @@ class LibraryFacts:
     sha256: str
     elements: Mapping[str, ElementFacts]
     concepts: Mapping[str, ConceptDetail]
+    inputs: tuple[InputFile, ...]
 
 
-def import_library_facts(spec_path: Path, projection: Path, receipt: Path) -> LibraryFacts:
+def import_library_facts(
+    spec_path: Path, projection: Path, receipt: Path, *, spec_attribution: Attribution
+) -> LibraryFacts:
     """Run the concept-source importer over a receipted projection copy."""
-    digest = _check_receipt(projection, receipt)
+    digest, assistance = _check_receipt(projection, receipt)
     spec_bytes = spec_path.read_bytes()
     spec = load_concept_source_spec(spec_path)
     with tempfile.TemporaryDirectory() as scratch:
@@ -83,20 +88,30 @@ def import_library_facts(spec_path: Path, projection: Path, receipt: Path) -> Li
         finally:
             staging.close()
     identity = hashlib.sha256(spec_bytes + digest.encode()).hexdigest()
-    return _facts(f"{spec.id}@{spec.release}", identity, imported.manifest)
+    inputs = (
+        InputFile("concept_spec", str(spec_path), hashlib.sha256(spec_bytes).hexdigest(),
+                  spec_attribution),
+        InputFile("projection", str(projection), digest, assistance),
+    )
+    return _facts(f"{spec.id}@{spec.release}", identity, imported.manifest, inputs)
 
 
-def _check_receipt(projection: Path, receipt: Path) -> str:
+def _check_receipt(projection: Path, receipt: Path) -> tuple[str, Attribution]:
     raw = json.loads(receipt.read_text())
     digest = hashlib.sha256(projection.read_bytes()).hexdigest()
     if not raw.get("complete"):
         raise SpecPinError(f"projection receipt {receipt} marks the extract incomplete")
     if raw["duckdb"]["sha256"] != digest:
         raise SpecPinError(f"projection {projection} does not match receipt {receipt}")
-    return digest
+    kind = (raw.get("assistance") or {}).get("kind")
+    if kind not in set(Attribution):
+        raise SpecPinError(f"projection receipt {receipt} states no assistance kind: {kind!r}")
+    return digest, Attribution(kind)
 
 
-def _facts(release: str, identity: str, manifest: Mapping[str, Any]) -> LibraryFacts:
+def _facts(
+    release: str, identity: str, manifest: Mapping[str, Any], inputs: tuple[InputFile, ...]
+) -> LibraryFacts:
     members: dict[str, list[tuple[str, str]]] = {}
     concepts: dict[str, ConceptDetail] = {}
     for term in manifest["terms"]:
@@ -113,7 +128,7 @@ def _facts(release: str, identity: str, manifest: Mapping[str, Any]) -> LibraryF
         for entity in manifest["entities"] for prop in entity.get("properties", [])
         if prop.get("concept_ref")
     }
-    return LibraryFacts(release, identity, elements, concepts)
+    return LibraryFacts(release, identity, elements, concepts, inputs)
 
 
 def _vocabulary(prop: Mapping[str, Any]) -> str:

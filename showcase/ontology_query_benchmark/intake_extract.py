@@ -35,13 +35,13 @@ from showcase.ontology_query_benchmark.intake_extract_utils import (
     sha256,
     tables_sql,
 )
-from showcase.ontology_query_benchmark.profile import Extract, Routing, load_profile
+from showcase.ontology_query_benchmark.profile import Attribution, Extract, Routing, load_profile
 from showcase.ontology_query_benchmark.routing import require_host
 
 DUCKDB_NAME = "workload_projection.duckdb"
 RECEIPT_NAME = "extract_receipt.json"
 ASSISTANCE = {
-    "kind": "supplied",
+    "kind": Attribution.SUPPLIED.value,
     "reason": "rows are selected by the element ids the declared workload's product specs "
     "name; this projection is not automatic discovery",
 }

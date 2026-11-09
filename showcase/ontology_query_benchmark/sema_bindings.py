@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from showcase.ontology_query_benchmark.profile import Attribution
 from showcase.ontology_query_benchmark.product_spec import (
     CompanionRole,
     ProductSpecDoc,
@@ -36,17 +37,28 @@ class BindingStatus(StrEnum):
 
 
 @dataclass(frozen=True)
+class InputFile:
+    role: str
+    path: str
+    sha256: str
+    attribution: Attribution
+
+
+@dataclass(frozen=True)
 class SpecPin:
     product: str
     table: str
     path: Path
     sha256: str
+    attribution: Attribution
 
 
 @dataclass(frozen=True)
 class Sidecar:
+    path: Path
     version: str
     sha256: str
+    attribution: Attribution
     authority: str
     executable_strategies: frozenset[str]
     model_role: str
@@ -78,6 +90,13 @@ class Sidecar:
 
     def relation(self, table: str) -> str:
         return f"{self.catalog}.{self.schema}.{table}"
+
+    def input_files(self) -> tuple[InputFile, ...]:
+        own = InputFile("sidecar", str(self.path), self.sha256, self.attribution)
+        return own, *(
+            InputFile(f"product_spec:{p.product}", str(p.path), p.sha256, p.attribution)
+            for p in self.specs
+        )
 
 
 @dataclass(frozen=True)
@@ -130,8 +149,10 @@ def load_sidecar(path: Path, harness_root: Path) -> Sidecar:
     raw = json.loads(data)
     root, grain, target = harness_root, raw["grain"], raw["target_model"]
     return Sidecar(
+        path=path,
         version=raw["sidecar_version"],
         sha256=hashlib.sha256(data).hexdigest(),
+        attribution=Attribution(raw["attribution"]),
         authority=raw["authority"],
         executable_strategies=frozenset(raw["approval_policy"]["executable_strategies"]),
         model_role=raw["model_role"],
@@ -139,7 +160,8 @@ def load_sidecar(path: Path, harness_root: Path) -> Sidecar:
         catalog=raw["physical"]["catalog"],
         schema=raw["physical"]["schema"],
         specs=tuple(
-            SpecPin(s["product"], s["table"], root / s["path"], s["sha256"])
+            SpecPin(s["product"], s["table"], root / s["path"], s["sha256"],
+                    Attribution(s["attribution"]))
             for s in raw["specs"]
         ),
         conventions_path=root / raw["conventions"]["path"],

@@ -18,7 +18,7 @@ from showcase.ontology_query_benchmark.sema_bindings import (
     resolve_bindings,
 )
 from showcase.ontology_query_benchmark import runner_utils, sema_live, sema_trace
-from showcase.ontology_query_benchmark.profile import Limits, Profile
+from showcase.ontology_query_benchmark.profile import Attribution, Limits, Profile
 from showcase.ontology_query_benchmark.routing import RoutingError
 from showcase.ontology_query_benchmark.sema_build import BuildManifest, write_manifest
 from showcase.ontology_query_benchmark.sema_build_utils import import_library_facts
@@ -322,7 +322,9 @@ def _live_inputs(tmp_path: Path, profile: Profile) -> tuple[Profile, BuildManife
     local = profile.model_copy(update={"sema": sema, "harness": harness})
     projection, receipt = write_projection(tmp_path / "library")
     sidecar = load_sidecar(sema.sidecar, tmp_path)
-    facts = import_library_facts(CONCEPT_SPEC, projection, receipt)
+    facts = import_library_facts(
+        CONCEPT_SPEC, projection, receipt, spec_attribution=Attribution.ASSISTED
+    )
     manifest = BuildManifest(
         graph_identity="graph-1", model_role=sidecar.model_role,
         sidecar_version=sidecar.version, sidecar_sha256=sidecar.sha256, spec_sha256=(),

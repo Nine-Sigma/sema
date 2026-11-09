@@ -14,6 +14,7 @@ import pytest
 
 from sema.graph.physical_catalog import PhysicalColumn, StaticPhysicalCatalogSource
 from showcase.ontology_query_benchmark import sema_build, sema_live
+from showcase.ontology_query_benchmark.profile import Attribution
 from showcase.ontology_query_benchmark.routing import (
     FORBIDDEN_ENV,
     FORBIDDEN_ENV_PREFIXES,
@@ -115,7 +116,9 @@ def _embedded_texts(embedder: MagicMock) -> list[str]:
 def test_library_facts_come_from_the_concept_source_import(tmp_path: Path) -> None:
     projection, receipt = write_projection(tmp_path)
     before = hashlib.sha256(projection.read_bytes()).hexdigest()
-    facts = import_library_facts(CONCEPT_SPEC, projection, receipt)
+    facts = import_library_facts(
+        CONCEPT_SPEC, projection, receipt, spec_attribution=Attribution.ASSISTED
+    )
     gender = facts.elements["G1"]
     assert (gender.label, gender.definition) == ("Administrative gender", "Gender for billing.")
     assert set(gender.members) == {("L8532", "Female"), ("L8507", "Male")}
@@ -130,13 +133,15 @@ def test_projection_must_match_its_receipt(tmp_path: Path) -> None:
     projection, receipt = write_projection(tmp_path)
     receipt.write_text(json.dumps({"complete": True, "duckdb": {"sha256": "0" * 64}}))
     with pytest.raises(SpecPinError, match="projection"):
-        import_library_facts(CONCEPT_SPEC, projection, receipt)
+        import_library_facts(CONCEPT_SPEC, projection, receipt,
+                             spec_attribution=Attribution.ASSISTED)
     receipt.write_text(json.dumps({
         "complete": False,
         "duckdb": {"sha256": hashlib.sha256(projection.read_bytes()).hexdigest()},
     }))
     with pytest.raises(SpecPinError, match="incomplete"):
-        import_library_facts(CONCEPT_SPEC, projection, receipt)
+        import_library_facts(CONCEPT_SPEC, projection, receipt,
+                             spec_attribution=Attribution.ASSISTED)
 
 
 def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
@@ -211,10 +216,43 @@ def test_graph_identity_tracks_inputs(tmp_path: Path) -> None:
     assert first.graph_identity == again.graph_identity
     fewer = {**ELEMENTS, "G1": (*ELEMENTS["G1"][:2], ELEMENTS["G1"][2][:1])}
     changed_facts = import_library_facts(
-        CONCEPT_SPEC, *write_projection(tmp_path / "b", fewer)
+        CONCEPT_SPEC, *write_projection(tmp_path / "b", fewer),
+        spec_attribution=Attribution.ASSISTED,
     )
     _, _, changed = _build_with(tmp_path / "a", changed_facts)
     assert changed.graph_identity != first.graph_identity
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_manifest_records_each_input_file_with_its_attribution(tmp_path: Path) -> None:
+    _, _, manifest = _build(tmp_path)
+    recorded = {i.role: (i.attribution, i.sha256) for i in manifest.inputs}
+    assert recorded == {
+        "sidecar": ("supplied", _sha256(tmp_path / "sidecar.json")),
+        "product_spec:people": ("supplied", _sha256(tmp_path / "people.json")),
+        "product_spec:events": ("assisted", _sha256(tmp_path / "events.json")),
+        "concept_spec": ("assisted", _sha256(CONCEPT_SPEC)),
+        "projection": ("supplied", _sha256(tmp_path / "projection.duckdb")),
+    }
+
+
+def test_the_projection_attribution_is_the_receipt_assistance(tmp_path: Path) -> None:
+    _, _, manifest = _build_with(tmp_path, facts_fixture(tmp_path, "automatic"))
+    recorded = {i.role: i.attribution for i in manifest.inputs}
+    assert recorded["projection"] == "automatic"
+
+
+def test_a_receipt_without_assistance_is_refused(tmp_path: Path) -> None:
+    projection, receipt = write_projection(tmp_path)
+    raw = json.loads(receipt.read_text())
+    del raw["assistance"]
+    receipt.write_text(json.dumps(raw))
+    with pytest.raises(SpecPinError, match="assistance"):
+        import_library_facts(CONCEPT_SPEC, projection, receipt,
+                             spec_attribution=Attribution.ASSISTED)
 
 
 def test_manifest_round_trips(tmp_path: Path) -> None:

@@ -65,3 +65,4 @@ extract:
 sema:
   sidecar: sidecar.json
   concept_spec: concept_source.yaml
+  concept_spec_attribution: assisted

@@ -2,6 +2,7 @@
  "schema_version": 1,
  "sidecar_version": "t-1",
  "authority": "Spec test authority",
+ "attribution": "supplied",
  "approval_policy": {
   "kind": "supplied_approved",
   "executable_strategies": [
@@ -62,6 +63,5 @@
   "concept_ancestor: ancestor_concept_id is broader."
  ],
  "prompt_frame_chars": 1500,
- "value_list_limit": 40,
- "attribution": "supplied"
+ "value_list_limit": 40
 }
