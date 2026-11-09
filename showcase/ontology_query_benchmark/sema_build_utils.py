@@ -33,6 +33,7 @@ from sema.models.target.entity import TargetEntityDecl
 from sema.models.target.normalized import NormalizedTargetModel
 from sema.models.target.properties import TargetPropertyDecl
 from sema.models.target.refs import TargetEntityRef
+from sema.targets.adapters.manifest_parser import RESERVED_ENDPOINT_PROPERTY_NAMES
 from showcase.ontology_query_benchmark.product_spec import CompanionRole
 from showcase.ontology_query_benchmark.profile import Attribution
 from showcase.ontology_query_benchmark.sema_bindings import (
@@ -239,9 +240,29 @@ def unbound_columns(
     product: ProductSpec,
     catalog_columns: Mapping[str, str],
 ) -> dict[str, str]:
-    """Catalog columns no approved binding covers, with their physical type."""
-    bound = {c for b in approved if b.table == product.pin.table for c in b.columns}
-    return {c: t for c, t in catalog_columns.items() if c not in bound}
+    """Catalog columns no approved binding covers, with their physical type.
+
+    Names the target model reserves are left out; ``reserved_name_findings`` reports them.
+    """
+    skipped = {c for b in approved if b.table == product.pin.table for c in b.columns}
+    skipped.update(RESERVED_ENDPOINT_PROPERTY_NAMES)
+    return {c: t for c, t in catalog_columns.items() if c not in skipped}
+
+
+def reserved_name_findings(
+    sidecar: Sidecar, catalog: Mapping[str, Mapping[str, str]]
+) -> tuple[Finding, ...]:
+    return tuple(
+        Finding(
+            f"catalog column {column!r} of {sidecar.relation(table)} has a reserved "
+            "target property name; it is not declared as a property",
+            sidecar.relation(table),
+            column,
+        )
+        for table, columns in catalog.items()
+        for column in columns
+        if column in RESERVED_ENDPOINT_PROPERTY_NAMES
+    )
 
 
 def _declared_joins(sidecar: Sidecar, product: ProductSpec) -> list[DeclaredJoinDecl]:

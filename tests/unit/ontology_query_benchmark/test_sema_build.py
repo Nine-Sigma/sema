@@ -155,7 +155,16 @@ def test_every_catalog_column_is_declared(tmp_path: Path) -> None:
     loader, _, _ = _build(tmp_path)
     declared = _declared(loader)
     catalog = {(table, column) for table, cols in catalog_fixture().items() for column in cols}
-    assert set(declared) == catalog
+    assert set(declared) == catalog - {(EVENTS, "subject")}
+
+
+def test_a_reserved_column_name_is_a_finding_not_a_failed_build(tmp_path: Path) -> None:
+    loader, embedder, manifest = _build(tmp_path)
+    assert (EVENTS, "subject") not in _declared(loader)
+    assert "subject" not in _embedded_texts(embedder)
+    reserved = [f for f in manifest.findings if "reserved" in f]
+    assert len(reserved) == 1
+    assert f"cat.sch.{EVENTS}" in reserved[0] and "'subject'" in reserved[0]
     roles = {p["model_role"] for p in _cypher_params(loader) if "model_role" in p}
     assert roles == {"BENCH_S"}
 

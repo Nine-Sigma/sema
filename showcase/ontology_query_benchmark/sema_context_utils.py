@@ -8,6 +8,7 @@ hierarchy relation facts. Business rules are referenced by hash, never restated.
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
@@ -57,7 +58,7 @@ def render(
     if not rendering.tables:
         rendering.findings.append(Finding("retrieval returned no physical asset for the question"))
     selected = [
-        b for b in resolution.approved()
+        _without_denied_companions(b, denied) for b in resolution.approved()
         if b.table in rendering.tables and (b.table, b.column) not in denied
     ]
     rendering.findings.extend(absent_elements(tuple(selected), facts))
@@ -81,6 +82,14 @@ def _without_denied(
     ]
     values = [g for g in sco.governed_values if (g.table, g.column) not in denied]
     return sco.model_copy(update={"physical_assets": assets, "governed_values": values})
+
+
+def _without_denied_companions(b: SuppliedBinding, denied: set[TableColumn]) -> SuppliedBinding:
+    return dataclasses.replace(
+        b,
+        companions=tuple((r, c) for r, c in b.companions if (b.table, c) not in denied),
+        catalog_companions=tuple(c for c in b.catalog_companions if (b.table, c) not in denied),
+    )
 
 
 def _add_unbound(

@@ -115,6 +115,7 @@ def catalog_fixture() -> dict[str, dict[str, str]]:
     events = _columns(_events_spec())
     events["site_S1_concept_code"] = "string"
     events["ended_on"] = "date"
+    events["subject"] = "string"
     return {PEOPLE: people, EVENTS: events}
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Mapping
 import hashlib
 import math
 from pathlib import Path
@@ -105,17 +106,17 @@ def _provider(
     limits: Limits | None = None,
     list_limit: int | None = None,
     graph_identity: str = "graph-1",
-    denied: tuple[str, ...] | None = None,
+    denied: Mapping[str, tuple[str, ...]] | None = None,
 ) -> SContextProvider:
     sidecar = load_sidecar(write_fixture(tmp_path), tmp_path)
     if list_limit is not None:
         sidecar = dataclasses.replace(sidecar, value_list_limit=list_limit)
     products = load_products(sidecar)
     if denied is not None:
-        exposure = SpecExposure(denied_columns=denied)
         products = tuple(
-            dataclasses.replace(p, doc=p.doc.model_copy(update={"exposure": exposure}))
-            if p.pin.table == PEOPLE else p
+            dataclasses.replace(p, doc=p.doc.model_copy(update={
+                "exposure": SpecExposure(denied_columns=denied.get(p.pin.table, ()))
+            }))
             for p in products
         )
     resolution = resolve_bindings(sidecar, products, catalog_fixture())
@@ -232,12 +233,22 @@ def test_denied_columns_are_never_rendered(tmp_path: Path) -> None:
 
 
 def test_a_denied_bound_column_has_no_binding_or_values(tmp_path: Path) -> None:
-    provider = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES], denied=("gender_G1",))
+    provider = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES], denied={PEOPLE: ("gender_G1",)})
     text = provider(QUESTION).text
     assert "gender_G1 " not in text and "gender_G1 <-" not in text
     assert "L8532 = Female" not in text
     assert "gender_G1_text" in _table_line(text, PEOPLE)
     assert "L1 = Alive" in text
+
+
+def test_denied_companion_columns_never_appear(tmp_path: Path) -> None:
+    event = _entity(EVENTS, [*EVENTS_ENTITY["columns"], _col("site_S1_concept_code")])
+    denied = {PEOPLE: ("gender_G1_text",), EVENTS: ("site_S1_concept_code",)}
+    provider = _provider(tmp_path, [PEOPLE_ENTITY, event, *PEOPLE_VALUES], denied=denied)
+    text = provider(QUESTION).text
+    assert "gender_G1_text" not in text and "site_S1_concept_code" not in text
+    assert "gender_G1 <-" in text and "site_S1 <-" in text
+    assert "L8532 = Female" in text
 
 
 def test_membership_query_template_is_stated_once(tmp_path: Path) -> None:

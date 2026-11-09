@@ -39,6 +39,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     concept_fields,
     import_library_facts,
     property_text,
+    reserved_name_findings,
     target_model,
     unbound_columns,
 )
@@ -106,7 +107,8 @@ def build_scoped_graph(
         dimensions=dimensions,
         counts=counts,
         findings=resolution.findings
-        + tuple(f.message for f in absent_elements(resolution.approved(), facts)),
+        + tuple(f.message for f in absent_elements(resolution.approved(), facts))
+        + tuple(f.message for f in reserved_name_findings(sidecar, catalog)),
         inputs=sidecar.input_files() + facts.inputs,
     )
 
