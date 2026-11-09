@@ -20,7 +20,10 @@ from showcase.partner_timbr_benchmark.sema_bindings import (
     resolve_bindings,
 )
 from showcase.partner_timbr_benchmark.sema_build import read_catalog, read_manifest
-from showcase.partner_timbr_benchmark.sema_build_utils import load_library_facts
+from showcase.partner_timbr_benchmark.sema_build_utils import (
+    CONCEPT_SPEC_PATH,
+    import_library_facts,
+)
 from showcase.partner_timbr_benchmark.sema_context import (
     SContext,
     SContextProvider,
@@ -60,12 +63,19 @@ def trace_rows(
 
 @contextmanager
 def open_live_provider(
-    neo4j_uri: str, manifest_path: Path, facts_path: Path, sidecar_path: Path = SIDECAR_PATH
+    neo4j_uri: str,
+    manifest_path: Path,
+    projection: Path,
+    receipt: Path,
+    *,
+    concept_spec: Path = CONCEPT_SPEC_PATH,
+    sidecar_path: Path = SIDECAR_PATH,
 ) -> Iterator[SContextProvider]:
     from sema.pipeline.retrieval import RetrievalEngine, RetrievalScope
     from showcase.partner_timbr_benchmark import sema_live
 
-    sidecar, facts = load_sidecar(sidecar_path), load_library_facts(facts_path)
+    sidecar = load_sidecar(sidecar_path)
+    facts = import_library_facts(concept_spec, projection, receipt)
     manifest = read_manifest(manifest_path)
     check_manifest(manifest, sidecar, facts)
     workspace = sema_live.prt_test_workspace()
@@ -87,12 +97,17 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Trace one question through arm S.")
     parser.add_argument("--neo4j-uri", required=True)
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--facts", type=Path, required=True)
+    parser.add_argument("--projection", type=Path, required=True)
+    parser.add_argument("--projection-receipt", type=Path, required=True)
+    parser.add_argument("--concept-spec", type=Path, default=CONCEPT_SPEC_PATH)
     parser.add_argument("--sidecar", type=Path, default=SIDECAR_PATH)
     parser.add_argument("--question", default=Q01)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args(argv)
-    with open_live_provider(args.neo4j_uri, args.manifest, args.facts, args.sidecar) as p:
+    with open_live_provider(
+        args.neo4j_uri, args.manifest, args.projection, args.projection_receipt,
+        concept_spec=args.concept_spec, sidecar_path=args.sidecar,
+    ) as p:
         context, rendering = p.explain(args.question)
         report = {"question": args.question, "identity": context.identity,
                   "findings": list(context.findings),

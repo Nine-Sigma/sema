@@ -15,7 +15,7 @@ from showcase.partner_timbr_benchmark.sema_bindings import (
     load_sidecar,
     resolve_bindings,
 )
-from showcase.partner_timbr_benchmark.sema_build_utils import load_library_facts
+from showcase.partner_timbr_benchmark import sema_live
 from showcase.partner_timbr_benchmark.sema_context import SContextProvider
 from showcase.partner_timbr_benchmark.sema_live import WrongWorkspaceError, assert_test_host
 from showcase.partner_timbr_benchmark.sema_trace import trace
@@ -25,6 +25,7 @@ from tests.unit.partner_timbr_benchmark.test_sema_bindings import (
     MRN,
     TUMOR,
     catalog_fixture,
+    facts_fixture,
     write_fixture,
 )
 
@@ -46,7 +47,7 @@ def _entity(table: str, columns: list[dict[str, str]]) -> dict[str, Any]:
 
 def _value(table: str, column: str, code: str, label: str) -> dict[str, Any]:
     return {"type": "value", "property_name": column, "column": column, "table": table,
-            "code": code, "label": label, "status": "auto", "confidence": 0.5,
+            "code": code, "label": label, "status": "auto", "confidence": 0.8,
             "confidence_policy": "semantic"}
 
 
@@ -82,8 +83,7 @@ def _provider(
     list_limit: int | None = None,
     graph_identity: str = "graph-1",
 ) -> SContextProvider:
-    sidecar_path, facts_path = write_fixture(tmp_path)
-    sidecar = load_sidecar(sidecar_path)
+    sidecar = load_sidecar(write_fixture(tmp_path))
     if budget is not None:
         sidecar = dataclasses.replace(sidecar, context_char_budget=budget)
     if list_limit is not None:
@@ -91,7 +91,7 @@ def _provider(
     resolution = resolve_bindings(sidecar, load_products(sidecar), catalog_fixture())
     return SContextProvider(
         _Retriever(candidates), sidecar, load_products(sidecar), resolution,
-        load_library_facts(facts_path), graph_identity=graph_identity,
+        facts_fixture(tmp_path), graph_identity=graph_identity,
         conventions=conventions,
     )
 
@@ -113,10 +113,17 @@ def test_incompletely_retrieved_value_set_is_not_listed(tmp_path: Path) -> None:
     assert any("G1" in f and "incomplete" in f for f in ctx.findings)
 
 
+def test_rejected_values_are_never_rendered(tmp_path: Path) -> None:
+    rejected = [{**v, "status": "rejected"} for v in DEMO_VALUES]
+    ctx = _provider(tmp_path, [DEMO_ENTITY, *rejected])(Q01)
+    assert "PRT8532 = Female" not in ctx.text
+    assert "PRT1 = Alive" not in ctx.text
+
+
 def test_large_value_set_points_at_membership_relation(tmp_path: Path) -> None:
-    ctx = _provider(tmp_path, [TUMOR_ENTITY])("How many tumors by site?")
+    ctx = _provider(tmp_path, [TUMOR_ENTITY], list_limit=2)("How many tumors by site?")
     assert "lib.sl.data_element" in ctx.text
-    assert "membership query S1" in ctx.text and "331" in ctx.text
+    assert "membership query S1" in ctx.text and "3 members" in ctx.text
     assert not any("S1" in f for f in ctx.findings)
 
 
@@ -159,9 +166,10 @@ def test_committed_budget_fits_the_first_prompt_limit() -> None:
     assert budget + HARNESS_OVERHEAD_CHARS <= FIRST_PROMPT_TOKEN_LIMIT * CHARS_PER_TOKEN
 
 
-def test_unloaded_value_set_is_a_finding(tmp_path: Path) -> None:
+def test_absent_library_elements_are_findings(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [DEMO_ENTITY, *DEMO_VALUES])(Q01)
-    assert any("C1" in f and "unloaded" in f for f in ctx.findings)
+    assert any(f.startswith("library element absent: C1") for f in ctx.findings)
+    assert any(f.startswith("library element absent: N1") for f in ctx.findings)
 
 
 def test_overflow_is_reported_without_truncating(tmp_path: Path) -> None:
@@ -185,6 +193,17 @@ def test_tumor_grain_and_hierarchy_reference_are_rendered(tmp_path: Path) -> Non
     assert f"{MRN}, site_S1" in ctx.text
     assert "row_id" in ctx.text and "surrogate" in ctx.text
     assert "ancestor_concept_id is broader" in ctx.text
+    assert "OMOP HIERARCHY REFERENCE (supplied):" in ctx.text
+    assert "executable" not in ctx.text
+
+
+def test_committed_hierarchy_reference_holds_relation_facts_only() -> None:
+    from showcase.partner_timbr_benchmark.sema_bindings import load_sidecar as load
+    text = "\n".join(load().hierarchy_reference)
+    relation = "partner_dev.partner_provenance.vb_vocabulary_test_2026_09_25_omop_ancestor"
+    assert relation in text and "Delta version 0" in text
+    assert "SELECT" not in text.upper() and "src_partner_wh" not in text
+    assert "Maps to" in text
 
 
 def test_identity_covers_text_and_graph(tmp_path: Path) -> None:
@@ -218,3 +237,24 @@ def test_live_host_guard_fails_closed() -> None:
     assert_test_host("https://partner-workspace.cloud.databricks.com/")
     with pytest.raises(WrongWorkspaceError):
         assert_test_host("https://dbc-6395977d.cloud.databricks.com")
+
+
+def test_embedder_resolved_host_is_checked(monkeypatch: pytest.MonkeyPatch) -> None:
+    import databricks_langchain
+    from mlflow.utils import databricks_utils
+
+    class _Embeddings:
+        def __init__(self, endpoint: str, target_uri: str) -> None:
+            self.target_uri = target_uri
+
+    class _Creds:
+        host = "https://dbc-6395977d.cloud.databricks.com"
+
+    class _Workspace:
+        class config:
+            host = sema_live.TEST_HOST
+
+    monkeypatch.setattr(databricks_langchain, "DatabricksEmbeddings", _Embeddings)
+    monkeypatch.setattr(databricks_utils, "get_databricks_host_creds", lambda uri: _Creds)
+    with pytest.raises(WrongWorkspaceError):
+        sema_live.embedder(_Workspace)

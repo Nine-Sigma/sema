@@ -6,7 +6,6 @@
 -- Origin of each fact:
 --   supplied   = asserted by the CPD v2 product spec (operator-supplied binding)
 --   discovered = read here from the Standard Library or the catalog
--- Expected values come from the arm S export of 2026-11-09 (S-sql.log).
 
 -- F1 (supplied by CPD, checked here against the catalog): the demographics product
 -- has the gender and vital-status value columns and their label companions.

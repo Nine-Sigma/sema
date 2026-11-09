@@ -53,11 +53,15 @@ class UnityCatalogSource:
 
 def embedder(workspace: Any) -> Any:
     from databricks_langchain import DatabricksEmbeddings
+    from mlflow.utils.databricks_utils import get_databricks_host_creds
 
     assert_test_host(str(workspace.config.host))
-    return DatabricksEmbeddings(
+    model = DatabricksEmbeddings(
         endpoint=EMBEDDER_ENDPOINT, target_uri=f"databricks://{TEST_PROFILE}"
     )
+    creds = get_databricks_host_creds(model.target_uri)  # type: ignore[no-untyped-call]
+    assert_test_host(str(creds.host))
+    return model
 
 
 def neo4j_driver(uri: str) -> Any:

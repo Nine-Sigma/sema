@@ -44,11 +44,11 @@
   },
   "membership_relation": "partner_library_test.standard_library.standard_library_data_element",
   "hierarchy_reference": [
-    "OMOP release: src_partner_wh.omop_cdm_2016 (executable on the arm SQL warehouse).",
-    "Value columns hold Standard Library permissible-value ids (PRT...). Bridge: partner_library_test.standard_library.standard_library_concept.concept_prt_id = value, then concept_athena_id is the OMOP concept_id of that value (often a non-standard ICDO3 concept).",
-    "Maps to (concept_relationship.relationship_id = 'Maps to', concept_id_1 -> concept_id_2) moves a non-standard concept to its standard concept. It is a mapping, not ancestry.",
-    "Ancestry: src_partner_wh.omop_cdm_2016.concept_ancestor(ancestor_concept_id, descendant_concept_id, min_levels_of_separation, max_levels_of_separation). ancestor_concept_id is the broader concept. Standard concepts have a self row (ancestor = descendant, min_levels_of_separation = 0), so 'X or a descendant of X' is descendant_concept_id IN (SELECT descendant_concept_id ... WHERE ancestor_concept_id = X).",
-    "OMOP concept_id (integer) is not a vocabulary code. Resolve a named concept through src_partner_wh.omop_cdm_2016.concept (concept_name, vocabulary_id, standard_concept = 'S'); concept_code with vocabulary_id is the source code."
+    "Ancestor relation: partner_dev.partner_provenance.vb_vocabulary_test_2026_09_25_omop_ancestor (ancestor_concept_id, descendant_concept_id, min_levels_of_separation, max_levels_of_separation); a view over vb_vocabulary_test_2026_09_25_candidate_ancestor at Delta version 0. Direction: ancestor_concept_id is the broader concept.",
+    "Self policy: the relation holds level-0 self rows (ancestor_concept_id = descendant_concept_id, min_levels_of_separation = 0).",
+    "Concept relation: partner_dev.partner_provenance.vb_vocabulary_test_2026_09_25_omop_concept (concept_id, concept_name, domain_id, vocabulary_id, concept_class_id, standard_concept, concept_code).",
+    "Library-to-OMOP relation: partner_library_test.standard_library.standard_library_concept (concept_prt_id = permissible-value id, concept_athena_id = OMOP concept_id).",
+    "Excluded: OMOP 'Maps to' relationships are mappings, not ancestry."
   ],
   "context_char_budget": 26000,
   "context_budget_note": "Coordinator limit 2026-11-09: first prompt <= 13934 tokens at 2.08 chars/token (28982 chars). Harness system, W4S conventions, SQL rules and a 160-char question measured 2458 chars; 2900 is reserved for overhead and longer questions, leaving 26000 chars of context.",

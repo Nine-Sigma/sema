@@ -1,9 +1,9 @@
 """Section renderers for arm S context.
 
 Physical assets and joins reuse SEMA's nl2sql section renderers. The added
-sections render supplied binding evidence, governed values (complete lists only,
-otherwise an executable membership reference), grain and the pinned hierarchy
-reference. Business rules are referenced by hash, never restated.
+sections render supplied binding evidence, the SCO's governed values (complete
+lists only, otherwise an executable membership reference), grain and the supplied
+hierarchy relation facts. Business rules are referenced by hash, never restated.
 """
 
 from __future__ import annotations
@@ -12,14 +12,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
-from sema.models.context import SemanticCandidateSet, SemanticContextObject
+from sema.models.context import SemanticContextObject
 from showcase.partner_timbr_benchmark.sema_bindings import (
     BindingResolution,
     ProductSpec,
     Sidecar,
     SuppliedBinding,
 )
-from showcase.partner_timbr_benchmark.sema_build_utils import LibraryFacts
+from showcase.partner_timbr_benchmark.sema_build_utils import LibraryFacts, absent_elements
 
 MEMBERSHIP_SQL = (
     "SELECT permissible_value_prt_id, permissible_value_prt_preferred_label "
@@ -47,7 +47,6 @@ class Rendering:
 
 def render(
     rendering: Rendering,
-    candidates: SemanticCandidateSet,
     sidecar: Sidecar,
     products: tuple[ProductSpec, ...],
     resolution: BindingResolution,
@@ -56,10 +55,11 @@ def render(
     if not rendering.tables:
         rendering.findings.append("retrieval returned no physical asset for the question")
     selected = [b for b in resolution.approved() if b.table in rendering.tables]
+    rendering.findings.extend(absent_elements(tuple(selected), facts))
     _add_tables_and_columns(rendering.parts, _without_companions(rendering.sco, selected))
     _add_join_section(rendering.parts, rendering.sco)
     _add_bindings(rendering.parts, selected, sidecar, facts)
-    _add_values(rendering, selected, _retrieved_values(candidates), sidecar, facts)
+    _add_values(rendering, selected, _governed_values(rendering.sco), sidecar, facts)
     _add_grain(rendering.parts, rendering.tables, products, sidecar)
     _add_rules(rendering.parts, sidecar)
     return rendering
@@ -109,14 +109,11 @@ def _binding_line(b: SuppliedBinding, facts: LibraryFacts) -> str:
     return line
 
 
-def _retrieved_values(
-    candidates: SemanticCandidateSet,
-) -> dict[TableColumn, dict[str, str]]:
+def _governed_values(sco: SemanticContextObject) -> dict[TableColumn, dict[str, str]]:
     values: dict[TableColumn, dict[str, str]] = {}
-    for c in candidates.candidates:
-        if c.get("type") == "value":
-            key = (str(c.get("table", "")), str(c.get("column", "")))
-            values.setdefault(key, {})[str(c.get("code", ""))] = str(c.get("label", ""))
+    for g in sco.governed_values:
+        listed = values.setdefault((g.table, g.column), {})
+        listed.update((v["code"], v["label"]) for v in g.values)
     return values
 
 
@@ -141,25 +138,21 @@ def _add_values(
         got = retrieved.get((b.table, b.column), {})
         reference = f"membership query {de_id}"
         if element is None:
-            rendering.findings.append(
-                f"value set unloaded: {de_id} ({b.column}) is absent from {facts.release}"
-            )
             rendering.parts.append(f"  {b.column}: no governed value set loaded ({de_id})")
-        elif element.members is not None and len(element.members) > sidecar.value_list_limit:
+        elif element.pv_count > sidecar.value_list_limit:
             rendering.parts.append(
                 f"  {b.column}: {element.pv_count} members, above the listing limit "
                 f"({reference})"
             )
-        elif element.members is not None and set(got) == {c for c, _ in element.members}:
+        elif set(got) == {c for c, _ in element.members}:
             listing = "; ".join(f"{code} = {got[code]}" for code, _ in element.members)
             rendering.parts.append(f"  {b.column}: {listing}")
             rendering.listed[(b.table, b.column)] = len(element.members)
         else:
-            if element.members is not None:
-                rendering.findings.append(
-                    f"value set incomplete: retrieved {len(got)} of {element.pv_count} "
-                    f"members for {de_id} ({b.column}); listing withheld"
-                )
+            rendering.findings.append(
+                f"value set incomplete: retrieved {len(got)} of {element.pv_count} "
+                f"members for {de_id} ({b.column}); listing withheld"
+            )
             rendering.parts.append(
                 f"  {b.column}: {element.pv_count} members, not listed ({reference})"
             )
@@ -205,5 +198,5 @@ def _add_rules(parts: list[str], sidecar: Sidecar) -> None:
         f"(sha256 {sidecar.conventions_sha256[:12]}) govern patient counting, tumor "
         "identity, null handling and attribute resolution; they are not restated here."
     )
-    parts.append("\nOMOP HIERARCHY REFERENCE (pinned, executable):")
+    parts.append("\nOMOP HIERARCHY REFERENCE (supplied):")
     parts.extend(f"  - {line}" for line in sidecar.hierarchy_reference)

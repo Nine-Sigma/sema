@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import duckdb
 import pytest
 
 from showcase.partner_timbr_benchmark.sema_bindings import (
@@ -16,6 +17,11 @@ from showcase.partner_timbr_benchmark.sema_bindings import (
     load_products,
     load_sidecar,
     resolve_bindings,
+)
+from showcase.partner_timbr_benchmark.sema_build_utils import (
+    CONCEPT_SPEC_PATH,
+    LibraryFacts,
+    import_library_facts,
 )
 
 pytestmark = pytest.mark.unit
@@ -58,6 +64,7 @@ def _demo_spec() -> dict[str, Any]:
              "strategy": "derived"},
             _scalar("person", "ghost-v1", "ghost_col", "STRING"),
             _scalar("person", "age-v1", "age_years", "BIGINT"),
+            {**_scalar("person", "birth-date-v1", "birth_date_N1", "DATE"), "de_id": "N1"},
         ],
         "relationships": [],
         "exposure": {"denied_columns": ["first_name"]},
@@ -104,24 +111,64 @@ def catalog_fixture() -> dict[str, dict[str, str]]:
     return {DEMO: demo, TUMOR: tumor}
 
 
-def facts_fixture() -> dict[str, Any]:
-    return {
-        "schema_version": 1, "release": "lib@test",
-        "source_relation": "lib.sl.data_element", "list_limit": 80,
-        "data_elements": {
-            "G1": {"label": "Administrative gender", "definition": "Gender for billing.",
-                   "pv_count": 2,
-                   "members": [["PRT8532", "Female"], ["PRT8507", "Male"]]},
-            "V1": {"label": "Vital status", "definition": "Dead or alive.",
-                   "pv_count": 2, "members": [["PRT1", "Alive"], ["PRT2", "Deceased"]]},
-            "S1": {"label": "Site of primary tumor", "definition": "ICD-O-3 site.",
-                   "pv_count": 331, "members": None},
-        },
-    }
+ELEMENTS: dict[str, tuple[str, str, list[tuple[str, str]]]] = {
+    "G1": ("Administrative gender", "Gender for billing.",
+           [("PRT8532", "Female"), ("PRT8507", "Male")]),
+    "V1": ("Vital status", "Dead or alive.", [("PRT1", "Alive"), ("PRT2", "Deceased")]),
+    "S1": ("Site of primary tumor", "ICD-O-3 site.",
+           [("P1", "Lung"), ("P2", "Breast"), ("P3", "Colon")]),
+}
+
+_DATA_ELEMENT_DDL = (
+    "CREATE TABLE standard_library.standard_library_data_element ("
+    "data_element_prt_id VARCHAR, data_element_prt_preferred_label VARCHAR, "
+    "data_element_title VARCHAR, data_element_definition VARCHAR, "
+    "data_element_data_type_id VARCHAR, data_element_phi BOOLEAN, "
+    "data_element_synonym_name VARCHAR[], permissible_value_prt_id VARCHAR, "
+    "permissible_value_prt_preferred_label VARCHAR, permissible_value_title VARCHAR, "
+    "permissible_value_vocabulary_id VARCHAR, permissible_value_concept_code VARCHAR, "
+    "permissible_value_synonym_name VARCHAR[])"
+)
+_CONCEPT_DDL = (
+    "CREATE TABLE standard_library.standard_library_concept (concept_prt_id VARCHAR, "
+    "concept_athena_id VARCHAR, concept_code VARCHAR, vocabulary_id VARCHAR, "
+    "definition VARCHAR)"
+)
 
 
-def write_fixture(tmp_path: Path) -> tuple[Path, Path]:
-    """Write a two-product sidecar plus facts; return (sidecar, facts) paths."""
+def write_projection(
+    tmp_path: Path, elements: dict[str, tuple[str, str, list[tuple[str, str]]]] = ELEMENTS
+) -> tuple[Path, Path]:
+    """A scoped projection in the workload layout plus its extract receipt."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    path = tmp_path / "projection.duckdb"
+    path.unlink(missing_ok=True)
+    con = duckdb.connect(str(path))
+    con.execute("CREATE SCHEMA standard_library")
+    con.execute(_DATA_ELEMENT_DDL)
+    con.execute(_CONCEPT_DDL)
+    con.executemany(
+        "INSERT INTO standard_library.standard_library_data_element VALUES "
+        "(?, ?, ?, ?, 'value set', false, [], ?, ?, ?, NULL, NULL, [])",
+        [(de, label, f"{de}: {label}", definition, pv, pv_label, pv_label)
+         for de, (label, definition, members) in elements.items()
+         for pv, pv_label in members],
+    )
+    con.close()
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text(json.dumps({
+        "complete": True,
+        "duckdb": {"sha256": hashlib.sha256(path.read_bytes()).hexdigest()},
+    }))
+    return path, receipt
+
+
+def facts_fixture(tmp_path: Path) -> LibraryFacts:
+    return import_library_facts(CONCEPT_SPEC_PATH, *write_projection(tmp_path))
+
+
+def write_fixture(tmp_path: Path) -> Path:
+    """Write a two-product sidecar; return its path."""
     tmp_path.mkdir(parents=True, exist_ok=True)
     pins = []
     for product, table, spec in (
@@ -152,13 +199,11 @@ def write_fixture(tmp_path: Path) -> tuple[Path, Path]:
     }
     sidecar_path = tmp_path / "sidecar.json"
     sidecar_path.write_text(json.dumps(sidecar))
-    facts_path = tmp_path / "facts.json"
-    facts_path.write_text(json.dumps(facts_fixture()))
-    return sidecar_path, facts_path
+    return sidecar_path
 
 
 def resolution_fixture(tmp_path: Path) -> BindingResolution:
-    sidecar = load_sidecar(write_fixture(tmp_path)[0])
+    sidecar = load_sidecar(write_fixture(tmp_path))
     return resolve_bindings(sidecar, load_products(sidecar), catalog_fixture())
 
 
@@ -202,14 +247,14 @@ def test_approved_set_excludes_refused_bindings(tmp_path: Path) -> None:
 
 
 def test_spec_hash_mismatch_fails_closed(tmp_path: Path) -> None:
-    sidecar_path, _ = write_fixture(tmp_path)
+    sidecar_path = write_fixture(tmp_path)
     (tmp_path / "demographics.json").write_text("{}")
     with pytest.raises(SpecPinError, match="demographics"):
         load_products(load_sidecar(sidecar_path))
 
 
 def test_competing_bindings_for_one_column_are_ambiguous(tmp_path: Path) -> None:
-    sidecar_path, _ = write_fixture(tmp_path)
+    sidecar_path = write_fixture(tmp_path)
     spec = _demo_spec()
     spec["fields"].append(_scalar("person", "other-v1", "gender_G1", "STRING"))
     path = tmp_path / "demographics.json"

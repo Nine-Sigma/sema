@@ -1,10 +1,10 @@
 """Arm S context provider: normal SEMA retrieval over the scoped graph.
 
-`RetrievalEngine.retrieve` then `prune_to_sco` select the physical assets and
-joins. Governed values are read from the same retrieval candidates before
-pruning, because `prune_to_sco` drops entity-expansion value candidates
-(confidence 0.5 against the 0.7 semantic threshold). Required evidence is never
-truncated: an over-budget context is returned whole with an overflow finding.
+`RetrievalEngine.retrieve` then `prune_to_sco` select the physical assets, joins
+and governed values; nothing is read from the candidates before pruning, so the
+visibility policy (rejected and superseded never shown) applies. Required evidence
+is never truncated: an over-budget context is returned whole with an overflow
+finding.
 """
 
 from __future__ import annotations
@@ -102,7 +102,7 @@ class SContextProvider:
     def explain(self, question: str) -> tuple[SContext, Rendering]:
         candidates = self._retriever.retrieve(question, top_k=self._top_k)
         rendering = render(
-            Rendering(prune_to_sco(candidates)), candidates, self._sidecar,
+            Rendering(prune_to_sco(candidates)), self._sidecar,
             self._products, self._resolution, self._facts,
         )
         header = (

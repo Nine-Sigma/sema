@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -10,19 +11,27 @@ from unittest.mock import MagicMock
 import pytest
 
 from sema.graph.physical_catalog import PhysicalColumn, StaticPhysicalCatalogSource
-from showcase.partner_timbr_benchmark.sema_bindings import load_sidecar
+from showcase.partner_timbr_benchmark.sema_bindings import SpecPinError, load_sidecar
 from showcase.partner_timbr_benchmark.sema_build import (
     BuildManifest,
     build_scoped_graph,
-    load_library_facts,
     read_manifest,
     write_manifest,
 )
+from showcase.partner_timbr_benchmark.sema_build_utils import (
+    CONCEPT_SPEC_PATH,
+    FactsConceptSource,
+    LibraryFacts,
+    import_library_facts,
+)
 from tests.unit.partner_timbr_benchmark.test_sema_bindings import (
     DEMO,
+    ELEMENTS,
     TUMOR,
     catalog_fixture,
+    facts_fixture,
     write_fixture,
+    write_projection,
 )
 
 pytestmark = pytest.mark.unit
@@ -41,18 +50,48 @@ def _embedder() -> MagicMock:
     return embedder
 
 
-def _build(tmp_path: Path) -> tuple[MagicMock, MagicMock, BuildManifest]:
-    sidecar_path, facts_path = write_fixture(tmp_path)
+def _build_with(tmp_path: Path, facts: LibraryFacts) -> tuple[MagicMock, MagicMock, BuildManifest]:
     loader, embedder = MagicMock(), _embedder()
     manifest = build_scoped_graph(
-        loader, _catalog(), load_sidecar(sidecar_path),
-        load_library_facts(facts_path), embedder, dimensions=4,
+        loader, _catalog(), load_sidecar(write_fixture(tmp_path)), facts, embedder,
+        dimensions=4,
     )
     return loader, embedder, manifest
 
 
+def _build(tmp_path: Path) -> tuple[MagicMock, MagicMock, BuildManifest]:
+    return _build_with(tmp_path, facts_fixture(tmp_path))
+
+
 def _cypher_params(loader: MagicMock) -> list[dict[str, Any]]:
     return [c.kwargs for c in loader._run.call_args_list]
+
+
+def test_library_facts_come_from_the_concept_source_import(tmp_path: Path) -> None:
+    projection, receipt = write_projection(tmp_path)
+    before = hashlib.sha256(projection.read_bytes()).hexdigest()
+    facts = import_library_facts(CONCEPT_SPEC_PATH, projection, receipt)
+    gender = facts.elements["G1"]
+    assert (gender.label, gender.definition) == ("Administrative gender", "Gender for billing.")
+    assert set(gender.members) == {("PRT8532", "Female"), ("PRT8507", "Male")}
+    assert set(facts.elements) == set(ELEMENTS)
+    assert "partner-standard-library-workload" in facts.release
+    detail = FactsConceptSource(facts).name_synonyms("PRT8532")
+    assert detail is not None and detail.name == "Female"
+    assert hashlib.sha256(projection.read_bytes()).hexdigest() == before
+
+
+def test_projection_must_match_its_receipt(tmp_path: Path) -> None:
+    projection, receipt = write_projection(tmp_path)
+    receipt.write_text(json.dumps({"complete": True, "duckdb": {"sha256": "0" * 64}}))
+    with pytest.raises(SpecPinError, match="projection"):
+        import_library_facts(CONCEPT_SPEC_PATH, projection, receipt)
+    receipt.write_text(json.dumps({
+        "complete": False,
+        "duckdb": {"sha256": hashlib.sha256(projection.read_bytes()).hexdigest()},
+    }))
+    with pytest.raises(SpecPinError, match="incomplete"):
+        import_library_facts(CONCEPT_SPEC_PATH, projection, receipt)
 
 
 def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
@@ -69,14 +108,18 @@ def test_build_projects_only_approved_bindings(tmp_path: Path) -> None:
     assert roles == {"BENCH_S"}
 
 
-def test_value_sets_hold_complete_lists_only(tmp_path: Path) -> None:
+def test_value_sets_hold_every_imported_member(tmp_path: Path) -> None:
     loader, _, manifest = _build(tmp_path)
     anchored = {c.args[1] for c in loader.upsert_value_set.call_args_list}
-    assert anchored == {"gender_G1", "vital_V1"}
+    assert anchored == {"gender_G1", "vital_V1", "site_S1"}
     members = {c.args[0] for c in loader.add_term_to_value_set.call_args_list}
-    assert members == {"PRT8532", "PRT8507", "PRT1", "PRT2"}
-    assert any("C1" in f and "unloaded" in f for f in manifest.findings)
-    assert any("S1" in f and "reference" in f for f in manifest.notes)
+    assert members == {"PRT8532", "PRT8507", "PRT1", "PRT2", "P1", "P2", "P3"}
+
+
+def test_absent_library_elements_are_build_findings(tmp_path: Path) -> None:
+    _, _, manifest = _build(tmp_path)
+    assert any(f.startswith("library element absent: C1") for f in manifest.findings)
+    assert any(f.startswith("library element absent: N1") for f in manifest.findings)
 
 
 def test_entities_and_properties_are_embedded_with_library_text(
@@ -105,15 +148,11 @@ def test_graph_identity_tracks_inputs(tmp_path: Path) -> None:
     _, _, first = _build(tmp_path / "a")
     _, _, again = _build(tmp_path / "a")
     assert first.graph_identity == again.graph_identity
-    facts_path = tmp_path / "a" / "facts.json"
-    raw = json.loads(facts_path.read_text())
-    raw["data_elements"]["G1"]["members"].pop()
-    raw["data_elements"]["G1"]["pv_count"] = 1
-    facts_path.write_text(json.dumps(raw))
-    changed = build_scoped_graph(
-        MagicMock(), _catalog(), load_sidecar(tmp_path / "a" / "sidecar.json"),
-        load_library_facts(facts_path), _embedder(), dimensions=4,
+    fewer = {**ELEMENTS, "G1": (*ELEMENTS["G1"][:2], ELEMENTS["G1"][2][:1])}
+    changed_facts = import_library_facts(
+        CONCEPT_SPEC_PATH, *write_projection(tmp_path / "b", fewer)
     )
+    _, _, changed = _build_with(tmp_path / "a", changed_facts)
     assert changed.graph_identity != first.graph_identity
 
 

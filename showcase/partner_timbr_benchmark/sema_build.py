@@ -28,10 +28,12 @@ from showcase.partner_timbr_benchmark.sema_bindings import (
     resolve_bindings,
 )
 from showcase.partner_timbr_benchmark.sema_build_utils import (
+    CONCEPT_SPEC_PATH,
     FactsConceptSource,
     LibraryFacts,
+    absent_elements,
     concept_fields,
-    load_library_facts,
+    import_library_facts,
     property_text,
     target_model,
 )
@@ -53,7 +55,6 @@ class BuildManifest:
     dimensions: int
     counts: dict[str, int] = field(default_factory=dict)
     findings: tuple[str, ...] = ()
-    notes: tuple[str, ...] = ()
 
 
 def build_scoped_graph(
@@ -69,7 +70,7 @@ def build_scoped_graph(
     products = load_products(sidecar)
     resolution = resolve_bindings(sidecar, products, read_catalog(catalog_source, sidecar))
     model, binding = target_model(sidecar, products, resolution)
-    fields, unloaded, notes = concept_fields(resolution.approved(), facts)
+    fields = concept_fields(resolution.approved(), facts)
     build_target_retrieval_graph(
         loader, model, binding, catalog_source,
         concepts=FactsConceptSource(facts),
@@ -96,8 +97,7 @@ def build_scoped_graph(
         embedder_model=embedder_model,
         dimensions=dimensions,
         counts=counts,
-        findings=resolution.findings + tuple(unloaded),
-        notes=tuple(notes),
+        findings=resolution.findings + tuple(absent_elements(resolution.approved(), facts)),
     )
 
 
@@ -161,7 +161,7 @@ def write_manifest(manifest: BuildManifest, path: Path) -> None:
 
 def read_manifest(path: Path) -> BuildManifest:
     raw = json.loads(path.read_text())
-    for key in ("spec_sha256", "findings", "notes"):
+    for key in ("spec_sha256", "findings"):
         raw[key] = tuple(raw[key])
     return BuildManifest(**raw)
 
@@ -175,7 +175,8 @@ def main(argv: list[str] | None = None) -> None:
         loader = GraphLoader(driver)
         manifest = build_scoped_graph(
             loader, sema_live.UnityCatalogSource(workspace),
-            load_sidecar(args.sidecar), load_library_facts(args.facts),
+            load_sidecar(args.sidecar),
+            import_library_facts(args.concept_spec, args.projection, args.projection_receipt),
             sema_live.embedder(workspace), dimensions=args.dimensions,
         )
     write_manifest(manifest, args.manifest)
@@ -185,7 +186,9 @@ def main(argv: list[str] | None = None) -> None:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build arm S scoped graph.")
     parser.add_argument("--neo4j-uri", required=True)
-    parser.add_argument("--facts", type=Path, required=True)
+    parser.add_argument("--projection", type=Path, required=True)
+    parser.add_argument("--projection-receipt", type=Path, required=True)
+    parser.add_argument("--concept-spec", type=Path, default=CONCEPT_SPEC_PATH)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--sidecar", type=Path, default=SIDECAR_PATH)
     parser.add_argument("--dimensions", type=int, default=1024)
