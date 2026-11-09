@@ -222,8 +222,8 @@ def test_reserved_and_upper_case_columns_execute(dialect: str) -> None:
 def test_a_preferred_row_without_a_value_yields_to_the_rule(rule: str, by_rule: str) -> None:
     by = {"by": "seen_on"} if rule == "min_by" else {}
     prefer = {"column": "ward_kind", "value": "primary"}
-    identity = {"key_columns": ["visit_id"],
-                "attributes": [{"column": "ward", "rule": rule, **by, "prefer": prefer}]}  # fmt: skip
+    attribute = {"column": "ward", "rule": rule, **by, "prefer": prefer}
+    identity = {"key_columns": ["visit_id"], "attributes": [attribute]}
     rows = [("v1", "a", 3, None, "primary"), ("v1", "a", 2, "w2", "other"),
             ("v1", "a", 4, "w1", "other"), ("v2", "a", 1, None, "primary")]  # fmt: skip
     assert _resolve(identity, VISITS, rows) == [("v1", by_rule), ("v2", None)]
