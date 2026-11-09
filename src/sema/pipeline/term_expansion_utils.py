@@ -222,7 +222,7 @@ def _expand_term_for_vocab(
     results.extend(
         _expand_term_governed_values(
             engine, code, hit_status, hit_confidence,
-            vocabulary_name=vocab,
+            vocabulary_name=vocab, label=label,
         )
     )
 
@@ -248,6 +248,7 @@ def _expand_term_governed_values(
     status: str,
     confidence: float,
     vocabulary_name: str | None = None,
+    label: str = "",
 ) -> list[dict[str, Any]]:
     """Traverse Term→MEMBER_OF→ValueSet←HAS_VALUE_SET←Column.
 
@@ -276,7 +277,7 @@ def _expand_term_governed_values(
             "column": col,
             "table": table,
             "code": code,
-            "label": code,
+            "label": label or code,
             "source": "retrieval_term_expansion",
             "status": status,
             "confidence": confidence,
