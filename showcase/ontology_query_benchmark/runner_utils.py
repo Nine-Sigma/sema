@@ -29,13 +29,20 @@ PUBLIC_QUESTION_KEYS = ("id", "class", "question", "result_shape", "needs", "pre
 OVERFLOW_FINDING = "overflow"
 
 
+class FindingLike(Protocol):
+    @property
+    def message(self) -> str: ...
+    @property
+    def column(self) -> str | None: ...
+
+
 class SContextLike(Protocol):
     @property
     def text(self) -> str: ...
     @property
     def identity(self) -> str: ...
     @property
-    def findings(self) -> tuple[str, ...]: ...
+    def findings(self) -> tuple[FindingLike, ...]: ...
 
 
 @dataclass(frozen=True)
@@ -107,7 +114,7 @@ class Meter:
     overflow: str | None = None
     context_identity: str | None = None
     failed_stage: str | None = None
-    findings: tuple[str, ...] = ()
+    findings: tuple[FindingLike, ...] = ()
     last_execution: Any = None
     last_reply: str | None = None
     request_estimates: list[list[int]] = field(default_factory=list)
@@ -178,7 +185,7 @@ class SArmContext:
     def __call__(self, question: str) -> Any:
         supplied = self.provider(question)
         self.last = supplied
-        overflow = any(f.split(":")[0] == OVERFLOW_FINDING for f in supplied.findings)
+        overflow = any(f.message.split(":")[0] == OVERFLOW_FINDING for f in supplied.findings)
         tokens = self.harness.context.estimate_tokens(supplied.text)
         return self.harness.models.ArmContext(
             "S", self.harness.context.ARM_A_DIALECT, supplied.text, tokens, self.budget, overflow

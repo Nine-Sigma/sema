@@ -100,7 +100,8 @@ def build_scoped_graph(
         embedder_model=embedder_model,
         dimensions=dimensions,
         counts=counts,
-        findings=resolution.findings + tuple(absent_elements(resolution.approved(), facts)),
+        findings=resolution.findings
+        + tuple(f.message for f in absent_elements(resolution.approved(), facts)),
         inputs=sidecar.input_files() + facts.inputs,
     )
 

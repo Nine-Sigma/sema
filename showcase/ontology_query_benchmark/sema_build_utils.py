@@ -148,10 +148,25 @@ class FactsConceptSource:
         return []
 
 
-def absent_elements(bindings: tuple[SuppliedBinding, ...], facts: LibraryFacts) -> list[str]:
+@dataclass(frozen=True)
+class Finding:
+    """A context defect; one naming a column concerns only SQL that reads that column."""
+
+    message: str
+    relation: str | None = None
+    column: str | None = None
+
+
+def absent_elements(
+    bindings: tuple[SuppliedBinding, ...], facts: LibraryFacts
+) -> list[Finding]:
     return [
-        f"library element absent: {b.de_id} ({b.relation}.{b.column}) is not in "
-        f"library {facts.release}"
+        Finding(
+            f"library element absent: {b.de_id} ({b.relation}.{b.column}) is not in "
+            f"library {facts.release}",
+            b.relation,
+            b.column,
+        )
         for b in bindings
         if b.de_id is not None and b.de_id not in facts.elements
     ]

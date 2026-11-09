@@ -27,7 +27,7 @@ from showcase.ontology_query_benchmark.sema_bindings import (
     SuppliedBinding,
 )
 from showcase.ontology_query_benchmark.sema_build import BuildManifest
-from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts
+from showcase.ontology_query_benchmark.sema_build_utils import Finding, LibraryFacts
 from showcase.ontology_query_benchmark.sema_context_utils import Rendering, render
 
 
@@ -39,7 +39,7 @@ class ManifestMismatchError(RuntimeError):
 class SContext:
     text: str
     identity: str
-    findings: tuple[str, ...]
+    findings: tuple[Finding, ...]
 
 
 class Retriever(Protocol):
@@ -119,17 +119,21 @@ class SContextProvider:
         identity = hashlib.sha256(f"{text}\n{self._graph_identity}".encode()).hexdigest()
         return SContext(text, identity, tuple(findings)), rendering
 
-    def _checks(self, text: str, question: str) -> list[str]:
+    def _checks(self, text: str, question: str) -> list[Finding]:
         findings = []
         if conventions_sha256(self._conventions) != self._sidecar.conventions_sha256:
             findings.append(
-                "conventions differ from the pinned workload conventions "
-                f"(sha256 {self._sidecar.conventions_sha256[:12]})"
+                Finding(
+                    "conventions differ from the pinned workload conventions "
+                    f"(sha256 {self._sidecar.conventions_sha256[:12]})"
+                )
             )
         budget = context_char_budget(self._limits, self._sidecar, question)
         if len(text) > budget:
             findings.append(
-                f"overflow: {len(text)} context chars exceed the {budget}-char budget of the "
-                f"{self._limits.first_prompt_ceiling}-token first-prompt limit"
+                Finding(
+                    f"overflow: {len(text)} context chars exceed the {budget}-char budget of the "
+                    f"{self._limits.first_prompt_ceiling}-token first-prompt limit"
+                )
             )
         return findings

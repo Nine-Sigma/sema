@@ -20,7 +20,11 @@ from showcase.ontology_query_benchmark.sema_bindings import (
     Sidecar,
     SuppliedBinding,
 )
-from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts, absent_elements
+from showcase.ontology_query_benchmark.sema_build_utils import (
+    Finding,
+    LibraryFacts,
+    absent_elements,
+)
 
 TableColumn = tuple[str, str]
 
@@ -29,7 +33,7 @@ TableColumn = tuple[str, str]
 class Rendering:
     sco: SemanticContextObject
     parts: list[str] = field(default_factory=list)
-    findings: list[str] = field(default_factory=list)
+    findings: list[Finding] = field(default_factory=list)
     listed: dict[TableColumn, int] = field(default_factory=dict)
 
     @property
@@ -49,7 +53,7 @@ def render(
     facts: LibraryFacts,
 ) -> Rendering:
     if not rendering.tables:
-        rendering.findings.append("retrieval returned no physical asset for the question")
+        rendering.findings.append(Finding("retrieval returned no physical asset for the question"))
     selected = [b for b in resolution.approved() if b.table in rendering.tables]
     rendering.findings.extend(absent_elements(tuple(selected), facts))
     _add_tables_and_columns(rendering.parts, _without_companions(rendering.sco, selected))
@@ -145,8 +149,12 @@ def _add_values(
             rendering.listed[(b.table, b.column)] = len(element.members)
         else:
             rendering.findings.append(
-                f"value set incomplete: retrieved {len(got)} of {element.pv_count} "
-                f"members for {de_id} ({b.column}); listing withheld"
+                Finding(
+                    f"value set incomplete: retrieved {len(got)} of {element.pv_count} "
+                    f"members for {de_id} ({b.column}); listing withheld",
+                    b.relation,
+                    b.column,
+                )
             )
             rendering.parts.append(
                 f"  {b.column}: {element.pv_count} members, not listed ({reference})"

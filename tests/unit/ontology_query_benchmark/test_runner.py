@@ -20,11 +20,19 @@ pytestmark = pytest.mark.unit
 R01_SQL = "```sql\nSELECT count(DISTINCT rid) AS people FROM main.s.person\n```"
 GOLD = 42
 
+
+@dataclass(frozen=True)
+class FakeFinding:
+    message: str
+    relation: str | None = None
+    column: str | None = None
+
+
 @dataclass(frozen=True)
 class FakeSContext:
     text: str
     identity: str
-    findings: tuple[str, ...] = ()
+    findings: tuple[FakeFinding, ...] = ()
 
 
 class FakeModel:
@@ -50,7 +58,9 @@ class FakeExecutor:
         return self.harness.models.Execution(True, ("people",), self.rows, 0.01)
 
 
-def s_provider(findings: tuple[str, ...] = (), text: str = "TABLE main.s.person\n  rid string"):
+def s_provider(
+    findings: tuple[FakeFinding, ...] = (), text: str = "TABLE main.s.person\n  rid string"
+):
     return lambda question: FakeSContext(text, "s-identity-1", findings)
 
 
@@ -135,9 +145,11 @@ def test_completeness_findings_withhold_credit(
     harness: SimpleNamespace, frozen: Path, profile: Profile
 ) -> None:
     model, executor = FakeModel(harness, [R01_SQL]), FakeExecutor(harness, ((GOLD,),))
-    receipt = run_r01(harness, frozen, profile, model, executor, s_provider(("missing:gender",)))
+    finding = FakeFinding("missing:gender")
+    receipt = run_r01(harness, frozen, profile, model, executor, s_provider((finding,)))
     assert receipt["outcome"] == "context_incomplete" and receipt["strict"] is False
     assert receipt["raw_match"] is True and receipt["earliest_failure_stage"] == "context"
+    assert receipt["findings"] == ["missing:gender"]
 
 
 def test_a_reply_without_sql_is_kept_as_a_bounded_excerpt(

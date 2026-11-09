@@ -114,7 +114,7 @@ def main(argv: list[str] | None = None) -> None:
     ) as p:
         context, rendering = p.explain(args.question)
         report = {"question": args.question, "identity": context.identity,
-                  "findings": list(context.findings),
+                  "findings": [f.message for f in context.findings],
                   "trace": trace_rows(p, context, rendering),
                   "context_text": context.text}
     payload = json.dumps(report, indent=1)

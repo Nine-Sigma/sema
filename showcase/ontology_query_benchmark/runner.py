@@ -109,7 +109,7 @@ def run_slot(slot: Slot, question: Any, runtime: Any, model: Any, contract: scor
         "raw_match": verdict.strict if verdict else None,
         "score_reason": verdict.reason if verdict else None,
         "first_sql": attempts[0].get("sql") if attempts else None, "final_sql": record["sql"],
-        "context_identity": meter.context_identity, "findings": list(meter.findings),
+        "context_identity": meter.context_identity, "findings": _messages(meter.findings),
         "context_tokens_estimate": record["context_tokens"],
         "generation_calls": meter.generation_calls, "sql_executions": meter.sql_executions,
         "repairs": record["repairs"], "prompt_tokens": meter.prompt_tokens,
@@ -123,6 +123,10 @@ def run_slot(slot: Slot, question: Any, runtime: Any, model: Any, contract: scor
     }  # fmt: skip
 
 
+def _messages(findings: tuple[ru.FindingLike, ...]) -> list[str]:
+    return [f.message for f in findings]
+
+
 def _excerpt(reply: str | None) -> str | None:
     return reply[:RESPONSE_EXCERPT_CHARS] if reply is not None else None
 
@@ -130,7 +134,7 @@ def _excerpt(reply: str | None) -> str | None:
 def _runner_error(slot: Slot, meter: Meter, message: str) -> dict[str, Any]:
     return {**_slot_fields(slot), "outcome": "runner_error", "strict": False, "tolerant": False,
             "error_message": message, "earliest_failure_stage": meter.failed_stage or "runner",
-            "context_identity": meter.context_identity, "findings": list(meter.findings),
+            "context_identity": meter.context_identity, "findings": _messages(meter.findings),
             "generation_calls": meter.generation_calls, "sql_executions": meter.sql_executions,
             "prompt_tokens": meter.prompt_tokens, "completion_tokens": meter.completion_tokens,
             "usage_reported": meter.usage_reported, "overflow": meter.overflow,

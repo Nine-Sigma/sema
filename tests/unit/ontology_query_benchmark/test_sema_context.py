@@ -7,7 +7,7 @@ import hashlib
 import math
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -47,6 +47,9 @@ from tests.unit.ontology_query_benchmark.test_sema_build import (
     clean_process,
     no_client,
 )
+
+if TYPE_CHECKING:
+    from showcase.ontology_query_benchmark.sema_build_utils import Finding
 
 pytestmark = pytest.mark.unit
 
@@ -123,8 +126,8 @@ def _first_prompt(tokens: int) -> Limits:
     return LIMITS.model_copy(update={"input_ceiling": tokens + LIMITS.repair_reserve})
 
 
-def _overflows(findings: tuple[str, ...]) -> bool:
-    return any(f.startswith("overflow:") for f in findings)
+def _overflows(findings: tuple[Finding, ...]) -> bool:
+    return any(f.message.startswith("overflow:") for f in findings)
 
 
 def test_context_renders_assets_bindings_and_complete_values(tmp_path: Path) -> None:
@@ -146,7 +149,9 @@ def test_incompletely_retrieved_value_set_is_not_listed(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES[1:]])(QUESTION)
     assert "L8507 = Male" not in ctx.text
     assert "membership query G1" in ctx.text
-    assert any("G1" in f and "incomplete" in f for f in ctx.findings)
+    assert [(f.relation, f.column) for f in ctx.findings if "incomplete" in f.message] == [
+        (f"cat.sch.{PEOPLE}", "gender_G1")
+    ]
 
 
 def test_rejected_values_are_never_rendered(tmp_path: Path) -> None:
@@ -160,14 +165,14 @@ def test_large_value_set_points_at_membership_relation(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [EVENTS_ENTITY], list_limit=2)("How many events by site?")
     assert "lib.sl.data_element" in ctx.text
     assert "membership query S1" in ctx.text and "3 members" in ctx.text
-    assert not any("S1" in f for f in ctx.findings)
+    assert not any("S1" in f.message for f in ctx.findings)
 
 
 def test_value_list_limit_switches_to_membership_reference(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES], list_limit=1)(QUESTION)
     assert "L8532 = Female" not in ctx.text
     assert "membership query G1" in ctx.text
-    assert not any("G1" in f for f in ctx.findings)
+    assert not any("G1" in f.message for f in ctx.findings)
 
 
 def test_catalog_companion_is_rendered_as_unsupplied(tmp_path: Path) -> None:
@@ -193,8 +198,9 @@ def test_membership_query_template_is_stated_once(tmp_path: Path) -> None:
 
 def test_absent_library_elements_are_findings(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES])(QUESTION)
-    assert any(f.startswith("library element absent: C1") for f in ctx.findings)
-    assert any(f.startswith("library element absent: N1") for f in ctx.findings)
+    absent = {f.message.split()[3]: f for f in ctx.findings if "element absent" in f.message}
+    assert absent.keys() == {"C1", "N1"}
+    assert (absent["C1"].relation, absent["C1"].column) == (f"cat.sch.{PEOPLE}", "city_C1")
 
 
 def test_overflow_is_reported_without_truncating(tmp_path: Path) -> None:
@@ -229,7 +235,7 @@ def test_conventions_are_referenced_not_paraphrased(tmp_path: Path) -> None:
     assert not any(rule in ctx.text for rule in CONVENTIONS)
     assert "conventions" in ctx.text.lower()
     mismatch = _provider(tmp_path, [EVENTS_ENTITY], conventions=("other",))("q")
-    assert any("conventions" in f for f in mismatch.findings)
+    assert [f.column for f in mismatch.findings if "conventions" in f.message] == [None]
 
 
 def test_grain_and_hierarchy_reference_are_rendered(tmp_path: Path) -> None:
@@ -251,7 +257,7 @@ def test_identity_covers_text_and_graph(tmp_path: Path) -> None:
 
 def test_no_retrieved_asset_is_a_finding(tmp_path: Path) -> None:
     ctx = _provider(tmp_path, [])(QUESTION)
-    assert any("no physical asset" in f for f in ctx.findings)
+    assert [f.column for f in ctx.findings if "no physical asset" in f.message] == [None]
 
 
 def test_trace_links_library_binding_asset_and_context(tmp_path: Path) -> None:
