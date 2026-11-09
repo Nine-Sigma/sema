@@ -33,6 +33,8 @@ class TargetPropertyDecl(BaseModel):
     endpoint_cardinality: Literal["one", "many"] | None = None
     endpoint_nullable: bool | None = None
     materialized_as_edge_property: bool = True
+    # A consumer policy; a denied column is still declared and stored in the graph.
+    exposure: Literal["denied"] | None = Field(default=None, exclude_if=lambda v: v is None)
     # Unset concept fields stay out of dumps so pre-concept snapshot hashes hold.
     concept_ref: ConceptRef | None = Field(default=None, exclude_if=lambda v: v is None)
     definition: str | None = Field(default=None, exclude_if=lambda v: v is None)

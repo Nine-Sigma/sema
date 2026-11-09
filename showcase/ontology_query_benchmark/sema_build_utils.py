@@ -228,7 +228,10 @@ def _properties(
         TargetPropertyDecl(name=c, type=t, nullable=True)
         for c, t in unbound_columns(approved, product, catalog_columns).items()
     )
-    return props
+    denied = set(product.doc.exposure.denied_columns)
+    return [
+        p.model_copy(update={"exposure": "denied"}) if p.name in denied else p for p in props
+    ]
 
 
 def unbound_columns(
@@ -236,10 +239,9 @@ def unbound_columns(
     product: ProductSpec,
     catalog_columns: Mapping[str, str],
 ) -> dict[str, str]:
-    """Exposed catalog columns no approved binding covers, with their physical type."""
-    hidden = {c for b in approved if b.table == product.pin.table for c in b.columns}
-    hidden.update(product.doc.exposure.denied_columns)
-    return {c: t for c, t in catalog_columns.items() if c not in hidden}
+    """Catalog columns no approved binding covers, with their physical type."""
+    bound = {c for b in approved if b.table == product.pin.table for c in b.columns}
+    return {c: t for c, t in catalog_columns.items() if c not in bound}
 
 
 def _declared_joins(sidecar: Sidecar, product: ProductSpec) -> list[DeclaredJoinDecl]:

@@ -52,9 +52,14 @@ def render(
     resolution: BindingResolution,
     facts: LibraryFacts,
 ) -> Rendering:
+    denied = {(p.pin.table, c) for p in products for c in p.doc.exposure.denied_columns}
+    rendering.sco = _without_denied(rendering.sco, denied)
     if not rendering.tables:
         rendering.findings.append(Finding("retrieval returned no physical asset for the question"))
-    selected = [b for b in resolution.approved() if b.table in rendering.tables]
+    selected = [
+        b for b in resolution.approved()
+        if b.table in rendering.tables and (b.table, b.column) not in denied
+    ]
     rendering.findings.extend(absent_elements(tuple(selected), facts))
     _add_tables_and_columns(rendering.parts, rendering.sco)
     _add_unbound(rendering.parts, rendering.sco, selected)
@@ -64,6 +69,18 @@ def render(
     _add_grain(rendering.parts, rendering.tables, products, sidecar)
     _add_rules(rendering.parts, sidecar)
     return rendering
+
+
+def _without_denied(
+    sco: SemanticContextObject, denied: set[TableColumn]
+) -> SemanticContextObject:
+    """Apply the product exposure policy; the graph holds denied columns, S never shows them."""
+    assets = [
+        a.model_copy(update={"columns": [c for c in a.columns if (a.table, c) not in denied]})
+        for a in sco.physical_assets
+    ]
+    values = [g for g in sco.governed_values if (g.table, g.column) not in denied]
+    return sco.model_copy(update={"physical_assets": assets, "governed_values": values})
 
 
 def _add_unbound(

@@ -110,6 +110,7 @@ def upsert_target_property(
     column_name: str,
     model_role: str,
     source_schema: str,
+    exposure: str | None,
 ) -> None:
     """MERGE a target `:Property {entity_name, name, semantic_type}` and its
     physical `PROPERTY_ON_COLUMN` / owning `HAS_PROPERTY` edges (M2)."""
@@ -117,7 +118,8 @@ def upsert_target_property(
         "MERGE (p:Property {entity_name: $entity_name, name: $name, "
         "schema_name: $schema_name, model_role: $model_role}) "
         "ON CREATE SET p.id = $id "
-        "SET p.semantic_type = $semantic_type, p.source_id = $source_schema "
+        "SET p.semantic_type = $semantic_type, p.source_id = $source_schema, "
+        "p.exposure = $exposure "
         "WITH p "
         "MERGE (e:Entity {name: $entity_name, schema_name: $schema_name, "
         "model_role: $model_role}) "
@@ -136,6 +138,7 @@ def upsert_target_property(
         ),
         semantic_type=semantic_type,
         source_schema=source_schema,
+        exposure=exposure,
         column_name=column_name,
         table=table,
         catalog=catalog,

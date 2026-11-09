@@ -151,13 +151,11 @@ def _declared(loader: MagicMock) -> dict[tuple[str, str], str]:
     }
 
 
-def test_every_exposed_catalog_column_is_declared(tmp_path: Path) -> None:
+def test_every_catalog_column_is_declared(tmp_path: Path) -> None:
     loader, _, _ = _build(tmp_path)
     declared = _declared(loader)
-    exposed = {
-        (table, column) for table, cols in catalog_fixture().items() for column in cols
-    } - {(PEOPLE, "first_name")}
-    assert set(declared) == exposed
+    catalog = {(table, column) for table, cols in catalog_fixture().items() for column in cols}
+    assert set(declared) == catalog
     roles = {p["model_role"] for p in _cypher_params(loader) if "model_role" in p}
     assert roles == {"BENCH_S"}
 
@@ -179,7 +177,17 @@ def test_unbound_columns_are_embedded_by_their_name(tmp_path: Path) -> None:
         for c in loader.set_node_embedding.call_args_list if c.kwargs["label"] == "Property"
     }
     assert (("entity_name", EVENTS), ("name", "ended_on")) in matches
-    assert (("entity_name", PEOPLE), ("name", "first_name")) not in matches
+    assert (("entity_name", PEOPLE), ("name", "first_name")) in matches
+
+
+def test_denied_columns_carry_the_denied_exposure(tmp_path: Path) -> None:
+    loader, _, _ = _build(tmp_path)
+    exposure = {
+        (p["entity_name"], p["name"]): p["exposure"] for p in _cypher_params(loader)
+        if "semantic_type" in p
+    }
+    assert {k for k, v in exposure.items() if v is not None} == {(PEOPLE, "first_name")}
+    assert exposure[(PEOPLE, "first_name")] == "denied"
 
 
 def test_value_sets_hold_every_imported_member(tmp_path: Path) -> None:

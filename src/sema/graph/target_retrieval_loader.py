@@ -95,6 +95,7 @@ def project_target_to_retrieval_graph(
                 column_name=prop.name,
                 model_role=binding.model_role,
                 source_schema=binding.schema,
+                exposure=prop.exposure,
             )
 
 

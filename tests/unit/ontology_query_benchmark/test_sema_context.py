@@ -18,6 +18,7 @@ from showcase.ontology_query_benchmark.sema_bindings import (
     resolve_bindings,
 )
 from showcase.ontology_query_benchmark import runner_utils, sema_live, sema_trace
+from showcase.ontology_query_benchmark.product_spec import SpecExposure
 from showcase.ontology_query_benchmark.profile import Attribution, Limits, Profile
 from showcase.ontology_query_benchmark.routing import RoutingError
 from showcase.ontology_query_benchmark.sema_build import BuildManifest, write_manifest
@@ -104,13 +105,22 @@ def _provider(
     limits: Limits | None = None,
     list_limit: int | None = None,
     graph_identity: str = "graph-1",
+    denied: tuple[str, ...] | None = None,
 ) -> SContextProvider:
     sidecar = load_sidecar(write_fixture(tmp_path), tmp_path)
     if list_limit is not None:
         sidecar = dataclasses.replace(sidecar, value_list_limit=list_limit)
-    resolution = resolve_bindings(sidecar, load_products(sidecar), catalog_fixture())
+    products = load_products(sidecar)
+    if denied is not None:
+        exposure = SpecExposure(denied_columns=denied)
+        products = tuple(
+            dataclasses.replace(p, doc=p.doc.model_copy(update={"exposure": exposure}))
+            if p.pin.table == PEOPLE else p
+            for p in products
+        )
+    resolution = resolve_bindings(sidecar, products, catalog_fixture())
     return SContextProvider(
-        _Retriever(candidates), sidecar, load_products(sidecar), resolution,
+        _Retriever(candidates), sidecar, products, resolution,
         facts_fixture(tmp_path), graph_identity=graph_identity,
         conventions=conventions, limits=limits or LIMITS,
     )
@@ -211,6 +221,23 @@ def test_unbound_columns_leave_the_binding_lines_unchanged(tmp_path: Path) -> No
     def bindings(text: str) -> str:
         return text[text.index("\nAPPROVED BINDINGS"):]
     assert bindings(with_unbound) == bindings(without)
+
+
+def test_denied_columns_are_never_rendered(tmp_path: Path) -> None:
+    people = _entity(PEOPLE, [*PEOPLE_ENTITY["columns"], _col("first_name")])
+    with_denied = _provider(tmp_path, [people, EVENTS_ENTITY, *PEOPLE_VALUES])(QUESTION)
+    without = _provider(tmp_path, [PEOPLE_ENTITY, EVENTS_ENTITY, *PEOPLE_VALUES])(QUESTION)
+    assert "first_name" not in with_denied.text
+    assert with_denied.text == without.text
+
+
+def test_a_denied_bound_column_has_no_binding_or_values(tmp_path: Path) -> None:
+    provider = _provider(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES], denied=("gender_G1",))
+    text = provider(QUESTION).text
+    assert "gender_G1 " not in text and "gender_G1 <-" not in text
+    assert "L8532 = Female" not in text
+    assert "gender_G1_text" in _table_line(text, PEOPLE)
+    assert "L1 = Alive" in text
 
 
 def test_membership_query_template_is_stated_once(tmp_path: Path) -> None:
