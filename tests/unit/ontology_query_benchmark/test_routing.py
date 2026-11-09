@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -93,5 +94,8 @@ def test_live_entry_modules_import_without_dotenv(entry: str) -> None:
         "sys.exit('dotenv' in sys.modules)"
     )
     env = {k: os.environ[k] for k in ("HOME", "PATH") if k in os.environ}
-    done = subprocess.run([sys.executable, "-c", probe], env=env, capture_output=True, timeout=120)
+    root = Path(__file__).resolve().parents[3]
+    done = subprocess.run(
+        [sys.executable, "-c", probe], env=env, cwd=root, capture_output=True, timeout=120
+    )
     assert done.returncode == 0, f"{entry} loads python-dotenv on import"
