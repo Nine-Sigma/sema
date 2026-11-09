@@ -28,13 +28,15 @@ Edge = tuple[str, str]
 @dataclass(frozen=True)
 class HierarchyFacts:
     """``edges`` are (parent, child); ``bridges`` are (member, standard concept);
-    ``targets`` are every concept id the slice's mapping rows point at."""
+    ``targets`` are every concept id the slice's mapping rows point at; ``own_ids`` are
+    the members bridged through their own id rather than a mapping row."""
 
     spec: ConceptHierarchy
     names: Mapping[str, str]
     edges: tuple[Edge, ...]
     bridges: tuple[Edge, ...]
     targets: frozenset[str]
+    own_ids: frozenset[str]
 
     def reaches(self, member: str) -> bool:
         if self.spec.mapping is None:
@@ -63,9 +65,9 @@ def load_hierarchy(
     }
     names = {str(row[0]): str(row[1]) for row in concepts}
     targets = frozenset(str(row[1]) for row in mapping)
-    own = {(m, m) for m in standard.intersection(members)} if spec.mapping else set()
-    bridges = tuple(sorted({*_bridges(spec, mapping, standard), *own}))
-    return HierarchyFacts(spec, names, edges, bridges, targets)
+    own = frozenset(standard.intersection(members) if spec.mapping else ())
+    bridges = tuple(sorted({*_bridges(spec, mapping, standard), *((m, m) for m in own)}))
+    return HierarchyFacts(spec, names, edges, bridges, targets, own)
 
 
 def _rows(con: duckdb.DuckDBPyConnection, table: str) -> list[tuple[object, ...]]:

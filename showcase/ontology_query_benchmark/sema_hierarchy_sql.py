@@ -1,8 +1,8 @@
 """One executable membership predicate per governed column a concept hierarchy reaches.
 
 The predicate's shape is fixed: value column, then the member-to-standard bridge
-(mapping types, then the declared replacement hop, standard concepts only, or the
-member's own id when it is a standard concept), then the closure at
+(mapping types, then the declared replacement hop, standard concepts only, or, when a
+loaded member's own id is a standard concept, that id), then the closure at
 ``ancestor = {anchor_id}``. Every relation and column name is profile data; every
 string literal is quoted in the warehouse's SQL dialect.
 """
@@ -24,9 +24,11 @@ ANCHORS_PER_COLUMN = 3
 
 
 def membership_sql(
-    spec: ConceptHierarchy, column: str, *, dialect: str, anchor: str | None = None
+    spec: ConceptHierarchy, column: str, *, dialect: str, anchor: str | None = None,
+    own_ids: bool = False,
 ) -> str:
-    """With no ``anchor`` code the ancestor slot stays the {anchor_id} placeholder."""
+    """With no ``anchor`` code the ancestor slot stays the {anchor_id} placeholder;
+    ``own_ids`` adds the route for members whose own id is a standard concept."""
     c, k, m = spec.closure, spec.concepts, spec.mapping
     slot = ANCHOR if anchor is None else _literal(anchor, dialect)
     under = f"a.{c.ancestor_column} = {slot}"
@@ -50,6 +52,8 @@ def membership_sql(
     mapped = f"m.{m.type_column} IN ({_quoted(m.mapping_types, dialect)})"
     bridged = " ".join([f"SELECT m.{m.source_column} FROM {m.relation} m", *joins,
                         f"WHERE {mapped} AND {under}"])  # fmt: skip
+    if not own_ids:
+        return f"{column} IN ({bridged})"
     return f"({column} IN ({bridged}) OR {_typed(column, m.target_type)} IN ({closure}))"
 
 
@@ -90,16 +94,16 @@ def add_hierarchy(
         return
     if not columns:
         return
-    spec = hierarchy.spec
+    spec, own = hierarchy.spec, bool(hierarchy.own_ids)
     parts.append(f"\nCONCEPT HIERARCHY ({spec.attribution.value}; each relation read at build):")
-    parts.append(f"  {_route(spec, dialect)} {_direction(spec)}"
+    parts.append(f"  {_route(spec, dialect, own)} {_direction(spec)}"
                  f" Replace {ANCHOR} with the anchor concept id.")  # fmt: skip
     kind = "source member ids" if spec.mapping else "concept ids of the hierarchy"
     for b in columns:
         found = [a for a in anchors if (a.table, a.column) == (b.table, b.column)]
         parts.append(f"  {b.table}.{b.column} holds {kind}:")
-        parts.append(f"  WHERE {membership_sql(spec, b.column, dialect=dialect)}")
-        parts.extend(_filled(spec, b.column, ranked(found, question), dialect))
+        parts.append(f"  WHERE {membership_sql(spec, b.column, dialect=dialect, own_ids=own)}")
+        parts.extend(_filled(spec, b.column, ranked(found, question), dialect, own))
 
 
 def ranked(anchors: Sequence[HierarchyAnchor], question: str) -> list[HierarchyAnchor]:
@@ -116,7 +120,8 @@ def ranked(anchors: Sequence[HierarchyAnchor], question: str) -> list[HierarchyA
 
 
 def _filled(
-    spec: ConceptHierarchy, column: str, anchors: Sequence[HierarchyAnchor], dialect: str
+    spec: ConceptHierarchy, column: str, anchors: Sequence[HierarchyAnchor], dialect: str,
+    own_ids: bool,
 ) -> list[str]:
     """A filled predicate for each of the first ``ANCHORS_PER_COLUMN`` anchors."""
     lines = []
@@ -125,7 +130,8 @@ def _filled(
         counted = (f"{a.member_count} member values of {column} sit strictly below this "
                    "concept; a value mapped to the concept itself is not counted")  # fmt: skip
         lines.append(f"  anchor {a.label} = id {a.code}{vocabulary}; {counted}:")
-        lines.append(f"  WHERE {membership_sql(spec, column, dialect=dialect, anchor=a.code)}")
+        sql = membership_sql(spec, column, dialect=dialect, anchor=a.code, own_ids=own_ids)
+        lines.append(f"  WHERE {sql}")
     if (omitted := len(anchors) - ANCHORS_PER_COLUMN) > 0:
         lines.append(f"  {omitted} more retrieved anchors on {column} are not shown.")
     return lines
@@ -137,7 +143,7 @@ def _reached(binding: SuppliedBinding, facts: LibraryFacts) -> bool:
     return bool(element and hierarchy and any(hierarchy.reaches(c) for c, _ in element.members))
 
 
-def _route(spec: ConceptHierarchy, dialect: str) -> str:
+def _route(spec: ConceptHierarchy, dialect: str, own_ids: bool) -> str:
     k, m = spec.concepts, spec.mapping
     route = ""
     if m is not None:
@@ -146,7 +152,7 @@ def _route(spec: ConceptHierarchy, dialect: str) -> str:
         if m.replacement_types:
             replaced = _quoted(m.replacement_types, dialect)
             route += f", then its replacement where {m.type_column} in ({replaced})"
-        route += ", or directly when its own id is a concept."
+        route += ", or directly when its own id is a concept." if own_ids else "."
     if k.standard_column:
         route += (f" Only concepts with {k.relation}.{k.standard_column} in "
                   f"({_quoted(k.standard_values, dialect)}) count.")  # fmt: skip
