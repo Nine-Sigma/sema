@@ -173,11 +173,9 @@ class DeclaredJoin(BaseModel):
 
 
 class RunDescriptor(BaseModel):
-    """What no predicate can derive; everything else follows from fixed rules.
-
-    An unstated ``scheme`` defaults, when a concepts section needs one, to
-    ``<identity_system>.<id>`` with a description naming the id and release.
-    """
+    """What no predicate can derive; fixed rules supply the rest. An unstated ``scheme``
+    defaults, when a concepts section needs one, to ``<identity_system>.<id>`` described by
+    id and release; ``relations`` is the warehouse Land allowlist, each entry required."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -187,6 +185,7 @@ class RunDescriptor(BaseModel):
     scheme: SchemeSpec | None = None
     term_storage: TermStorageSpec | None = None
     entity_case: Literal["preserve", "lower"] | None = None
+    relations: tuple[str, ...] | None = Field(default=None, min_length=1)
 
 
 class DocumentEmbedder(Protocol):

@@ -270,7 +270,7 @@ class Stages:
         if inputs.source is None:
             land = land_warehouse(
                 self._connector(), catalog=str(inputs.catalog), schema=inputs.schema,
-                ledger=self.ledger,
+                ledger=self.ledger, relations=self.descriptor().relations,
             )
         else:
             try:
