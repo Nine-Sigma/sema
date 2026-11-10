@@ -63,6 +63,7 @@ class ResolvedAttribute(_Frozen):
     by: str | None = None
     prefer: PreferredValue | None = None
     name: str | None = None
+    label_of: str | None = None
 
     @property
     def output_name(self) -> str:
@@ -116,9 +117,20 @@ class EntityIdentity(_Frozen):
             raise ValueError(f"attribute names repeat: {outputs}")
         if clash := set(outputs) & set(self.key_columns):
             raise ValueError(f"attribute names a key column: {sorted(clash)}")
+        self._check_labels(outputs)
         if not self.nullable_keys and "null_keys_group" in self.model_fields_set:
             raise ValueError("null_keys_group applies only when null keys are kept")
         return self
+
+    def _check_labels(self, outputs: list[str]) -> None:
+        resolved = {*self.key_columns, *outputs}
+        for attribute in self.attributes:
+            code = attribute.label_of
+            if code is not None and (code == attribute.output_name or code not in resolved):
+                raise ValueError(
+                    f"{attribute.output_name} is the label of {code!r}, which is not "
+                    "another resolved column of the entity"
+                )
 
     def _check_non_null_keys(self) -> None:
         if not isinstance(self.exclude_null_keys, tuple):

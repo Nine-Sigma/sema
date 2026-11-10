@@ -24,6 +24,7 @@ from sema.models.target.identity import (
 __all__ = [
     "CompositeKeyCountFinding",
     "composite_key_count_findings",
+    "entity_key_name",
     "identity_cte_sql",
     "identity_select",
 ]
@@ -98,7 +99,35 @@ def _rank(
 def _first_ranked(attribute: ResolvedAttribute, identity: EntityIdentity) -> exp.Expr:
     rank = _col(_rank_name(attribute, identity))
     first = exp.Case().when(rank.eq(exp.Literal.number(1)), _col(attribute.column))
-    return _as(exp.Max(this=first), attribute.output_name)
+    return exp.Max(this=first)
+
+
+def _resolved_values(identity: EntityIdentity) -> list[exp.Expr]:
+    """Each attribute's first ranked value; a label is NULL wherever its code is NULL."""
+    resolved = {a.output_name: _first_ranked(a, identity) for a in identity.attributes}
+    codes: dict[str, exp.Expr] = {k: _col(k) for k in identity.key_columns} | resolved
+    values = []
+    for attribute in identity.attributes:
+        value = resolved[attribute.output_name]
+        if attribute.label_of is not None:
+            code_is_null = codes[attribute.label_of].copy().is_(exp.null())
+            value = exp.Case().when(code_is_null, exp.null()).else_(value.copy())
+        values.append(_as(value, attribute.output_name))
+    return values
+
+
+def _key_part(column: str) -> exp.Expr:
+    """NULL as ``n``, a value as ``v<length>:<value>``: no two key tuples share a text."""
+    text = exp.cast(_col(column), exp.DataType.Type.VARCHAR)
+    length = exp.cast(exp.Length(this=text.copy()), exp.DataType.Type.VARCHAR)
+    value = exp.Concat(expressions=[exp.Literal.string("v"), length, exp.Literal.string(":"),
+                                    text])  # fmt: skip
+    return exp.Case().when(_col(column).is_(exp.null()), exp.Literal.string("n")).else_(value)
+
+
+def _entity_key(parts: list[str], name: str) -> exp.Expr:
+    encoded = exp.Concat(expressions=[_key_part(p) for p in parts])
+    return _as(exp.MD5(this=encoded), name)
 
 
 def _null_key_rows_stand_alone(identity: EntityIdentity) -> bool:
@@ -124,26 +153,37 @@ def _keyed_rows(relation: str, identity: EntityIdentity) -> exp.Expr:
     return rows.subquery("keyed")
 
 
-def identity_select(relation: str, identity: EntityIdentity) -> exp.Select:
-    """One row per entity of ``relation``: its key columns and resolved attributes."""
+def identity_select(
+    relation: str, identity: EntityIdentity, key: str | None = None
+) -> exp.Select:
+    """One row per entity of ``relation``: its keys, the ``key`` column, and attributes.
+
+    The ``key`` column hashes the key parts with NULL as a value (and the own-row marker
+    when null keys do not group), so ``COUNT(DISTINCT key)`` counts every entity.
+    """
     keys = [_col(k) for k in identity.key_columns]
     alone = _null_key_rows_stand_alone(identity)
-    own_row = [_col(_internal(NULL_KEY_ROW, identity))] if alone else []
-    groups = [*keys, *own_row]
+    own_row = [_internal(NULL_KEY_ROW, identity)] if alone else []
+    groups = [*keys, *(_col(c) for c in own_row)]
+    surrogate = [_entity_key([*identity.key_columns, *own_row], key)] if key else []
     rows = _keyed_rows(relation, identity)
     if not identity.attributes:
-        return exp.select(*keys).from_(rows).group_by(*groups)
+        return exp.select(*keys, *surrogate).from_(rows).group_by(*groups)
     ranks = [_rank(a, identity, groups) for a in identity.attributes]
     ranked = exp.select(exp.Star(), *ranks).from_(rows).subquery("ranked")
-    values = [_first_ranked(a, identity) for a in identity.attributes]
-    return exp.select(*keys, *values).from_(ranked).group_by(*groups)
+    values = _resolved_values(identity)
+    return exp.select(*keys, *surrogate, *values).from_(ranked).group_by(*groups)
+
+
+def entity_key_name(entity: str) -> str:
+    return f"{entity}_key"
 
 
 def identity_cte_sql(
     name: str, relation: str, identity: EntityIdentity, dialect: str | None = None
 ) -> str:
     """``WITH <name> AS (...)``, ready for a ``SELECT ... FROM <name>`` to follow."""
-    body = identity_select(relation, identity).sql(dialect=dialect)
+    body = identity_select(relation, identity, entity_key_name(name)).sql(dialect=dialect)
     return f"WITH {exp.to_identifier(name).sql(dialect=dialect)} AS ({body})"
 
 

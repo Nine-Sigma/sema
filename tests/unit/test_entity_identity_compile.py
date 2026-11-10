@@ -25,7 +25,8 @@ def _resolve(
     marks = ", ".join("?" for _ in columns.split(","))
     con.executemany(f"INSERT INTO src VALUES ({marks})", rows)
     cte = identity_cte_sql("entity", "src", EntityIdentity.model_validate(identity), dialect)
-    return con.execute(f"{cte} SELECT * FROM entity ORDER BY ALL NULLS LAST").fetchall()
+    select = "SELECT * EXCLUDE (entity_key) FROM entity ORDER BY ALL NULLS LAST"
+    return con.execute(f"{cte} {select}").fetchall()
 
 
 NULL_KEY_ROWS = [

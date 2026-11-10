@@ -151,3 +151,12 @@ def test_a_pums_person_entity_keys_persons_whose_order_is_unrecorded() -> None:
     identity = yaml.safe_load(PUMS_PERSON)
     assert _multi_column_distinct(con, identity["key_columns"]) == 2
     assert _distinct_keys(con, "person", identity) == 4
+
+
+@pytest.mark.parametrize("label_of", ["site_label", "seen_on"])
+def test_a_companion_label_names_another_resolved_column(label_of: str) -> None:
+    identity = {**VISIT_KEYS, "attributes": [
+        {"column": "site_label", "rule": "min_by", "by": "seen_on", "label_of": label_of},
+    ]}  # fmt: skip
+    with pytest.raises(ValueError, match="not another resolved column"):
+        EntityIdentity.model_validate(identity)
