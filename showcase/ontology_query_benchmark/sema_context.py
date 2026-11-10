@@ -30,6 +30,10 @@ from showcase.ontology_query_benchmark.sema_bindings import (
 )
 from showcase.ontology_query_benchmark.sema_build import BuildManifest
 from showcase.ontology_query_benchmark.sema_build_utils import Finding, LibraryFacts
+from showcase.ontology_query_benchmark.sema_entity_utils import (
+    ExposedEntity,
+    exposed_entities,
+)
 from showcase.ontology_query_benchmark.sema_context_utils import (
     Rendering,
     nothing_denied,
@@ -122,6 +126,13 @@ class SContextProvider:
     @property
     def facts(self) -> LibraryFacts:
         return self._facts
+
+    @property
+    def sql_dialect(self) -> str:
+        return self._sidecar.sql_dialect
+
+    def exposed_entities(self, is_denied: Callable[[str], bool]) -> tuple[ExposedEntity, ...]:
+        return exposed_entities(self._products, self._sidecar, is_denied)
 
     def approved_in(self, tables: tuple[str, ...]) -> tuple[SuppliedBinding, ...]:
         return tuple(b for b in self._resolution.approved() if b.table in tables)

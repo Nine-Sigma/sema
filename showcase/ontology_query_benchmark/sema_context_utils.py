@@ -3,7 +3,7 @@
 Physical assets and joins reuse SEMA's nl2sql section renderers. The added
 sections render supplied binding evidence, the SCO's governed values (complete
 lists only, otherwise an executable membership reference), grain, any declared entity
-identity as an executable CTE, and the supplied hierarchy relation facts. Business
+identity as a table read by name, and the supplied hierarchy relation facts. Business
 rules are referenced by hash, never restated.
 """
 
@@ -15,7 +15,7 @@ import string
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
-from sema.compile.entity_identity import identity_cte_sql
+from sema.compile.entity_identity import entity_key_name
 from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
 from sema.models.context import SemanticContextObject
 from showcase.ontology_query_benchmark.product_spec import SpecEntity, SpecRelationship
@@ -271,7 +271,7 @@ def _add_grain(
             units = _grain_units(rendering, exposure, table, relation, entity)
             if units:
                 lines.append((f"  {relation}: {'; '.join(units)}", [], "grain line"))
-            lines.extend(_executable_entity(entity, p, sidecar))
+            lines.extend(_entity_listing(entity, p))
         for rel in p.doc.relationships:
             target = _table_of(products, rel)
             pairs = " AND ".join(
@@ -312,17 +312,22 @@ def _grain_units(
     return units
 
 
-def _executable_entity(
-    entity: SpecEntity, product: ProductSpec, sidecar: Sidecar
+def _entity_listing(
+    entity: SpecEntity, product: ProductSpec
 ) -> list[tuple[str, list[TableColumn], str]]:
+    """The entity as a table the statement reads by name, with its key and columns."""
     if entity.identity is None:
         return []
     name = entity.entity_id or product.pin.product
-    keys = ", ".join(entity.identity.key_columns)
-    relation = sidecar.relation(product.pin.table)
-    cte = identity_cte_sql(name, relation, entity.identity, dialect=sidecar.sql_dialect)
-    names = [(product.pin.table, c) for c in entity.identity.columns]
-    text = f"  ENTITY {name} (executable; one row per {keys}):\n    {cte}"
+    identity = entity.identity
+    key = entity_key_name(name)
+    columns = [*identity.key_columns, key, *(a.output_name for a in identity.attributes)]
+    text = (
+        f"  table {name}: one row per {', '.join(identity.key_columns)}; columns "
+        f"{', '.join(columns)}. COUNT(DISTINCT {key}) counts each {name} once, "
+        "a NULL key part included"
+    )
+    names = [(product.pin.table, c) for c in identity.columns]
     return [(text, names, "entity identity")]
 
 

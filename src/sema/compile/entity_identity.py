@@ -25,6 +25,7 @@ __all__ = [
     "CompositeKeyCountFinding",
     "composite_key_count_findings",
     "entity_key_name",
+    "identity_cte",
     "identity_cte_sql",
     "identity_select",
 ]
@@ -179,12 +180,19 @@ def entity_key_name(entity: str) -> str:
     return f"{entity}_key"
 
 
+def identity_cte(
+    name: str, relation: str, identity: EntityIdentity, dialect: str | None = None
+) -> str:
+    """``<name> AS (...)``: one entry of a ``WITH`` list, with the ``<name>_key`` column."""
+    body = identity_select(relation, identity, entity_key_name(name)).sql(dialect=dialect)
+    return f"{exp.to_identifier(name).sql(dialect=dialect)} AS ({body})"
+
+
 def identity_cte_sql(
     name: str, relation: str, identity: EntityIdentity, dialect: str | None = None
 ) -> str:
     """``WITH <name> AS (...)``, ready for a ``SELECT ... FROM <name>`` to follow."""
-    body = identity_select(relation, identity, entity_key_name(name)).sql(dialect=dialect)
-    return f"WITH {exp.to_identifier(name).sql(dialect=dialect)} AS ({body})"
+    return f"WITH {identity_cte(name, relation, identity, dialect)}"
 
 
 @dataclass(frozen=True)

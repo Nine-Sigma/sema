@@ -21,6 +21,7 @@ from typing import Any, Protocol
 
 from showcase.ontology_query_benchmark.profile import Harness, Knobs, Limits, Sources, Timbr
 from showcase.ontology_query_benchmark.routing import require_mcp_tool
+from showcase.ontology_query_benchmark.sema_entity_utils import EntityExecutor
 
 HARNESS_MODULES = ("benchmark_models", "benchmark_workflow", "benchmark_clients",
                    "benchmark_config_utils", "benchmark_context_utils",
@@ -240,6 +241,8 @@ def arm_runtimes(harness: SimpleNamespace, frozen: Path, layout: Harness,
         if s_provider is None:
             raise ValueError("arm S needs an S context provider")
         contexts["S"] = SArmContext(harness, s_provider, budget, policy.is_denied)
+        executors = {**executors, "S": _s_executor(harness, executors["S"], s_provider,
+                                                   policy.is_denied)}  # fmt: skip
     return {
         arm: harness.workflow.ArmRuntime(
             arm, contexts[arm], executor, policy, known[arm], limits.row_limit,
@@ -248,6 +251,16 @@ def arm_runtimes(harness: SimpleNamespace, frozen: Path, layout: Harness,
         )  # fmt: skip
         for arm, executor in executors.items()
     }
+
+
+def _s_executor(harness: SimpleNamespace, inner: Any, provider: SProvider,
+                is_denied: Callable[[str], bool]) -> Any:  # fmt: skip
+    """The warehouse executor, reading the provider's exposed entities by name."""
+    exposed = getattr(provider, "exposed_entities", None)
+    entities = exposed(is_denied) if exposed is not None else ()
+    if inner is None or not entities:
+        return inner
+    return EntityExecutor(harness, inner, entities, getattr(provider, "sql_dialect"))
 
 
 def _with_knobs(config: Any, knobs: Knobs) -> Any:
