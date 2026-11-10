@@ -18,7 +18,11 @@ from dataclasses import dataclass, field
 from sema.compile.entity_identity import entity_key_name, key_clash
 from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
 from sema.models.context import SemanticContextObject
-from showcase.ontology_query_benchmark.product_spec import SpecEntity, SpecRelationship
+from showcase.ontology_query_benchmark.product_spec import (
+    CompanionRole,
+    SpecEntity,
+    SpecRelationship,
+)
 from showcase.ontology_query_benchmark.profile import ConceptHierarchy
 from showcase.ontology_query_benchmark.sema_bindings import (
     BindingResolution,
@@ -195,6 +199,9 @@ def _binding_line(b: SuppliedBinding, facts: LibraryFacts, sidecar: Sidecar) -> 
     line = f"{b.column} <- {label} [{b.de_id or b.library_id}]"
     if element and element.definition:
         line += f": {element.definition}"
+    for role, companion in b.companions:
+        if role is CompanionRole.LABEL:
+            line += f" {b.column} displays as {companion}."
     if b.catalog_companions:
         companions = ", ".join(b.catalog_companions)
         line += f" Catalog companion, not in {sidecar.spec_name}: {companions}."
