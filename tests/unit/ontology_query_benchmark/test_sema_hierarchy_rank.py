@@ -1,9 +1,10 @@
 """Each governed column shows the anchors whose label the question covers first, at most a
-named number of them, always beside the {anchor_id} template; each anchor literal is
+named number of them, always beside the {anchor_name} template; each anchor literal is
 quoted in the warehouse's own SQL dialect."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -58,13 +59,13 @@ def _text(
 
 
 def _anchors(text: str) -> list[str]:
-    return [x.strip().removeprefix("anchor ").split(" = id ")[0]
-            for x in text.splitlines() if x.strip().startswith("anchor ")]  # fmt: skip
+    return [found.group(1) for x in text.splitlines()
+            if (found := re.match(r"anchor name '(.*?)'(?:, vocabulary|;)", x.strip()))]
 
 
 def _filled(text: str) -> list[str]:
     return [x.strip().removeprefix("WHERE ") for x in text.splitlines()
-            if x.strip().startswith("WHERE ") and "{anchor_id}" not in x]  # fmt: skip
+            if x.strip().startswith("WHERE ") and "{anchor_name}" not in x]  # fmt: skip
 
 
 def _acris_text(tmp_path: Path, question: str) -> tuple[Any, str]:
@@ -88,8 +89,8 @@ def test_a_question_naming_no_concept_keeps_the_instruction_and_the_template(
     _, text = _acris_text(tmp_path, "How many records were filed?")
 
     assert _anchors(text) == [acris.CLASS, "OTHER DOCUMENTS"]
-    assert "Replace {column} with a value column below and {anchor_id} with the anchor" in text
-    assert any("{anchor_id}" in x for x in text.splitlines() if x.strip().startswith("WHERE "))
+    assert "Replace {column} with a value column below, {anchor_name} with the anchor" in text
+    assert any("{anchor_name}" in x for x in text.splitlines() if x.strip().startswith("WHERE "))
 
 
 def test_at_most_the_cap_of_filled_anchors_render_and_the_rest_are_counted(
@@ -106,7 +107,7 @@ def test_at_most_the_cap_of_filled_anchors_render_and_the_rest_are_counted(
 
 def test_a_crafted_anchor_code_selects_only_true_members_in_duckdb(tmp_path: Path) -> None:
     text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS,
-                 [anchor(CRAFTED, "Crafted", "std", 0)], "Which events are crafted?")  # fmt: skip
+                 [anchor("C1", CRAFTED, "std", 0)], "Which events are crafted?")  # fmt: skip
 
     [fragment] = _filled(text)
     assert members(warehouse(), EVENTS_SQL, fragment) == set()
@@ -114,7 +115,7 @@ def test_a_crafted_anchor_code_selects_only_true_members_in_duckdb(tmp_path: Pat
 
 def test_a_databricks_warehouse_gets_its_own_string_quoting(tmp_path: Path) -> None:
     text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS,
-                 [anchor(CRAFTED, "Crafted", "std", 0)], "Which events are crafted?",
+                 [anchor("C1", CRAFTED, "std", 0)], "Which events are crafted?",
                  dialect="databricks")  # fmt: skip
 
     [fragment] = _filled(text)
@@ -135,7 +136,7 @@ def test_the_member_count_reads_as_strict_descendants_only(tmp_path: Path) -> No
 
     assert ("An anchor's member count is the column's values strictly below it; a value "
             "mapped to the anchor itself is not counted.") in text  # fmt: skip
-    assert "anchor Neoplasm = id 'C1' in std; 2 members" in text
+    assert "anchor name 'Neoplasm', vocabulary 'std'; 2 members" in text
 
 
 def test_the_section_states_the_join_once_however_many_anchors_are_retrieved(
@@ -147,14 +148,14 @@ def test_the_section_states_the_join_once_however_many_anchors_are_retrieved(
     section = text[text.index("CONCEPT HIERARCHY"):]
     predicates = [x for x in section.splitlines() if x.strip().startswith("WHERE ")]
     assert len(predicates) == 2
-    assert "{column}" in predicates[0] and "{anchor_id}" in predicates[0]
+    assert "{column}" in predicates[0] and "{anchor_name}" in predicates[0]
     assert _filled(text) == [predicates[1].strip().removeprefix("WHERE ")]
 
 
-def test_a_listed_anchor_id_is_a_literal_in_the_warehouse_dialect(tmp_path: Path) -> None:
-    found = [anchor(CRAFTED, "Crafted", "std", 0), anchor("C1", "Neoplasm", "std", 2)]
+def test_a_listed_anchor_name_is_a_literal_in_the_warehouse_dialect(tmp_path: Path) -> None:
+    found = [anchor("C0", CRAFTED, "std", 0), anchor("C1", "Neoplasm", "std", 2)]
     text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found,
                  "Which neoplasm events?", dialect="databricks")  # fmt: skip
 
-    assert "anchor Crafted = id 'x\\' OR TRUE) --' in std; 0 members" in text
-    assert "anchor Neoplasm = id 'C1' in std; 2 members" in text
+    assert "anchor name 'x\\' OR TRUE) --', vocabulary 'std'; 0 members" in text
+    assert "anchor name 'Neoplasm', vocabulary 'std'; 2 members" in text

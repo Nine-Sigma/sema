@@ -95,14 +95,15 @@ def fragments(text: str, column: str, *, filled: bool = True) -> list[str]:
     template = template.replace("{column}", column)
     if not filled:
         return [template]
-    return [template.replace("{anchor_id}", code) for code in listed(lines, column)]
+    return [template.replace("{anchor_name}", name) for name in listed(lines, column)]
 
 
-LISTED = r"anchor .+? = id ('(?:[^'\\]|\\.|'')*')(?: in [^;]+)?; \d+ members"
+QUOTED = r"'(?:[^'\\]|\\.|'')*'"
+LISTED = rf"anchor name ({QUOTED})(?:, vocabulary {QUOTED})?; \d+ members"
 
 
 def listed(lines: list[str], column: str) -> list[str]:
-    """Anchor id literals on the lines under the column's ``holds`` line."""
+    """Anchor name literals on the lines under the column's ``holds`` line."""
     start = next(i for i, x in enumerate(lines) if f".{column} holds " in x and x.endswith(":"))
     codes = []
     for x in lines[start + 1:]:
@@ -126,8 +127,7 @@ def test_a_retrieved_anchor_fills_the_fragment_and_is_named(tmp_path: Path) -> N
                    [anchor("C1", "Neoplasm", "std", 2)]).text  # fmt: skip
 
     section = text[text.index("CONCEPT HIERARCHY"):]
-    assert "Neoplasm" in section and "C1" in section and "std" in section
-    assert "'C1' in std; 2 members" in section
+    assert "anchor name 'Neoplasm', vocabulary 'std'; 2 members" in section
     [fragment] = fragments(text, "site_S1")
     assert members(warehouse(), EVENTS_SQL, fragment) == {"L10", "L11"}
 
@@ -233,7 +233,7 @@ def test_an_anchor_four_levels_up_fills_an_executable_fragment(tmp_path: Path) -
 
 @pytest.mark.parametrize(("denied", "relation", "column"), [
     ("ANC", "wh.voc.ancestor", "anc"), ("flag", "wh.voc.concept", "flag"),
-    ("rel", "wh.voc.relationship", "rel"),
+    ("rel", "wh.voc.relationship", "rel"), ("cname", "wh.voc.concept", "cname"),
 ])  # fmt: skip
 def test_a_hierarchy_naming_a_denied_column_is_withheld_with_a_finding(
     tmp_path: Path, denied: str, relation: str, column: str
@@ -252,7 +252,7 @@ def test_a_policy_denying_no_hierarchy_column_leaves_the_section_as_before(
 ) -> None:
     facts, anchors = _facts(tmp_path, hierarchy()), [anchor("C1", "Neoplasm", "std", 2)]
     plain = context(tmp_path, facts, READABLE, anchors).text
-    policed = context(tmp_path, facts, READABLE, anchors, lambda n: n in ("cname", "lvl"))
+    policed = context(tmp_path, facts, READABLE, anchors, lambda n: n == "lvl")
 
     assert policed.text == plain
     assert "concept hierarchy" not in " ".join(f.message for f in policed.findings)

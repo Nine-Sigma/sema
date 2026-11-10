@@ -56,8 +56,9 @@ def _acris_warehouse() -> duckdb.DuckDBPyConnection:
     edges = [(r["CLASS CODE DESCRIPTION"], r["DOC. TYPE"]) for r in ROWS]
     table(con, "wh.acris.closure", "ancestor VARCHAR, descendant VARCHAR, levels INTEGER",
           sorted(closure_rows(edges, self_rows=True)))  # fmt: skip
+    classes = {(c, c) for c in {r["CLASS CODE DESCRIPTION"] for r in ROWS}}
     table(con, "wh.acris.concept", "doc_type VARCHAR, description VARCHAR",
-          [(r["DOC. TYPE"], r["DOC. TYPE DESCRIPTION"]) for r in ROWS])  # fmt: skip
+          [(r["DOC. TYPE"], r["DOC. TYPE DESCRIPTION"]) for r in ROWS] + sorted(classes))
     table(con, "wh.acris.master", "document_id INTEGER, doc_type VARCHAR",
           [(i, r["DOC. TYPE"]) for i, r in enumerate(ROWS * 2)])  # fmt: skip
     return con
@@ -96,7 +97,7 @@ def test_documents_of_a_kind_resolve_through_the_closure(tmp_path: Path) -> None
     context = _context(tmp_path, _facts(tmp_path, con), dict.fromkeys(RELATIONS, True))
 
     assert "site_S1 holds concept ids of the hierarchy" in context.text
-    fragment = _fragment(context.text, "site_S1").replace("{anchor_id}", f"'{CLASS}'")
+    fragment = _fragment(context.text, "site_S1").replace("{anchor_name}", f"'{CLASS}'")
     found = con.execute(
         "SELECT DISTINCT site_S1 FROM (SELECT doc_type AS site_S1 FROM wh.acris.master)"
         f" WHERE {fragment}"

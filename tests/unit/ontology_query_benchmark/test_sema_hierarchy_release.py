@@ -12,7 +12,7 @@ from showcase.ontology_query_benchmark.profile import Attribution, ConceptHierar
 from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts, import_library_facts
 from showcase.ontology_query_benchmark.sema_hierarchy_sql import membership_sql
 from tests.unit.ontology_query_benchmark.hierarchy_fixture import (
-    ANCHOR,
+    HIERARCHY,
     add_hierarchy_slice,
     add_typed_vocabulary,
     hierarchy,
@@ -87,10 +87,10 @@ def test_a_shared_release_adds_no_release_finding(tmp_path: Path) -> None:
     assert not any("release" in f for f in manifest.findings)
 
 
-def test_an_anchor_code_fills_the_ancestor_slot() -> None:
+def test_an_anchor_name_fills_the_ancestor_slot() -> None:
     con = warehouse()
-    text_ids = membership_sql(hierarchy(), "dx", dialect="duckdb", anchor=ANCHOR)
-    typed_ids = membership_sql(typed_hierarchy(), "dx", dialect="duckdb", anchor="1")
+    text_ids = membership_sql(hierarchy(), "dx", dialect="duckdb", name="Neoplasm")
+    typed_ids = membership_sql(typed_hierarchy(), "dx", dialect="duckdb", name="Neoplasm")
 
     found = con.execute(f"SELECT DISTINCT dx FROM wh.data.events WHERE {text_ids}").fetchall()
     assert {row[0] for row in found} == {"L10", "L11"}
@@ -98,4 +98,12 @@ def test_an_anchor_code_fills_the_ancestor_slot() -> None:
         f"SELECT dx FROM (VALUES ('L10'), ('L11'), ('L12')) v(dx) WHERE {typed_ids}"
     ).fetchall()
     assert typed == [("L10",)]
-    assert "{anchor_id}" in membership_sql(hierarchy(), "dx", dialect="duckdb")
+    assert "{anchor_name}" in membership_sql(hierarchy(), "dx", dialect="duckdb")
+
+
+def test_a_declared_vocabulary_column_adds_a_vocabulary_slot_to_the_template() -> None:
+    spec = hierarchy(concepts={**HIERARCHY["concepts"], "vocabulary_column": "vocab"})
+
+    assert "n.vocab = {anchor_vocabulary}" in membership_sql(spec, "dx", dialect="duckdb")
+    assert "{anchor_vocabulary}" not in membership_sql(hierarchy(), "dx", dialect="duckdb")
+    assert "vocab" not in membership_sql(spec, "dx", dialect="duckdb", name="Neoplasm")

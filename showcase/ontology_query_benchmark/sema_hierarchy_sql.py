@@ -2,9 +2,10 @@
 
 The predicate's shape is fixed: value column, then the member-to-standard bridge
 (mapping types, then the declared replacement hop, standard concepts only, or, when a
-loaded member's own id is a standard concept, that id), then the closure at
-``ancestor = {anchor_id}``. Every relation and column name is profile data; every
-string literal is quoted in the warehouse's SQL dialect.
+loaded member's own id is a standard concept, that id), then the closure under the
+anchor concept, selected by name plus the qualifiers given, never by a listed id. Every
+relation and column name is profile data; every string literal is quoted in the
+warehouse's SQL dialect.
 """
 
 from __future__ import annotations
@@ -19,7 +20,8 @@ from showcase.ontology_query_benchmark.profile import ConceptHierarchy
 from showcase.ontology_query_benchmark.sema_bindings import SuppliedBinding
 from showcase.ontology_query_benchmark.sema_build_utils import Finding, LibraryFacts
 
-ANCHOR = "{anchor_id}"
+ANCHOR_NAME = "{anchor_name}"
+ANCHOR_VOCABULARY = "{anchor_vocabulary}"
 COLUMN = "{column}"
 COUNTED = ("An anchor's member count is the column's values strictly below it; a value "
            "mapped to the anchor itself is not counted.")
@@ -27,14 +29,15 @@ ANCHORS_PER_COLUMN = 3
 
 
 def membership_sql(
-    spec: ConceptHierarchy, column: str, *, dialect: str, anchor: str | None = None,
-    own_ids: bool = False,
+    spec: ConceptHierarchy, column: str, *, dialect: str, name: str | None = None,
+    vocabulary: str | None = None, concept_class: str | None = None, own_ids: bool = False,
 ) -> str:
-    """With no ``anchor`` code the ancestor slot stays the {anchor_id} placeholder;
-    ``own_ids`` adds the route for members whose own id is a standard concept."""
+    """With no ``name`` the anchor's name and vocabulary stay placeholders; otherwise a
+    qualifier left None adds no filter. ``own_ids`` adds the route for members whose own
+    id is a standard concept."""
     c, k, m = spec.closure, spec.concepts, spec.mapping
-    slot = ANCHOR if anchor is None else _literal(anchor, dialect)
-    under = f"a.{c.ancestor_column} = {slot}"
+    anchor = _anchor_ids(spec, dialect, name, vocabulary, concept_class)
+    under = f"a.{c.ancestor_column} IN ({anchor})"
     standard = (
         f" JOIN {k.relation} s ON s.{k.id_column} = a.{c.descendant_column}"
         f" AND s.{k.standard_column} IN ({_quoted(k.standard_values, dialect)})"
@@ -64,8 +67,8 @@ def named_columns(spec: ConceptHierarchy) -> list[tuple[str, str]]:
     """Every (relation, column) the section's route, direction and predicates name."""
     c, k, m = spec.closure, spec.concepts, spec.mapping
     names = [(c.relation, c.ancestor_column), (c.relation, c.descendant_column)]
-    if k.standard_column:
-        names += [(k.relation, k.id_column), (k.relation, k.standard_column)]
+    anchor = (k.id_column, k.name_column, k.vocabulary_column, k.standard_column)
+    names += [(k.relation, col) for col in anchor if col]
     if m is not None:
         names += [(m.relation, col) for col in (m.source_column, m.target_column, m.type_column)]
     return names
@@ -101,8 +104,11 @@ def add_hierarchy(
     found = {(b.table, b.column): ranked([a for a in anchors if (a.table, a.column)
                                           == (b.table, b.column)], question) for b in columns}
     parts.append(f"\nCONCEPT HIERARCHY ({spec.attribution.value}; each relation read at build):")
+    vocabulary = (f" and {ANCHOR_VOCABULARY} with its vocabulary"
+                  if spec.concepts.vocabulary_column else "")  # fmt: skip
     parts.append(f"  {_route(spec, dialect, own)} {_direction(spec)} Replace {COLUMN} with a "
-                 f"value column below and {ANCHOR} with the anchor concept id. {COUNTED}")
+                 f"value column below, {ANCHOR_NAME} with the anchor's quoted name{vocabulary}."
+                 f" {COUNTED}")  # fmt: skip
     parts.append(f"  WHERE {membership_sql(spec, COLUMN, dialect=dialect, own_ids=own)}")
     parts.extend(_example(spec, found, question, dialect, own))
     kind = "source member ids" if spec.mapping else "concept ids of the hierarchy"
@@ -133,7 +139,8 @@ def _example(
     if not best:
         return []
     a = best[0]
-    sql = membership_sql(spec, a.column, dialect=dialect, anchor=a.code, own_ids=own_ids)
+    sql = membership_sql(spec, a.column, dialect=dialect, name=a.label,
+                         vocabulary=a.vocabulary, own_ids=own_ids)  # fmt: skip
     return [f"  Filled for anchor {a.label} on {a.table}.{a.column}:", f"  WHERE {sql}"]
 
 
@@ -143,12 +150,32 @@ def _anchor_lines(
     """The first ``ANCHORS_PER_COLUMN`` anchors, then a count of the rest."""
     lines = []
     for a in anchors[:ANCHORS_PER_COLUMN]:
-        vocabulary = f" in {a.vocabulary}" if a.vocabulary else ""
-        code = _literal(a.code, dialect)
-        lines.append(f"  anchor {a.label} = id {code}{vocabulary}; {a.member_count} members")
+        vocabulary = f", vocabulary {_literal(a.vocabulary, dialect)}" if a.vocabulary else ""
+        name = _literal(a.label, dialect)
+        lines.append(f"  anchor name {name}{vocabulary}; {a.member_count} members")
     if (omitted := len(anchors) - ANCHORS_PER_COLUMN) > 0:
         lines.append(f"  {omitted} more retrieved anchors on {column} are not shown.")
     return lines
+
+
+def _anchor_ids(
+    spec: ConceptHierarchy, dialect: str, name: str | None, vocabulary: str | None,
+    concept_class: str | None,
+) -> str:
+    """The anchor concept's ids by name plus every qualifier column the spec declares."""
+    k = spec.concepts
+    if name is None:
+        named = [(k.name_column, ANCHOR_NAME), (k.vocabulary_column, ANCHOR_VOCABULARY)]
+    else:
+        named = [(k.name_column, _literal(name, dialect))] + [
+            (col, _literal(value, dialect)) for col, value
+            in ((k.vocabulary_column, vocabulary), (k.class_column, concept_class))
+            if value is not None
+        ]  # fmt: skip
+    where = [f"n.{col} = {value}" for col, value in named if col]
+    if k.standard_column:
+        where.append(f"n.{k.standard_column} IN ({_quoted(k.standard_values, dialect)})")
+    return f"SELECT n.{k.id_column} FROM {k.relation} n WHERE {' AND '.join(where)}"
 
 
 def _reached(binding: SuppliedBinding, facts: LibraryFacts) -> bool:

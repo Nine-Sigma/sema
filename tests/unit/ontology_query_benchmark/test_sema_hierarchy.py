@@ -32,7 +32,6 @@ from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts, imp
 from showcase.ontology_query_benchmark.sema_context import SContext, SContextProvider
 from showcase.ontology_query_benchmark.sema_hierarchy_sql import membership_sql
 from tests.unit.ontology_query_benchmark.hierarchy_fixture import (
-    ANCHOR,
     MEMBERS,
     add_hierarchy_slice,
     add_typed_vocabulary,
@@ -169,7 +168,7 @@ def test_the_fragment_returns_the_descendant_members_including_the_replaced_one(
 ) -> None:
     context = _context(tmp_path, _facts(tmp_path, hierarchy()), dict.fromkeys(RELATIONS, True))
 
-    fragment = _fragment(context.text, "site_S1").replace("{anchor_id}", f"'{ANCHOR}'")
+    fragment = _fragment(context.text, "site_S1").replace("{anchor_name}", "'Neoplasm'")
     found = warehouse().execute(
         f"SELECT DISTINCT site_S1 FROM (SELECT dx AS site_S1 FROM wh.data.events) WHERE {fragment}"
     ).fetchall()
@@ -203,7 +202,7 @@ def test_without_a_hierarchy_the_context_has_no_hierarchy_section(tmp_path: Path
 
 
 def test_a_declared_target_type_casts_text_mapping_targets() -> None:
-    sql = membership_sql(typed_hierarchy(), "dx", dialect="duckdb").replace("{anchor_id}", "1")
+    sql = membership_sql(typed_hierarchy(), "dx", dialect="duckdb", name="Neoplasm")
 
     found = add_typed_vocabulary(warehouse()).execute(
         f"SELECT dx FROM (VALUES ('L10'), ('L11'), ('L12')) v(dx) WHERE {sql}"

@@ -39,11 +39,12 @@ pytestmark = pytest.mark.unit
 
 # C9 is a standard concept under C8 and C7 a non-standard one; neither has a mapping row.
 OWN_IDS = ("C9", "C7")
-# The mapping-only text b90375f rendered for this spec, before the identity route existed.
+# The mapping-only text for this spec, without the identity route, anchor keyed by name.
 MAPPED = ("site_S1 IN (SELECT m.id_1 FROM wh.voc.relationship m LEFT JOIN wh.voc.relationship r"
           " ON r.id_1 = m.id_2 AND r.rel IN ('Replaced by') JOIN wh.voc.ancestor a ON a.des IN"
           " (m.id_2, r.id_2) JOIN wh.voc.concept s ON s.cid = a.des AND s.flag IN ('S')"
-          " WHERE m.rel IN ('Maps to') AND a.anc = {slot})")  # fmt: skip
+          " WHERE m.rel IN ('Maps to') AND a.anc IN (SELECT n.cid FROM wh.voc.concept n"
+          " WHERE n.cname = {slot} AND n.flag IN ('S')))")  # fmt: skip
 MAPPED_ROUTE = ("A member reaches a concept through wh.voc.relationship where rel in ('Maps to'),"
                 " then its replacement where rel in ('Replaced by'). Only concepts with"
                 " wh.voc.concept.flag in ('S') count.")  # fmt: skip
@@ -104,8 +105,8 @@ def test_without_a_member_that_is_a_concept_the_section_keeps_the_mapping_only_t
     text = context(tmp_path, _mapped_facts(tmp_path, hierarchy()), READABLE,
                    [anchor("C1", "Neoplasm", "std", 2)]).text  # fmt: skip
 
-    assert fragments(text, "site_S1", filled=False) == [MAPPED.format(slot="{anchor_id}")]
-    assert fragments(text, "site_S1") == [MAPPED.format(slot="'C1'")]
+    assert fragments(text, "site_S1", filled=False) == [MAPPED.format(slot="{anchor_name}")]
+    assert fragments(text, "site_S1") == [MAPPED.format(slot="'Neoplasm'")]
     assert f"  {MAPPED_ROUTE} In wh.voc.ancestor" in text
 
 

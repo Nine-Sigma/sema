@@ -165,11 +165,14 @@ class ClosureRelation(_Frozen):
 
 
 class ConceptRelation(_Frozen):
-    """Concept ids and names; with a standard column, only its listed values count."""
+    """Concept ids, names and optional name qualifiers; with a standard column, only its
+    listed values count."""
 
     relation: str = QualifiedRelation
     id_column: str = Column
     name_column: str = Column
+    vocabulary_column: str | None = Field(default=None, pattern=r"^\w+$")
+    class_column: str | None = Field(default=None, pattern=r"^\w+$")
     standard_column: str | None = Field(default=None, pattern=r"^\w+$")
     standard_values: tuple[str, ...] = ()
 
