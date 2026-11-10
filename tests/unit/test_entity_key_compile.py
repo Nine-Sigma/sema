@@ -160,3 +160,16 @@ def test_a_companion_label_names_another_resolved_column(label_of: str) -> None:
     ]}  # fmt: skip
     with pytest.raises(ValueError, match="not another resolved column"):
         EntityIdentity.model_validate(identity)
+
+
+@pytest.mark.parametrize(("identity", "clash"), [
+    ({"key_columns": ["e_key"]}, "e_key"),
+    ({"key_columns": ["a"], "attributes": [{"column": "a", "rule": "min", "name": "E_Key"}]},
+     "E_Key"),
+])  # fmt: skip
+def test_an_entity_key_equal_to_a_projected_column_is_refused(
+    identity: dict[str, Any], clash: str
+) -> None:
+    """Two ``e_key`` columns would let ``COUNT(DISTINCT e_key)`` count the source column."""
+    with pytest.raises(ValueError, match=f"e_key.*{clash}"):
+        identity_cte_sql("e", "src", EntityIdentity.model_validate(identity), "duckdb")
