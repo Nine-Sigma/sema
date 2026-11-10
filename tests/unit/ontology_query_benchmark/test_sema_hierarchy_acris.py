@@ -13,6 +13,7 @@ import pytest
 from showcase.ontology_query_benchmark.intake_extract import extract
 from showcase.ontology_query_benchmark.profile import Attribution, ConceptHierarchy
 from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts, import_library_facts
+from showcase.ontology_query_benchmark.sema_hierarchy_sql import membership_sql
 from tests.unit.ontology_query_benchmark.hierarchy_fixture import (
     WarehouseCursor,
     closure_rows,
@@ -27,7 +28,12 @@ from tests.unit.ontology_query_benchmark.test_sema_bindings import (
     ELEMENTS,
     write_projection,
 )
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy import _build, _context, _fragment
+from tests.unit.ontology_query_benchmark.test_sema_hierarchy import (
+    _build,
+    _context,
+    _fragment,
+    require_name_keyed_template,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -97,3 +103,42 @@ def test_documents_of_a_kind_resolve_through_the_closure(tmp_path: Path) -> None
     ).fetchall()
     expected = {r["DOC. TYPE"] for r in ROWS if r["CLASS CODE DESCRIPTION"] == CLASS}
     assert {row[0] for row in found} == expected and len(expected) == 23
+
+
+KIND_CONCEPTS = [
+    ("class-1", CLASS, "document control", "Document class"),
+    ("class-2", "DEEDS AND OTHER CONVEYANCES", "document control", "Document class"),
+    ("SAT", "SATISFACTION OF MORTGAGE", "document control", "Document type"),
+    ("ASPM", "ASSUMPTION OF MORTGAGE", "document control", "Document type"),
+    ("SUBM", "SUBORDINATION OF MORTGAGE", "document control", "Document type"),
+    ("CORRD", "CORRECTION DEED", "document control", "Document type"),
+]
+KIND_EDGES = [("class-1", "SAT"), ("class-1", "ASPM"), ("class-1", "SUBM"), ("class-2", "CORRD")]
+
+
+def test_document_types_of_a_kind_are_selected_by_class_name_not_id() -> None:
+    require_name_keyed_template()
+    con = duckdb.connect()
+    con.execute("ATTACH ':memory:' AS wh")
+    con.execute("CREATE SCHEMA wh.acris")
+    table(con, "wh.acris.concept",
+          "doc_type VARCHAR, description VARCHAR, code_list VARCHAR, level VARCHAR",
+          KIND_CONCEPTS)  # fmt: skip
+    table(con, "wh.acris.closure", "ancestor VARCHAR, descendant VARCHAR, levels INTEGER",
+          sorted(closure_rows(KIND_EDGES, self_rows=True)))  # fmt: skip
+
+    spec = ConceptHierarchy.model_validate({
+        **SPEC.model_dump(mode="json", exclude_none=True),
+        "concepts": {"relation": "wh.acris.concept", "id_column": "doc_type",
+                     "name_column": "description", "vocabulary_column": "code_list",
+                     "class_column": "level"},
+    })  # fmt: skip
+    sql = membership_sql(spec, "doc_type", dialect="duckdb", name=CLASS,
+                         concept_class="Document class")  # fmt: skip
+
+    assert "class-1" not in sql
+    found = con.execute(
+        "SELECT doc_type FROM (VALUES ('SAT'), ('ASPM'), ('SUBM'), ('CORRD')) v(doc_type)"
+        f" WHERE {sql}"
+    ).fetchall()
+    assert {row[0] for row in found} == {"SAT", "ASPM", "SUBM"}

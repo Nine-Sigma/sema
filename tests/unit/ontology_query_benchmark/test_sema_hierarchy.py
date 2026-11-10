@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import inspect
 import json
+import re
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
+import duckdb
 import pytest
 
-from showcase.ontology_query_benchmark.profile import Attribution, ConceptHierarchy
+from showcase.ontology_query_benchmark.profile import (
+    Attribution,
+    ConceptHierarchy,
+    ConceptRelation,
+)
 from showcase.ontology_query_benchmark.sema_bindings import (
     load_products,
     load_sidecar,
@@ -29,7 +36,9 @@ from tests.unit.ontology_query_benchmark.hierarchy_fixture import (
     MEMBERS,
     add_hierarchy_slice,
     add_typed_vocabulary,
+    closure_rows,
     hierarchy,
+    table,
     typed_hierarchy,
     warehouse,
 )
@@ -210,3 +219,75 @@ def test_a_projection_without_the_slice_is_refused_with_the_remedy(tmp_path: Pat
             CONCEPT_SPEC, projection, receipt,
             spec_attribution=Attribution.ASSISTED, hierarchy=hierarchy(),
         )
+
+
+NAME_KEYED_PARAMETERS = {"name", "vocabulary", "concept_class"}
+QUALIFIER_COLUMNS = {"vocabulary_column", "class_column"}
+LOAN_SPEC: dict[str, Any] = {
+    "attribution": "assisted",
+    "closure": {"relation": "wh.kb.closure", "ancestor_column": "anc",
+                "descendant_column": "des", "level_column": "lvl", "self_rows": True},
+    "concepts": {"relation": "wh.kb.concept", "id_column": "cid", "name_column": "cname",
+                 "vocabulary_column": "vocab", "class_column": "kind",
+                 "standard_column": "flag", "standard_values": ["S"]},
+}  # fmt: skip
+LOAN_CONCEPTS = [
+    ("K1", "Bank loan", "alpha", "Product", "S"), ("K2", "Bank loan", "beta", "Product", "S"),
+    ("K3", "Bank loan", "alpha", "Product", None), ("K7", "Bank loan", "alpha", "Channel", "S"),
+    ("K4", "Car loan", "alpha", "Product", "S"), ("K5", "Home loan", "alpha", "Product", "S"),
+    ("K6", "Student loan", "beta", "Product", "S"), ("K8", "Payday loan", "alpha", "Product", "S"),
+    ("K10", "Branch", "alpha", "Channel", "S"),
+]
+LOAN_EDGES = [("K1", "K4"), ("K1", "K5"), ("K2", "K6"), ("K3", "K8"), ("K7", "K10")]
+
+
+def require_name_keyed_template() -> None:
+    """The template API the name-keyed predicate needs; absent, the red is an assertion."""
+    missing = NAME_KEYED_PARAMETERS - set(inspect.signature(membership_sql).parameters)
+    assert not missing, f"membership_sql has no name-keyed parameters {sorted(missing)}"
+    absent = QUALIFIER_COLUMNS - set(ConceptRelation.model_fields)
+    assert not absent, f"ConceptRelation has no qualifier columns {sorted(absent)}"
+
+
+def _loan_warehouse() -> duckdb.DuckDBPyConnection:
+    con = duckdb.connect()
+    con.execute("ATTACH ':memory:' AS wh")
+    con.execute("CREATE SCHEMA wh.kb")
+    table(con, "wh.kb.concept", "cid VARCHAR, cname VARCHAR, vocab VARCHAR, kind VARCHAR, "
+          "flag VARCHAR", LOAN_CONCEPTS)  # fmt: skip
+    table(con, "wh.kb.closure", "anc VARCHAR, des VARCHAR, lvl INTEGER",
+          sorted(closure_rows(LOAN_EDGES, self_rows=True)))  # fmt: skip
+    return con
+
+
+@pytest.mark.parametrize("own_ids", [False, True])
+def test_the_template_keys_the_anchor_by_name_not_by_a_listed_id(own_ids: bool) -> None:
+    template = membership_sql(hierarchy(), "{column}", dialect="duckdb", own_ids=own_ids)
+
+    assert "{anchor_id}" not in template
+    assert re.search(r"\bcname = ", template), template
+
+
+def test_a_qualified_name_renders_name_and_qualifier_filters_without_an_id() -> None:
+    require_name_keyed_template()
+    spec = ConceptHierarchy.model_validate(LOAN_SPEC)
+
+    sql = membership_sql(spec, "dx", dialect="duckdb", name="Bank loan", vocabulary="alpha",
+                         concept_class="Product")  # fmt: skip
+
+    for predicate in ("cname = 'Bank loan'", "vocab = 'alpha'", "kind = 'Product'", "flag IN"):
+        assert predicate in sql, sql
+    assert not {cid for cid, *_ in LOAN_CONCEPTS} & set(re.findall(r"'([^']*)'", sql))
+
+
+def test_a_shared_name_selects_only_the_qualified_standard_concept_members() -> None:
+    require_name_keyed_template()
+    spec = ConceptHierarchy.model_validate(LOAN_SPEC)
+    sql = membership_sql(spec, "dx", dialect="duckdb", name="Bank loan", vocabulary="alpha",
+                         concept_class="Product")  # fmt: skip
+
+    found = _loan_warehouse().execute(
+        "SELECT dx FROM (VALUES ('K4'), ('K5'), ('K6'), ('K8'), ('K10')) v(dx)"
+        f" WHERE {sql} ORDER BY dx"
+    ).fetchall()
+    assert [row[0] for row in found] == ["K4", "K5"]
