@@ -10,6 +10,8 @@ columns, and its internal column names never equal one of them.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import sqlglot.expressions as exp
 
 from sema.models.target.identity import (
@@ -19,7 +21,12 @@ from sema.models.target.identity import (
     ResolvedAttribute,
 )
 
-__all__ = ["identity_cte_sql", "identity_select"]
+__all__ = [
+    "CompositeKeyCountFinding",
+    "composite_key_count_findings",
+    "identity_cte_sql",
+    "identity_select",
+]
 
 NULL_KEY_ROW = "_null_key_row"
 _DESCENDING = frozenset({ResolutionRule.MAX, ResolutionRule.MAX_BY})
@@ -138,3 +145,49 @@ def identity_cte_sql(
     """``WITH <name> AS (...)``, ready for a ``SELECT ... FROM <name>`` to follow."""
     body = identity_select(relation, identity).sql(dialect=dialect)
     return f"WITH {exp.to_identifier(name).sql(dialect=dialect)} AS ({body})"
+
+
+@dataclass(frozen=True)
+class CompositeKeyCountFinding:
+    """A multi-column ``COUNT(DISTINCT ...)`` that drops tuples with a NULL key part."""
+
+    key_columns: tuple[str, ...]
+    columns: tuple[str, ...]
+    nullable_columns: tuple[str, ...]
+    message: str
+
+
+def _counted_columns(count: exp.Count) -> tuple[str, ...] | None:
+    """Column names of a ``COUNT(DISTINCT ...)`` over two or more arguments, else None."""
+    distinct = count.this
+    if not isinstance(distinct, exp.Distinct) or len(distinct.expressions) < 2:
+        return None
+    return tuple(e.name for e in distinct.expressions if isinstance(e, exp.Column))
+
+
+def composite_key_count_findings(
+    statement: exp.Expr, identity: EntityIdentity
+) -> list[CompositeKeyCountFinding]:
+    """Flag each multi-column ``COUNT(DISTINCT ...)`` that counts a nullable key part.
+
+    SQL skips every tuple holding a NULL, so such a count misses the entities whose
+    nullable key part is NULL. Any counted nullable key part fires, whether or not the
+    other counted columns cover the rest of the key.
+    """
+    findings = []
+    for count in statement.find_all(exp.Count):
+        columns = _counted_columns(count)
+        if not columns:
+            continue
+        nullable = tuple(k for k in identity.nullable_keys if k in columns)
+        if not nullable:
+            continue
+        message = (
+            f"COUNT(DISTINCT {', '.join(columns)}) skips every row where "
+            f"{', '.join(nullable)} is NULL; count entities from the one-row-per-entity "
+            f"identity over key ({', '.join(identity.key_columns)}) instead"
+        )
+        findings.append(
+            CompositeKeyCountFinding(identity.key_columns, columns, nullable, message)
+        )
+    return findings

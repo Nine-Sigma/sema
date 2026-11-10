@@ -274,3 +274,9 @@ def test_qualified_reordered_key_count_inside_a_cte_is_flagged() -> None:
     [finding] = _lint(sql, ONE_PART_NULLABLE)
     assert finding.columns == ("b_part", "a_part")
     assert finding.nullable_columns == ("b_part",)
+
+
+def test_count_with_a_nullable_key_part_and_a_non_key_column_is_flagged() -> None:
+    [finding] = _lint("SELECT COUNT(DISTINCT b_part, visit_day) FROM src", ONE_PART_NULLABLE)
+    assert finding.columns == ("b_part", "visit_day")
+    assert finding.nullable_columns == ("b_part",)
