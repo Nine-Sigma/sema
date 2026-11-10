@@ -14,7 +14,7 @@ import pytest
 
 from sema.models.context import SemanticCandidateSet
 from showcase.ontology_query_benchmark import runner_utils
-from showcase.ontology_query_benchmark.product_spec import SpecExposure
+from showcase.ontology_query_benchmark.product_spec import ProductSpecDoc, SpecExposure
 from showcase.ontology_query_benchmark.profile import Limits
 from showcase.ontology_query_benchmark.sema_bindings import (
     load_products,
@@ -324,3 +324,71 @@ def test_trace_links_library_binding_asset_and_context(tmp_path: Path) -> None:
     assert gender["context"] == {"retrieved": True, "rendered": True,
                                  "values_listed": 2}
     assert "derived_x" not in rows
+
+
+ACRIS_MASTER = "acris_real_property_master"
+ACRIS_MASTER_DOC = ProductSpecDoc.model_validate({
+    "product_id": "acris_master",
+    "fields": [
+        {"column_id": "document-id", "column_name": "document_id",
+         "physical_type": "STRING", "strategy": "scalar"},
+        {"column_id": "doc-type", "column_name": "doc_type", "physical_type": "STRING",
+         "strategy": "pass_through", "label_column": "doc_type_description"},
+    ],
+})  # fmt: skip
+
+
+def _display_context(
+    tmp_path: Path,
+    candidates: list[dict[str, Any]],
+    *,
+    without_display: str | None = None,
+    acris: bool = False,
+) -> str:
+    """The rendered context after dropping one field's display companion or adding ACRIS."""
+    sidecar = load_sidecar(write_fixture(tmp_path), tmp_path)
+    products = load_products(sidecar)
+    if without_display is not None:
+        products = tuple(
+            dataclasses.replace(p, doc=p.doc.model_copy(update={"fields": tuple(
+                f.model_copy(update={"label_column": None}) if f.column_name == without_display
+                else f for f in p.doc.fields
+            )}))
+            for p in products
+        )
+    catalog = catalog_fixture()
+    if acris:
+        pin = dataclasses.replace(products[0].pin, product="acris_master", table=ACRIS_MASTER)
+        products = (*products, dataclasses.replace(products[0], pin=pin, doc=ACRIS_MASTER_DOC))
+        catalog[ACRIS_MASTER] = dict.fromkeys(
+            ("document_id", "doc_type", "doc_type_description"), "string"
+        )
+    resolution = resolve_bindings(sidecar, products, catalog)
+    provider = SContextProvider(
+        _Retriever(candidates), sidecar, products, resolution, facts_fixture(tmp_path),
+        graph_identity="graph-1", conventions=CONVENTIONS, limits=LIMITS,
+    )
+    return provider(QUESTION).text
+
+
+def test_a_coded_column_states_the_column_that_displays_it(tmp_path: Path) -> None:
+    text = _display_context(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES])
+    assert text.count("gender_G1 displays as gender_G1_text") == 1
+    assert text.count("vital_V1 displays as vital_V1_label") == 1
+
+
+def test_a_coded_column_without_a_display_companion_states_none(tmp_path: Path) -> None:
+    """The display column comes from the declared role, never from a column-name pattern."""
+    text = _display_context(tmp_path, [PEOPLE_ENTITY, *PEOPLE_VALUES], without_display="vital_V1")
+    assert "gender_G1 displays as gender_G1_text" in text
+    assert "vital_V1 displays as" not in text
+
+
+def test_an_acris_document_type_displays_as_its_description(tmp_path: Path) -> None:
+    master = _entity(ACRIS_MASTER, [
+        _col("document_id"), _col("doc_type", "categorical"), _col("doc_type_description"),
+    ])  # fmt: skip
+    text = _display_context(tmp_path, [master], acris=True)
+    assert f"cat.sch.{ACRIS_MASTER}" in text and "doc_type <-" in text
+    assert text.count("doc_type displays as doc_type_description") == 1
+    assert "document_id displays as" not in text
