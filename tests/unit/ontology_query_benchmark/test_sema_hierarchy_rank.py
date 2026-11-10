@@ -153,9 +153,11 @@ def test_the_section_states_the_join_once_however_many_anchors_are_retrieved(
 
 
 def test_a_listed_anchor_name_is_a_literal_in_the_warehouse_dialect(tmp_path: Path) -> None:
-    found = [anchor("C0", CRAFTED, "std", 0), anchor("C1", "Neoplasm", "std", 2)]
+    found = [anchor("C2", CRAFTED, "std", 0), anchor(CRAFTED, "Crafted", "std", 0),
+             anchor("C1", "Neoplasm", "std", 2)]  # fmt: skip
     text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found,
                  "Which neoplasm events?", dialect="databricks")  # fmt: skip
 
     assert "anchor name 'x\\' OR TRUE) --', vocabulary 'std'; 0 members" in text
+    assert "anchor id 'x\\' OR TRUE) --', vocabulary 'std'; 0 members" in text
     assert "anchor name 'Neoplasm', vocabulary 'std'; 2 members" in text

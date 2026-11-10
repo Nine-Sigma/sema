@@ -3,9 +3,10 @@
 The predicate's shape is fixed: value column, then the member-to-standard bridge
 (mapping types, then the declared replacement hop, standard concepts only, or, when a
 loaded member's own id is a standard concept, that id), then the closure under the
-anchor concept, selected by name plus the qualifiers given, never by a listed id. Every
-relation and column name is profile data; every string literal is quoted in the
-warehouse's SQL dialect.
+anchor concept, selected by name plus the qualifiers given. An ancestor with no row in
+the concepts relation has no name, so it alone is keyed by its id. Every relation and
+column name is profile data; every string literal is quoted in the warehouse's SQL
+dialect.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from showcase.ontology_query_benchmark.profile import ConceptHierarchy
 from showcase.ontology_query_benchmark.sema_bindings import SuppliedBinding
 from showcase.ontology_query_benchmark.sema_build_utils import Finding, LibraryFacts
 
+ANCHOR_ID = "{anchor_id}"
 ANCHOR_NAME = "{anchor_name}"
 ANCHOR_VOCABULARY = "{anchor_vocabulary}"
 COLUMN = "{column}"
@@ -35,9 +37,26 @@ def membership_sql(
     """With no ``name`` the anchor's name and vocabulary stay placeholders; otherwise a
     qualifier left None adds no filter. ``own_ids`` adds the route for members whose own
     id is a standard concept."""
-    c, k, m = spec.closure, spec.concepts, spec.mapping
     anchor = _anchor_ids(spec, dialect, name, vocabulary, concept_class)
-    under = f"a.{c.ancestor_column} IN ({anchor})"
+    return _membership(spec, column, f"IN ({anchor})", dialect, own_ids)
+
+
+def id_membership_sql(
+    spec: ConceptHierarchy, column: str, *, dialect: str, code: str | None = None,
+    own_ids: bool = False,
+) -> str:
+    """The predicate for an ancestor with no concept row, keyed by its id; with no
+    ``code`` the id stays the {anchor_id} placeholder."""
+    slot = ANCHOR_ID if code is None else _literal(code, dialect)
+    return _membership(spec, column, f"= {slot}", dialect, own_ids)
+
+
+def _membership(
+    spec: ConceptHierarchy, column: str, anchor: str, dialect: str, own_ids: bool,
+) -> str:
+    """``anchor`` is the condition on the closure's ancestor column."""
+    c, k, m = spec.closure, spec.concepts, spec.mapping
+    under = f"a.{c.ancestor_column} {anchor}"
     standard = (
         f" JOIN {k.relation} s ON s.{k.id_column} = a.{c.descendant_column}"
         f" AND s.{k.standard_column} IN ({_quoted(k.standard_values, dialect)})"
@@ -110,11 +129,16 @@ def add_hierarchy(
                  f"value column below, {ANCHOR_NAME} with the anchor's quoted name{vocabulary}."
                  f" {COUNTED}")  # fmt: skip
     parts.append(f"  WHERE {membership_sql(spec, COLUMN, dialect=dialect, own_ids=own)}")
-    parts.extend(_example(spec, found, question, dialect, own))
+    names = hierarchy.names
+    if any(parent not in names for parent, _ in hierarchy.edges):
+        parts.append(f"  An ancestor with no row in {spec.concepts.relation} is listed by id;"
+                     f" for it replace {ANCHOR_ID} with the quoted id instead:")  # fmt: skip
+        parts.append(f"  WHERE {id_membership_sql(spec, COLUMN, dialect=dialect, own_ids=own)}")
+    parts.extend(_example(spec, found, question, dialect, own, names))
     kind = "source member ids" if spec.mapping else "concept ids of the hierarchy"
     for b in columns:
         parts.append(f"  {b.table}.{b.column} holds {kind}:")
-        parts.extend(_anchor_lines(b.column, found[(b.table, b.column)], dialect))
+        parts.extend(_anchor_lines(b.column, found[(b.table, b.column)], dialect, names))
 
 
 def ranked(anchors: Sequence[HierarchyAnchor], question: str) -> list[HierarchyAnchor]:
@@ -132,27 +156,31 @@ def ranked(anchors: Sequence[HierarchyAnchor], question: str) -> list[HierarchyA
 
 def _example(
     spec: ConceptHierarchy, found: Mapping[tuple[str, str], list[HierarchyAnchor]],
-    question: str, dialect: str, own_ids: bool,
+    question: str, dialect: str, own_ids: bool, names: Mapping[str, str],
 ) -> list[str]:
     """The template filled for the best-ranked anchor across every column."""
     best = ranked([a for anchors in found.values() for a in anchors[:1]], question)
     if not best:
         return []
     a = best[0]
-    sql = membership_sql(spec, a.column, dialect=dialect, name=a.label,
-                         vocabulary=a.vocabulary, own_ids=own_ids)  # fmt: skip
+    sql = (membership_sql(spec, a.column, dialect=dialect, name=a.label,
+                          vocabulary=a.vocabulary, own_ids=own_ids)
+           if a.code in names
+           else id_membership_sql(spec, a.column, dialect=dialect, code=a.code,
+                                  own_ids=own_ids))  # fmt: skip
     return [f"  Filled for anchor {a.label} on {a.table}.{a.column}:", f"  WHERE {sql}"]
 
 
 def _anchor_lines(
-    column: str, anchors: Sequence[HierarchyAnchor], dialect: str,
+    column: str, anchors: Sequence[HierarchyAnchor], dialect: str, names: Mapping[str, str],
 ) -> list[str]:
     """The first ``ANCHORS_PER_COLUMN`` anchors, then a count of the rest."""
     lines = []
     for a in anchors[:ANCHORS_PER_COLUMN]:
         vocabulary = f", vocabulary {_literal(a.vocabulary, dialect)}" if a.vocabulary else ""
-        name = _literal(a.label, dialect)
-        lines.append(f"  anchor name {name}{vocabulary}; {a.member_count} members")
+        key = f"name {_literal(a.label, dialect)}" if a.code in names else (
+            f"id {_literal(a.code, dialect)}")  # fmt: skip
+        lines.append(f"  anchor {key}{vocabulary}; {a.member_count} members")
     if (omitted := len(anchors) - ANCHORS_PER_COLUMN) > 0:
         lines.append(f"  {omitted} more retrieved anchors on {column} are not shown.")
     return lines
