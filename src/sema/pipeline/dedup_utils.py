@@ -19,7 +19,7 @@ _STOP_WORDS: frozenset[str] = frozenset({
     "make", "like", "most", "many", "some",
 })
 
-_TOKEN_SPLIT_RE = re.compile(r"[\s\-_/.,;:!?()]+")
+_TOKEN_SPLIT_RE = re.compile(r"[\s\-_/.,;:!?()'\"\u2018\u2019\u201c\u201d]+")
 
 
 def merge_and_rank_candidates(
