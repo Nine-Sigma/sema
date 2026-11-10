@@ -12,6 +12,7 @@ from sema.models.planner._enums import (
 )
 from sema.models.target.completeness import SemanticCompletenessAnnotations
 from sema.models.target.declared import DeclarationEvidence
+from sema.models.target.identity import EntityIdentity
 from sema.models.target.refs import ConceptRef, ExternalRef, VocabularySource
 
 
@@ -164,6 +165,7 @@ class ManifestEntity(BaseModel):
     joins: list[ManifestDeclaredJoin] = Field(default_factory=list)
     domains: list[ManifestDeclaredDomain] = Field(default_factory=list)
     context_card: ManifestContextCard | None = None
+    identity: EntityIdentity | None = None
 
 
 class ManifestDescriptor(BaseModel):

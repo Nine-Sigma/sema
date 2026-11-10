@@ -191,6 +191,7 @@ def to_target_entity(
         declared_domains=[
             DeclaredDomainDecl(**domain.model_dump()) for domain in entity.domains
         ],
+        identity=entity.identity,
     )
 
 

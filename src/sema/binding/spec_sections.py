@@ -18,7 +18,9 @@ from pydantic import (
     model_validator,
 )
 
-Provider = Literal["warehouse", "staging"]
+from sema.models.target.identity import EntityIdentity
+
+Provider =Literal["warehouse", "staging"]
 DEFAULT_RELATIONSHIP_TYPE = "BROADER"
 
 
@@ -264,6 +266,7 @@ class PerFileEntry(_SpecModel):
     entity: str | None = None
     foreign_keys: list[DeclaredForeignKey] = Field(default_factory=list)
     domains: dict[str, str] = Field(default_factory=dict)
+    identity: EntityIdentity | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class HeaderKeys(_SpecModel):

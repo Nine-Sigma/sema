@@ -32,6 +32,7 @@ from sema.intake.table_schema_utils import (
     table_schema_from_rows,
 )
 from sema.log import logger
+from sema.models.target.identity import EntityIdentity
 
 HeaderPair = tuple[str, str | None]
 SourceNames = dict[str, str]
@@ -51,6 +52,7 @@ class EntityTables:
 
     schemas: dict[str, TableSchema] = field(default_factory=dict)
     labels: dict[str, str] = field(default_factory=dict)
+    identities: dict[str, EntityIdentity] = field(default_factory=dict)
 
 
 def entity_table_schemas(
@@ -80,6 +82,9 @@ def entity_records(spec: ConceptSourceSpec, tables: EntityTables) -> list[Record
         label = tables.labels.get(qualified_name)
         if label is not None:
             _add_label(record, label, version)
+        identity = tables.identities.get(qualified_name)
+        if identity is not None:
+            record["identity"] = identity.model_dump(mode="json", exclude_defaults=True)
         records.append(record)
     return records
 
@@ -188,7 +193,10 @@ def _per_file_schemas(
     sources: SourceNames = {}
     for entry in model.entities or []:
         source, schema = _per_file_schema(model, entry, provider)
-        tables.schemas[_claim(spec, tables, sources, source, model)] = schema
+        qualified_name = _claim(spec, tables, sources, source, model)
+        tables.schemas[qualified_name] = schema
+        if entry.identity is not None:
+            tables.identities[qualified_name] = entry.identity
     return tables
 
 
