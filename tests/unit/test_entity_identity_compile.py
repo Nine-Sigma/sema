@@ -236,3 +236,41 @@ def test_source_columns_named_like_internal_columns_do_not_change_the_result() -
     columns = "k VARCHAR, v INTEGER, _rank_v INTEGER, _null_key_row INTEGER"
     rows = [("a", 2, 7, 9), ("a", 1, 8, 9), (None, 3, 9, 1), (None, 4, 9, 1)]
     assert _resolve(identity, columns, rows) == [("a", 1, 8), (None, 3, 9), (None, 4, 9)]
+
+
+ONE_PART_NULLABLE = {"key_columns": ["a_part", "b_part"], "exclude_null_keys": ["a_part"]}
+NO_PART_NULLABLE = {"key_columns": ["household_serial", "member_ordinal"],
+                    "exclude_null_keys": True}  # fmt: skip
+
+
+def _lint(sql: str, identity: dict[str, Any]) -> list[Any]:
+    from sema.compile.entity_identity import composite_key_count_findings
+
+    statement = sqlglot.parse_one(sql)
+    return list(composite_key_count_findings(statement, EntityIdentity.model_validate(identity)))
+
+
+def test_multi_column_count_distinct_over_a_key_with_a_nullable_part_is_flagged() -> None:
+    [finding] = _lint("SELECT COUNT(DISTINCT a_part, b_part) FROM src", ONE_PART_NULLABLE)
+    assert finding.key_columns == ("a_part", "b_part")
+    assert finding.columns == ("a_part", "b_part")
+    assert finding.nullable_columns == ("b_part",)
+    assert "b_part" in finding.message
+
+
+def test_single_column_count_distinct_is_not_flagged() -> None:
+    assert not _lint("SELECT COUNT(DISTINCT b_part) FROM src", ONE_PART_NULLABLE)
+
+
+def test_composite_key_with_no_nullable_part_is_not_flagged() -> None:
+    sql = "SELECT COUNT(DISTINCT household_serial, member_ordinal) FROM src"
+    assert not _lint(sql, NO_PART_NULLABLE)
+
+
+def test_qualified_reordered_key_count_inside_a_cte_is_flagged() -> None:
+    sql = ("WITH k AS (SELECT a_part, b_part FROM src), "
+           "n AS (SELECT COUNT(DISTINCT k.b_part, k.a_part) AS entities FROM k) "
+           "SELECT entities FROM n")  # fmt: skip
+    [finding] = _lint(sql, ONE_PART_NULLABLE)
+    assert finding.columns == ("b_part", "a_part")
+    assert finding.nullable_columns == ("b_part",)
