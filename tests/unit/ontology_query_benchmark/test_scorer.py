@@ -181,3 +181,32 @@ def test_load_contracts_reads_gold_and_refuses_a_retired_question(tmp_path: Path
     path.write_text(json.dumps({"questions": [item("scalar", ["5"], qid="R99")]}))
     with pytest.raises(ValueError, match="retired"):
         scorer.load_contracts([path], frozenset({"R99"}))
+
+
+def strict_modes(entry: dict[str, Any], rows: list[tuple[Any, ...]]) -> tuple[bool, bool]:
+    contract = scorer.contract_for(entry)
+    ordered = scorer.score(contract, rows, complete=True)
+    free = scorer.score(contract, rows, complete=True, order_free=True)
+    return ordered.strict, free.strict
+
+
+def test_order_free_mode_credits_swapped_measures_that_strict_rejects() -> None:
+    entry = item("table_unordered", {"visits": "812", "members": "347"}, precision=None)
+    assert strict_modes(entry, [(812, 347)]) == (True, True)
+    assert strict_modes(entry, [(347, 812)]) == (False, True)
+
+
+def test_a_wrong_value_fails_both_modes() -> None:
+    entry = item("table_unordered", {"visits": "812", "members": "347"}, precision=None)
+    assert strict_modes(entry, [(812, 348)]) == (False, False)
+    assert strict_modes(entry, [(348, 812)]) == (False, False)
+
+
+def test_order_free_mode_needs_one_column_mapping_for_every_row() -> None:
+    gold = [{"branch": "North", "visits": "812", "members": "347"},
+            {"branch": "South", "visits": "95", "members": "61"}]  # fmt: skip
+    entry = item("table_unordered", gold, category_columns=["branch"])
+    consistent = [(347, "North", 812), (61, "South", 95)]
+    assert strict_modes(entry, consistent) == (False, True)
+    per_row = [(347, "North", 812), (95, "South", 61)]
+    assert strict_modes(entry, per_row) == (False, False)
