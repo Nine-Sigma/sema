@@ -63,7 +63,7 @@ class ResolvedAttribute(_Frozen):
     by: str | None = None
     prefer: PreferredValue | None = None
     name: str | None = None
-    label_of: str | None = None
+    label_of: str | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @property
     def output_name(self) -> str:
