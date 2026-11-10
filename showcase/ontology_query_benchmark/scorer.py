@@ -3,7 +3,8 @@
 Each question's declared result_shape, category_columns, precision and tolerance become a
 result contract. A result must have exactly the gold width (a ranked result may add one rank
 column). Columns may appear in any order, except that strict credit keeps the gold relative
-order of numeric columns (swapped counts never pass strict). Gold cells that are canonical
+order of numeric columns (swapped counts never pass strict); the order_free mode, a second
+reported number, lifts only that numeric order rule. Gold cells that are canonical
 decimal text compare as numbers, anything else (for example code '001') compares as exact
 text. NULL equals only NULL, and '' is not NULL. Strict labels, category columns included,
 are equal after trimming surrounding whitespace only. Ranked results keep gold order except
@@ -102,10 +103,12 @@ def load_contracts(
     return contracts
 
 
-def score(contract: Contract, rows: Sequence[Sequence[Any]], *, complete: bool) -> Verdict:
+def score(
+    contract: Contract, rows: Sequence[Sequence[Any]], *, complete: bool, order_free: bool = False
+) -> Verdict:
     if not complete:
         return Verdict(False, False, "incomplete")
-    if _matches(contract, rows, Decimal(0)):
+    if _matches(contract, rows, Decimal(0), keep_numeric_order=not order_free):
         return Verdict(True, True, "match")
     tolerant = _matches(contract, rows, TOLERANT_SHARE)
     return Verdict(False, tolerant, "within_1pct" if tolerant else "mismatch")
@@ -117,13 +120,19 @@ def _precision(value: Any) -> int | None:
     raise ValueError(f"precision {value!r} is not a number of decimal places")
 
 
-def _matches(contract: Contract, rows: Sequence[Sequence[Any]], relative: Decimal) -> bool:
+def _matches(
+    contract: Contract,
+    rows: Sequence[Sequence[Any]],
+    relative: Decimal,
+    *,
+    keep_numeric_order: bool = True,
+) -> bool:
     width = len(contract.numeric)
     identity = [tuple(range(width))]
     orders: Iterable[tuple[int, ...]] = (
         itertools.permutations(range(width)) if width <= MAX_PERMUTED_WIDTH else identity
     )
-    if not relative:
+    if keep_numeric_order and not relative:
         orders = [o for o in orders if _numeric_order_kept(contract, o)]
     candidates = _width_candidates(contract, [tuple(r) for r in rows])
     return any(
