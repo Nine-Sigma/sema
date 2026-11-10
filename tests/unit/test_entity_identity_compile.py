@@ -280,3 +280,22 @@ def test_count_with_a_nullable_key_part_and_a_non_key_column_is_flagged() -> Non
     [finding] = _lint("SELECT COUNT(DISTINCT b_part, visit_day) FROM src", ONE_PART_NULLABLE)
     assert finding.columns == ("b_part", "visit_day")
     assert finding.nullable_columns == ("b_part",)
+
+
+def test_key_names_match_counted_columns_in_another_case_in_the_warehouse_dialect() -> None:
+    from sema.compile.entity_identity import composite_key_count_findings
+
+    identity = EntityIdentity(key_columns=("SERIALNO", "SPORDER"),
+                              exclude_null_keys=("SERIALNO",))  # fmt: skip
+    sql = "SELECT COUNT(DISTINCT serialno, sporder) FROM src"
+    statement = sqlglot.parse_one(sql, read="databricks")
+    [finding] = composite_key_count_findings(statement, identity)
+    assert finding.columns == ("serialno", "sporder")
+    assert finding.key_columns == ("SERIALNO", "SPORDER")
+    assert finding.nullable_columns == ("SPORDER",)
+
+
+def test_upper_case_counted_columns_match_a_lower_case_key() -> None:
+    [finding] = _lint("SELECT COUNT(DISTINCT A_PART, B_PART) FROM src", ONE_PART_NULLABLE)
+    assert finding.columns == ("A_PART", "B_PART")
+    assert finding.nullable_columns == ("b_part",)
