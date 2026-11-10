@@ -179,7 +179,8 @@ def composite_key_count_findings(
         columns = _counted_columns(count)
         if not columns:
             continue
-        nullable = tuple(k for k in identity.nullable_keys if k in columns)
+        counted = {c.casefold() for c in columns}  # warehouses fold identifier case
+        nullable = tuple(k for k in identity.nullable_keys if k.casefold() in counted)
         if not nullable:
             continue
         message = (
