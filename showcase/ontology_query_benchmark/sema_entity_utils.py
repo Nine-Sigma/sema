@@ -2,8 +2,9 @@
 
 The S executor prepends the entity's CTE to each statement that names it, merged into
 the statement's own ``WITH`` list, and rejects a multi-column key count over the
-entity's source relation as a repairable error that names ``<entity>_key``. An entity whose identity reads a denied column is
-never exposed, because the harness's denied-token check sees only the model's SQL.
+entity's source relation as a repairable error that names ``<entity>_key``. An entity
+whose identity reads a denied column is never exposed, because the harness's
+denied-token check sees only the model's SQL.
 """
 
 from __future__ import annotations
