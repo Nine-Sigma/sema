@@ -161,6 +161,20 @@ def test_an_acris_class_anchor_resolves_its_document_types(tmp_path: Path) -> No
     assert members(con, source, fragment) == expected and len(expected) == 23
 
 
+def test_an_acris_class_without_a_concept_row_fills_a_predicate_that_resolves(
+    tmp_path: Path,
+) -> None:
+    con = acris._acris_warehouse(class_rows=False)
+    text = context(tmp_path, acris._facts(tmp_path, con), dict.fromkeys(acris.RELATIONS, True),
+                   [anchor(acris.CLASS, acris.CLASS, "lib", 23)]).text  # fmt: skip
+
+    lines = [x.strip() for x in text.splitlines()]
+    filled = lines[next(i for i, x in enumerate(lines) if x.startswith("Filled for anchor")) + 1]
+    expected = {r["DOC. TYPE"] for r in acris.ROWS if r["CLASS CODE DESCRIPTION"] == acris.CLASS}
+    source = "SELECT doc_type AS site_S1 FROM wh.acris.master"
+    assert members(con, source, filled.removeprefix("WHERE ")) == expected
+
+
 def test_the_structured_section_replaces_the_prose_hierarchy_reference(tmp_path: Path) -> None:
     text = context(tmp_path, _facts(tmp_path, hierarchy()), READABLE, []).text
 

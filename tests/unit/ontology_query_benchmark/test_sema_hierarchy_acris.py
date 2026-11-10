@@ -50,13 +50,14 @@ SPEC = ConceptHierarchy.model_validate({
 })  # fmt: skip
 
 
-def _acris_warehouse() -> duckdb.DuckDBPyConnection:
+def _acris_warehouse(*, class_rows: bool = True) -> duckdb.DuckDBPyConnection:
+    """Without ``class_rows`` a class is only a closure ancestor, as in the code table."""
     con = warehouse(tuple(r["DOC. TYPE"] for r in ROWS))
     con.execute("CREATE SCHEMA wh.acris")
     edges = [(r["CLASS CODE DESCRIPTION"], r["DOC. TYPE"]) for r in ROWS]
     table(con, "wh.acris.closure", "ancestor VARCHAR, descendant VARCHAR, levels INTEGER",
           sorted(closure_rows(edges, self_rows=True)))  # fmt: skip
-    classes = {(c, c) for c in {r["CLASS CODE DESCRIPTION"] for r in ROWS}}
+    classes = {(c, c) for c in {r["CLASS CODE DESCRIPTION"] for r in ROWS}} if class_rows else ()
     table(con, "wh.acris.concept", "doc_type VARCHAR, description VARCHAR",
           [(r["DOC. TYPE"], r["DOC. TYPE DESCRIPTION"]) for r in ROWS] + sorted(classes))
     table(con, "wh.acris.master", "document_id INTEGER, doc_type VARCHAR",
@@ -98,6 +99,22 @@ def test_documents_of_a_kind_resolve_through_the_closure(tmp_path: Path) -> None
 
     assert "site_S1 holds concept ids of the hierarchy" in context.text
     fragment = _fragment(context.text, "site_S1").replace("{anchor_name}", f"'{CLASS}'")
+    found = con.execute(
+        "SELECT DISTINCT site_S1 FROM (SELECT doc_type AS site_S1 FROM wh.acris.master)"
+        f" WHERE {fragment}"
+    ).fetchall()
+    expected = {r["DOC. TYPE"] for r in ROWS if r["CLASS CODE DESCRIPTION"] == CLASS}
+    assert {row[0] for row in found} == expected and len(expected) == 23
+
+
+def test_a_class_without_a_concept_row_resolves_through_the_closure(tmp_path: Path) -> None:
+    con = _acris_warehouse(class_rows=False)
+    context = _context(tmp_path, _facts(tmp_path, con), dict.fromkeys(RELATIONS, True))
+
+    keyed = [x.strip().removeprefix("WHERE ") for x in context.text.splitlines()
+             if "{column} IN" in x and "{anchor_id}" in x]  # fmt: skip
+    assert keyed, "no template keys an ancestor that has no concept row by its id"
+    fragment = keyed[0].replace("{column}", "site_S1").replace("{anchor_id}", f"'{CLASS}'")
     found = con.execute(
         "SELECT DISTINCT site_S1 FROM (SELECT doc_type AS site_S1 FROM wh.acris.master)"
         f" WHERE {fragment}"
