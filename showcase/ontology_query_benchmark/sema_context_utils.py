@@ -15,7 +15,7 @@ import string
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
-from sema.compile.entity_identity import entity_key_name
+from sema.compile.entity_identity import entity_key_name, key_clash
 from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
 from sema.models.context import SemanticContextObject
 from showcase.ontology_query_benchmark.product_spec import SpecEntity, SpecRelationship
@@ -271,7 +271,7 @@ def _add_grain(
             units = _grain_units(rendering, exposure, table, relation, entity)
             if units:
                 lines.append((f"  {relation}: {'; '.join(units)}", [], "grain line"))
-            lines.extend(_entity_listing(entity, p))
+            lines.extend(_entity_listing(rendering, relation, entity, p))
         for rel in p.doc.relationships:
             target = _table_of(products, rel)
             pairs = " AND ".join(
@@ -313,7 +313,7 @@ def _grain_units(
 
 
 def _entity_listing(
-    entity: SpecEntity, product: ProductSpec
+    rendering: Rendering, relation: str, entity: SpecEntity, product: ProductSpec
 ) -> list[tuple[str, list[TableColumn], str]]:
     """The entity as a table the statement reads by name, with its key and columns."""
     if entity.identity is None:
@@ -321,6 +321,9 @@ def _entity_listing(
     name = entity.entity_id or product.pin.product
     identity = entity.identity
     key = entity_key_name(name)
+    if clash := key_clash(key, identity):
+        rendering.findings.append(Finding(f"entity identity withheld: {clash}", relation, key))
+        return []
     columns = [*identity.key_columns, key, *(a.output_name for a in identity.attributes)]
     text = (
         f"  table {name}: one row per {', '.join(identity.key_columns)}; columns "

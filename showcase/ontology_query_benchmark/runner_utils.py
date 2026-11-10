@@ -242,7 +242,7 @@ def arm_runtimes(harness: SimpleNamespace, frozen: Path, layout: Harness,
             raise ValueError("arm S needs an S context provider")
         contexts["S"] = SArmContext(harness, s_provider, budget, policy.is_denied)
         executors = {**executors, "S": _s_executor(harness, executors["S"], s_provider,
-                                                   policy.is_denied)}  # fmt: skip
+                                                   policy)}  # fmt: skip
     return {
         arm: harness.workflow.ArmRuntime(
             arm, contexts[arm], executor, policy, known[arm], limits.row_limit,
@@ -253,14 +253,14 @@ def arm_runtimes(harness: SimpleNamespace, frozen: Path, layout: Harness,
     }
 
 
-def _s_executor(harness: SimpleNamespace, inner: Any, provider: SProvider,
-                is_denied: Callable[[str], bool]) -> Any:  # fmt: skip
+def _s_executor(harness: SimpleNamespace, inner: Any, provider: SProvider, policy: Any) -> Any:
     """The warehouse executor, reading the provider's exposed entities by name."""
     exposed = getattr(provider, "exposed_entities", None)
-    entities = exposed(is_denied) if exposed is not None else ()
+    entities = exposed(policy.is_denied) if exposed is not None else ()
     if inner is None or not entities:
         return inner
-    return EntityExecutor(harness, inner, entities, getattr(provider, "sql_dialect"))
+    return EntityExecutor(harness, inner, entities, getattr(provider, "sql_dialect"),
+                          is_identifier=policy.is_identifier)  # fmt: skip
 
 
 def _with_knobs(config: Any, knobs: Knobs) -> Any:

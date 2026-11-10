@@ -4,7 +4,9 @@ The S executor prepends the entity's CTE to each statement that names it, merged
 the statement's own ``WITH`` list, and rejects a multi-column key count over the
 entity's source relation as a repairable error that names ``<entity>_key``. An entity
 whose identity reads a denied column is never exposed, because the harness's
-denied-token check sees only the model's SQL.
+denied-token check sees only the model's SQL; nor is one whose key name equals one of
+its projected columns. The key hashes its key parts, so when the run treats a key part
+as an identifier, the key may be counted but never returned in the outer SELECT.
 """
 
 from __future__ import annotations
@@ -24,12 +26,15 @@ from sema.compile.entity_identity import (
     composite_key_count_findings,
     entity_key_name,
     identity_cte,
+    key_clash,
 )
 from sema.log import logger
 from sema.models.target.identity import EntityIdentity
 from showcase.ontology_query_benchmark.sema_bindings import ProductSpec, Sidecar
 
 LEADING_WITH = re.compile(r"^\s*WITH\s+(RECURSIVE\s+)?", re.IGNORECASE)
+# the frozen harness's identifier rule lets these functions wrap an identifier output
+COUNTING = (exp.Count, exp.CountIf, exp.ApproxDistinct, exp.Sum, exp.Avg)
 
 
 @dataclass(frozen=True)
@@ -56,6 +61,9 @@ def exposed_entities(
         if denied := [c for c in entity.identity.columns if c in spec_denied or is_denied(c)]:
             logger.info("Entity {} withheld from arm S: it reads denied {}", name, denied)
             continue
+        if clash := key_clash(entity_key_name(name), entity.identity):
+            logger.info("Entity {} withheld from arm S: {}", name, clash)
+            continue
         relation = sidecar.relation(product.pin.table)
         cte = identity_cte(name, relation, entity.identity, dialect=sidecar.sql_dialect)
         exposed.append(ExposedEntity(name, relation, entity.identity, cte))
@@ -80,13 +88,56 @@ def _parsed(sql: str, dialect: str) -> exp.Expr | None:
         return None
 
 
-def _named(statement: exp.Expr | None, entities: tuple[ExposedEntity, ...]) -> list[str]:
-    """CTEs of the entities ``statement`` reads by name; all of them when it does not parse."""
+def _named(
+    statement: exp.Expr | None, entities: tuple[ExposedEntity, ...]
+) -> tuple[ExposedEntity, ...]:
+    """The entities ``statement`` reads by name; all of them when it does not parse."""
     if statement is None:
-        return [e.cte for e in entities]
+        return entities
     own = {cte.alias.casefold() for cte in statement.find_all(exp.CTE)}
     read = {t.name.casefold() for t in statement.find_all(exp.Table) if not t.db}
-    return [e.cte for e in entities if e.name.casefold() in read - own]
+    return tuple(e for e in entities if e.name.casefold() in read - own)
+
+
+def _outer_selects(query: exp.Expr) -> list[exp.Select]:
+    if isinstance(query, exp.SetOperation):
+        return [*_outer_selects(query.left), *_outer_selects(query.right)]
+    if isinstance(query, exp.Subquery):
+        return _outer_selects(query.this)
+    return [query] if isinstance(query, exp.Select) else []
+
+
+def _returned_names(statement: exp.Expr) -> set[str]:
+    """Column names the outer SELECT lists outside a counting function."""
+    return {
+        column.name.casefold()
+        for select in _outer_selects(statement)
+        for projection in select.expressions
+        for column in projection.find_all(exp.Column)
+        if column.find_ancestor(*COUNTING) is None
+    }
+
+
+def key_output_rejections(
+    sql: str, statement: exp.Expr | None, entities: tuple[ExposedEntity, ...]
+) -> list[str]:
+    """Each identifier-bearing entity key the outer SELECT returns, with a repair hint.
+
+    A statement that does not parse is refused whenever it names such a key, because its
+    use of the key cannot be checked.
+    """
+    returned = _returned_names(statement) if statement is not None else None
+    messages = []
+    for entity in entities:
+        key = entity_key_name(entity.name)
+        named = key.casefold() in (sql.casefold() if returned is None else returned)
+        if named:
+            messages.append(
+                f"{key} may be counted, not returned: it stands in for the key "
+                f"({', '.join(entity.identity.key_columns)}) of {entity.name}, which this "
+                f"run treats as an identifier; return COUNT(DISTINCT {key}) instead"
+            )
+    return messages
 
 
 def key_count_rejections(
@@ -116,18 +167,25 @@ class EntityExecutor:
     """The warehouse executor, reading exposed entities by name; it never raises."""
 
     def __init__(self, harness: SimpleNamespace, inner: Any,
-                 entities: tuple[ExposedEntity, ...], dialect: str) -> None:  # fmt: skip
+                 entities: tuple[ExposedEntity, ...], dialect: str,
+                 is_identifier: Callable[[str], bool] = lambda _name: False) -> None:  # fmt: skip
         self.harness, self.inner = harness, inner
         self.entities, self.dialect = entities, dialect
+        self.counted_only = frozenset(
+            e.name for e in entities if any(map(is_identifier, e.identity.key_columns))
+        )
 
     def execute(self, sql: str, row_limit: int) -> Any:
         started = time.perf_counter()
         statement = _parsed(sql, self.dialect)
+        named = _named(statement, self.entities)
+        counted_only = tuple(e for e in named if e.name in self.counted_only)
+        rejections = key_output_rejections(sql, statement, counted_only)
         if statement is not None:
-            if rejections := key_count_rejections(statement, self.entities, self.dialect):
-                latency = time.perf_counter() - started
-                message = "; ".join(rejections)
-                return self.harness.models.Execution(
-                    False, (), (), latency, "sql_error", message
-                )
-        return self.inner.execute(with_entities(sql, _named(statement, self.entities)), row_limit)
+            rejections += key_count_rejections(statement, self.entities, self.dialect)
+        if rejections:
+            latency = time.perf_counter() - started
+            return self.harness.models.Execution(
+                False, (), (), latency, "sql_error", "; ".join(rejections)
+            )
+        return self.inner.execute(with_entities(sql, [e.cte for e in named]), row_limit)

@@ -52,12 +52,16 @@ class ColumnPolicy:
 
     denied: tuple[str, ...] = ()
     deny_patterns: tuple[str, ...] = ()
+    identifiers: tuple[str, ...] = ()
 
     def is_denied(self, name: str) -> bool:
         key = name.lower()
         return key in {d.lower() for d in self.denied} or any(
             p.lower() in key for p in self.deny_patterns
         )
+
+    def is_identifier(self, name: str) -> bool:
+        return not self.is_denied(name) and name.lower() in {i.lower() for i in self.identifiers}
 
 
 @dataclass(frozen=True)

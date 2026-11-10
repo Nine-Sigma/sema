@@ -28,6 +28,7 @@ __all__ = [
     "identity_cte",
     "identity_cte_sql",
     "identity_select",
+    "key_clash",
 ]
 
 NULL_KEY_ROW = "_null_key_row"
@@ -162,6 +163,8 @@ def identity_select(
     The ``key`` column hashes the key parts with NULL as a value (and the own-row marker
     when null keys do not group), so ``COUNT(DISTINCT key)`` counts every entity.
     """
+    if key and (clash := key_clash(key, identity)):
+        raise ValueError(clash)
     keys = [_col(k) for k in identity.key_columns]
     alone = _null_key_rows_stand_alone(identity)
     own_row = [_internal(NULL_KEY_ROW, identity)] if alone else []
@@ -178,6 +181,16 @@ def identity_select(
 
 def entity_key_name(entity: str) -> str:
     return f"{entity}_key"
+
+
+def key_clash(key: str, identity: EntityIdentity) -> str | None:
+    """Why ``key`` cannot be projected: it equals a key column or an attribute name."""
+    projected = [*identity.key_columns, *(a.output_name for a in identity.attributes)]
+    # warehouses fold identifier case, so E_KEY and e_key are one column
+    clash = next((c for c in projected if c.casefold() == key.casefold()), None)
+    if clash is None:
+        return None
+    return f"entity key {key} equals the projected column {clash}; rename that column"
 
 
 def identity_cte(
