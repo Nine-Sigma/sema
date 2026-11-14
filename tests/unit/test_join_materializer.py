@@ -79,7 +79,10 @@ def _fk_to_assertion(tier: int = 1, confidence: float = 0.95) -> Assertion:
         pk_table="patient", pk_column="patient_id",
         fk_table="sample", fk_column="patient_id",
         pk_type="string", fk_type="string",
-        schema_name=SCHEMA, catalog="workspace",
+        schema_name=SCHEMA,
+        pk_ref=f"databricks://workspace/workspace/{SCHEMA}/patient/patient_id",
+        fk_ref=f"databricks://workspace/workspace/{SCHEMA}/sample/patient_id",
+        catalog="workspace",
     )
     fk = FKAssertion(
         candidate=candidate, confidence=confidence,

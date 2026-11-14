@@ -19,10 +19,12 @@ def _columns_with_fk_pair() -> list[ExtractedColumn]:
         ExtractedColumn(
             name="patient_id", table_name="patient",
             catalog="workspace", schema=SCHEMA, data_type="string",
+            ref=f"databricks://workspace/workspace/{SCHEMA}/patient/patient_id",
         ),
         ExtractedColumn(
             name="patient_id", table_name="sample",
             catalog="workspace", schema=SCHEMA, data_type="string",
+            ref=f"databricks://workspace/workspace/{SCHEMA}/sample/patient_id",
         ),
     ]
 

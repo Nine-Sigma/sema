@@ -29,6 +29,7 @@ class ExtractedColumn:
     data_type: str
     nullable: bool = True
     comment: str | None = None
+    ref: str | None = None
 
 
 @dataclass(frozen=True)

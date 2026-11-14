@@ -170,19 +170,9 @@ class JoinDetector:
 def to_fk_assertion(
     fk: FKAssertion, run_id: str,
 ) -> Assertion:
-    cat = fk.candidate.catalog or ""
-    schema = fk.candidate.schema_name
-    fk_ref = (
-        f"databricks://workspace/{cat}/{schema}/"
-        f"{fk.candidate.fk_table}/{fk.candidate.fk_column}"
-    )
-    pk_ref = (
-        f"databricks://workspace/{cat}/{schema}/"
-        f"{fk.candidate.pk_table}/{fk.candidate.pk_column}"
-    )
     return Assertion(
         id=str(uuid.uuid4()),
-        subject_ref=fk_ref,
+        subject_ref=fk.candidate.fk_ref,
         predicate=AssertionPredicate.FK_TO,
         payload={
             "pk_table": fk.candidate.pk_table,
@@ -191,7 +181,7 @@ def to_fk_assertion(
             "fk_column": fk.candidate.fk_column,
             "tier": fk.tier,
         },
-        object_ref=pk_ref,
+        object_ref=fk.candidate.pk_ref,
         source="fk_detector",
         confidence=fk.confidence,
         status=AssertionStatus.AUTO,
