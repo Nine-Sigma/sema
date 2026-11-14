@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 import fnmatch
-import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
 from databricks import sql as databricks_sql
+from databricks.sql import exc as databricks_exc
 
 from sema.connectors.base import Connector
-from sema.connectors.databricks_utils import _make_table_ref
+from sema.connectors.databricks_utils import (
+    _make_table_ref,
+    declared_keys_from_rows,
+    declared_keys_query,
+)
+from sema.log import logger
 from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
 )
 from sema.models.config import DatabricksConfig, ProfilingConfig
+from sema.models.extraction import ExtractedForeignKey
 from sema.models.physical_key import CanonicalRef
 from sema.models.schema_metadata import SchemaMetadata, Unreadable
 
@@ -27,8 +33,6 @@ class TableWorkItem:
     schema: str
     table_name: str
     fqn: str
-
-logger = logging.getLogger(__name__)
 
 # Alias for mocking in tests
 sql_connect = databricks_sql.connect
@@ -109,31 +113,17 @@ class DatabricksConnector(Connector):
             for row in rows
         ]
 
-    def _get_fk_constraints(self, catalog: str, schema: str, table: str) -> list[dict[str, str]]:
-        query = (
-            f"SELECT tc.table_name, kcu.column_name, "
-            f"kcu.referenced_table_name, kcu.referenced_column_name "
-            f"FROM `system`.`information_schema`.`table_constraints` tc "
-            f"JOIN `system`.`information_schema`.`key_column_usage` kcu "
-            f"ON tc.constraint_name = kcu.constraint_name "
-            f"WHERE tc.constraint_type = 'FOREIGN KEY' "
-            f"AND tc.table_catalog = '{catalog}' "
-            f"AND tc.table_schema = '{schema}' "
-            f"AND tc.table_name = '{table}'"
-        )
+    def _get_fk_constraints(
+        self, catalog: str, schema: str, table: str,
+    ) -> list[ExtractedForeignKey]:
         try:
-            rows = self._execute(query)
-        except Exception:
+            rows = self._execute(declared_keys_query(catalog, schema, table))
+        except databricks_exc.Error as exc:
+            logger.warning(
+                "Declared keys unreadable for {}.{}.{}: {}", catalog, schema, table, exc,
+            )
             return []
-        return [
-            {
-                "from_table": row[0],
-                "from_col": row[1],
-                "to_table": row[2],
-                "to_col": row[3],
-            }
-            for row in rows
-        ]
+        return declared_keys_from_rows(catalog, schema, table, rows)
 
     def _get_tags(self, catalog: str, schema: str, table: str) -> list[dict[str, str]]:
         query = (
