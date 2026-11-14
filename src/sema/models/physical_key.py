@@ -142,6 +142,13 @@ def _ref_part(value: str | None) -> str:
     return value
 
 
+def _column_part(value: str) -> str:
+    # Parse reads everything after the table as the column, so a '/' here round-trips.
+    if not value:
+        raise ValueError("Reference column part must be non-empty")
+    return value
+
+
 class CanonicalRef:
     """Parse connector-native URIs into PhysicalKey, and build the one canonical form."""
 
@@ -155,12 +162,13 @@ class CanonicalRef:
     @staticmethod
     def build(scheme: str, key: PhysicalKey) -> str:
         """Render ``key`` as ``<scheme>://<ds>/<catalog>/<schema>/<table>[/<column>]``."""
-        parts = [key.catalog_or_db, key.schema, key.table]
+        parts = [
+            CanonicalRef.datasource(scheme, key.datasource_id),
+            *map(_ref_part, [key.catalog_or_db, key.schema, key.table]),
+        ]
         if key.column is not None:
-            parts.append(key.column)
-        return "/".join(
-            [CanonicalRef.datasource(scheme, key.datasource_id), *map(_ref_part, parts)],
-        )
+            parts.append(_column_part(key.column))
+        return "/".join(parts)
 
     @staticmethod
     def with_column(table_ref: str, column: str) -> str:

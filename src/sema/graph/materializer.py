@@ -42,9 +42,13 @@ def materialize_unified(
     Executes 4 ordered phases:
       1. Physical nodes (DataSource, Catalog, Schema, Table, Column)
       2. Semantic nodes (Entity, Property, Vocabulary, Term, ValueSet,
-         Alias, JoinPath)
+         Alias)
       3. Bridge edges (CLASSIFIED_AS, IN_VOCABULARY, PARENT_OF)
       4. Directed provenance (Assertion SUBJECT/OBJECT edges)
+
+    JoinPaths are NOT written here: a join needs both of its tables, so the
+    build writes them once per schema after every table
+    (``materialize_schema_joins``).
 
     Vocabulary lifecycle (deprecating stale vocabularies) is NOT run
     here: it runs once per build over the union of every table's active

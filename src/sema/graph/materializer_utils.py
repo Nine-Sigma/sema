@@ -422,8 +422,6 @@ def upsert_semantic_nodes(
     upsert_properties(loader, groups, source_schema=source_schema)
     upsert_decoded_values(loader, groups, source_schema=source_schema)
     upsert_aliases(loader, groups, source_schema=source_schema)
-    from sema.graph.join_materializer import materialize_join_paths
-    materialize_join_paths(loader, groups, source_schema=source_schema)
 
 
 def apply_resolution_edges(

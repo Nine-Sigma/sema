@@ -146,6 +146,7 @@ class TestTierAssignment:
         det = JoinDetector()
         out = det.detect(
             columns=self.cols, source_schema=SCHEMA,
+            profiles={(SCHEMA, "patient", "patient_id"): (2, 2)},
             sampler=lambda key: {"P1", "P2"},
             containment=lambda key, values: len(values),
         )
@@ -219,7 +220,7 @@ class TestContainmentEvidence:
             return 2
 
         out = JoinDetector().detect(
-            columns=self.cols, source_schema=SCHEMA,
+            columns=self.cols, source_schema=SCHEMA, profiles={self.PK_KEY: (2, 2)},
             sampler=sampler, containment=containment,
         )
         assert sampler_calls == [self.FK_KEY]
@@ -234,7 +235,7 @@ class TestContainmentEvidence:
             return len(values)
 
         JoinDetector(sample_cap=3).detect(
-            columns=self.cols, source_schema=SCHEMA,
+            columns=self.cols, source_schema=SCHEMA, profiles={self.PK_KEY: (5, 5)},
             sampler=lambda key: {"a", "b", "c", "d", "e"},
             containment=containment,
         )

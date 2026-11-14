@@ -149,10 +149,14 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         full_coverage=not (config.slice_tables or config.table_pattern),
     )
 
+    from sema.graph.join_materializer import materialize_schema_joins
     schemas = sorted({wi.schema for wi in work_items})
-    run_fk_detection(
+    detected = run_fk_detection(
         loader, discovery_connector, config, schemas, run_id=run_id,
     )
+    # Joins wait for every table of the run: either end may be built last.
+    for schema in schemas:
+        materialize_schema_joins(loader, schema, detected.get(schema, []))
 
     _compute_embeddings(config, loader, skip_embeddings=config.skip_embeddings)
 

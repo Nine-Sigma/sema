@@ -10,6 +10,8 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from sema.graph.join_materializer_utils import (
+    JOIN_PREDICATES,
+    fetch_join_assertions,
     join_keys,
     join_path_name,
     normalize_fk_to_assertion,
@@ -21,11 +23,6 @@ from sema.models.assertions import Assertion, AssertionPredicate
 if TYPE_CHECKING:
     from sema.graph.loader import GraphLoader
 
-_JOIN_PREDICATES = (
-    AssertionPredicate.HAS_JOIN_EVIDENCE.value,
-    AssertionPredicate.JOINS_TO.value,
-    AssertionPredicate.FK_TO.value,
-)
 _EDGE_ONLY_FIELDS = ("from_key", "to_key")
 
 
@@ -100,7 +97,7 @@ def materialize_join_paths(
     for (_subject, pred), group in groups.items():
         if pred == AssertionPredicate.FK_TO.value:
             joins.extend(normalize_fk_to_assertion(a) for a in group)
-        elif pred in _JOIN_PREDICATES:
+        elif pred in JOIN_PREDICATES:
             joins.extend(group)
     records = _build_join_path_records(_group_by_name(joins))
     batch = [
@@ -109,3 +106,17 @@ def materialize_join_paths(
     ]
     batch_upsert_join_paths(loader, batch, source_schema=source_schema)
     _wire_join_path_edges(loader, records, source_schema)
+
+
+def materialize_schema_joins(
+    loader: GraphLoader, source_schema: str, detected: list[Assertion],
+) -> None:
+    """Write one schema's joins in one batch, once every table of the run is built.
+
+    The stored declared keys and this run's detected joins meet in one batch, so
+    a join name gets one winner whatever order the tables were built in.
+    """
+    groups: dict[tuple[str, str], list[Assertion]] = {}
+    for a in [*fetch_join_assertions(loader, source_schema), *detected]:
+        groups.setdefault((a.subject_ref, a.predicate.value), []).append(a)
+    materialize_join_paths(loader, groups, source_schema=source_schema)
