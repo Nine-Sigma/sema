@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from neo4j.exceptions import DriverError, Neo4jError
+
 from sema.graph.queries import CypherQueries
 from sema.log import logger
 from sema.pipeline.dedup_utils import (
@@ -75,8 +77,9 @@ def _expand_joins(
             CypherQueries.find_join_paths(),
             table_names=table_names,
         )
-    except Exception:
-        return []
+    except (Neo4jError, DriverError):
+        logger.error(f"Join path read failed for tables {table_names}")
+        raise
 
 
 def _expand_values(

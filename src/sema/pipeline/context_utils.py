@@ -123,12 +123,11 @@ def _build_join_paths(
     ][:max_joins]
     join_paths: list[JoinPath] = []
     for jc in join_candidates:
+        predicates = _parse_join_predicates(jc.get("join_predicates"))
         join_paths.append(JoinPath(
-            from_table=jc.get("from_table", ""),
-            to_table=jc.get("to_table", ""),
-            join_predicates=_parse_join_predicates(
-                jc.get("join_predicates")
-            ),
+            from_table=predicates[0].left_table if predicates else "",
+            to_table=predicates[0].right_table if predicates else "",
+            join_predicates=predicates,
             hop_count=jc.get("hop_count", 1),
             cardinality_hint=jc.get("cardinality_hint"),
             sql_snippet=jc.get("sql_snippet"),
