@@ -57,21 +57,22 @@ def _fetch(
     if relation.file is not None:
         local = paths.source_root / relation.file
         return fetch_utils.record(str(local), local, fetch_utils.csv_data_rows(local))
-    target = paths.downloads / f"{relation.name}.csv"
-    if known and target.exists() and fetch_utils.sha256(target) == known.sha256:
+    target = paths.downloads / relation.name
+    files = fetch_utils.files_of(target)
+    if known and files and fetch_utils.sha256(files) == known.sha256:
         logger.info(f"{relation.name}: reusing {target}")
         return known
-    url = profile.download_url.format(dataset=relation.dataset)
-    count = fetch_utils.publisher_count(profile.count_url.format(dataset=relation.dataset))
-    fetch_utils.download(url, target)
-    return fetch_utils.record(url, target, count)
+    dataset = str(relation.dataset)
+    count = fetch_utils.publisher_count(profile.count_url.format(dataset=dataset))
+    fetch_utils.download_pages(profile.page_url, dataset, profile.page_size, target)
+    return fetch_utils.record(profile.page_url.replace("{dataset}", dataset), target, count)
 
 
 def _land(staging: Staging, profile: Profile, relation: Relation, file: FileRecord) -> None:
-    path = Path(file.path)
-    headers = fetch_utils.csv_headers(path)
+    files = fetch_utils.files_of(Path(file.path))
+    headers = fetch_utils.csv_headers(files[0])
     targets = map_headers(relation, headers)
-    source = cast_utils.read_csv_sql(path, len(targets))
+    source = cast_utils.read_csv_sql(files, len(targets))
     cast_utils.check_casts(staging, relation, headers, targets, source, profile.date_format)
     columns = {column.name: column.type for column in relation.columns}
     table = qualified(SCHEMA, relation.name)
@@ -103,7 +104,7 @@ def run_load(profile: Profile, paths: argparse.Namespace) -> int:
             except LoadError as error:
                 print(error, file=sys.stderr)
                 failed += 1
-            except (OSError, duckdb.Error) as error:
+            except (*fetch_utils.FETCH_ERRORS, duckdb.Error) as error:
                 print(f"{relation.name}: {error}", file=sys.stderr)
                 failed += 1
     return 1 if failed else 0

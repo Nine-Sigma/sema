@@ -4,76 +4,79 @@
 # (id 94g4-w6xz); schema.json says "Property Type Codes". Code tables load from the local
 # copies under docs/, so that spelling does not change the load.
 #
+# Pages come from the SODA2 resource endpoint in :id order. The one-file export
+# (/api/views/<id>/rows.csv) honors no Range request and the server cut it mid-stream, so a
+# multi-GB file could not finish; a page can be retried alone.
+#
 # `headers` names the published CSV header for a column whose header differs from its
-# dictionary_name (matching ignores case and repeated spaces). Each pair was aligned from the
-# publisher's column metadata (/api/views/<id>.json) by position and type.
+# dictionary_name (matching ignores case, underscores and repeated spaces). Each pair was
+# aligned from the publisher's column metadata (/api/views/<id>.json) by position and type.
 # `ignore_headers` are published columns the dictionaries do not define; the publisher reports
 # them null in every row, and the load refuses them if any row holds a value.
-date_format: "%m/%d/%Y"
-download_url: "https://data.cityofnewyork.us/api/views/{dataset}/rows.csv?accessType=DOWNLOAD"
+date_format: "%Y-%m-%dT%H:%M:%S.%g"
+page_url: "https://data.cityofnewyork.us/resource/{dataset}.csv?$order=:id&$limit={limit}&$offset={offset}"
+page_size: 1000000
 count_url: "https://data.cityofnewyork.us/resource/{dataset}.json?$select=count(*)"
 relations:
   real_property_master:
     dataset: bnx9-e6tj
     headers:
-      recorded_borough: "BOROUGH"
-      doc_type: "DOC. TYPE"
-      document_date: "DOC. DATE"
-      document_amount: "DOC. AMOUNT"
-      recorded_date: "RECORDED / FILED"
-      percentage_transferred: "% TRANSFERRED"
+      doc_type: doc_type
+      document_amount: document_amt
+      recorded_date: recorded_datetime
+      reel_year: reel_yr
+      reel_page: reel_pg
+      percentage_transferred: percent_trans
   real_property_legals:
     dataset: 8h5j-fqxa
   real_property_parties:
     dataset: 636b-3b5g
     headers:
-      address_line_1: "ADDRESS 1"
-      address_line_2: "ADDRESS 2"
+      address_line_1: address_1
+      address_line_2: address_2
   real_property_references:
     dataset: pwkr-dpni
     headers:
-      crfn_reference: "REFERENCE BY CRFN "
-      document_id_reference: "REFERENCE BY DOC ID"
-      reel_year: "REFERENCE BY REEL YEAR"
-      reel_borough: "REFERENCE BY REEL BOROUGH"
-      reel_nbr: "REFERENCE BY REEL NBR"
-      reel_page: "REFERENCE BY REEL PAGE"
-    ignore_headers: ["Not_Used_1", "Not_Used_2"]
+      crfn_reference: reference_by_crfn_
+      document_id_reference: reference_by_doc_id
+      reel_year: reference_by_reel_year
+      reel_borough: reference_by_reel_borough
+      reel_nbr: reference_by_reel_nbr
+      reel_page: reference_by_reel_page
+    ignore_headers: [not_used_1, not_used_2]
   real_property_remarks:
     dataset: 9p4w-7npp
     headers:
-      sequence: "REMARK LINE NBR"
-      text: "REMARK TEXT LINE"
+      sequence: sequence_number
+      text: remark_text
   personal_property_master:
     dataset: sv7x-dduq
     headers:
-      recorded_borough: "BOROUGH"
-      doc_type: "DOC. TYPE"
-      document_amount: "DOC. AMOUNT"
-      recorded_filed_date: "RECORDED / FILED"
-      ucc_collateral: "COLLATERAL"
-      fedtax_serial_slid_nbr: "SLID#"
-      fedtax_assessment_date: "ASSESSMENT DATE"
-      rptt_nbr: "RPTT #"
-      file_nbr: "FILE NUMBER"
+      doc_type: doc_type
+      document_amount: document_amt
+      recorded_filed_date: recorded_datetime
+      fedtax_serial_slid_nbr: fedtax_serial_nbr
+      rptt_nbr: rpttl_nbr
+      reel_year: reel_yr
+      reel_page: reel_pg
   personal_property_legals:
     dataset: uqqa-hym2
+    headers:
+      unit: addr_unit
   personal_property_parties:
     dataset: nbbg-wtuz
     headers:
-      address_line_1: "ADDRESS 1"
-      address_line_2: "ADDRESS 2"
+      address_line_1: address_1
+      address_line_2: address_2
   personal_property_references:
     dataset: 6y3e-jcrc
     headers:
-      crfn: "REFERENCE BY CRFN "
-      document_id_reference: "REFERENCE BY DOC ID"
-      file_nbr: "REFERENCE BY FILE NBR"
+      document_id_reference: doc_id_ref
   personal_property_remarks:
     dataset: fuzi-5ks9
     headers:
-      sequence: "REMARK LINE NBR"
-      text: "REMARK TEXT LINE"
+      sequence: sequence_number
+      text: remark_text
   document_control_codes:
     file: docs/poc/acris/code_tables/Document_Control_Codes.csv
   property_types_codes:

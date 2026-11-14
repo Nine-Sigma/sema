@@ -24,10 +24,11 @@ def position(index: int) -> str:
     return quote_ident(f"c{index}")
 
 
-def read_csv_sql(path: Path, width: int) -> str:
+def read_csv_sql(files: list[Path], width: int) -> str:
     columns = ", ".join(f"{_literal(f'c{i}')}: 'VARCHAR'" for i in range(width))
+    paths = ", ".join(_literal(str(path)) for path in files)
     return (
-        f"read_csv({_literal(str(path))}, header = true, auto_detect = false, "
+        f"read_csv([{paths}], header = true, auto_detect = false, "
         f"delim = ',', quote = '\"', escape = '\"', columns = {{{columns}}})"
     )
 

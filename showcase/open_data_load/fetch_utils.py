@@ -1,4 +1,4 @@
-"""Files on disk: publisher counts, downloads, digests and the manifest that records them."""
+"""Files on disk: publisher counts, paged downloads, digests and the manifest recording them."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import http.client
 import json
 import shutil
 import ssl
+import time
 import urllib.request
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -20,6 +21,9 @@ from sema.log import logger
 CHUNK = 1 << 20
 TIMEOUT_SECONDS = 600
 USER_AGENT = "open-data-load/1"
+RETRIES = 5
+RETRY_SECONDS = 30
+FETCH_ERRORS = (OSError, http.client.HTTPException)
 
 
 @dataclass(frozen=True)
@@ -59,11 +63,46 @@ def download(url: str, target: Path) -> None:
     logger.info(f"downloaded {target.stat().st_size:,} bytes -> {target}")
 
 
-def sha256(path: Path) -> str:
+def _fetch_page(url: str, target: Path) -> None:
+    for attempt in range(1, RETRIES + 1):
+        try:
+            download(url, target)
+            return
+        except FETCH_ERRORS as error:
+            if attempt == RETRIES:
+                raise
+            logger.warning(f"{url}: attempt {attempt} failed ({error!r}), retrying")
+            time.sleep(RETRY_SECONDS * attempt)
+
+
+def download_pages(url_template: str, dataset: str, page_size: int, target_dir: Path) -> None:
+    """Fetch pages until one holds fewer than page_size rows; a page already on disk is kept.
+
+    shortcut: kept pages are trusted to share the publisher's current version; the row count
+    check catches a change that alters the count, not one that rewrites rows in place.
+    """
+    offset = 0
+    while True:
+        page = target_dir / f"{offset:012d}.csv"
+        if not page.exists():
+            url = url_template.format(dataset=dataset, limit=page_size, offset=offset)
+            _fetch_page(url, page)
+        if csv_data_rows(page) < page_size:
+            return
+        offset += page_size
+
+
+def files_of(path: Path) -> list[Path]:
+    """A directory of pages in offset order, or a single file."""
+    return sorted(path.glob("*.csv")) if path.is_dir() else [path]
+
+
+def sha256(files: list[Path]) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(CHUNK):
-            digest.update(chunk)
+    for path in files:
+        with path.open("rb") as handle:
+            while chunk := handle.read(CHUNK):
+                digest.update(chunk)
     return digest.hexdigest()
 
 
@@ -79,7 +118,7 @@ def csv_data_rows(path: Path) -> int:
 
 def record(source: str, path: Path, count: int) -> FileRecord:
     now = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
-    return FileRecord(source, str(path), sha256(path), count, now)
+    return FileRecord(source, str(path), sha256(files_of(path)), count, now)
 
 
 def read_manifest(path: Path) -> dict[str, FileRecord]:

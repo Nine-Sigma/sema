@@ -34,13 +34,14 @@ class Relation:
 @dataclass(frozen=True)
 class Profile:
     date_format: str
-    download_url: str
+    page_url: str
+    page_size: int
     count_url: str
     relations: tuple[Relation, ...]
 
 
 def normalize_header(header: str) -> str:
-    return re.sub(r"\s+", " ", header).strip().casefold()
+    return re.sub(r"[\s_]+", " ", header).strip().casefold()
 
 
 def _relation(table: dict[str, Any], source: dict[str, Any]) -> Relation:
@@ -72,7 +73,8 @@ def read_profile(profile_path: Path, schema_path: Path) -> Profile:
         raise LoadError(f"profile relations differ from schema: {', '.join(sorted(differ))}")
     return Profile(
         date_format=profile["date_format"],
-        download_url=profile["download_url"],
+        page_url=profile["page_url"],
+        page_size=int(profile["page_size"]),
         count_url=profile["count_url"],
         relations=tuple(_relation(table, sources[table["name"]]) for table in tables),
     )
