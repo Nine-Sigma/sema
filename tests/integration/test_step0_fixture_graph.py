@@ -286,7 +286,7 @@ def test_no_decoy_join_is_present(graph: FixtureGraph) -> None:
 def _declared_pairs() -> list[list[Pair]]:
     return [
         [(key.referenced_table, referenced, table.name, referencing)
-         for referencing, referenced in sorted(zip(key.columns, key.referenced_columns))]
+         for referencing, referenced in zip(key.columns, key.referenced_columns)]
         for table in MAIN_TABLES for key in table.declared_keys
     ]
 

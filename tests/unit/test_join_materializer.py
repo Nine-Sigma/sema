@@ -23,20 +23,20 @@ pytestmark = pytest.mark.unit
 SCHEMA = "cbioportal_msk_chord_2024"
 
 
-def _join_assertion(name: str = "patient_to_sample"):
+def _join_assertion(name: str = "owner_to_event"):
     payload = {
         "join_predicates": [{
-            "left_table": "patient", "left_column": "patient_id",
-            "right_table": "sample", "right_column": "patient_id",
+            "left_table": "owner", "left_column": "owner_id",
+            "right_table": "event", "right_column": "owner_id",
             "operator": "=",
         }],
         "hop_count": 1,
-        "from_ref": "databricks://ws/cat/sch/patient",
-        "to_ref": "databricks://ws/cat/sch/sample",
+        "from_ref": "databricks://ws/cat/sch/owner",
+        "to_ref": "databricks://ws/cat/sch/event",
     }
     return Assertion(
         id=f"a-{name}",
-        subject_ref="databricks://ws/cat/sch/patient",
+        subject_ref="databricks://ws/cat/sch/owner",
         predicate=AssertionPredicate.HAS_JOIN_EVIDENCE,
         payload=payload,
         source="fk_detector",
@@ -67,12 +67,12 @@ def test_materialize_threads_source_schema_to_batch():
 
 def _fk_to_assertion(tier: int = 1, confidence: float = 0.95) -> Assertion:
     candidate = FKCandidate(
-        pk_table="patient", pk_column="patient_id",
-        fk_table="sample", fk_column="patient_id",
+        pk_table="owner", pk_column="owner_id",
+        fk_table="event", fk_column="owner_id",
         pk_type="string", fk_type="string",
         schema_name=SCHEMA,
-        pk_ref=f"databricks://workspace/workspace/{SCHEMA}/patient/patient_id",
-        fk_ref=f"databricks://workspace/workspace/{SCHEMA}/sample/patient_id",
+        pk_ref=f"databricks://workspace/workspace/{SCHEMA}/owner/owner_id",
+        fk_ref=f"databricks://workspace/workspace/{SCHEMA}/event/owner_id",
         catalog="workspace",
     )
     fk = FKAssertion(
@@ -94,7 +94,7 @@ def test_fk_to_predicate_produces_join_path():
     rows = batch_calls[0].kwargs["rows"]
     assert len(rows) == 1
     rec = rows[0]
-    assert rec["name"] == "patient/patient_id=sample/patient_id"
+    assert rec["name"] == "owner/owner_id=event/owner_id"
     assert rec["confidence"] == 0.95
     assert rec["source_schema"] == SCHEMA
     loader.add_join_path_uses.assert_called()
@@ -115,4 +115,4 @@ def test_fk_to_and_join_evidence_on_one_pair_merge_into_one_record():
     rows = [
         c for c in loader.method_calls if c[0] == "_run"
     ][0].kwargs["rows"]
-    assert [r["name"] for r in rows] == ["patient/patient_id=sample/patient_id"]
+    assert [r["name"] for r in rows] == ["owner/owner_id=event/owner_id"]
