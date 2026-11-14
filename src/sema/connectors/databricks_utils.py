@@ -15,6 +15,7 @@ from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
 )
+from sema.models.extraction import ExtractedForeignKey
 from sema.models.physical_key import CanonicalRef, PhysicalKey
 from sema.models.schema_metadata import (
     ColumnMetadata,
@@ -22,6 +23,7 @@ from sema.models.schema_metadata import (
     SchemaMetadata,
     Unreadable,
 )
+from sema.pipeline.normalizer import AssertionNormalizer
 
 if TYPE_CHECKING:
     from sema.connectors.databricks import (
@@ -49,18 +51,10 @@ def _build_table_assertion(
         connector._make_assertion(fqn, AssertionPredicate.TABLE_EXISTS, {"table_type": "TABLE"})
     )
 
-    fks = connector._get_fk_constraints(catalog, schema, table_name)
-    for fk in fks:
-        to_ref = _make_table_ref(connector, catalog, schema, fk["to_table"])
-        assertions.append(
-            connector._make_assertion(
-                fqn,
-                AssertionPredicate.JOINS_TO,
-                {"on_column": fk["from_col"], "to_column": fk["to_col"]},
-                object_ref=to_ref,
-                confidence=0.95,
-            )
-        )
+    _, platform, workspace = connector.get_datasource_ref()
+    normalizer = AssertionNormalizer(workspace, connector._run_id, platform)
+    for key in connector._get_fk_constraints(catalog, schema, table_name):
+        assertions.extend(normalizer.normalize_foreign_key(key))
 
     tags = connector._get_tags(catalog, schema, table_name)
     for tag in tags:
@@ -238,3 +232,51 @@ def read_schema_metadata(
         logger.warning("Schema metadata unreadable for {}.{}: {}", catalog, schema, reason)
         return Unreadable(catalog=catalog, schema_name=schema, reason=reason)
     return build_schema_metadata(catalog, schema, object_rows, column_rows, view_rows)
+
+
+def _same_constraint(left: str, right: str, prefix: str = "") -> str:
+    return " AND ".join(
+        f"{left}.constraint_{part} = {right}.{prefix}constraint_{part}"
+        for part in ("catalog", "schema", "name")
+    )
+
+
+def declared_keys_query(catalog: str, schema: str, table: str) -> str:
+    """Each foreign key column of one table beside the referenced column it pairs with."""
+    return (
+        "SELECT kcu.constraint_name, kcu.column_name, "
+        "ref.table_catalog, ref.table_schema, ref.table_name, ref.column_name "
+        f"FROM {METADATA_SOURCE}.`table_constraints` tc "
+        f"JOIN {METADATA_SOURCE}.`referential_constraints` rc "
+        f"ON {_same_constraint('rc', 'tc')} "
+        f"JOIN {METADATA_SOURCE}.`key_column_usage` kcu "
+        f"ON {_same_constraint('kcu', 'tc')} "
+        f"JOIN {METADATA_SOURCE}.`key_column_usage` ref "
+        f"ON {_same_constraint('ref', 'rc', 'unique_')} "
+        "AND ref.ordinal_position = kcu.position_in_unique_constraint "
+        "WHERE tc.constraint_type = 'FOREIGN KEY' "
+        f"AND tc.table_catalog = {sql_string_literal(catalog)} "
+        f"AND tc.table_schema = {sql_string_literal(schema)} "
+        f"AND tc.table_name = {sql_string_literal(table)} "
+        "ORDER BY kcu.constraint_name, kcu.ordinal_position"
+    )
+
+
+def declared_keys_from_rows(
+    catalog: str, schema: str, table: str, rows: Sequence[Row],
+) -> list[ExtractedForeignKey]:
+    """Group ordinal-ordered key rows into one foreign key per constraint."""
+    pairs: dict[tuple[str, str, str, str], list[tuple[str, str]]] = {}
+    for name, column, ref_catalog, ref_schema, ref_table, ref_column in rows:
+        pairs.setdefault((name, ref_catalog, ref_schema, ref_table), []).append(
+            (column, ref_column),
+        )
+    return [
+        ExtractedForeignKey(
+            constraint_name=name,
+            referencing_catalog=catalog, referencing_schema=schema, referencing_table=table,
+            referenced_catalog=ref_catalog, referenced_schema=ref_schema,
+            referenced_table=ref_table, column_pairs=tuple(columns),
+        )
+        for (name, ref_catalog, ref_schema, ref_table), columns in pairs.items()
+    ]

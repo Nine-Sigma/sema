@@ -103,14 +103,26 @@ def _meta(table: str) -> list[str]:
         "SELECT column_name, data_type, is_nullable, comment "
         f"FROM `system`.`information_schema`.`columns` {where} "
         "ORDER BY ordinal_position",
-        "SELECT tc.table_name, kcu.column_name, kcu.referenced_table_name, "
-        "kcu.referenced_column_name "
+        "SELECT kcu.constraint_name, kcu.column_name, "
+        "ref.table_catalog, ref.table_schema, ref.table_name, ref.column_name "
         "FROM `system`.`information_schema`.`table_constraints` tc "
+        "JOIN `system`.`information_schema`.`referential_constraints` rc "
+        "ON rc.constraint_catalog = tc.constraint_catalog "
+        "AND rc.constraint_schema = tc.constraint_schema "
+        "AND rc.constraint_name = tc.constraint_name "
         "JOIN `system`.`information_schema`.`key_column_usage` kcu "
-        "ON tc.constraint_name = kcu.constraint_name "
+        "ON kcu.constraint_catalog = tc.constraint_catalog "
+        "AND kcu.constraint_schema = tc.constraint_schema "
+        "AND kcu.constraint_name = tc.constraint_name "
+        "JOIN `system`.`information_schema`.`key_column_usage` ref "
+        "ON ref.constraint_catalog = rc.unique_constraint_catalog "
+        "AND ref.constraint_schema = rc.unique_constraint_schema "
+        "AND ref.constraint_name = rc.unique_constraint_name "
+        "AND ref.ordinal_position = kcu.position_in_unique_constraint "
         "WHERE tc.constraint_type = 'FOREIGN KEY' "
         f"AND tc.table_catalog = '{CATALOG}' AND tc.table_schema = '{SCHEMA}' "
-        f"AND tc.table_name = '{table}'",
+        f"AND tc.table_name = '{table}' "
+        "ORDER BY kcu.constraint_name, kcu.ordinal_position",
         "SELECT column_name, tag_name, tag_value "
         f"FROM `system`.`information_schema`.`column_tags` {where}",
     ]
