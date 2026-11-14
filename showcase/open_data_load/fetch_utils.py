@@ -5,11 +5,15 @@ from __future__ import annotations
 import csv
 import datetime
 import hashlib
+import http.client
 import json
 import shutil
+import ssl
 import urllib.request
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+import certifi
 
 from sema.log import logger
 
@@ -27,13 +31,19 @@ class FileRecord:
     recorded_at: str
 
 
-def _request(url: str) -> urllib.request.Request:
-    return urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+def _open(url: str) -> http.client.HTTPResponse:
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    # A uv-managed interpreter's OpenSSL finds no system CA store; certifi ships one.
+    context = ssl.create_default_context(cafile=certifi.where())
+    response: http.client.HTTPResponse = urllib.request.urlopen(
+        request, timeout=TIMEOUT_SECONDS, context=context
+    )
+    return response
 
 
 def publisher_count(url: str) -> int:
     """The single value of the single row the count endpoint returns."""
-    with urllib.request.urlopen(_request(url), timeout=TIMEOUT_SECONDS) as response:
+    with _open(url) as response:
         rows = json.load(response)
     (value,) = rows[0].values()
     return int(value)
@@ -43,10 +53,7 @@ def download(url: str, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     partial = target.with_name(target.name + ".part")
     logger.info(f"downloading {url} -> {target}")
-    with (
-        urllib.request.urlopen(_request(url), timeout=TIMEOUT_SECONDS) as response,
-        partial.open("wb") as handle,
-    ):
+    with _open(url) as response, partial.open("wb") as handle:
         shutil.copyfileobj(response, handle, CHUNK)
     partial.replace(target)
     logger.info(f"downloaded {target.stat().st_size:,} bytes -> {target}")

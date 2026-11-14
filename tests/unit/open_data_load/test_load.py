@@ -119,6 +119,15 @@ def test_a_row_count_other_than_the_publishers_fails_the_load(
     assert "orders: loaded 3 rows, publisher count 4" in capsys.readouterr().err
 
 
+def test_a_failed_download_names_its_relation_and_the_others_still_load(
+    source: Source, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (source.published / "ord-0001.csv").unlink()
+    assert main(source.args("load")) == 1
+    assert capsys.readouterr().err.startswith("orders: ")
+    assert _rows(source.db, "SELECT count(*) FROM colors") == [(2,)]
+
+
 def test_verify_reports_each_relation_and_the_total(
     source: Source, capsys: pytest.CaptureFixture[str]
 ) -> None:

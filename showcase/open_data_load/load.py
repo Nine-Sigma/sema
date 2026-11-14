@@ -100,8 +100,11 @@ def run_load(profile: Profile, paths: argparse.Namespace) -> int:
                 manifest[relation.name] = _fetch(profile, relation, known, paths)
                 fetch_utils.write_manifest(manifest_path, manifest)
                 _land(staging, profile, relation, manifest[relation.name])
-            except (LoadError, OSError, duckdb.Error) as error:
+            except LoadError as error:
                 print(error, file=sys.stderr)
+                failed += 1
+            except (OSError, duckdb.Error) as error:
+                print(f"{relation.name}: {error}", file=sys.stderr)
                 failed += 1
     return 1 if failed else 0
 
