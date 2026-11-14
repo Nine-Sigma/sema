@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 pytestmark = pytest.mark.unit
 
 from sema.graph.loader import GraphLoader
+from sema.models.physical_key import PhysicalKey
 from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
@@ -277,8 +278,8 @@ class TestJoinPathOperations:
         _, session = mock_driver
         loader.add_join_path_entity_links(
             "t1/c1=t2/c2",
-            from_table_ref="databricks://ws/cat/sch/t1",
-            to_table_ref="databricks://ws/cat/sch/t2",
+            from_key=PhysicalKey("ws", "cat", "sch", "t1"),
+            to_key=PhysicalKey("ws", "cat", "sch", "t2"),
             source_schema="sch",
         )
         session.run.assert_called()
@@ -293,13 +294,13 @@ class TestJoinPathOperations:
         with pytest.raises(ValueError, match="source_schema"):
             loader.add_join_path_entity_links(
                 "t1/c1=t2/c2",
-                from_table_ref="t1",
-                to_table_ref="t2",
+                from_key=PhysicalKey("ws", "cat", "sch", "t1"),
+                to_key=PhysicalKey("ws", "cat", "sch", "t2"),
             )
 
     def test_add_join_path_uses_requires_source_schema(self, loader):
         with pytest.raises(ValueError, match="source_schema"):
-            loader.add_join_path_uses("jp", "t1")
+            loader.add_join_path_uses("jp", PhysicalKey("ws", "cat", "sch", "t1"))
 
 
 class TestAssertionStorage:

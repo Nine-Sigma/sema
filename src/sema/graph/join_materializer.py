@@ -6,10 +6,16 @@ Extracted from materializer_utils.py to keep files under 400 lines.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
-from sema.graph.join_materializer_utils import normalize_fk_to_assertion
+from sema.graph.join_materializer_utils import (
+    join_keys,
+    join_path_name,
+    normalize_fk_to_assertion,
+)
 from sema.graph.loader_utils import batch_upsert_join_paths
+from sema.log import logger
 from sema.models.assertions import Assertion, AssertionPredicate
 
 if TYPE_CHECKING:
@@ -20,43 +26,46 @@ _JOIN_PREDICATES = (
     AssertionPredicate.JOINS_TO.value,
     AssertionPredicate.FK_TO.value,
 )
+_EDGE_ONLY_FIELDS = ("from_key", "to_key")
 
 
-def _derive_join_path_name(
-    join_predicates: list[dict[str, str]],
-) -> str:
-    parts = []
-    for jp in join_predicates:
-        left = f"{jp['left_table']}/{jp['left_column']}"
-        right = f"{jp['right_table']}/{jp['right_column']}"
-        parts.append(f"{left}={right}")
-    return "|".join(parts)
+def _group_by_name(assertions: list[Assertion]) -> dict[str, list[Assertion]]:
+    by_name: dict[str, list[Assertion]] = {}
+    for a in assertions:
+        keys = join_keys(a)
+        if keys is None:
+            logger.warning(
+                "Skipping join assertion {} on {}: payload has no parseable "
+                "from_ref/to_ref or no join_predicates (old shape; rebuild to migrate)",
+                a.id, a.subject_ref,
+            )
+            continue
+        name = join_path_name(a.payload["join_predicates"], *keys)
+        by_name.setdefault(name, []).append(a)
+    return by_name
 
 
 def _build_join_path_records(
-    join_groups: dict[str, list[Assertion]],
+    by_name: dict[str, list[Assertion]],
 ) -> list[dict[str, Any]]:
     from sema.graph.materializer_utils import pick_winner
 
     records: list[dict[str, Any]] = []
-    for _subject_ref, group in join_groups.items():
+    for name, group in by_name.items():
         winner = pick_winner(group)
-        if not winner:
+        keys = join_keys(winner) if winner else None
+        if winner is None or keys is None:
             continue
-        join_predicates = winner.payload.get("join_predicates", [])
-        hop_count = winner.payload.get("hop_count", 1)
-        cardinality = winner.payload.get("cardinality")
-        name = _derive_join_path_name(join_predicates)
         records.append({
             "name": name,
-            "join_predicates": join_predicates,
-            "hop_count": hop_count,
+            "join_predicates": winner.payload["join_predicates"],
+            "hop_count": winner.payload.get("hop_count", 1),
             "source": winner.source,
             "confidence": winner.confidence,
             "sql_snippet": winner.payload.get("sql_snippet"),
-            "cardinality_hint": cardinality,
-            "from_table": winner.payload.get("from_table", ""),
-            "to_table": winner.payload.get("to_table", ""),
+            "cardinality_hint": winner.payload.get("cardinality"),
+            "from_key": keys[0],
+            "to_key": keys[1],
         })
     return records
 
@@ -69,33 +78,16 @@ def _wire_join_path_edges(
     if source_schema is None:
         return
     for rec in records:
-        name = rec["name"]
+        name, from_key, to_key = rec["name"], rec["from_key"], rec["to_key"]
+        keys = [from_key, to_key]
         for jp in rec["join_predicates"]:
-            if jp.get("left_table"):
-                loader.add_join_path_uses(
-                    name, jp["left_table"],
-                    source_schema=source_schema,
-                )
-            if jp.get("left_column") and jp.get("left_table"):
-                loader.add_join_path_uses(
-                    name, jp["left_table"], jp["left_column"],
-                    source_schema=source_schema,
-                )
-            if jp.get("right_table"):
-                loader.add_join_path_uses(
-                    name, jp["right_table"],
-                    source_schema=source_schema,
-                )
-            if jp.get("right_column") and jp.get("right_table"):
-                loader.add_join_path_uses(
-                    name, jp["right_table"], jp["right_column"],
-                    source_schema=source_schema,
-                )
-        if rec.get("from_table") or rec.get("to_table"):
-            loader.add_join_path_entity_links(
-                name, rec.get("from_table", ""), rec.get("to_table", ""),
-                source_schema=source_schema,
-            )
+            keys.append(replace(from_key, column=jp["left_column"]))
+            keys.append(replace(to_key, column=jp["right_column"]))
+        for key in keys:
+            loader.add_join_path_uses(name, key, source_schema=source_schema)
+        loader.add_join_path_entity_links(
+            name, from_key, to_key, source_schema=source_schema,
+        )
 
 
 def materialize_join_paths(
@@ -104,23 +96,15 @@ def materialize_join_paths(
     source_schema: str | None = None,
 ) -> None:
     """Normalize JOINS_TO + HAS_JOIN_EVIDENCE + FK_TO into JoinPath nodes."""
-    join_groups: dict[str, list[Assertion]] = {}
-    for (subj, pred), group in groups.items():
-        if pred not in _JOIN_PREDICATES:
-            continue
-        normalized = (
-            [normalize_fk_to_assertion(a) for a in group]
-            if pred == AssertionPredicate.FK_TO.value
-            else list(group)
-        )
-        if subj in join_groups:
-            join_groups[subj].extend(normalized)
-        else:
-            join_groups[subj] = normalized
-    records = _build_join_path_records(join_groups)
+    joins: list[Assertion] = []
+    for (_subject, pred), group in groups.items():
+        if pred == AssertionPredicate.FK_TO.value:
+            joins.extend(normalize_fk_to_assertion(a) for a in group)
+        elif pred in _JOIN_PREDICATES:
+            joins.extend(group)
+    records = _build_join_path_records(_group_by_name(joins))
     batch = [
-        {k: v for k, v in r.items()
-         if k not in ("from_table", "to_table")}
+        {k: v for k, v in r.items() if k not in _EDGE_ONLY_FIELDS}
         for r in records
     ]
     batch_upsert_join_paths(loader, batch, source_schema=source_schema)

@@ -82,14 +82,12 @@ def _join_assertion(schema: str) -> Assertion:
         predicate=AssertionPredicate.HAS_JOIN_EVIDENCE,
         payload={
             "join_predicates": [{
-                "left_table": _ref(CATALOG, schema, "sample"),
-                "left_column": _ref(CATALOG, schema, "sample", "patient_id"),
-                "right_table": _ref(CATALOG, schema, "patient"),
-                "right_column": _ref(CATALOG, schema, "patient", "patient_id"),
+                "left_table": "sample", "left_column": "patient_id",
+                "right_table": "patient", "right_column": "patient_id",
             }],
             "hop_count": 1,
-            "from_table": _ref(CATALOG, schema, "sample"),
-            "to_table": _ref(CATALOG, schema, "patient"),
+            "from_ref": _ref(CATALOG, schema, "sample"),
+            "to_ref": _ref(CATALOG, schema, "patient"),
         },
         source="fk_detector",
         confidence=0.95,

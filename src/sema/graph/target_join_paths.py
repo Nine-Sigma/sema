@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from sema.graph.loader import GraphLoader
 from sema.graph.target_retrieval_loader import PhysicalSchemaBinding
 from sema.log import logger
+from sema.models.physical_key import PhysicalKey
 from sema.models.target.normalized import NormalizedTargetModel
 
 _OBLIGATION_SOURCE = "manifest"
@@ -125,14 +126,19 @@ def _write_join_path(
         name, predicates, hop_count=1, source=item.join.source,
         confidence=item.join.confidence, source_schema=binding.schema,
     )
-    loader.add_join_path_uses(name, entity_ref, source_schema=binding.schema)
-    loader.add_join_path_uses(
-        name, referenced_ref, source_schema=binding.schema
-    )
+    for table in (item.entity_table, item.referenced_table):
+        loader.add_join_path_uses(
+            name, _table_key(binding, table), source_schema=binding.schema
+        )
 
 
 def _table_ref(binding: PhysicalSchemaBinding, table: str) -> str:
     return f"{binding.catalog}.{binding.schema}.{table}"
+
+
+def _table_key(binding: PhysicalSchemaBinding, table: str) -> PhysicalKey:
+    # The binding names no datasource; the graph writers match catalog, schema, table.
+    return PhysicalKey("", binding.catalog, binding.schema, table)
 
 
 __all__ = [

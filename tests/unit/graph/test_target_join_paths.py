@@ -106,12 +106,12 @@ def _upserts(loader: MagicMock) -> list[dict[str, Any]]:
     return calls
 
 
-def _uses_by_path(loader: MagicMock) -> dict[str, set[str]]:
-    uses: dict[str, set[str]] = {}
+def _uses_by_path(loader: MagicMock) -> dict[str, set[Any]]:
+    uses: dict[str, set[Any]] = {}
     for call in loader.add_join_path_uses.call_args_list:
         name = call.kwargs.get("join_path_name", call.args[0] if call.args else None)
-        ref = call.kwargs.get("table_ref", call.args[1] if len(call.args) > 1 else None)
-        uses.setdefault(name, set()).add(ref)
+        key = call.kwargs.get("key", call.args[1] if len(call.args) > 1 else None)
+        uses.setdefault(name, set()).add(key)
     return uses
 
 
