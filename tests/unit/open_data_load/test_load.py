@@ -10,7 +10,7 @@ import duckdb
 import pytest
 
 from showcase.open_data_load.load import main
-from tests.unit.open_data_load.conftest import ORDERS_CSV, Source, neutral_profile
+from tests.unit.open_data_load.conftest import HEADER, ORDERS_CSV, Source, neutral_profile
 
 pytestmark = pytest.mark.unit
 
@@ -52,10 +52,11 @@ def test_load_lands_every_relation_under_an_unqualified_name_with_schema_types(
 def test_the_manifest_records_publisher_count_and_file_digest(source: Source) -> None:
     assert main(source.args("load")) == 0
     manifest = _manifest(source)
-    downloaded = source.db.parent / "downloads" / source.db.stem / "orders.csv"
-    assert downloaded.read_text() == ORDERS_CSV
+    pages = sorted((source.db.parent / "downloads" / source.db.stem / "orders").glob("*.csv"))
+    assert [page.name for page in pages] == ["000000000000.csv", "000000000002.csv"]
+    joined = b"".join(page.read_bytes() for page in pages)
     assert manifest["orders"]["publisher_count"] == 3
-    assert manifest["orders"]["sha256"] == hashlib.sha256(ORDERS_CSV.encode()).hexdigest()
+    assert manifest["orders"]["sha256"] == hashlib.sha256(joined).hexdigest()
     assert manifest["colors"]["publisher_count"] == 2
 
 
@@ -68,7 +69,7 @@ def test_a_value_that_does_not_cast_losslessly_stops_only_its_relation(
 ) -> None:
     cells = {"qty": "1", "amount": "1.00", "ship_date": "01.01.2020"} | {column: value}
     bad = (
-        "ORDER NO,SHIP DATE,AMOUNT,QTY,Unused Flag,Region Code\n"
+        HEADER
         + "".join(f"B{i},{cells['ship_date']},{cells['amount']},{cells['qty']},,\n"
                   for i in range(4))
     )  # fmt: skip
@@ -85,8 +86,7 @@ def test_a_header_that_maps_to_no_column_stops_its_relation(
     source: Source, capsys: pytest.CaptureFixture[str]
 ) -> None:
     extra = (
-        "ORDER NO,SHIP DATE,AMOUNT,QTY,Unused Flag,Region Code,Extra\n"
-        "A1,02.01.2020,10.50,3,,007,x\n"
+        HEADER.replace("\n", ",Extra\n") + "A1,02.01.2020,10.50,3,,007,x\n"
     )
     source.publish("ord-0001", extra, 1)
     assert main(source.args("load")) == 1
@@ -122,10 +122,19 @@ def test_a_row_count_other_than_the_publishers_fails_the_load(
 def test_a_failed_download_names_its_relation_and_the_others_still_load(
     source: Source, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (source.published / "ord-0001.csv").unlink()
+    (source.published / "ord-0001-2-2.csv").unlink()
     assert main(source.args("load")) == 1
     assert capsys.readouterr().err.startswith("orders: ")
     assert _rows(source.db, "SELECT count(*) FROM colors") == [(2,)]
+
+
+def test_a_rerun_keeps_the_pages_it_already_has(source: Source) -> None:
+    (source.published / "ord-0001-2-2.csv").rename(source.root / "held.csv")
+    assert main(source.args("load")) == 1
+    (source.root / "held.csv").rename(source.published / "ord-0001-2-2.csv")
+    (source.published / "ord-0001-0-2.csv").unlink()
+    assert main(source.args("load")) == 0
+    assert _rows(source.db, "SELECT count(*) FROM orders") == [(3,)]
 
 
 def test_verify_reports_each_relation_and_the_total(
@@ -163,8 +172,8 @@ def test_verify_fails_a_relation_whose_type_differs_from_the_schema(
 
 def test_a_second_load_skips_a_relation_that_already_verifies(source: Source) -> None:
     assert main(source.args("load")) == 0
-    (source.published / "ord-0001.csv").unlink()
-    (source.published / "ord-0001.count.json").unlink()
+    for published in source.published.glob("ord-0001*"):
+        published.unlink()
     assert main(source.args("load")) == 0
     assert _rows(source.db, "SELECT count(*) FROM orders") == [(3,)]
 

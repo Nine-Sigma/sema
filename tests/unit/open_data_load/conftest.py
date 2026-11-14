@@ -9,9 +9,10 @@ from pathlib import Path
 import pytest
 import yaml
 
+HEADER = "ORDER NO,SHIP DATE,AMOUNT,QTY,Unused Flag,region_code\n"
+PAGE_SIZE = 2
 ORDERS_CSV = (
-    "ORDER NO,SHIP DATE,AMOUNT,QTY,Unused Flag,Region Code\n"
-    "A1,02.01.2020,10.50,3,,007\n"
+    HEADER + "A1,02.01.2020,10.50,3,,007\n"
     "A2,31.12.2021,,4,,010\n"
     "A3,,2.25,,,\n"
 )
@@ -51,7 +52,11 @@ class Source:
     db: Path
 
     def publish(self, name: str, text: str, count: int) -> None:
-        (self.published / f"{name}.csv").write_text(text)
+        """Serve ``text`` as pages of PAGE_SIZE rows, each with the header, then a short page."""
+        header, *rows = text.splitlines(keepends=True)
+        for offset in range(0, len(rows) + 1, PAGE_SIZE):
+            page = header + "".join(rows[offset : offset + PAGE_SIZE])
+            (self.published / f"{name}-{offset}-{PAGE_SIZE}.csv").write_text(page)
         (self.published / f"{name}.count.json").write_text(json.dumps([{"n": str(count)}]))
 
     def write_profile(self, profile: dict[str, object]) -> None:
@@ -67,7 +72,8 @@ class Source:
 def neutral_profile(published: Path) -> dict[str, object]:
     return {
         "date_format": "%d.%m.%Y",
-        "download_url": f"file://{published}/{{dataset}}.csv",
+        "page_url": f"file://{published}/{{dataset}}-{{offset}}-{{limit}}.csv",
+        "page_size": PAGE_SIZE,
         "count_url": f"file://{published}/{{dataset}}.count.json",
         "relations": {
             "orders": {
@@ -78,6 +84,11 @@ def neutral_profile(published: Path) -> dict[str, object]:
             "colors": {"file": "local/colors.csv"},
         },
     }
+
+
+@pytest.fixture(autouse=True)
+def no_retry_wait(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("showcase.open_data_load.fetch_utils.RETRY_SECONDS", 0)
 
 
 @pytest.fixture
