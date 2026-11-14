@@ -26,6 +26,7 @@ from tests.support.connector_fixture import (
     EXPECTED_DETECTED_JOINS,
     MAIN_SCHEMA,
     MAIN_TABLES,
+    UNDETECTABLE_DECLARED_JOIN,
     FixtureJoin,
     fixture_build_config,
     fixture_environment,
@@ -52,8 +53,11 @@ class JoinNode:
     name: str
     pairs: list[Pair]
     uses: set[tuple[str, str]]
+    uses_columns: set[tuple[str, str]]
     from_entities: set[str]
     to_entities: set[str]
+    source: str
+    confidence: float
 
 
 @dataclass(frozen=True)
@@ -61,10 +65,26 @@ class FixtureGraph:
     joins: list[JoinNode]
     entities_on_table: dict[tuple[str, str], set[str]]
     declared_payloads: list[list[Pair]]
+    declared_provenance: dict[str, tuple[str, float]]
     driver: Any
 
     def with_pairs(self, pairs: list[Pair]) -> list[JoinNode]:
         return [join for join in self.joins if join.pairs == pairs]
+
+    def signature(self) -> list[tuple[Any, ...]]:
+        """The join graph with node identities replaced by the tables they sit on."""
+        tables_of = {
+            entity: table for table, entities in self.entities_on_table.items()
+            for entity in entities
+        }
+        return sorted(
+            (join.name, tuple(join.pairs), tuple(sorted(join.uses)),
+             tuple(sorted(join.uses_columns)),
+             tuple(sorted(tables_of[e] for e in join.from_entities)),
+             tuple(sorted(tables_of[e] for e in join.to_entities)),
+             join.source, join.confidence)
+            for join in self.joins
+        )
 
 
 def _pairs(raw: Any) -> list[Pair]:
@@ -90,18 +110,24 @@ _JOINS_QUERY = (
     "MATCH (jp:JoinPath) "
     "OPTIONAL MATCH (jp)-[:USES]->(t:Table) "
     "WITH jp, collect(DISTINCT [t.name, t.schema_name]) AS uses "
+    "OPTIONAL MATCH (jp)-[:USES]->(c:Column) "
+    "WITH jp, uses, collect(DISTINCT [c.table_name, c.name]) AS uses_columns "
     "OPTIONAL MATCH (jp)-[:FROM_ENTITY]->(fe:Entity) "
-    "WITH jp, uses, collect(DISTINCT elementId(fe)) AS from_entities "
+    "WITH jp, uses, uses_columns, collect(DISTINCT elementId(fe)) AS from_entities "
     "OPTIONAL MATCH (jp)-[:TO_ENTITY]->(te:Entity) "
     "RETURN elementId(jp) AS node_id, jp.name AS name, "
-    "jp.join_predicates AS join_predicates, uses, from_entities, "
-    "collect(DISTINCT elementId(te)) AS to_entities"
+    "jp.join_predicates AS join_predicates, uses, uses_columns, from_entities, "
+    "collect(DISTINCT elementId(te)) AS to_entities, "
+    "jp.source AS source, jp.confidence AS confidence"
 )
 _ENTITIES_QUERY = (
     "MATCH (e:Entity)-[:ENTITY_ON_TABLE]->(t:Table) "
     "RETURN elementId(e) AS entity, t.name AS table_name, t.schema_name AS schema_name"
 )
-_DECLARED_QUERY = "MATCH (a:Assertion {predicate: 'joins_to'}) RETURN a.payload AS payload"
+_DECLARED_QUERY = (
+    "MATCH (a:Assertion {predicate: 'joins_to'}) "
+    "RETURN a.payload AS payload, a.source AS source, a.confidence AS confidence"
+)
 
 
 def _read_graph(driver: Any) -> FixtureGraph:
@@ -110,18 +136,23 @@ def _read_graph(driver: Any) -> FixtureGraph:
             node_id=row["node_id"], name=row["name"] or "",
             pairs=_pairs(row["join_predicates"]),
             uses={(name, schema) for name, schema in row["uses"] if name is not None},
+            uses_columns={(t, c) for t, c in row["uses_columns"] if t is not None},
             from_entities=set(row["from_entities"]), to_entities=set(row["to_entities"]),
+            source=row["source"], confidence=row["confidence"],
         )
         for row in _read(driver, _JOINS_QUERY)
     ]
     entities: dict[tuple[str, str], set[str]] = {}
     for row in _read(driver, _ENTITIES_QUERY):
         entities.setdefault((row["table_name"], row["schema_name"]), set()).add(row["entity"])
-    declared = [
-        _pairs(_payload(row["payload"]).get("join_predicates"))
+    declared_rows = [
+        (_pairs(_payload(row["payload"]).get("join_predicates")), row)
         for row in _read(driver, _DECLARED_QUERY)
     ]
-    return FixtureGraph(joins, entities, declared, driver)
+    provenance = {
+        repr(pairs): (row["source"], row["confidence"]) for pairs, row in declared_rows
+    }
+    return FixtureGraph(joins, entities, [p for p, _ in declared_rows], provenance, driver)
 
 
 def _neo4j_config() -> Neo4jConfig:
@@ -132,14 +163,22 @@ def _neo4j_config() -> Neo4jConfig:
     )
 
 
-@pytest.fixture
-def graph(clean_neo4j: Any) -> FixtureGraph:
+def _build(driver: Any, *, wipe: bool = False, **overrides: Any) -> FixtureGraph:
+    if wipe:
+        with driver.session() as session:
+            session.run("MATCH (n) DETACH DELETE n")
+    config = fixture_build_config(_neo4j_config()).model_copy(update=overrides)
     with fixture_environment():
-        report = run_build(fixture_build_config(_neo4j_config()))
+        report = run_build(config)
     assert report["tables_failed"] == 0, report["failed_tables"]
-    built = _read_graph(clean_neo4j)
+    built = _read_graph(driver)
     assert built.joins, "run_build wrote no JoinPath"
     return built
+
+
+@pytest.fixture
+def graph(clean_neo4j: Any) -> FixtureGraph:
+    return _build(clean_neo4j)
 
 
 def _matches_decoy(join: JoinNode, decoy: FixtureJoin) -> bool:
@@ -242,3 +281,68 @@ def test_no_decoy_join_is_present(graph: FixtureGraph) -> None:
         for decoy in DECOY_JOINS for join in graph.joins if _matches_decoy(join, decoy)
     ]
     assert not present
+
+
+def _declared_pairs() -> list[list[Pair]]:
+    return [
+        [(key.referenced_table, referenced, table.name, referencing)
+         for referencing, referenced in sorted(zip(key.columns, key.referenced_columns))]
+        for table in MAIN_TABLES for key in table.declared_keys
+    ]
+
+
+def _fully_wired(graph: FixtureGraph, pairs: list[Pair]) -> list[str]:
+    """What the one join on ``pairs`` lacks: relations, columns or entity links."""
+    joins = graph.with_pairs(pairs)
+    if len(joins) != 1:
+        return [f"{len(joins)} joins on {pairs}"]
+    join = joins[0]
+    left, right = pairs[0][0], pairs[0][2]
+    gaps = [f"USES {t}" for t in (left, right) if (t, MAIN_SCHEMA) not in join.uses]
+    gaps += [
+        f"USES {t}.{c}" for p in pairs for t, c in ((p[0], p[1]), (p[2], p[3]))
+        if (t, c) not in join.uses_columns
+    ]
+    if not join.from_entities & graph.entities_on_table.get((left, MAIN_SCHEMA), set()):
+        gaps.append("FROM_ENTITY")
+    if not join.to_entities & graph.entities_on_table.get((right, MAIN_SCHEMA), set()):
+        gaps.append("TO_ENTITY")
+    return gaps
+
+
+UNDETECTABLE_PAIRS: list[Pair] = [(
+    UNDETECTABLE_DECLARED_JOIN.referenced_table or "",
+    UNDETECTABLE_DECLARED_JOIN.referenced_column or "",
+    UNDETECTABLE_DECLARED_JOIN.referencing_table,
+    UNDETECTABLE_DECLARED_JOIN.referencing_column,
+)]
+
+
+def test_a_key_declared_before_its_referenced_table_is_built_is_fully_wired(
+    graph: FixtureGraph,
+) -> None:
+    assert _fully_wired(graph, UNDETECTABLE_PAIRS) == []
+
+
+def test_declared_and_detected_join_keeps_the_declared_source_and_confidence(
+    graph: FixtureGraph,
+) -> None:
+    [join] = graph.with_pairs(DECLARED_AND_DETECTED)
+    assert (join.source, join.confidence) == graph.declared_provenance[repr(DECLARED_AND_DETECTED)]
+
+
+def test_the_graph_is_the_same_with_parallel_table_workers(graph: FixtureGraph) -> None:
+    parallel = _build(graph.driver, wipe=True, table_workers=4)
+    assert _fully_wired(parallel, UNDETECTABLE_PAIRS) == []
+    assert parallel.signature() == graph.signature()
+
+
+def test_a_resumed_build_keeps_the_same_join_graph(graph: FixtureGraph) -> None:
+    resumed = _build(graph.driver, resume=True)
+    assert resumed.signature() == graph.signature()
+
+
+def test_declared_joins_are_fully_wired_with_fk_detection_off(clean_neo4j: Any) -> None:
+    built = _build(clean_neo4j, enable_fk_detection=False)
+    gaps = {repr(pairs): g for pairs in _declared_pairs() if (g := _fully_wired(built, pairs))}
+    assert gaps == {}

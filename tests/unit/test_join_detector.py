@@ -312,3 +312,24 @@ class TestAssertionEmission:
         assert assertion.payload["tier"] == 3
         assert assertion.subject_ref == cols[1].ref
         assert assertion.object_ref == cols[0].ref
+
+
+class TestReferencedColumnWithoutProfile:
+    COLS = [_col("item_id", "item"), _col("item_id", "line")]
+
+    def test_containment_cannot_lift_it_above_tier_3(self):
+        out = JoinDetector().detect(
+            columns=self.COLS, source_schema=SCHEMA, profiles={},
+            sampler=lambda key: {"1", "2"},
+            containment=lambda key, values: len(values),
+        )
+        assert [(fk.tier, fk.confidence) for fk in out] == [(3, TIER_3)]
+
+    def test_it_stays_behind_the_structural_opt_in(self):
+        out = JoinDetector().detect(
+            columns=self.COLS, source_schema=SCHEMA,
+            sampler=lambda key: {"1", "2"},
+            containment=lambda key, values: len(values),
+        )
+        assert JoinDetector().should_materialize(out[0]) is False
+        assert JoinDetector(materialization_threshold=0.70).should_materialize(out[0]) is True

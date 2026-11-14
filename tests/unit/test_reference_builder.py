@@ -29,6 +29,8 @@ TABLE_KEY = PhysicalKey("host.example", "cat", "sch", "tbl")
     TABLE_KEY,
     replace(TABLE_KEY, column="col"),
     replace(TABLE_KEY, column="a.b"),
+    replace(TABLE_KEY, column="a/b"),
+    replace(TABLE_KEY, column="a.b/c"),
 ])
 def test_build_is_the_inverse_of_parse(key: PhysicalKey) -> None:
     assert CanonicalRef.parse(CanonicalRef.build("databricks", key)) == key
@@ -45,8 +47,10 @@ def test_build_renders_the_slash_form() -> None:
     ("databricks", replace(TABLE_KEY, table="")),
     ("databricks", replace(TABLE_KEY, schema=None)),
     ("databricks", replace(TABLE_KEY, column="")),
+    ("databricks", replace(TABLE_KEY, datasource_id="a/b")),
     ("databricks", replace(TABLE_KEY, catalog_or_db="a/b")),
-    ("databricks", replace(TABLE_KEY, column="a/b")),
+    ("databricks", replace(TABLE_KEY, schema="a/b")),
+    ("databricks", replace(TABLE_KEY, table="a/b")),
 ])
 def test_build_rejects_unrenderable_keys(scheme: str, key: PhysicalKey) -> None:
     with pytest.raises(ValueError):
@@ -58,6 +62,12 @@ def test_with_column_builds_over_the_parsed_table_key() -> None:
     assert CanonicalRef.with_column(table_ref, "col") == CanonicalRef.build(
         "databricks", replace(TABLE_KEY, column="col"),
     )
+
+
+def test_with_column_round_trips_a_column_name_holding_a_slash() -> None:
+    table_ref = CanonicalRef.build("databricks", TABLE_KEY)
+    column_ref = CanonicalRef.with_column(table_ref, "a/b")
+    assert CanonicalRef.parse(column_ref) == replace(TABLE_KEY, column="a/b")
 
 
 def test_with_column_rejects_a_column_ref() -> None:

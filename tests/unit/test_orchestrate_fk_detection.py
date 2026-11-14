@@ -91,7 +91,7 @@ def test_threshold_drops_to_070_with_structural_opt_in():
     assert captured["materialization_threshold"] == 0.70
 
 
-def test_filters_by_should_materialize_then_calls_materializer():
+def test_returns_only_joins_above_the_threshold_by_schema():
     loader = MagicMock()
     config = _build_config()
     columns = _columns_with_fk_pair()
@@ -112,21 +112,13 @@ def test_filters_by_should_materialize_then_calls_materializer():
         return_value=detector_inst,
     ), patch(
         "sema.pipeline.orchestrate_utils.to_fk_assertion"
-    ) as to_fk, patch(
-        "sema.pipeline.orchestrate_utils.materialize_join_paths"
-    ) as materialize:
-        to_fk.return_value = MagicMock(
-            subject_ref="ref-1",
-            predicate=MagicMock(value="fk_to"),
-        )
-        run_fk_detection(
+    ) as to_fk:
+        detected = run_fk_detection(
             loader, _connector(), config, [SCHEMA], run_id="r-1",
         )
 
     to_fk.assert_called_once_with(above, "r-1")
-    materialize.assert_called_once()
-    _, kwargs = materialize.call_args
-    assert kwargs["source_schema"] == SCHEMA
+    assert detected == {SCHEMA: [to_fk.return_value]}
 
 
 def test_skips_schemas_with_no_columns():
@@ -135,13 +127,11 @@ def test_skips_schemas_with_no_columns():
     with patch(
         "sema.pipeline.orchestrate_utils.fetch_columns_by_schema",
         return_value=[],
-    ), patch(
-        "sema.pipeline.orchestrate_utils.materialize_join_paths"
-    ) as materialize:
-        run_fk_detection(
+    ):
+        detected = run_fk_detection(
             loader, _connector(), config, [SCHEMA], run_id="r-1",
         )
-    materialize.assert_not_called()
+    assert detected == {}
 
 
 def test_passes_sampler_and_profiles_to_detector():
@@ -205,7 +195,7 @@ def test_prebuilds_profiles_only_for_candidate_columns():
     assert (SCHEMA, "sample", "patient_id") in keys
 
 
-def test_two_detected_joins_from_one_column_both_reach_the_materializer():
+def test_two_detected_joins_from_one_column_are_both_returned():
     loader = MagicMock()
     first = MagicMock(subject_ref="ref-1", predicate=MagicMock(value="fk_to"))
     second = MagicMock(subject_ref="ref-1", predicate=MagicMock(value="fk_to"))
@@ -222,28 +212,10 @@ def test_two_detected_joins_from_one_column_both_reach_the_materializer():
     ), patch(
         "sema.pipeline.orchestrate_utils.to_fk_assertion",
         side_effect=[first, second],
-    ), patch(
-        "sema.pipeline.orchestrate_utils.materialize_join_paths"
-    ) as materialize:
-        run_fk_detection(
+    ):
+        detected = run_fk_detection(
             loader, _connector(), _build_config(), [SCHEMA], run_id="r-1",
         )
 
-    groups = materialize.call_args.args[1]
-    assert groups == {("ref-1", "fk_to"): [first, second]}
+    assert detected == {SCHEMA: [first, second]}
 
-
-def test_passes_containment_to_detector():
-    detector_inst = MagicMock()
-    detector_inst.detect.return_value = []
-    with patch(
-        "sema.pipeline.orchestrate_utils.fetch_columns_by_schema",
-        return_value=_columns_with_fk_pair(),
-    ), patch(
-        "sema.pipeline.orchestrate_utils.JoinDetector",
-        return_value=detector_inst,
-    ):
-        run_fk_detection(
-            MagicMock(), _connector(), _build_config(), [SCHEMA], run_id="r-1",
-        )
-    assert detector_inst.detect.call_args.kwargs["containment"] is not None
