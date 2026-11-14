@@ -29,6 +29,7 @@ def _col(name: str, table: str, dtype: str = "STRING") -> ExtractedColumn:
     return ExtractedColumn(
         name=name, table_name=table,
         catalog=CAT, schema=SCHEMA, data_type=dtype,
+        ref=f"databricks://host/{CAT}/{SCHEMA}/{table}/{name}",
     )
 
 
@@ -68,9 +69,11 @@ class TestCandidateEnumeration:
         cols = [
             ExtractedColumn(
                 "patient_id", "patient", CAT, "schema_a", "STRING",
+                ref="ref-a",
             ),
             ExtractedColumn(
                 "patient_id", "sample", CAT, "schema_b", "STRING",
+                ref="ref-b",
             ),
         ]
         cands = enumerate_candidates_from_metadata(cols)
@@ -261,3 +264,5 @@ class TestAssertionEmission:
         assert assertion.payload["fk_table"] == "sample"
         assert assertion.payload["pk_table"] == "patient"
         assert assertion.payload["tier"] == 3
+        assert assertion.subject_ref == cols[1].ref
+        assert assertion.object_ref == cols[0].ref

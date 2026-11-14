@@ -34,6 +34,8 @@ class FKCandidate:
     pk_type: str
     fk_type: str
     schema_name: str
+    pk_ref: str
+    fk_ref: str
     catalog: str = ""
 
 
@@ -98,12 +100,12 @@ def _candidates_within_schema(
     out: list[FKCandidate] = []
     for fk_col in cols:
         root = fk_name_root(fk_col.name)
-        if not root:
+        if not root or fk_col.ref is None:
             continue
         if fk_col.table_name.lower() == root:
             continue
         for pk_col in cols:
-            if pk_col is fk_col:
+            if pk_col is fk_col or pk_col.ref is None:
                 continue
             if pk_col.table_name == fk_col.table_name:
                 continue
@@ -119,6 +121,8 @@ def _candidates_within_schema(
                 pk_type=pk_col.data_type,
                 fk_type=fk_col.data_type,
                 schema_name=fk_col.schema,
+                pk_ref=pk_col.ref,
+                fk_ref=fk_col.ref,
                 catalog=fk_col.catalog,
             ))
     return out

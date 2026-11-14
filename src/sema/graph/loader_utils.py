@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from sema.graph.term_identity_utils import term_namespace
+from sema.log import logger
 from sema.models.extraction import ExtractedColumn
 
 if TYPE_CHECKING:
@@ -53,7 +54,7 @@ _FETCH_COLUMNS_QUERY = (
     "RETURN c.name AS name, c.table_name AS table_name, "
     "c.catalog AS catalog, c.schema_name AS schema_name, "
     "c.data_type AS data_type, c.nullable AS nullable, "
-    "c.comment AS comment"
+    "c.comment AS comment, c.ref AS ref"
 )
 
 
@@ -63,7 +64,7 @@ def fetch_columns_by_schema(
     rows = loader._run_read(
         _FETCH_COLUMNS_QUERY, schema_name=schema_name,
     )
-    return [
+    columns = [
         ExtractedColumn(
             name=row["name"],
             table_name=row["table_name"],
@@ -72,9 +73,14 @@ def fetch_columns_by_schema(
             data_type=row.get("data_type", "UNKNOWN"),
             nullable=bool(row.get("nullable", True)),
             comment=row.get("comment"),
+            ref=row.get("ref"),
         )
         for row in rows
     ]
+    for col in columns:
+        if col.ref is None:
+            logger.warning(f"Column {col.table_name}.{col.name} has no ref; no join candidate")
+    return columns
 
 
 def _annotate_rows(
