@@ -68,7 +68,7 @@ class CypherQueries:
         return (
             "MATCH (e:Entity {name: $entity_name})-[:ENTITY_ON_TABLE]->(t:Table) "
             "OPTIONAL MATCH (e)-[:HAS_PROPERTY]->(p:Property)"
-            "-[:PROPERTY_ON_COLUMN]->(c:Column) "
+            "-[:PROPERTY_ON_COLUMN]->(c:Column)-[:IN_TABLE]->(t) "
             "RETURN t.name AS table_name, t.schema_name AS schema_name, "
             "t.catalog AS catalog, "
             "collect({property: p.name, column: c.name, "
@@ -86,7 +86,7 @@ class CypherQueries:
             "WHERE (e.model_role = $model_role OR $model_role IS NULL) "
             "AND (e.schema_name = $schema_name OR $schema_name IS NULL) "
             "OPTIONAL MATCH (e)-[:HAS_PROPERTY]->(p:Property)"
-            "-[:PROPERTY_ON_COLUMN]->(c:Column) "
+            "-[:PROPERTY_ON_COLUMN]->(c:Column)-[:IN_TABLE]->(t) "
             "RETURN t.name AS table_name, t.schema_name AS schema_name, "
             "t.catalog AS catalog, "
             "collect({property: p.name, column: c.name, "
