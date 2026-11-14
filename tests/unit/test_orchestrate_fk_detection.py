@@ -203,3 +203,47 @@ def test_prebuilds_profiles_only_for_candidate_columns():
     keys = set(profile_calls)
     assert (SCHEMA, "patient", "patient_id") in keys
     assert (SCHEMA, "sample", "patient_id") in keys
+
+
+def test_two_detected_joins_from_one_column_both_reach_the_materializer():
+    loader = MagicMock()
+    first = MagicMock(subject_ref="ref-1", predicate=MagicMock(value="fk_to"))
+    second = MagicMock(subject_ref="ref-1", predicate=MagicMock(value="fk_to"))
+    detector_inst = MagicMock()
+    detector_inst.detect.return_value = ["fk-a", "fk-b"]
+    detector_inst.should_materialize.return_value = True
+
+    with patch(
+        "sema.pipeline.orchestrate_utils.fetch_columns_by_schema",
+        return_value=_columns_with_fk_pair(),
+    ), patch(
+        "sema.pipeline.orchestrate_utils.JoinDetector",
+        return_value=detector_inst,
+    ), patch(
+        "sema.pipeline.orchestrate_utils.to_fk_assertion",
+        side_effect=[first, second],
+    ), patch(
+        "sema.pipeline.orchestrate_utils.materialize_join_paths"
+    ) as materialize:
+        run_fk_detection(
+            loader, _connector(), _build_config(), [SCHEMA], run_id="r-1",
+        )
+
+    groups = materialize.call_args.args[1]
+    assert groups == {("ref-1", "fk_to"): [first, second]}
+
+
+def test_passes_containment_to_detector():
+    detector_inst = MagicMock()
+    detector_inst.detect.return_value = []
+    with patch(
+        "sema.pipeline.orchestrate_utils.fetch_columns_by_schema",
+        return_value=_columns_with_fk_pair(),
+    ), patch(
+        "sema.pipeline.orchestrate_utils.JoinDetector",
+        return_value=detector_inst,
+    ):
+        run_fk_detection(
+            MagicMock(), _connector(), _build_config(), [SCHEMA], run_id="r-1",
+        )
+    assert detector_inst.detect.call_args.kwargs["containment"] is not None

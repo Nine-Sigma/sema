@@ -46,7 +46,7 @@ def _loader(tables: list[str]) -> MagicMock:
     loader._run_read.return_value = [
         {"name": name, "table_name": table, "catalog": CATALOG,
          "schema_name": SCHEMA, "data_type": data_type, "nullable": True,
-         "comment": None}
+         "comment": None, "ref": f"{CATALOG}/{SCHEMA}/{table}/{name}"}
         for table in tables for name, data_type in COLUMNS[table]
     ]
     return loader

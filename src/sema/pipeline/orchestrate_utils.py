@@ -21,6 +21,7 @@ from sema.engine.join_detector_utils import (
     enumerate_candidates_from_metadata,
 )
 from sema.engine.warehouse_lookup import (
+    WarehouseContainment,
     WarehouseProfileLookup,
     WarehouseSampler,
 )
@@ -323,9 +324,8 @@ def run_fk_detection(
     Skips entirely when `enable_fk_detection=False`. Threshold derives
     from `materialize_structural_fk` (0.70 if opt-in, else 0.80) so
     Tier-3 structural-only matches stay gated by an explicit user flag.
-    The detector receives a lazy `sampler` (Tier 1 sample-set
-    verification) and a pre-built `profiles` dict for candidate columns
-    (Tier 2 cardinality verification).
+    The detector receives a lazy `sampler` and `containment` (Tier 1) and
+    pre-built candidate `profiles` (uniqueness and Tier 2 cardinality).
     """
     if not config.enable_fk_detection:
         return
@@ -338,6 +338,7 @@ def run_fk_detection(
     profile_lookup = WarehouseProfileLookup(
         query_fn=connector.execute_query, catalog=config.catalog,
     )
+    containment = WarehouseContainment(query_fn=connector.execute_query, catalog=config.catalog)
     for schema in schemas:
         columns = fetch_columns_by_schema(loader, schema)
         if not columns:
@@ -347,16 +348,15 @@ def run_fk_detection(
         )
         fks = detector.detect(
             columns=columns, source_schema=schema,
-            profiles=profiles, sampler=sampler,
+            profiles=profiles, sampler=sampler, containment=containment,
         )
         keep = [fk for fk in fks if detector.should_materialize(fk)]
         if not keep:
             continue
         assertions = [to_fk_assertion(fk, run_id) for fk in keep]
-        groups = {
-            (a.subject_ref, a.predicate.value): [a]
-            for a in assertions
-        }
+        groups: dict[tuple[str, str], list[Any]] = {}
+        for a in assertions:
+            groups.setdefault((a.subject_ref, a.predicate.value), []).append(a)
         materialize_join_paths(
             loader, groups, source_schema=schema,
         )

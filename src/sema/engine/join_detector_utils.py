@@ -1,7 +1,7 @@
 """Helpers for the FK / join detector.
 
-Pure-functional name-pattern matching, type compatibility, and
-sample-set verification. The detector itself orchestrates these
+Pure-functional name-affinity matching, type compatibility, and
+cardinality verification. The detector itself orchestrates these
 helpers; the helpers never touch I/O.
 """
 from __future__ import annotations
@@ -67,23 +67,29 @@ def fk_name_root(column_name: str) -> str | None:
     return match.group("entity") if match else None
 
 
-def is_pk_match(pk_table: str, pk_column: str, fk_root: str) -> bool:
-    """A PK candidate matches the FK's entity root.
+def has_name_affinity(
+    fk_name: str, pk_col: ExtractedColumn, fk_root: str,
+) -> bool:
+    """Names propose a pair; data evidence decides it.
 
-    A column qualifies as a PK candidate when (a) its table name equals
-    the FK root, or (b) the column name itself equals `<root>_id` /
-    `<root>_key` / `<root>_code` — the same FK suffix pattern.
+    Equal names, a role prefix before a key-shaped referenced name
+    (`from_<x>_id` -> `<x>_id`), or a referenced table named after the
+    referencing root. A bare `id` is not key-shaped, so it never pairs
+    by prefix with every `<x>_id`.
     """
-    if pk_table.lower() == fk_root:
+    fk = fk_name.lower()
+    pk = pk_col.name.lower()
+    if fk == pk:
         return True
-    pk_root = fk_name_root(pk_column)
-    return pk_root == fk_root
+    if fk.endswith(f"_{pk}") and fk_name_root(pk) is not None:
+        return True
+    return pk_col.table_name.lower() == fk_root
 
 
 def enumerate_candidates_from_metadata(
     columns: list[ExtractedColumn],
 ) -> list[FKCandidate]:
-    """Enumerate intra-schema FK candidates by name pattern + type."""
+    """Enumerate intra-schema FK candidates by name affinity + type."""
     by_schema: dict[str, list[ExtractedColumn]] = {}
     for col in columns:
         by_schema.setdefault(col.schema, []).append(col)
@@ -109,7 +115,7 @@ def _candidates_within_schema(
                 continue
             if pk_col.table_name == fk_col.table_name:
                 continue
-            if pk_col.table_name.lower() != root:
+            if not has_name_affinity(fk_col.name, pk_col, root):
                 continue
             if not types_compatible(pk_col.data_type, fk_col.data_type):
                 continue
@@ -126,27 +132,6 @@ def _candidates_within_schema(
                 catalog=fk_col.catalog,
             ))
     return out
-
-
-def coverage_ratio(
-    fk_values: set[str], pk_values: set[str],
-) -> float:
-    """Fraction of FK distinct values that appear in PK distinct values."""
-    if not fk_values:
-        return 0.0
-    return len(fk_values & pk_values) / len(fk_values)
-
-
-def verify_data_subset(
-    fk_values: set[str],
-    pk_values: set[str],
-    *,
-    coverage_threshold: float = 0.80,
-) -> bool:
-    """FK ⊆ PK with at least `coverage_threshold` of FK values matched."""
-    if not fk_values:
-        return False
-    return coverage_ratio(fk_values, pk_values) >= coverage_threshold
 
 
 def verify_cardinality(
