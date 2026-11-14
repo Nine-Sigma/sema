@@ -254,7 +254,10 @@ def _join_paths(loader: MagicMock) -> dict[str, dict[str, Any]]:
 def _uses(loader: MagicMock) -> dict[str, set[str]]:
     uses: dict[str, set[str]] = {}
     for call in loader.add_join_path_uses.call_args_list:
-        uses.setdefault(call.args[0], set()).add(call.args[1])
+        key = call.args[1]
+        uses.setdefault(call.args[0], set()).add(
+            f"{key.catalog_or_db}.{key.schema}.{key.table}"
+        )
     return uses
 
 

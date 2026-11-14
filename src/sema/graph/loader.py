@@ -21,6 +21,7 @@ from sema.models.assertions import (
     AssertionPredicate,
     AssertionStatus,
 )
+from sema.models.physical_key import PhysicalKey
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,25 @@ def _require_source_schema(method: str, source_schema: str | None) -> None:
             f"{method} requires source_schema; the relationship MERGE key "
             f"includes source_schema for multi-study isolation"
         )
+
+
+def _table_by_key(prefix: str = "") -> str:
+    return (
+        f"Table {{name: ${prefix}table, schema_name: ${prefix}schema, "
+        f"catalog: ${prefix}catalog}}"
+    )
+
+
+_COLUMN_BY_KEY = (
+    "Column {name: $column, table_name: $table, schema_name: $schema, catalog: $catalog}"
+)
+
+
+def _key_params(key: PhysicalKey, prefix: str = "") -> dict[str, str | None]:
+    return {
+        f"{prefix}table": key.table, f"{prefix}schema": key.schema or "",
+        f"{prefix}catalog": key.catalog_or_db, f"{prefix}column": key.column,
+    }
 
 
 class GraphLoader:
@@ -418,57 +438,33 @@ class GraphLoader:
         )
 
     def add_join_path_uses(
-        self, join_path_name: str, table_ref: str,
-        column_name: str | None = None,
+        self, join_path_name: str, key: PhysicalKey,
         source_schema: str | None = None,
     ) -> None:
         _require_source_schema("add_join_path_uses", source_schema)
-        if column_name:
-            self._run(
-                "MATCH (jp:JoinPath {name: $jp_name, "
-                "source_schema: $source_schema}) "
-                "MATCH (c:Column {ref: $ref}) "
-                "MERGE (jp)-[u:USES "
-                "{source_schema: $source_schema}]->(c)",
-                jp_name=join_path_name, ref=table_ref,
-                source_schema=source_schema,
-            )
-        else:
-            self._run(
-                "MATCH (jp:JoinPath {name: $jp_name, "
-                "source_schema: $source_schema}) "
-                "MATCH (t:Table {ref: $ref}) "
-                "MERGE (jp)-[u:USES "
-                "{source_schema: $source_schema}]->(t)",
-                jp_name=join_path_name, ref=table_ref,
-                source_schema=source_schema,
-            )
+        node = _COLUMN_BY_KEY if key.column is not None else _table_by_key()
+        self._run(
+            "MATCH (jp:JoinPath {name: $jp_name, source_schema: $source_schema}) "
+            f"MATCH (n:{node}) "
+            "MERGE (jp)-[u:USES {source_schema: $source_schema}]->(n)",
+            jp_name=join_path_name, source_schema=source_schema, **_key_params(key),
+        )
 
     def add_join_path_entity_links(
-        self, join_path_name: str, from_table_ref: str,
-        to_table_ref: str,
+        self, join_path_name: str, from_key: PhysicalKey, to_key: PhysicalKey,
         source_schema: str | None = None,
     ) -> None:
         _require_source_schema("add_join_path_entity_links", source_schema)
         self._run(
-            "MATCH (jp:JoinPath {name: $jp_name, "
-            "source_schema: $source_schema}) "
-            "OPTIONAL MATCH (fe:Entity)-[:ENTITY_ON_TABLE]->"
-            "(:Table {ref: $from_ref}) "
-            "OPTIONAL MATCH (te:Entity)-[:ENTITY_ON_TABLE]->"
-            "(:Table {ref: $to_ref}) "
-            "FOREACH (_ IN CASE WHEN fe IS NOT NULL "
-            "THEN [1] ELSE [] END | "
-            "MERGE (jp)-[fr:FROM_ENTITY "
-            "{source_schema: $source_schema}]->(fe)) "
-            "FOREACH (_ IN CASE WHEN te IS NOT NULL "
-            "THEN [1] ELSE [] END | "
-            "MERGE (jp)-[to_:TO_ENTITY "
-            "{source_schema: $source_schema}]->(te))",
-            jp_name=join_path_name,
-            from_ref=from_table_ref,
-            to_ref=to_table_ref,
-            source_schema=source_schema,
+            "MATCH (jp:JoinPath {name: $jp_name, source_schema: $source_schema}) "
+            f"OPTIONAL MATCH (fe:Entity)-[:ENTITY_ON_TABLE]->(:{_table_by_key('from_')}) "
+            f"OPTIONAL MATCH (te:Entity)-[:ENTITY_ON_TABLE]->(:{_table_by_key('to_')}) "
+            "FOREACH (_ IN CASE WHEN fe IS NOT NULL THEN [1] ELSE [] END | "
+            "MERGE (jp)-[:FROM_ENTITY {source_schema: $source_schema}]->(fe)) "
+            "FOREACH (_ IN CASE WHEN te IS NOT NULL THEN [1] ELSE [] END | "
+            "MERGE (jp)-[:TO_ENTITY {source_schema: $source_schema}]->(te))",
+            jp_name=join_path_name, source_schema=source_schema,
+            **_key_params(from_key, "from_"), **_key_params(to_key, "to_"),
         )
 
     def store_assertion(

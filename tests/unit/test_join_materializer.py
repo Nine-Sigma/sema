@@ -10,7 +10,6 @@ from sema.engine.join_detector import FKAssertion, to_fk_assertion
 from sema.engine.join_detector_utils import FKCandidate
 from sema.graph.join_materializer import (
     _build_join_path_records,
-    _derive_join_path_name,
     materialize_join_paths,
 )
 from sema.models.assertions import (
@@ -32,8 +31,8 @@ def _join_assertion(name: str = "patient_to_sample"):
             "operator": "=",
         }],
         "hop_count": 1,
-        "from_table": "databricks://ws/cat/sch/patient",
-        "to_table": "databricks://ws/cat/sch/sample",
+        "from_ref": "databricks://ws/cat/sch/patient",
+        "to_ref": "databricks://ws/cat/sch/sample",
     }
     return Assertion(
         id=f"a-{name}",
@@ -46,14 +45,6 @@ def _join_assertion(name: str = "patient_to_sample"):
         run_id="run-1",
         observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-
-
-def test_derive_join_path_name():
-    name = _derive_join_path_name([
-        {"left_table": "p", "left_column": "id",
-         "right_table": "s", "right_column": "p_id"},
-    ])
-    assert name == "p/id=s/p_id"
 
 
 def test_build_join_path_records_skips_empty_group():
@@ -109,21 +100,16 @@ def test_fk_to_predicate_produces_join_path():
         assert call.kwargs.get("source_schema") == SCHEMA
 
 
-def test_fk_to_and_legacy_join_evidence_coexist():
+def test_fk_to_and_join_evidence_on_one_pair_merge_into_one_record():
     loader = MagicMock()
-    legacy = _join_assertion(name="legacy")
+    evidence = _join_assertion(name="evidence")
     fk = _fk_to_assertion()
     groups = {
-        (legacy.subject_ref, legacy.predicate.value): [legacy],
+        (evidence.subject_ref, evidence.predicate.value): [evidence],
         (fk.subject_ref, fk.predicate.value): [fk],
     }
     materialize_join_paths(loader, groups, source_schema=SCHEMA)
     rows = [
         c for c in loader.method_calls if c[0] == "_run"
     ][0].kwargs["rows"]
-    names = sorted(r["name"] for r in rows)
-    assert names == [
-        "patient/patient_id=sample/patient_id",
-        "patient/patient_id=sample/patient_id",
-    ]
-    assert len(rows) == 2
+    assert [r["name"] for r in rows] == ["patient/patient_id=sample/patient_id"]

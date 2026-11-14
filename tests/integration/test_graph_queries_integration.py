@@ -3,6 +3,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 from sema.graph.loader import GraphLoader
+from sema.models.physical_key import PhysicalKey
 from sema.graph.queries import CypherQueries
 
 
@@ -11,7 +12,7 @@ def loaded_graph(clean_neo4j):
     """Load a small test graph for query testing."""
     loader = GraphLoader(clean_neo4j)
 
-    # Physical layer (refs let `add_join_path_uses` MATCH the tables)
+    # Physical layer
     loader.upsert_catalog("cdm")
     loader.upsert_schema("clinical", "cdm")
     diag_ref = "unity://cdm.clinical.cancer_diagnosis"
@@ -65,8 +66,9 @@ def loaded_graph(clean_neo4j):
         source="heuristic", confidence=0.8,
         source_schema="clinical",
     )
-    loader.add_join_path_uses(jp_name, diag_ref, source_schema="clinical")
-    loader.add_join_path_uses(jp_name, surg_ref, source_schema="clinical")
+    for table in ("cancer_diagnosis", "cancer_surgery"):
+        key = PhysicalKey("unity", "cdm", "clinical", table)
+        loader.add_join_path_uses(jp_name, key, source_schema="clinical")
 
     return clean_neo4j
 
