@@ -19,6 +19,7 @@ from sema.models.extraction import (
     ExtractedTag,
     ExtractedTopValues,
 )
+from sema.models.physical_key import CanonicalRef, PhysicalKey
 
 
 class AssertionNormalizer:
@@ -35,15 +36,16 @@ class AssertionNormalizer:
         self._platform = platform
 
     def _table_ref(self, catalog: str, schema: str, table: str) -> str:
-        return (
-            f"{self._platform}://{self._workspace}"
-            f"/{catalog}/{schema}/{table}"
+        return CanonicalRef.build(
+            self._platform, PhysicalKey(self._workspace, catalog, schema, table),
         )
 
     def _column_ref(
         self, catalog: str, schema: str, table: str, column: str,
     ) -> str:
-        return f"{self._table_ref(catalog, schema, table)}/{column}"
+        return CanonicalRef.build(
+            self._platform, PhysicalKey(self._workspace, catalog, schema, table, column),
+        )
 
     def _make(
         self,

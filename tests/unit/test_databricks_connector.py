@@ -350,12 +350,12 @@ class TestExtractTable:
         ]
         mock_cursor.description = [("col1",), ("col2",)]
 
-        work_item = TableWorkItem(catalog="cdm", schema="clinical", table_name="cancer_diagnosis", fqn="unity://cdm.clinical.cancer_diagnosis")
+        work_item = TableWorkItem(catalog="cdm", schema="clinical", table_name="cancer_diagnosis", fqn="databricks://test.databricks.com/cdm/clinical/cancer_diagnosis")
         assertions = connector.extract_table(work_item)
 
         table_assertions = [a for a in assertions if a.predicate == AssertionPredicate.TABLE_EXISTS]
         assert len(table_assertions) == 1
-        assert table_assertions[0].subject_ref == "unity://cdm.clinical.cancer_diagnosis"
+        assert table_assertions[0].subject_ref == "databricks://test.databricks.com/cdm/clinical/cancer_diagnosis"
 
         col_assertions = [a for a in assertions if a.predicate == AssertionPredicate.COLUMN_EXISTS]
         assert len(col_assertions) == 1
@@ -384,7 +384,7 @@ class TestExtractTable:
         ]
         mock_cursor.description = [("col1",)]
 
-        work_item = TableWorkItem(catalog="cdm", schema="clinical", table_name="cancer_diagnosis", fqn="unity://cdm.clinical.cancer_diagnosis")
+        work_item = TableWorkItem(catalog="cdm", schema="clinical", table_name="cancer_diagnosis", fqn="databricks://test.databricks.com/cdm/clinical/cancer_diagnosis")
         assertions = connector.extract_table(work_item)
 
         join_assertions = [a for a in assertions if a.predicate == AssertionPredicate.JOINS_TO]

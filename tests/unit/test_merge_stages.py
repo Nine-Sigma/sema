@@ -24,7 +24,7 @@ from sema.models.stages import (
 
 pytestmark = pytest.mark.unit
 
-TABLE_REF = "unity://catalog.schema.data_mutations"
+TABLE_REF = "databricks://ws/catalog/schema/data_mutations"
 
 STAGE_A = StageAResult(
     primary_entity="Somatic Mutation",
@@ -370,7 +370,7 @@ class TestMergePartial:
             TABLE_REF, STAGE_A, b, run_id="test",
         )
         prop_cols = {
-            a.subject_ref.split(".")[-1]
+            a.subject_ref.split("/")[-1]
             for a in assertions
             if a.predicate == AssertionPredicate.HAS_PROPERTY_NAME
         }

@@ -7,9 +7,8 @@ NodeKey builds Neo4j merge keys from PhysicalKey + semantic scope.
 
 from __future__ import annotations
 
-import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Final
 
 
@@ -70,7 +69,7 @@ _UNITY_RE: Final[re.Pattern[str]] = re.compile(
 # Handles dotted column refs: databricks://ws/cat/sch/table.column
 _DATABRICKS_DOTTED_RE: Final[re.Pattern[str]] = re.compile(
     r"^databricks://(?P<ws>[^/]+)/(?P<cat>[^/]+)"
-    r"/(?P<sch>[^/]+)/(?P<tbl>[^.]+)\.(?P<col>.+)$"
+    r"/(?P<sch>[^/]+)/(?P<tbl>[^./]+)\.(?P<col>.+)$"
 )
 
 
@@ -133,9 +132,44 @@ def _try_unity(
 
 _PARSERS = [_try_databricks, _try_postgres, _try_mysql, _try_unity]
 
+# Schemes whose parse reads back <datasource>/<catalog>/<schema>/<table>[/<column>].
+_RENDERED_SCHEMES: Final[frozenset[str]] = frozenset({"databricks"})
+
+
+def _ref_part(value: str | None) -> str:
+    if not value or "/" in value:
+        raise ValueError(f"Reference part must be non-empty and hold no '/': {value!r}")
+    return value
+
 
 class CanonicalRef:
-    """Parse any connector-native URI into a PhysicalKey."""
+    """Parse connector-native URIs into PhysicalKey, and build the one canonical form."""
+
+    @staticmethod
+    def datasource(scheme: str, datasource_id: str) -> str:
+        """Render the datasource-level reference ``<scheme>://<datasource>``."""
+        if scheme not in _RENDERED_SCHEMES:
+            raise ValueError(f"No reference renderer for scheme: {scheme}")
+        return f"{scheme}://{_ref_part(datasource_id)}"
+
+    @staticmethod
+    def build(scheme: str, key: PhysicalKey) -> str:
+        """Render ``key`` as ``<scheme>://<ds>/<catalog>/<schema>/<table>[/<column>]``."""
+        parts = [key.catalog_or_db, key.schema, key.table]
+        if key.column is not None:
+            parts.append(key.column)
+        return "/".join(
+            [CanonicalRef.datasource(scheme, key.datasource_id), *map(_ref_part, parts)],
+        )
+
+    @staticmethod
+    def with_column(table_ref: str, column: str) -> str:
+        """Build the reference of ``column`` in the table that ``table_ref`` names."""
+        key = CanonicalRef.parse(table_ref)
+        if key.column is not None:
+            raise ValueError(f"Reference already names a column: {table_ref}")
+        scheme = table_ref.split("://", 1)[0]
+        return CanonicalRef.build(scheme, replace(key, column=column))
 
     @staticmethod
     def parse(ref: str, datasource_id: str | None = None) -> PhysicalKey:
@@ -221,22 +255,4 @@ class NodeKey:
         return {
             "datasource_id": pk.datasource_id,
             "column_key": col_key,
-        }
-
-    @staticmethod
-    def joinpath(
-        datasource_id: str,
-        from_table: str,
-        to_table: str,
-        join_columns: list[tuple[str, str]],
-    ) -> dict[str, str]:
-        cols_str = ",".join(
-            f"{a}={b}" for a, b in sorted(join_columns)
-        )
-        cols_hash = hashlib.sha256(cols_str.encode()).hexdigest()[:12]
-        return {
-            "datasource_id": datasource_id,
-            "from_table": from_table,
-            "to_table": to_table,
-            "join_columns_hash": cols_hash,
         }

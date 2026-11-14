@@ -15,6 +15,7 @@ from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
 )
+from sema.models.physical_key import CanonicalRef, PhysicalKey
 from sema.models.schema_metadata import (
     ColumnMetadata,
     ObjectMetadata,
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
 def _make_table_ref(connector: DatabricksConnector, catalog: str, schema: str, table: str) -> str:
     """Build a canonical table ref using the connector's workspace."""
     workspace = connector._config.host.replace("https://", "").rstrip("/")
-    return f"databricks://{workspace}/{catalog}/{schema}/{table}"
+    return CanonicalRef.build("databricks", PhysicalKey(workspace, catalog, schema, table))
 
 
 def _build_table_assertion(
@@ -65,7 +66,7 @@ def _build_table_assertion(
     for tag in tags:
         assertions.append(
             connector._make_assertion(
-                f"{fqn}/{tag['column_name']}",
+                CanonicalRef.with_column(fqn, tag["column_name"]),
                 AssertionPredicate.HAS_TAG,
                 {"tag_key": tag["tag_key"], "tag_value": tag["tag_value"]},
             )
@@ -81,7 +82,7 @@ def _build_column_assertions(
     fqn = work_item.fqn
 
     for col in columns:
-        col_ref = f"{fqn}/{col['name']}"
+        col_ref = CanonicalRef.with_column(fqn, col["name"])
         assertions.append(
             connector._make_assertion(
                 col_ref,
@@ -123,7 +124,7 @@ def _build_profiling_assertions(
     distinct_scanned = columns if connector._profiling.enable_distinct_counts else []
 
     for col in distinct_scanned:
-        col_ref = f"{fqn}/{col['name']}"
+        col_ref = CanonicalRef.with_column(fqn, col["name"])
 
         if connector._should_skip_profiling(col["data_type"]):
             continue

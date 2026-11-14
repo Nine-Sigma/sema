@@ -46,12 +46,12 @@ def _make_extraction_assertions():
     """Minimal extraction assertions for one table."""
     return [
         _make_assertion(
-            "unity://cat.sch.tbl",
+            "databricks://ws/cat/sch/tbl",
             AssertionPredicate.TABLE_EXISTS,
             {"table_type": "TABLE"},
         ),
         _make_assertion(
-            "unity://cat.sch.tbl.col1",
+            "databricks://ws/cat/sch/tbl/col1",
             AssertionPredicate.COLUMN_EXISTS,
             {"data_type": "STRING", "nullable": True, "comment": None},
         ),
@@ -64,7 +64,7 @@ def _make_extraction_assertions():
 
 class TestBuildTableMetadata:
     def test_assembles_full_metadata(self):
-        table_ref = "unity://cat.sch.tbl"
+        table_ref = "databricks://ws/cat/sch/tbl"
         assertions = [
             _make_assertion(table_ref, AssertionPredicate.TABLE_EXISTS,
                            {"table_type": "TABLE"}),
@@ -116,7 +116,7 @@ class TestTableResult:
 
 class TestProcessTable:
     def test_success_returns_counts(self):
-        work_item = TableWorkItem("cat", "sch", "tbl", "unity://cat.sch.tbl")
+        work_item = TableWorkItem("cat", "sch", "tbl", "databricks://ws/cat/sch/tbl")
 
         connector = MagicMock()
         connector.extract_table.return_value = _make_extraction_assertions()
@@ -153,14 +153,14 @@ class TestProcessTable:
         loader._run.assert_called()
 
     def test_llm_stage_error_returns_failed(self):
-        work_item = TableWorkItem("cat", "sch", "tbl", "unity://cat.sch.tbl")
+        work_item = TableWorkItem("cat", "sch", "tbl", "databricks://ws/cat/sch/tbl")
 
         connector = MagicMock()
         connector.extract_table.return_value = _make_extraction_assertions()
 
         llm_client = MagicMock(spec=LLMClient)
         llm_client.invoke.side_effect = LLMStageError(
-            table_ref="unity://cat.sch.tbl",
+            table_ref="databricks://ws/cat/sch/tbl",
             stage_name="L2 semantic",
             step_errors=[("plain_invoke", ValueError("fail"))],
         )
@@ -180,7 +180,7 @@ class TestProcessTable:
 
     def test_all_or_nothing_on_failure(self):
         """L1 extraction succeeds but L2 fails → nothing committed."""
-        work_item = TableWorkItem("cat", "sch", "tbl", "unity://cat.sch.tbl")
+        work_item = TableWorkItem("cat", "sch", "tbl", "databricks://ws/cat/sch/tbl")
 
         connector = MagicMock()
         connector.extract_table.return_value = _make_extraction_assertions()
@@ -253,18 +253,18 @@ class TestAssertionIsolation:
         results = []
         for i in range(2):
             work_item = TableWorkItem(
-                "cat", "sch", f"tbl{i}", f"unity://cat.sch.tbl{i}"
+                "cat", "sch", f"tbl{i}", f"databricks://ws/cat/sch/tbl{i}"
             )
             connector = MagicMock()
             connector.extract_table.return_value = [
                 _make_assertion(
-                    f"unity://cat.sch.tbl{i}",
+                    f"databricks://ws/cat/sch/tbl{i}",
                     AssertionPredicate.TABLE_EXISTS,
                     {"table_type": "TABLE"},
                     run_id=f"run-{i}",
                 ),
                 _make_assertion(
-                    f"unity://cat.sch.tbl{i}.col1",
+                    f"databricks://ws/cat/sch/tbl{i}/col1",
                     AssertionPredicate.COLUMN_EXISTS,
                     {"data_type": "STRING", "nullable": True},
                     run_id=f"run-{i}",
