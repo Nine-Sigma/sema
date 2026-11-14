@@ -311,7 +311,7 @@ class TestIsolation:
         )
 
         metadata = {
-            "table_ref": "unity://cat.sch.patient",
+            "table_ref": "databricks://ws/cat/sch/patient",
             "table_name": "patient",
             "columns": [{"name": "id", "data_type": "STRING"}],
             "sample_rows": [],

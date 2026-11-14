@@ -10,11 +10,13 @@ from typing import Any
 from databricks import sql as databricks_sql
 
 from sema.connectors.base import Connector
+from sema.connectors.databricks_utils import _make_table_ref
 from sema.models.assertions import (
     Assertion,
     AssertionPredicate,
 )
 from sema.models.config import DatabricksConfig, ProfilingConfig
+from sema.models.physical_key import CanonicalRef
 from sema.models.schema_metadata import SchemaMetadata, Unreadable
 
 
@@ -65,8 +67,7 @@ class DatabricksConnector(Connector):
     def get_datasource_ref(self) -> tuple[str, str, str]:
         """Return (ref, platform, workspace) for this Databricks instance."""
         workspace = self._config.host.replace("https://", "").rstrip("/")
-        ref = f"databricks://{workspace}"
-        return ref, "databricks", workspace
+        return CanonicalRef.datasource("databricks", workspace), "databricks", workspace
 
     def list_catalogs(self) -> list[str]:
         rows = self._execute("SHOW CATALOGS")
@@ -213,18 +214,11 @@ class DatabricksConnector(Connector):
             for table_name, _table_type in tables:
                 if table_pattern and not fnmatch.fnmatch(table_name, table_pattern):
                     continue
-                workspace = self._config.host.replace(
-                    "https://", ""
-                ).rstrip("/")
-                fqn = (
-                    f"databricks://{workspace}"
-                    f"/{catalog}/{schema}/{table_name}"
-                )
                 work_items.append(TableWorkItem(
                     catalog=catalog,
                     schema=schema,
                     table_name=table_name,
-                    fqn=fqn,
+                    fqn=_make_table_ref(self, catalog, schema, table_name),
                 ))
 
         return work_items

@@ -166,7 +166,7 @@ class TestStageCExecution:
         )
         table_meta = {
             "table_name": "patient",
-            "table_ref": "unity://cat.sch.patient",
+            "table_ref": "databricks://ws/cat/sch/patient",
             "columns": [
                 {"name": "gender", "data_type": "STRING",
                  "top_values": [{"value": "Male"}, {"value": "Female"}]},
@@ -189,7 +189,7 @@ class TestStageCExecution:
         )
         table_meta = {
             "table_name": "patient",
-            "table_ref": "unity://cat.sch.patient",
+            "table_ref": "databricks://ws/cat/sch/patient",
             "columns": [
                 {"name": "patient_id", "data_type": "STRING",
                  "top_values": [{"value": "P001"}]},
@@ -214,7 +214,7 @@ class TestStageCExecution:
         )
         table_meta = {
             "table_name": "patient",
-            "table_ref": "unity://cat.sch.patient",
+            "table_ref": "databricks://ws/cat/sch/patient",
             "columns": [
                 {"name": "gender", "data_type": "STRING",
                  "top_values": [{"value": "Male"}]},
@@ -262,7 +262,7 @@ class TestStageCMerge:
         }
 
         assertions = merge_stage_outputs(
-            "unity://cat.sch.patient",
+            "databricks://ws/cat/sch/patient",
             stage_a, stage_b,
             c_results=c_results,
             run_id="run-1",
@@ -277,7 +277,7 @@ class TestStageCMerge:
         from sema.engine.stage_utils import merge_stage_outputs
 
         assertions = merge_stage_outputs(
-            "unity://cat.sch.patient",
+            "databricks://ws/cat/sch/patient",
             _stage_a(),
             _stage_b([_b_col("gender", "categorical")]),
             run_id="run-1",
@@ -321,7 +321,7 @@ class TestStageCPartialFailure:
         )
         table_meta = {
             "table_name": "patient",
-            "table_ref": "unity://cat.sch.patient",
+            "table_ref": "databricks://ws/cat/sch/patient",
             "columns": [
                 {"name": "gender", "data_type": "STRING",
                  "top_values": [{"value": "Male"}]},

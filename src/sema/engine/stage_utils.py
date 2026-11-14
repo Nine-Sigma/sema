@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from sema.models.assertions import Assertion, AssertionPredicate
+from sema.models.physical_key import CanonicalRef
 from sema.models.stages import (
     StageAResult,
     StageBCoverage,
@@ -553,7 +554,7 @@ def merge_stage_outputs(
         for col in batch.columns:
             if col.column in unresolved_names:
                 continue
-            col_ref = f"{table_ref}.{col.column}"
+            col_ref = CanonicalRef.with_column(table_ref, col.column)
 
             assertions.append(_make_assertion(
                 table_ref, col_ref,
@@ -582,7 +583,7 @@ def merge_stage_outputs(
     # Decoded values from C only
     if c_results:
         for col_name, c in c_results.items():
-            col_ref = f"{table_ref}.{col_name}"
+            col_ref = CanonicalRef.with_column(table_ref, col_name)
             for dv in c.decoded_categories:
                 assertions.append(_make_assertion(
                     table_ref, col_ref,

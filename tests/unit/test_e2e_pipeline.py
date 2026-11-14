@@ -69,7 +69,7 @@ def _make_assertion(subject_ref, predicate, payload=None, run_id="r"):
 
 
 def _make_extraction_for_table(name, num_cols=3):
-    fqn = f"unity://cat.sch.{name}"
+    fqn = f"databricks://ws/cat/sch/{name}"
     assertions = [
         _make_assertion(
             fqn, AssertionPredicate.TABLE_EXISTS,
@@ -92,7 +92,7 @@ def _make_extraction_for_table(name, num_cols=3):
 class TestSequentialEquivalence:
     def test_table_workers_1_processes_all(self):
         tables = [
-            TableWorkItem("cat", "sch", f"tbl{i}", f"unity://cat.sch.tbl{i}")
+            TableWorkItem("cat", "sch", f"tbl{i}", f"databricks://ws/cat/sch/tbl{i}")
             for i in range(3)
         ]
 
@@ -124,7 +124,7 @@ class TestSequentialEquivalence:
 class TestConcurrentMultipleTables:
     def test_table_workers_2_all_assertions_present(self):
         tables = [
-            TableWorkItem("cat", "sch", f"tbl{i}", f"unity://cat.sch.tbl{i}")
+            TableWorkItem("cat", "sch", f"tbl{i}", f"databricks://ws/cat/sch/tbl{i}")
             for i in range(6)
         ]
 
@@ -170,7 +170,7 @@ class TestConcurrentMultipleTables:
 class TestWideTableMultiBatchB:
     def test_60_columns_produces_all_properties_via_batched_b(self):
         work_item = TableWorkItem(
-            "cat", "sch", "wide_tbl", "unity://cat.sch.wide_tbl"
+            "cat", "sch", "wide_tbl", "databricks://ws/cat/sch/wide_tbl"
         )
 
         connector = MagicMock()
@@ -220,7 +220,7 @@ class TestWideTableMultiBatchB:
 class TestLLMFallbackChainE2E:
     def test_structured_output_fails_plain_succeeds(self):
         work_item = TableWorkItem(
-            "cat", "sch", "tbl", "unity://cat.sch.tbl"
+            "cat", "sch", "tbl", "databricks://ws/cat/sch/tbl"
         )
 
         connector = MagicMock()
@@ -275,7 +275,7 @@ class TestLLMFallbackChainE2E:
 class TestTransactionalWriteFailure:
     def test_commit_failure_leaves_no_state(self):
         work_item = TableWorkItem(
-            "cat", "sch", "tbl", "unity://cat.sch.tbl"
+            "cat", "sch", "tbl", "databricks://ws/cat/sch/tbl"
         )
 
         connector = MagicMock()
@@ -311,7 +311,7 @@ class TestMaterializationIdempotency:
         """Calling process_table twice (simulating re-run) should work."""
         for _ in range(2):
             work_item = TableWorkItem(
-                "cat", "sch", "tbl", "unity://cat.sch.tbl"
+                "cat", "sch", "tbl", "databricks://ws/cat/sch/tbl"
             )
             connector = MagicMock()
             connector.extract_table.return_value = (
@@ -340,7 +340,7 @@ class TestMaterializationIdempotency:
 class TestFailureAccounting:
     def test_failed_table_in_report_others_succeed(self):
         tables = [
-            TableWorkItem("cat", "sch", f"tbl{i}", f"unity://cat.sch.tbl{i}")
+            TableWorkItem("cat", "sch", f"tbl{i}", f"databricks://ws/cat/sch/tbl{i}")
             for i in range(3)
         ]
 
@@ -373,5 +373,5 @@ class TestFailureAccounting:
         assert report["tables_processed"] == 2
         assert report["tables_failed"] == 1
         assert len(report["failed_tables"]) == 1
-        assert report["failed_tables"][0]["table"] == "unity://cat.sch.tbl1"
+        assert report["failed_tables"][0]["table"] == "databricks://ws/cat/sch/tbl1"
         assert report["failed_tables"][0]["stage"] == "L2 semantic"
