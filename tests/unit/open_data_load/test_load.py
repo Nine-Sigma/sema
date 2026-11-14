@@ -170,3 +170,24 @@ def test_a_profile_whose_relations_differ_from_the_schema_is_refused(
     source.write_profile(profile)
     assert main(source.args("load")) == 1
     assert "profile relations differ from schema: extra" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("entry", "message"),
+    [
+        ({"dataset": "ord-0001", "headers": {"no_such": "X"}},
+         "orders: profile headers name no column: ['no_such']"),
+        ({"dataset": "ord-0001", "file": "local/colors.csv"},
+         "orders: the profile needs exactly one of dataset or file"),
+    ],
+)  # fmt: skip
+def test_a_profile_entry_that_cannot_be_followed_is_refused(
+    source: Source, capsys: pytest.CaptureFixture[str], entry: dict[str, object], message: str
+) -> None:
+    profile = neutral_profile(source.published)
+    relations = profile["relations"]
+    assert isinstance(relations, dict)
+    relations["orders"] = entry
+    source.write_profile(profile)
+    assert main(source.args("load")) == 1
+    assert message in capsys.readouterr().err
