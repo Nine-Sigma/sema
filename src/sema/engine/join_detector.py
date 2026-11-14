@@ -2,11 +2,13 @@
 
 Enumerates intra-schema FK candidates from column metadata, verifies
 each via tiered evidence, and emits `FK_TO` assertions tagged with
-`source_schema`. Verification uses bounded distinct-value samples
-when available; the detector NEVER issues unbounded
-`COUNT(... NOT IN ...)` referential-integrity scans — when sample-based
-verification is inconclusive, the detector downgrades confidence
-rather than escalating cost.
+`source_schema`. Tier 1 checks a bounded distinct sample of the
+referencing column against the whole referenced column, one statement
+per candidate; the detector NEVER issues unbounded
+`COUNT(... NOT IN ...)` referential-integrity scans. When the check is
+inconclusive, the detector downgrades confidence rather than escalating
+cost. A referenced column the profile shows is not unique, or one the
+check refutes, yields no assertion.
 """
 from __future__ import annotations
 
@@ -17,7 +19,6 @@ from typing import Callable
 
 from sema.engine.join_detector_utils import (
     FKCandidate,
-    coverage_ratio,
     enumerate_candidates_from_metadata,
     verify_cardinality,
 )
@@ -29,9 +30,12 @@ from sema.models.assertions import (
 from sema.models.extraction import ExtractedColumn
 
 ColumnKey = tuple[str, str, str]
+Profiles = dict[ColumnKey, tuple[int, int]]
 SamplerFn = Callable[[ColumnKey], set[str] | None]
+ContainmentFn = Callable[[ColumnKey, frozenset[str]], int | None]
 DEFAULT_SAMPLE_CAP = 500
 DEFAULT_MATERIALIZE_THRESHOLD = 0.80
+COVERAGE_THRESHOLD = 0.80
 TIER_1 = 0.95
 TIER_2 = 0.80
 TIER_3 = 0.70
@@ -50,12 +54,21 @@ def _column_key(table: str, column: str, schema: str) -> ColumnKey:
     return (schema, table, column)
 
 
+def _referenced_not_unique(
+    candidate: FKCandidate, profiles: Profiles | None,
+) -> bool:
+    stats = (profiles or {}).get(
+        _column_key(candidate.pk_table, candidate.pk_column, candidate.schema_name),
+    )
+    return stats is not None and stats[0] != stats[1]
+
+
 @dataclass
 class JoinDetector:
     """FK / join candidate detector.
 
-    `sample_cap` bounds detector-owned distinct-value samples. When FK
-    distinct cardinality exceeds this cap the detector downgrades to
+    `sample_cap` bounds the referencing values sent in one containment
+    statement. Without a containment answer the detector downgrades to
     Tier 2 if cardinality metadata supports the FK relation, else
     Tier 3. The detector NEVER scales up to unbounded RI queries.
     """
@@ -67,15 +80,20 @@ class JoinDetector:
         *,
         columns: list[ExtractedColumn],
         source_schema: str,
-        profiles: dict[ColumnKey, tuple[int, int]] | None = None,
-        samples: dict[ColumnKey, set[str]] | None = None,
+        profiles: Profiles | None = None,
         sampler: SamplerFn | None = None,
+        containment: ContainmentFn | None = None,
     ) -> list[FKAssertion]:
-        candidates = enumerate_candidates_from_metadata(columns)
-        return [
-            self._classify(c, source_schema, profiles, samples, sampler)
-            for c in candidates
-        ]
+        out: list[FKAssertion] = []
+        for candidate in enumerate_candidates_from_metadata(columns):
+            if _referenced_not_unique(candidate, profiles):
+                continue
+            fk = self._classify(
+                candidate, source_schema, profiles, sampler, containment,
+            )
+            if fk is not None:
+                out.append(fk)
+        return out
 
     def should_materialize(self, fk: FKAssertion) -> bool:
         return fk.confidence >= self.materialization_threshold
@@ -84,26 +102,21 @@ class JoinDetector:
         self,
         candidate: FKCandidate,
         source_schema: str,
-        profiles: dict[ColumnKey, tuple[int, int]] | None,
-        samples: dict[ColumnKey, set[str]] | None,
+        profiles: Profiles | None,
         sampler: SamplerFn | None,
-    ) -> FKAssertion:
+        containment: ContainmentFn | None,
+    ) -> FKAssertion | None:
         pk_key = _column_key(
             candidate.pk_table, candidate.pk_column, candidate.schema_name,
         )
         fk_key = _column_key(
             candidate.fk_table, candidate.fk_column, candidate.schema_name,
         )
-
-        pk_sample, fk_sample, sample_origin = self._collect_samples(
-            pk_key, fk_key, samples, sampler,
-        )
-        if pk_sample is not None and fk_sample is not None:
-            tier1 = self._try_tier_1(pk_sample, fk_sample)
-            if tier1 is not None:
-                return FKAssertion(
-                    candidate, tier1, 1, source_schema,
-                )
+        coverage = self._coverage(pk_key, fk_key, sampler, containment)
+        if coverage is not None:
+            if coverage < COVERAGE_THRESHOLD:
+                return None
+            return FKAssertion(candidate, TIER_1, 1, source_schema)
 
         tier2 = self._try_tier_2(pk_key, fk_key, profiles)
         if tier2 is not None:
@@ -111,48 +124,33 @@ class JoinDetector:
 
         return FKAssertion(candidate, TIER_3, 3, source_schema)
 
-    def _collect_samples(
+    def _coverage(
         self,
         pk_key: ColumnKey,
         fk_key: ColumnKey,
-        samples: dict[ColumnKey, set[str]] | None,
         sampler: SamplerFn | None,
-    ) -> tuple[set[str] | None, set[str] | None, str]:
-        if samples and pk_key in samples and fk_key in samples:
-            return samples[pk_key], samples[fk_key], "profiler"
-        if sampler is None:
-            return None, None, "missing"
-        try:
-            pk = sampler(pk_key)
-            fk = sampler(fk_key)
-        except Exception:
-            return None, None, "warehouse_error"
-        if pk is None or fk is None:
-            return None, None, "missing"
-        return pk, fk, "detector"
-
-    def _try_tier_1(
-        self, pk_sample: set[str], fk_sample: set[str],
+        containment: ContainmentFn | None,
     ) -> float | None:
-        """Tier 1 sample subset test.
-
-        When FK distinct cardinality has hit the sample cap the subset
-        relation is unprovable — return None so the caller falls
-        through to Tier 2 / Tier 3 without escalating to RI scans.
-        """
-        if len(fk_sample) >= self.sample_cap:
+        """Share of the referencing sample found in the whole referenced column."""
+        if sampler is None or containment is None:
+            return None
+        try:
+            fk_sample = sampler(fk_key)
+        except Exception:
             return None
         if not fk_sample:
             return None
-        if coverage_ratio(fk_sample, pk_sample) < 0.80:
+        values = frozenset(sorted(fk_sample)[: self.sample_cap])
+        matched = containment(pk_key, values)
+        if matched is None:
             return None
-        return TIER_1
+        return matched / len(values)
 
     def _try_tier_2(
         self,
         pk_key: ColumnKey,
         fk_key: ColumnKey,
-        profiles: dict[ColumnKey, tuple[int, int]] | None,
+        profiles: Profiles | None,
     ) -> float | None:
         if not profiles:
             return None

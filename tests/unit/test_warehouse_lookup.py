@@ -159,7 +159,8 @@ class TestWarehouseContainment:
         sql = query_fn.call_args[0][0]
         assert "`workspace`.`cbioportal_msk_chord_2024`.`patient`" in sql
         assert "LIMIT" not in sql
-        assert "'p1', 'p2', 'p\\'3'" in sql
+        literals = sql.split(" IN (", 1)[1].rstrip(")").split(", ")
+        assert sorted(literals) == sorted(["'p1'", "'p2'", "'p\\'3'"])
 
     def test_one_statement_per_column_and_sample(self):
         query_fn = MagicMock(return_value=[(1,)])

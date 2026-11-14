@@ -1,16 +1,20 @@
 """Lazy warehouse-backed lookups for `JoinDetector`.
 
 `WarehouseSampler` returns bounded distinct-value samples for a column;
-`WarehouseProfileLookup` returns `(approx_distinct, row_count)`. Both
-cache per column (and the profile lookup also caches `row_count` per
-table to avoid redundant `COUNT(*)` scans). Both fail closed: a
-warehouse error returns `None` and is cached, so the detector
+`WarehouseProfileLookup` returns `(approx_distinct, row_count)`;
+`WarehouseContainment` counts how many of a bounded value set occur in a
+whole column. All cache per column (and the profile lookup also caches
+`row_count` per table to avoid redundant `COUNT(*)` scans). All fail
+closed: a warehouse error returns `None` and is cached, so the detector
 downgrades confidence rather than retrying failing queries.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Callable
+
+from sema.connectors.databricks_utils import sql_string_literal
+from sema.log import logger
 
 ColumnKey = tuple[str, str, str]
 TableKey = tuple[str, str]
@@ -96,3 +100,34 @@ class WarehouseProfileLookup:
         rows = int(res[0][0]) if res and res[0] else None
         self._row_cache[tk] = rows
         return rows
+
+
+@dataclass
+class WarehouseContainment:
+    """One statement per call, with exactly the given values as literals."""
+    query_fn: QueryFn
+    catalog: str
+    _cache: dict[tuple[ColumnKey, frozenset[str]], int | None] = field(
+        default_factory=dict,
+    )
+
+    def __call__(self, key: ColumnKey, values: frozenset[str]) -> int | None:
+        cache_key = (key, values)
+        if cache_key not in self._cache:
+            self._cache[cache_key] = self._fetch(key, values)
+        return self._cache[cache_key]
+
+    def _fetch(self, key: ColumnKey, values: frozenset[str]) -> int | None:
+        schema, table, column = key
+        as_text = f"CAST(`{column}` AS STRING)"
+        literals = ", ".join(sql_string_literal(v) for v in sorted(values))
+        try:
+            res = self.query_fn(
+                f"SELECT COUNT(DISTINCT {as_text}) "
+                f"FROM `{self.catalog}`.`{schema}`.`{table}` "
+                f"WHERE {as_text} IN ({literals})"
+            )
+        except Exception as exc:
+            logger.warning(f"Containment check on {schema}.{table}.{column} failed: {exc}")
+            return None
+        return int(res[0][0]) if res and res[0] else None
