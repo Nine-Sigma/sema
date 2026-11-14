@@ -25,8 +25,8 @@ from sema.engine.warehouse_lookup import (
     WarehouseProfileLookup,
     WarehouseSampler,
 )
-from sema.graph.join_materializer import materialize_join_paths
 from sema.graph.loader_utils import fetch_columns_by_schema
+from sema.models.assertions import Assertion
 from sema.models.config import (
     BuildConfig,
     QueryConfig,
@@ -318,17 +318,17 @@ def run_fk_detection(
     config: BuildConfig,
     schemas: list[str],
     run_id: str,
-) -> None:
-    """Detect FK candidates per schema and materialize JoinPaths.
+) -> dict[str, list[Assertion]]:
+    """Detect FK candidates per schema; return the joins worth materializing.
 
-    Skips entirely when `enable_fk_detection=False`. Threshold derives
+    Returns nothing when `enable_fk_detection=False`. Threshold derives
     from `materialize_structural_fk` (0.70 if opt-in, else 0.80) so
     Tier-3 structural-only matches stay gated by an explicit user flag.
     The detector receives a lazy `sampler` and `containment` (Tier 1) and
     pre-built candidate `profiles` (uniqueness and Tier 2 cardinality).
     """
     if not config.enable_fk_detection:
-        return
+        return {}
     detector = JoinDetector(
         materialization_threshold=config.fk_materialization_threshold,
     )
@@ -339,6 +339,7 @@ def run_fk_detection(
         query_fn=connector.execute_query, catalog=config.catalog,
     )
     containment = WarehouseContainment(query_fn=connector.execute_query, catalog=config.catalog)
+    detected: dict[str, list[Assertion]] = {}
     for schema in schemas:
         columns = fetch_columns_by_schema(loader, schema)
         if not columns:
@@ -351,15 +352,9 @@ def run_fk_detection(
             profiles=profiles, sampler=sampler, containment=containment,
         )
         keep = [fk for fk in fks if detector.should_materialize(fk)]
-        if not keep:
-            continue
-        assertions = [to_fk_assertion(fk, run_id) for fk in keep]
-        groups: dict[tuple[str, str], list[Any]] = {}
-        for a in assertions:
-            groups.setdefault((a.subject_ref, a.predicate.value), []).append(a)
-        materialize_join_paths(
-            loader, groups, source_schema=schema,
-        )
+        if keep:
+            detected[schema] = [to_fk_assertion(fk, run_id) for fk in keep]
+    return detected
 
 
 def _prebuild_profiles_for_candidates(

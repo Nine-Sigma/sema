@@ -8,7 +8,7 @@ per candidate; the detector NEVER issues unbounded
 `COUNT(... NOT IN ...)` referential-integrity scans. When the check is
 inconclusive, the detector downgrades confidence rather than escalating
 cost. A referenced column the profile shows is not unique, or one the
-check refutes, yields no assertion.
+check refutes, yields no assertion; one with no profile stays at Tier 3.
 """
 from __future__ import annotations
 
@@ -112,6 +112,8 @@ class JoinDetector:
         fk_key = _column_key(
             candidate.fk_table, candidate.fk_column, candidate.schema_name,
         )
+        if pk_key not in (profiles or {}):
+            return FKAssertion(candidate, TIER_3, 3, source_schema)
         coverage = self._coverage(pk_key, fk_key, sampler, containment)
         if coverage is not None:
             if coverage < COVERAGE_THRESHOLD:

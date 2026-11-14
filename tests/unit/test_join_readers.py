@@ -73,14 +73,14 @@ class TestJoinEndsFromStoredPredicates:
 
     def test_two_column_join_names_both_relations(self) -> None:
         stored = [
-            _pair("lot", "block", "parcel", "block"),
-            _pair("lot", "lot", "parcel", "lot"),
+            _pair("header", "part_a", "detail", "part_a"),
+            _pair("header", "part_b", "detail", "part_b"),
         ]
-        assert _ends(stored) == ("lot", "parcel")
+        assert _ends(stored) == ("header", "detail")
 
     def test_projection_join_keeps_dotted_relation_names(self) -> None:
-        stored = json.dumps([_pair("core.person", "person_id", "core.visit", "person_id")])
-        assert _ends(stored) == ("core.person", "core.visit")
+        stored = json.dumps([_pair("core.owner", "owner_id", "core.event", "owner_id")])
+        assert _ends(stored) == ("core.owner", "core.event")
 
     def test_a_join_with_no_predicates_has_empty_ends(self) -> None:
         assert _ends(None) == ("", "")

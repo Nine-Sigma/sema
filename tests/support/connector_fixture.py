@@ -107,6 +107,13 @@ MAIN_TABLES: tuple[FixtureTable, ...] = (
         "SELECT i, 'sup ' || i FROM range(1, 21) t(i)",
     ),
     FixtureTable(
+        "memo",
+        (("memo_id", "INTEGER"), ("vendor_ref", "INTEGER"), ("body", "VARCHAR")),
+        ("memo_id",),
+        "SELECT i, 1 + (i % 20), 'memo ' || i FROM range(1, 61) t(i)",
+        (DeclaredKey(("vendor_ref",), "supplier", ("supplier_id",)),),
+    ),
+    FixtureTable(
         "product_supplier",
         (("product_id", "INTEGER"), ("supplier_id", "INTEGER")),
         ("product_id", "supplier_id"),
@@ -172,6 +179,9 @@ EXPECTED_DETECTED_JOINS: tuple[FixtureJoin, ...] = (
     FixtureJoin("order_line", "product_id", "product", "product_id"),
     FixtureJoin("price_period", "product_id", "product", "product_id"),
 )
+
+# Declared on a table that sorts before the one it references, with no name affinity.
+UNDETECTABLE_DECLARED_JOIN = FixtureJoin("memo", "vendor_ref", "supplier", "supplier_id")
 
 DECOY_JOINS: tuple[FixtureJoin, ...] = (
     FixtureJoin("order_line", "qty", None, None),

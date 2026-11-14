@@ -1,10 +1,39 @@
 """Helpers for `join_materializer.py` — kept thin per the engine-file rule."""
 from __future__ import annotations
 
-from typing import Any
+import json
+from typing import TYPE_CHECKING, Any
 
 from sema.models.assertions import Assertion, AssertionPredicate
 from sema.models.physical_key import CanonicalRef, PhysicalKey
+
+if TYPE_CHECKING:
+    from sema.graph.loader import GraphLoader
+
+JOIN_PREDICATES = (
+    AssertionPredicate.HAS_JOIN_EVIDENCE.value,
+    AssertionPredicate.JOINS_TO.value,
+    AssertionPredicate.FK_TO.value,
+)
+_STORED_JOINS_QUERY = (
+    "MATCH (a:Assertion {source_schema: $schema}) "
+    "WHERE a.predicate IN $predicates AND a.status <> 'superseded' "
+    "RETURN a.id AS id, a.subject_ref AS subject_ref, a.predicate AS predicate, "
+    "a.payload AS payload, a.object_ref AS object_ref, a.source AS source, "
+    "a.confidence AS confidence, a.status AS status, a.run_id AS run_id, "
+    "a.observed_at AS observed_at, a.source_schema AS source_schema"
+)
+
+
+def fetch_join_assertions(loader: GraphLoader, schema: str) -> list[Assertion]:
+    """The join assertions the build stored for one schema."""
+    rows = loader._run_read(
+        _STORED_JOINS_QUERY, schema=schema, predicates=list(JOIN_PREDICATES),
+    )
+    return [
+        Assertion.model_validate({**row, "payload": json.loads(row["payload"])})
+        for row in rows
+    ]
 
 
 def _strip_trailing_segment(ref: str) -> str:

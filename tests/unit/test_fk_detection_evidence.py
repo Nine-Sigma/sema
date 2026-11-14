@@ -6,7 +6,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -23,6 +23,7 @@ from tests.support.connector_fixture import (
     DECOY_JOINS,
     EXPECTED_DETECTED_JOINS,
     MAIN_SCHEMA,
+    UNDETECTABLE_DECLARED_JOIN,
     FixtureJoin,
     fixture_build_config,
     fixture_environment,
@@ -72,14 +73,10 @@ def run() -> Iterator[DetectionRun]:
         loader = MagicMock()
         loader._run_read.return_value = rows
         config = BuildConfig(catalog=CATALOG, schemas=[MAIN_SCHEMA], enable_fk_detection=True)
-        with patch("sema.pipeline.orchestrate_utils.materialize_join_paths") as materialize:
-            run_fk_detection(loader, connector, config, [MAIN_SCHEMA], run_id="run-1")
-    groups: dict[Any, list[Assertion]] = (
-        materialize.call_args.args[1] if materialize.called else {}
-    )
+        detected = run_fk_detection(loader, connector, config, [MAIN_SCHEMA], run_id="run-1")
     candidates = enumerate_candidates_from_metadata(fetch_columns_by_schema(loader, MAIN_SCHEMA))
     yield DetectionRun(
-        detected=[a for group in groups.values() for a in group],
+        detected=detected.get(MAIN_SCHEMA, []),
         statements=statements,
         unanswered=[
             u for c in connections for u in c.unanswered if u not in extraction_unanswered
@@ -120,6 +117,10 @@ def test_no_decoy_join_is_detected(run: DetectionRun) -> None:
         (join, a.payload) for join in DECOY_JOINS for a in run.detected if _matches(a, join)
     ]
     assert found == []
+
+
+def test_the_declared_key_with_no_name_affinity_is_not_detected(run: DetectionRun) -> None:
+    assert [a.payload for a in run.detected if _matches(a, UNDETECTABLE_DECLARED_JOIN)] == []
 
 
 def test_containment_is_checked_with_at_most_one_bounded_statement_per_candidate(

@@ -28,6 +28,7 @@ from tests.support.connector_fixture import (
     MAIN_SCHEMA,
     MAIN_TABLES,
     SCHEMA_TABLES,
+    UNDETECTABLE_DECLARED_JOIN,
     FakeConnection,
     FixtureJoin,
     build_warehouse,
@@ -138,6 +139,19 @@ def test_decoy_schema_mirrors_a_joined_main_table() -> None:
         assert main[decoy.name] == decoy.columns
         assert decoy.name in referenced
     assert DECOY_SCHEMA != MAIN_SCHEMA
+
+
+def test_the_undetectable_key_is_declared_on_a_table_built_before_its_referenced_table() -> None:
+    join = UNDETECTABLE_DECLARED_JOIN
+    declared = {
+        (table.name, key.columns, key.referenced_table, key.referenced_columns)
+        for table in MAIN_TABLES for key in table.declared_keys
+    }
+    assert (
+        join.referencing_table, (join.referencing_column,),
+        join.referenced_table, (join.referenced_column,),
+    ) in declared
+    assert join.referenced_table and join.referencing_table < join.referenced_table
 
 
 def _is_unique(con: duckdb.DuckDBPyConnection, table: str, column: str) -> bool:
