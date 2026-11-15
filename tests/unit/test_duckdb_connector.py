@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import duckdb
 import pytest
@@ -168,3 +169,22 @@ class TestExtractTable:
             (p["left_table"], p["left_column"], p["right_table"], p["right_column"], p["operator"])
             for p in join.payload["join_predicates"]
         ] == [("parent", "a", "child", "x", "="), ("parent", "b", "child", "y", "=")]
+
+    def test_a_failed_profiling_statement_skips_only_its_column(
+        self, connector: DuckDBConnector, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        profile_column = connector.extract_top_values_dto
+
+        def fail_on_label(catalog: str, schema: str, table: str, column: str, k: int = 20) -> Any:
+            if column == "label":
+                raise duckdb.ConversionException("unreadable column")
+            return profile_column(catalog, schema, table, column, k)
+
+        monkeypatch.setattr(connector, "extract_top_values_dto", fail_on_label)
+        assertions = connector.extract_table(_item(connector, "parent"))
+        profiled = {
+            CanonicalRef.parse(a.subject_ref).column
+            for a in _of(assertions, AssertionPredicate.HAS_TOP_VALUES)
+        }
+        assert profiled == {"a", "b"}
+        assert _of(assertions, AssertionPredicate.HAS_SAMPLE_ROWS)
