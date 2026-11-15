@@ -10,6 +10,7 @@ import pytest
 from pydantic import BaseModel, SecretStr
 
 from sema.connectors.databricks import DatabricksConnector
+from sema.engine.stage_utils import build_stage_b_prompt
 from sema.llm_client import SynonymExpansion, TableSummary, VocabularyDetection
 from sema.models.assertions import AssertionPredicate
 from sema.models.config import Neo4jConfig
@@ -200,7 +201,15 @@ def test_fake_model_answers_every_stage_schema(schema: type[BaseModel]) -> None:
     assert isinstance(answer, schema)
 
 
-def test_fake_model_names_properties_for_the_columns_in_the_prompt() -> None:
-    table_ref = f"databricks://host/{CATALOG}/{MAIN_SCHEMA}/order_line"
-    answer = make_fake_llm_client().invoke("order_id qty", StageBBatchResult, table_ref=table_ref)
-    assert {c.column for c in answer.columns} == {"order_id", "qty"}
+def test_fake_model_names_properties_for_exactly_the_columns_the_prompt_lists() -> None:
+    batch = [
+        {"name": "order_id", "data_type": "INTEGER", "comment": "joins id (see qty)",
+         "top_values": [{"value": "id"}]},
+        {"name": "id", "data_type": "DECIMAL(10, 2)"},
+    ]
+    prompt = build_stage_b_prompt(
+        {"table_name": "any_table"}, batch,
+        StageAResult(primary_entity="Any", grain_hypothesis="one row", confidence=0.9),
+    )
+    answer = make_fake_llm_client().invoke(prompt, StageBBatchResult, table_ref="x://h/c/s/t")
+    assert [c.column for c in answer.columns] == ["order_id", "id"]

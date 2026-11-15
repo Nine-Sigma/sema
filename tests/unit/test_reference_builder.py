@@ -42,6 +42,13 @@ def test_build_renders_the_slash_form() -> None:
     )
 
 
+def test_a_duckdb_column_ref_renders_and_parses_back() -> None:
+    key = PhysicalKey("fix-cat-0123456789ab", "fix-cat", "main", "tbl", column="col")
+    ref = CanonicalRef.build("duckdb", key)
+    assert ref == "duckdb://fix-cat-0123456789ab/fix-cat/main/tbl/col"
+    assert CanonicalRef.parse(ref) == key
+
+
 @pytest.mark.parametrize(("scheme", "key"), [
     ("nosuch", TABLE_KEY),
     ("databricks", replace(TABLE_KEY, table="")),

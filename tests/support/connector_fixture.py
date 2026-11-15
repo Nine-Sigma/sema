@@ -12,6 +12,8 @@ import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from itertools import takewhile
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -163,10 +165,6 @@ SCHEMA_TABLES: dict[str, tuple[FixtureTable, ...]] = {
     DECOY_SCHEMA: DECOY_TABLES,
 }
 
-COLUMNS_BY_TABLE: dict[str, tuple[str, ...]] = {
-    table.name: table.column_names for tables in SCHEMA_TABLES.values() for table in tables
-}
-
 EXPECTED_DETECTED_JOINS: tuple[FixtureJoin, ...] = (
     FixtureJoin("account", "customer_id", "customer", "customer_id"),
     FixtureJoin("order_header", "customer_id", "customer", "customer_id"),
@@ -192,6 +190,7 @@ DECOY_JOINS: tuple[FixtureJoin, ...] = (
 )
 
 _SYSTEM_INFORMATION_SCHEMA = "`system`.`information_schema`."
+_STAGE_B_COLUMNS = re.compile(r"^Columns to classify \((?P<count>\d+)\):$", re.MULTILINE)
 _SHOW_TABLES = re.compile(r"^SHOW TABLES IN `(?P<catalog>[^`]+)`\.`(?P<schema>[^`]+)`$")
 _COMPAT_VIEWS = {
     "columns": "SELECT *, COLUMN_COMMENT AS comment, data_type AS full_data_type "
@@ -214,16 +213,32 @@ def _create_table_sql(schema: str, table: FixtureTable) -> str:
     return f"CREATE TABLE {schema}.{table.name} ({', '.join(parts)})"
 
 
-def build_warehouse() -> duckdb.DuckDBPyConnection:
-    """The fixture warehouse with every table, key and row; DuckDB enforces the keys."""
-    con = duckdb.connect(":memory:")
-    con.execute(f"ATTACH ':memory:' AS {CATALOG}")
-    con.execute(f"USE {CATALOG}")
+def _create_tables(con: duckdb.DuckDBPyConnection) -> None:
+    """Every schema, table, key and row, in the connection's current catalog."""
     for schema, tables in SCHEMA_TABLES.items():
         con.execute(f"CREATE SCHEMA {schema}")
         for table in tables:
             con.execute(_create_table_sql(schema, table))
             con.execute(f"INSERT INTO {schema}.{table.name} {table.rows}")
+
+
+def write_fixture_database(directory: Path) -> Path:
+    """The fixture as a DuckDB file whose catalog, its file stem, is `CATALOG`."""
+    path = directory / f"{CATALOG}.duckdb"
+    con = duckdb.connect(str(path))
+    try:
+        _create_tables(con)
+    finally:
+        con.close()
+    return path
+
+
+def build_warehouse() -> duckdb.DuckDBPyConnection:
+    """The fixture warehouse with every table, key and row; DuckDB enforces the keys."""
+    con = duckdb.connect(":memory:")
+    con.execute(f"ATTACH ':memory:' AS {CATALOG}")
+    con.execute(f"USE {CATALOG}")
+    _create_tables(con)
     con.execute("USE memory")
     con.execute(f"CREATE SCHEMA {COMPAT_SCHEMA}")
     for view, body in _COMPAT_VIEWS.items():
@@ -287,6 +302,16 @@ class FakeConnection:
         return FakeCursor(self._warehouse.cursor(), self.unanswered)
 
 
+def prompt_columns(prompt: str) -> list[str]:
+    """The column names a Stage B prompt lists under its `Columns to classify (n):` line."""
+    header = _STAGE_B_COLUMNS.search(prompt)
+    if header is None:
+        return []
+    block = takewhile(lambda line: line.startswith("  "), prompt[header.end():].splitlines()[1:])
+    names = [line[2:].split(" (", 1)[0] for line in block if not line.startswith("   ")]
+    return names[:int(header["count"])]
+
+
 class FakeLLMClient(LLMClient):
     """Names each entity after its table and each property after its column."""
 
@@ -307,7 +332,7 @@ class FakeLLMClient(LLMClient):
                     semantic_type="identifier" if column.endswith("_id") else "attribute",
                     confidence=0.9,
                 )
-                for column in COLUMNS_BY_TABLE.get(table, ()) if column in prompt
+                for column in prompt_columns(prompt)
             ])
         if schema is StageCBatchResult:
             return StageCBatchResult(columns=[])
@@ -326,8 +351,9 @@ def make_fake_llm_client() -> FakeLLMClient:
     return FakeLLMClient(llm=MagicMock())
 
 
-def fixture_build_config(neo4j: Neo4jConfig) -> BuildConfig:
-    return BuildConfig(
+def fixture_build_config(neo4j: Neo4jConfig, *, database: Path | None = None) -> BuildConfig:
+    """The Databricks build config, or with `database` the same build over that DuckDB file."""
+    config = BuildConfig(
         catalog=CATALOG,
         schemas=list(SCHEMA_TABLES),
         skip_embeddings=True,
@@ -337,11 +363,27 @@ def fixture_build_config(neo4j: Neo4jConfig) -> BuildConfig:
         ),
         neo4j=neo4j,
     )
+    if database is None:
+        return config
+    from sema.models.config import DuckDBConfig
+
+    return config.model_copy(
+        update={"source": "duckdb", "duckdb": DuckDBConfig(path=str(database))},
+    )
+
+
+@contextmanager
+def fake_model_environment() -> Iterator[None]:
+    """Route every model call the build makes to the fake."""
+    with patch(
+        "sema.pipeline.build.LLMClientFactory.create", lambda _self: make_fake_llm_client(),
+    ):
+        yield
 
 
 @contextmanager
 def fixture_environment() -> Iterator[list[FakeConnection]]:
-    """Route every connector to the fixture warehouse and every model call to the fake.
+    """Route every Databricks connector to the fixture warehouse and every model call to the fake.
 
     Yields the connections opened, so a caller can read the statements left unanswered.
     """
@@ -353,9 +395,6 @@ def fixture_environment() -> Iterator[list[FakeConnection]]:
         connections.append(connection)
         return connection
 
-    with (
-        patch("sema.connectors.databricks.sql_connect", connect),
-        patch("sema.pipeline.build.LLMClientFactory.create", lambda _self: make_fake_llm_client()),
-    ):
+    with patch("sema.connectors.databricks.sql_connect", connect), fake_model_environment():
         yield connections
     warehouse.close()

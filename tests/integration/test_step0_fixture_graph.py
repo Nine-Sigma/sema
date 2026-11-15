@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -28,8 +30,10 @@ from tests.support.connector_fixture import (
     MAIN_TABLES,
     UNDETECTABLE_DECLARED_JOIN,
     FixtureJoin,
+    fake_model_environment,
     fixture_build_config,
     fixture_environment,
+    write_fixture_database,
 )
 
 pytestmark = pytest.mark.integration
@@ -163,12 +167,20 @@ def _neo4j_config() -> Neo4jConfig:
     )
 
 
-def _build(driver: Any, *, wipe: bool = False, **overrides: Any) -> FixtureGraph:
+def _build(
+    driver: Any, database: Path | None, *, wipe: bool = False, **overrides: Any,
+) -> FixtureGraph:
+    """Build from the fake Databricks connection, or from the DuckDB file at `database`."""
     if wipe:
         with driver.session() as session:
             session.run("MATCH (n) DETACH DELETE n")
-    config = fixture_build_config(_neo4j_config()).model_copy(update=overrides)
-    with fixture_environment():
+    config = fixture_build_config(_neo4j_config(), database=database).model_copy(
+        update=overrides,
+    )
+    environment: AbstractContextManager[Any] = (
+        fixture_environment() if database is None else fake_model_environment()
+    )
+    with environment:
         report = run_build(config)
     assert report["tables_failed"] == 0, report["failed_tables"]
     built = _read_graph(driver)
@@ -176,9 +188,15 @@ def _build(driver: Any, *, wipe: bool = False, **overrides: Any) -> FixtureGraph
     return built
 
 
+@pytest.fixture(params=["databricks", "duckdb"])
+def database(request: pytest.FixtureRequest, tmp_path: Path) -> Path | None:
+    """The connector path: `None` for the fake Databricks connection, else a DuckDB file."""
+    return None if request.param == "databricks" else write_fixture_database(tmp_path)
+
+
 @pytest.fixture
-def graph(clean_neo4j: Any) -> FixtureGraph:
-    return _build(clean_neo4j)
+def graph(clean_neo4j: Any, database: Path | None) -> FixtureGraph:
+    return _build(clean_neo4j, database)
 
 
 def _matches_decoy(join: JoinNode, decoy: FixtureJoin) -> bool:
@@ -331,18 +349,24 @@ def test_declared_and_detected_join_keeps_the_declared_source_and_confidence(
     assert (join.source, join.confidence) == graph.declared_provenance[repr(DECLARED_AND_DETECTED)]
 
 
-def test_the_graph_is_the_same_with_parallel_table_workers(graph: FixtureGraph) -> None:
-    parallel = _build(graph.driver, wipe=True, table_workers=4)
+def test_the_graph_is_the_same_with_parallel_table_workers(
+    graph: FixtureGraph, database: Path | None,
+) -> None:
+    parallel = _build(graph.driver, database, wipe=True, table_workers=4)
     assert _fully_wired(parallel, UNDETECTABLE_PAIRS) == []
     assert parallel.signature() == graph.signature()
 
 
-def test_a_resumed_build_keeps_the_same_join_graph(graph: FixtureGraph) -> None:
-    resumed = _build(graph.driver, resume=True)
+def test_a_resumed_build_keeps_the_same_join_graph(
+    graph: FixtureGraph, database: Path | None,
+) -> None:
+    resumed = _build(graph.driver, database, resume=True)
     assert resumed.signature() == graph.signature()
 
 
-def test_declared_joins_are_fully_wired_with_fk_detection_off(clean_neo4j: Any) -> None:
-    built = _build(clean_neo4j, enable_fk_detection=False)
+def test_declared_joins_are_fully_wired_with_fk_detection_off(
+    clean_neo4j: Any, database: Path | None,
+) -> None:
+    built = _build(clean_neo4j, database, enable_fk_detection=False)
     gaps = {repr(pairs): g for pairs in _declared_pairs() if (g := _fully_wired(built, pairs))}
     assert gaps == {}
