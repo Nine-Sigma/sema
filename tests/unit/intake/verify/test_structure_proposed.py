@@ -13,11 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from sema.intake.loaders.tabular import land_tabular
-from sema.intake.shapes.base import SlotBinding
-from sema.intake.structure import BoundEntry, StructureResult
+from sema.intake.land.loaders.tabular import land_tabular
+from sema.intake.structure.shapes.base import SlotBinding
+from sema.intake.structure.structure import BoundEntry, StructureResult
 from sema.intake.verify.structure import verify_structure
-from sema.intake.views import ViewSpec
+from sema.intake.structure.views import ViewSpec
 from tests.unit.intake.layout_proposal_env import (
     CODEBOOK,
     CODEBOOK_CSV,

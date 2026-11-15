@@ -92,7 +92,7 @@ def _spec(lifecycle: bool = True, cap: int = 5) -> ConceptSourceSpec:
 
 def _import(spec: ConceptSourceSpec, staging: Staging | None, source: Staging) -> Any:
     from sema.binding.importer import import_concept_source
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.relations import RelationProvider
 
     provider = RelationProvider(warehouse=None, staging=source)
     return import_concept_source(spec, provider, dataset_map={}, staging=staging)

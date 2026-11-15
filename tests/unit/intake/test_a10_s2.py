@@ -17,9 +17,9 @@ import pytest
 import yaml
 
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
-from sema.intake.ledger import Ledger
-from sema.intake.profile import EvidencePolicy, ProfileTools
-from sema.intake.structure import run_structure
+from sema.intake.calls.ledger import Ledger
+from sema.intake.land.profile import EvidencePolicy, ProfileTools
+from sema.intake.structure.structure import run_structure
 from tests.unit.intake.eligibility_env import (
     ACRIS_RUN,
     GROUPED_CODE_TABLE,

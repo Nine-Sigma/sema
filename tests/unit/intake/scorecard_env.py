@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from sema.intake.scorecard import Scorecard
+from sema.intake.run.scorecard import Scorecard
 from tests.unit.intake.oracle_review_env import ORACLES as ORACLES, UNREVIEWED as UNREVIEWED
 from tests.unit.intake.oracle_review_env import oracle_review as oracle_review
 from tests.unit.intake.oracle_review_env import unreviewed_floors as unreviewed_floors

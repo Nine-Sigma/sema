@@ -24,14 +24,14 @@ import pytest
 import yaml
 
 from sema.binding.spec import ConceptSourceSpec
-from sema.intake.eligibility import assemble_spec
-from sema.intake.eligibility_utils import RunDescriptor
-from sema.intake.loaders.tabular import land_tabular
+from sema.intake.roles.eligibility import assemble_spec
+from sema.intake.roles.eligibility_utils import RunDescriptor
+from sema.intake.land.loaders.tabular import land_tabular
 from sema.intake.verify.roles import UNVERIFIABLE, verify_roles
 from sema.intake.verify.roles_utils import LANG_TAGS
 from tests.unit.intake.catalog_env import write_descriptor
 from tests.unit.intake.role_entries_env import concept_list, pinned, roles_of, source_of
-from tests.unit.intake.shapes.shapes_env import Source
+from tests.unit.intake.structure.shapes.shapes_env import Source
 from tests.unit.intake.structure_env import land
 from tests.unit.intake.verify.verify_env import failures, tools_for
 

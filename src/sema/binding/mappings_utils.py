@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from sema.binding.importer_utils import Record, RefKey, as_text, fetch, refs_payload
 from sema.binding.spec_sections import MappingsSpec
-from sema.intake.relations import RelationProvider
+from sema.intake.land.relations import RelationProvider
 from sema.log import logger
 
 

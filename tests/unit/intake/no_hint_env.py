@@ -29,14 +29,14 @@ from sema.binding.importer import import_concept_source
 from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import TermStorageSpec
 from sema.ingest.duckdb_staging import Staging
-from sema.intake import graph as intake_graph
-from sema.intake.graph_stages import REGISTRY_FILE, STAGING_FILE
-from sema.intake.ledger import Ledger
-from sema.intake.metrics import RunMetrics
-from sema.intake.model_calls import BUDGET_REASON
-from sema.intake.registry import Registry, RunRecord
-from sema.intake.scorecard import Scorecard, score
-from sema.intake.relations import RelationProvider
+from sema.intake.run import graph as intake_graph
+from sema.intake.run.graph_stages import REGISTRY_FILE, STAGING_FILE
+from sema.intake.calls.ledger import Ledger
+from sema.intake.run.metrics import RunMetrics
+from sema.intake.calls.model_calls import BUDGET_REASON
+from sema.intake.calls.registry import Registry, RunRecord
+from sema.intake.run.scorecard import Scorecard, score
+from sema.intake.land.relations import RelationProvider
 from sema.models.config import IntakeModelConfig, ModelPrice
 from tests.support.athena_bundle import export_schema
 from tests.unit.intake.model_calls_env import intake_config

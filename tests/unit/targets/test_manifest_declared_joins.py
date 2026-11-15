@@ -10,7 +10,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from sema.intake.table_schema import TableSchema, to_manifest_entity
+from sema.intake.land.table_schema import TableSchema, to_manifest_entity
 from sema.targets.adapters import manifest_models
 from sema.targets.adapters.manifest import ManifestTargetAdapter
 from sema.targets.adapters.manifest_models import ManifestEntity

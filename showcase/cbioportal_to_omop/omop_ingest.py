@@ -8,7 +8,7 @@ from urllib.request import urlopen
 import pyarrow as pa
 
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.loaders.athena import (
+from sema.intake.land.loaders.athena import (
     OPTIONAL_VOCAB_FILES,
     REQUIRED_VOCAB_FILES,
     land_athena_bundle,

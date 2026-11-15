@@ -3,7 +3,7 @@
 Each run lands a committed fixture, runs Structure and Roles with its hand-written spec as
 the hint (so Roles assembles a spec with no model), and wires a real ``ModelCalls`` over a
 mocked client that answers the engine's stage B and C output models from the prompt.
-``sema.intake.enrichment`` is imported inside the helpers so a missing module fails each
+``sema.intake.report.enrichment`` is imported inside the helpers so a missing module fails each
 test instead of the whole collection.
 """
 
@@ -23,8 +23,8 @@ import yaml
 from sema.binding.spec import load_concept_source_spec
 from sema.engine import semantic
 from sema.engine.semantic import SemanticEngine
-from sema.intake.eligibility_spec_utils import RolesResult
-from sema.intake.eligibility_utils import RunDescriptor
+from sema.intake.roles.eligibility_spec_utils import RolesResult
+from sema.intake.roles.eligibility_utils import RunDescriptor
 from sema.llm_client import InvocationStats
 from sema.models.stages import StageBBatchResult, StageBColumnResult, StageCBatchResult
 from tests.unit.intake.model_calls_env import intake_config, stats
@@ -106,7 +106,7 @@ class EnrichRun:
     roles_before: RolesResult | None = None
 
     def enrich(self, **kwargs: Any) -> Any:
-        from sema.intake.enrichment import enrich
+        from sema.intake.report.enrichment import enrich
 
         landed = self.stages.landed
         tools = landed.tools(ENRICH_STAGE, self.stages.structure)
@@ -152,7 +152,7 @@ class EnrichRun:
 
 @contextmanager
 def enrich_run(source: Path, root: Path, schema: str, stem: str) -> Iterator[EnrichRun]:
-    from sema.intake.model_calls import ModelCalls
+    from sema.intake.calls.model_calls import ModelCalls
 
     directory = source if source.is_dir() else source.parent
     with landed_run(source, root, schema) as landed:

@@ -9,7 +9,7 @@ from sema.binding.spec import (
     ConceptSourceSpec,
     ValueMappingsSpec,
 )
-from sema.intake.relations import RelationProvider
+from sema.intake.land.relations import RelationProvider
 
 
 def column_bindings(

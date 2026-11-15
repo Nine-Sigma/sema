@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 
-from sema.intake.profile import ProfileTools
-from sema.intake.shapes.base import RelationProfile, SlotBinding
-from sema.intake.shapes.ignore_utils import FULL_RESOLVE, other_multi_groups
-from sema.intake.structure import StructureResult
+from sema.intake.land.profile import ProfileTools
+from sema.intake.structure.shapes.base import RelationProfile, SlotBinding
+from sema.intake.structure.shapes.ignore_utils import FULL_RESOLVE, other_multi_groups
+from sema.intake.structure.structure import StructureResult
 
 BindingKey = tuple[str, tuple[tuple[str, str], ...], tuple[str, ...]]
 

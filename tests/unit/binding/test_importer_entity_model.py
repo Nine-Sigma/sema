@@ -10,7 +10,7 @@ import yaml
 
 from sema.binding.spec import ConceptSourceSpec
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.landing import LOCATOR_COLUMN
+from sema.intake.land.landing import LOCATOR_COLUMN
 from sema.targets.adapters.manifest_parser import parse_manifest_raw
 
 pytestmark = pytest.mark.unit
@@ -56,8 +56,8 @@ def _spec(**sections: Any) -> ConceptSourceSpec:
 
 def _import(tmp_path: Path, spec: ConceptSourceSpec) -> Any:
     from sema.binding.importer import import_concept_source
-    from sema.intake.loaders.tabular import land_tabular
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.loaders.tabular import land_tabular
+    from sema.intake.land.relations import RelationProvider
 
     path = tmp_path / "dictionary.csv"
     path.write_text(DICTIONARY)
@@ -189,7 +189,7 @@ def _per_file_spec(entries: list[dict[str, Any]], **section: Any) -> ConceptSour
 
 def _per_file_import(tmp_path: Path, spec: ConceptSourceSpec) -> Any:
     from sema.binding.importer import import_concept_source
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.relations import RelationProvider
 
     with Staging(str(tmp_path / "per_file.duckdb"), schemas=()) as staging:
         _per_file_staging(staging)
@@ -201,7 +201,7 @@ def _per_file_import(tmp_path: Path, spec: ConceptSourceSpec) -> Any:
 def _read_header(tmp_path: Path, header_keys: Any = None, rows: Any = None) -> Any:
     from sema.binding.importer_entity_utils import read_header
     from sema.binding.spec import HeaderKeys, RelationRef
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.relations import RelationProvider
 
     keys = HeaderKeys.model_validate(header_keys) if header_keys is not None else None
     ref = RelationRef(provider="staging", name="land.orders__Header")
@@ -333,7 +333,7 @@ def test_type_omitted_gives_any_fields_and_logs_a_count_per_entity(tmp_path: Pat
 
 
 def test_declared_foreign_keys_and_domains_reach_the_table_schema(tmp_path: Path) -> None:
-    from sema.intake.table_schema import ForeignKey, Reference
+    from sema.intake.land.table_schema import ForeignKey, Reference
 
     entry = _orders_entry(
         foreign_keys=[

@@ -2,7 +2,7 @@
 
 Contract added to ``test_record_intake_run.py``'s: ``record_source`` and ``verify_replay``
 take ``approver: str | None = None``. With an approver, a run stopped at ``value_ask`` is
-answered through ``sema.intake.graph.approve_values`` (at most ``MAX_VALUE_ASKS`` times),
+answered through ``sema.intake.run.graph.approve_values`` (at most ``MAX_VALUE_ASKS`` times),
 each approval is logged in the run ledger as a ``VALUE_APPROVAL_KIND`` event at stage
 ``value_ask`` carrying the approver, and the run continues to Review; ``recording.json``
 carries ``approver`` and ``value_asks`` (approvals made). Without an approver a value ask
@@ -21,7 +21,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sema.intake.registry import Registry
+from sema.intake.calls.registry import Registry
 from tests.unit.intake.graph_env import (
     ACRIS_DESCRIPTOR,
     REGISTRY_FILE,

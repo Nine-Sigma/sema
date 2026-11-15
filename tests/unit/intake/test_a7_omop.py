@@ -33,8 +33,8 @@ EXPECTED_DELTAS = {
 def imported(tmp_path_factory: pytest.TempPathFactory) -> tuple[ParsedManifest, list[str]]:
     from sema.binding.importer import import_concept_source
     from sema.binding.spec import load_concept_source_spec
-    from sema.intake.loaders.tabular import land_tabular
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.loaders.tabular import land_tabular
+    from sema.intake.land.relations import RelationProvider
 
     path = tmp_path_factory.mktemp("a7") / "staging.duckdb"
     with Staging(str(path), schemas=()) as staging, captured_log() as messages:

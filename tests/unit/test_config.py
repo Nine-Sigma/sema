@@ -255,7 +255,7 @@ class TestEvidenceTier:
         assert defining == ["models/config.py"]
 
     def test_intake_profile_imports_the_tier_from_models_config(self):
-        from sema.intake import profile
+        from sema.intake.land import profile
 
         tree = ast.parse(Path(profile.__file__).read_text())
         imported = {
@@ -267,7 +267,7 @@ class TestEvidenceTier:
         assert "EvidenceTier" in imported
 
     def test_build_config_and_intake_policy_share_the_type(self):
-        from sema.intake.profile import EvidencePolicy
+        from sema.intake.land.profile import EvidencePolicy
         from sema.models.config import EvidenceTier
 
         assert get_args(EvidenceTier) == ("metadata_only", "bounded_values", "full")

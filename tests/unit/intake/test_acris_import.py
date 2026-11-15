@@ -89,8 +89,8 @@ class _Imported:
 def imported(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_Imported]:
     from sema.binding.importer import import_concept_source
     from sema.binding.spec import load_concept_source_spec
-    from sema.intake.loaders.tabular import land_tabular
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.loaders.tabular import land_tabular
+    from sema.intake.land.relations import RelationProvider
 
     spec = load_concept_source_spec(SPEC)
     path = tmp_path_factory.mktemp("acris_import") / "staging.duckdb"
@@ -259,7 +259,7 @@ def test_six_fields_carry_inline_values(imported: _Imported) -> None:
 def test_schemas_with_inline_values_record_the_extractor_version(
     imported: _Imported,
 ) -> None:
-    from sema.intake.lexicon import PATTERNS_VERSION
+    from sema.intake.roles.lexicon import PATTERNS_VERSION
 
     schemas = imported.result.table_schemas
     owners = {f"acris.{owner}" for owner, _ in INLINE_VALUES}

@@ -26,7 +26,7 @@ from typing import Any
 
 import pytest
 
-from sema.intake.resolve_utils import member_bindings, open_entries, render_prompt
+from sema.intake.resolve.resolve_utils import member_bindings, open_entries, render_prompt
 from sema.intake.verify.roles import verify_roles
 from sema.intake.verify.structure import verify_structure
 from tests.unit.intake.findings_env import (
@@ -38,7 +38,7 @@ from tests.unit.intake.findings_env import (
 )
 from tests.unit.intake.no_hint_env import KEYS_MOVED, replay, utils
 from tests.unit.intake.role_entries_env import concept_list, pinned, roles_of
-from tests.unit.intake.shapes.shapes_env import Source, candidates
+from tests.unit.intake.structure.shapes.shapes_env import Source, candidates
 from tests.unit.intake.structure_env import fresh_tools, run
 from tests.unit.intake.verify.verify_env import tools_for
 

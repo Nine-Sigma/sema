@@ -1,6 +1,6 @@
 """Shared fakes for the intake model-call path: a mocked client, configs, and a wired run.
 
-`sema.intake.model_calls` and `IntakeModelConfig` are imported inside the helpers so a
+`sema.intake.calls.model_calls` and `IntakeModelConfig` are imported inside the helpers so a
 missing module fails each test instead of the whole collection.
 """
 
@@ -16,8 +16,8 @@ from unittest.mock import MagicMock
 
 from pydantic import BaseModel, ConfigDict
 
-from sema.intake.ledger import Ledger, RunLedger
-from sema.intake.registry import Registry, RunRecord
+from sema.intake.calls.ledger import Ledger, RunLedger
+from sema.intake.calls.registry import Registry, RunRecord
 from sema.llm_client import InvocationStats
 
 MODEL = "vendor-a/model-x"
@@ -132,7 +132,7 @@ def wired_run(
     config: Any | None = None,
     run_id: str | None = None,
 ) -> WiredRun:
-    from sema.intake.model_calls import ModelCalls
+    from sema.intake.calls.model_calls import ModelCalls
 
     run_id = run_id or str(uuid.uuid4())
     ledger = Ledger(root / "runs").run(run_id)

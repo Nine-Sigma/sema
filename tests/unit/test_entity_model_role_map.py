@@ -11,7 +11,7 @@ import json
 import pytest
 
 from sema.binding.spec_sections import EntityModelRoles, PerFileEntry
-from sema.intake.output_models import role_map_model
+from sema.intake.resolve.output_models import role_map_model
 
 pytestmark = pytest.mark.unit
 

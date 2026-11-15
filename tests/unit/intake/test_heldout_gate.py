@@ -17,8 +17,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from sema.intake.eligibility_utils import RunDescriptor
-from sema.intake.metrics import RunMetrics, run_metrics
+from sema.intake.roles.eligibility_utils import RunDescriptor
+from sema.intake.run.metrics import RunMetrics, run_metrics
 from tests.unit.intake.pipeline_env import (
     FINAL_STAGE,
     Landed,

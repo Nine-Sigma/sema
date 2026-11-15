@@ -142,7 +142,7 @@ def staging(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Staging]:
 def imported(staging: Staging) -> _Imported:
     from sema.binding.importer import import_concept_source
     from sema.binding.spec import load_concept_source_spec, load_dataset_map
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.relations import RelationProvider
 
     spec = load_concept_source_spec(SPEC)
     assert spec.authored_bindings is not None

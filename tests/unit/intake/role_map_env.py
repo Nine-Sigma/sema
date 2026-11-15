@@ -22,14 +22,14 @@ from pydantic import BaseModel
 
 from sema.binding.spec_sections import Provider
 
-from sema.intake.output_models import ENTRY_PREFIX, ROLE_PREFIX
-from sema.intake.output_models_utils import ABSTAIN, NONE
-from sema.intake.resolve import resolve_roles
-from sema.intake.shapes import entity_model
-from sema.intake.shapes.base import SlotBinding
+from sema.intake.resolve.output_models import ENTRY_PREFIX, ROLE_PREFIX
+from sema.intake.resolve.output_models_utils import ABSTAIN, NONE
+from sema.intake.resolve.resolve import resolve_roles
+from sema.intake.structure.shapes import entity_model
+from sema.intake.structure.shapes.base import SlotBinding
 from tests.unit.intake.model_calls_env import WiredRun, stats, wired_run
 from tests.unit.intake.role_entries_env import concept_list, pinned, roles_of, source_of
-from tests.unit.intake.shapes.shapes_env import Source, make_tools
+from tests.unit.intake.structure.shapes.shapes_env import Source, make_tools
 from tests.unit.intake.structure_env import fresh_tools, run
 
 SCHEMA = "rm"
@@ -59,7 +59,7 @@ def module(name: str) -> ModuleType:
 
 
 def output_models() -> ModuleType:
-    return module("sema.intake.output_models")
+    return module("sema.intake.resolve.output_models")
 
 
 def _pad(prefix: str) -> str:
@@ -127,7 +127,7 @@ CONFLICT_SQL = (
 
 def schema_rows() -> int:
     """More dictionary rows than the role-map prompt may show."""
-    return int(module("sema.intake.resolve_roles_utils").SCHEMA_TEXT_SAMPLE_ROWS) + 5
+    return int(module("sema.intake.resolve.resolve_roles_utils").SCHEMA_TEXT_SAMPLE_ROWS) + 5
 
 
 def tally_fields_sql() -> str:

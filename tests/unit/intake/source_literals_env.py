@@ -93,7 +93,7 @@ def _scanned(root: Path, pattern: str) -> list[Path]:
     return sorted(
         path
         for path in root.rglob(pattern)
-        if path.relative_to(root).parts[0] not in UNSCANNED_PACKAGES
+        if not set(path.relative_to(root).parts[:-1]) & set(UNSCANNED_PACKAGES)
     )
 
 

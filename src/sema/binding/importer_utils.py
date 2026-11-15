@@ -19,8 +19,8 @@ from sema.binding.spec import (
     ExternalRefRole,
     RelationRef,
 )
-from sema.intake.landing import LOCATOR_COLUMN, LOCATOR_ROW_SEPARATOR
-from sema.intake.relations import RelationProvider
+from sema.intake.land.landing import LOCATOR_COLUMN, LOCATOR_ROW_SEPARATOR
+from sema.intake.land.relations import RelationProvider
 from sema.log import logger
 
 Record = dict[str, Any]

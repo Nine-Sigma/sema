@@ -10,10 +10,10 @@ from __future__ import annotations
 from typing import get_args
 
 from sema.binding.spec_sections import Provider, RelationRef
-from sema.intake.landing import LOCATOR_COLUMN, LandedRelation, LandResult
-from sema.intake.profile import EvidenceTier, ProfileTools
-from sema.intake.profile_utils import CatalogColumn, RelationProfile
-from sema.intake.shapes.base_utils import failure
+from sema.intake.land.landing import LOCATOR_COLUMN, LandedRelation, LandResult
+from sema.intake.land.profile import EvidenceTier, ProfileTools
+from sema.intake.land.profile_utils import CatalogColumn, RelationProfile
+from sema.intake.structure.shapes.base_utils import failure
 from sema.intake.verify.base import Ambiguity, Failure, Verdict
 from sema.intake.verify.land_utils import (
     HEADERLESS,

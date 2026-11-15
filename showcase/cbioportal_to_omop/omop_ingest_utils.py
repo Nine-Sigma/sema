@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from sema.intake.loaders.dictionary_utils import (
+from sema.intake.land.loaders.dictionary_utils import (
     ColumnDef,
     parse_postgres_ddl,
     postgres_to_duckdb_type,

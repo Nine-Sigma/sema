@@ -21,7 +21,7 @@ SCHEMA = "land_heldout"
 
 
 def _expected_relations() -> set[str]:
-    from sema.intake.loaders.base import relation_name
+    from sema.intake.land.loaders.base import relation_name
 
     names: set[str] = set()
     for path in sorted(HELDOUT.glob("*.xlsx")):
@@ -34,7 +34,7 @@ def _expected_relations() -> set[str]:
 
 
 def test_heldout_fixture_lands_with_every_relation_accounted_for(tmp_path: Path) -> None:
-    from sema.intake.loaders.tabular import land_tabular
+    from sema.intake.land.loaders.tabular import land_tabular
 
     expected = _expected_relations()
     with Staging(str(tmp_path / "staging.duckdb"), schemas=()) as staging:

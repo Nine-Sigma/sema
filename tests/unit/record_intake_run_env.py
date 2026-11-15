@@ -12,8 +12,8 @@ from typing import Any
 
 import pytest
 
-from sema.intake.ledger import Ledger
-from sema.intake.registry import Registry
+from sema.intake.calls.ledger import Ledger
+from sema.intake.calls.registry import Registry
 from tests.unit.intake.graph_env import (
     ACRIS_DESCRIPTOR,
     LAYOUT_PROPOSAL,
@@ -25,7 +25,7 @@ from tests.unit.intake.graph_env import (
     routed_client,
 )
 from tests.unit.intake.model_calls_env import MODEL, choice, numbered_prompt
-from tests.unit.intake.shapes.shapes_env import FIXTURES
+from tests.unit.intake.structure.shapes.shapes_env import FIXTURES
 
 HELD_OUT = ("heldout", "heldout2")
 REVIEW_PARTS = ("ambiguities", "proposals", "spec", "dry_run")

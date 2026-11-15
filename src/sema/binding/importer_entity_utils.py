@@ -21,11 +21,11 @@ from sema.binding.spec import (
     PerFileEntry,
     RelationRef,
 )
-from sema.intake.landing import LOCATOR_COLUMN, SHEET_SEPARATOR
-from sema.intake.lexicon import HEADER_KEY_TOKENS, normalize
-from sema.intake.relations import RelationProvider
-from sema.intake.table_schema import ForeignKey, Reference, TableSchema, to_manifest_entity
-from sema.intake.table_schema_utils import (
+from sema.intake.land.landing import LOCATOR_COLUMN, SHEET_SEPARATOR
+from sema.intake.roles.lexicon import HEADER_KEY_TOKENS, normalize
+from sema.intake.land.relations import RelationProvider
+from sema.intake.land.table_schema import ForeignKey, Reference, TableSchema, to_manifest_entity
+from sema.intake.land.table_schema_utils import (
     DictionaryRow,
     dictionary_flag,
     inline_values,

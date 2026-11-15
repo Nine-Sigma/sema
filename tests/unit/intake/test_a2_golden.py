@@ -22,8 +22,8 @@ GOLDEN = FIXTURES / "codes_a2.manifest.yaml"
 def import_a2(tmp_path: Path) -> Any:
     from sema.binding.importer import import_concept_source
     from sema.binding.spec import load_concept_source_spec
-    from sema.intake.loaders.tabular import land_tabular
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.loaders.tabular import land_tabular
+    from sema.intake.land.relations import RelationProvider
 
     with Staging(str(tmp_path / "staging.duckdb"), schemas=()) as staging:
         land_tabular(WORKBOOK, staging, schema="land_a2")

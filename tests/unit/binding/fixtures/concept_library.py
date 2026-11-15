@@ -15,7 +15,7 @@ from typing import Any, Callable
 import duckdb
 import yaml
 
-from sema.intake.relations import RelationProvider
+from sema.intake.land.relations import RelationProvider
 
 FIXTURES_DIR = Path(__file__).parent
 SPEC_PATH = FIXTURES_DIR / "concept_source.yaml"

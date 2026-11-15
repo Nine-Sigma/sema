@@ -4,7 +4,7 @@ Pinned CLI surface (task 13.2), every command under ``sema target``, in ``sema.c
 
 - ``discover SOURCE [--descriptor YAML] [--hint SPEC] [--schema NAME]
   [--tier metadata_only|bounded_values|full] [--enrich] [--run-id ID] [--root DIR]`` calls
-  ``sema.intake.graph.discover(source, root=, descriptor=, config=, client=, hint=,
+  ``sema.intake.run.graph.discover(source, root=, descriptor=, config=, client=, hint=,
   enrich=, tier=, run_id=, schema=)``. Defaults: tier ``metadata_only``, enrichment off, no
   hint, schema and run id left to the graph. ``--root`` is the ledger root (default
   ``.sema/intake``); the tests always pass it. Without ``--descriptor`` the single
@@ -32,7 +32,7 @@ Pinned CLI surface (task 13.2), every command under ``sema target``, in ``sema.c
   that run's ``run_metrics`` artifact as JSON, and fails naming the run when it has none.
 - The model: each discover or approve builds ``IntakeModelConfig()`` from the environment
   and passes ``_intake_client(config)`` to the graph as ``client``. The CLI imports
-  ``sema.intake.graph`` inside the command, so ``sema --help`` loads no LangGraph.
+  ``sema.intake.run.graph`` inside the command, so ``sema --help`` loads no LangGraph.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ from typing import Any
 import pytest
 import yaml
 
-from sema.intake.registry import Registry
+from sema.intake.calls.registry import Registry
 from sema.models.config import IntakeModelConfig
 from tests.unit.cli_intake_env import (
     APPROVER,

@@ -15,7 +15,7 @@ from typing import Any
 import duckdb
 
 from sema.binding.spec import ConceptSourceSpec
-from sema.intake.relations import RelationProvider
+from sema.intake.land.relations import RelationProvider
 from sema.log import logger
 from tests.unit.binding.fixtures.concept_library import warehouse_sql
 

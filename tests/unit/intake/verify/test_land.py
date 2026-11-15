@@ -11,9 +11,9 @@ import duckdb
 import pytest
 
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.landing import LandResult
-from sema.intake.loaders.tabular import land_tabular
-from tests.unit.intake.shapes.shapes_env import Source, staging_source, write_workbook
+from sema.intake.land.landing import LandResult
+from sema.intake.land.loaders.tabular import land_tabular
+from tests.unit.intake.structure.shapes.shapes_env import Source, staging_source, write_workbook
 from tests.unit.intake.verify.conftest import Landed
 from tests.unit.intake.verify.verify_env import (
     LAND_CHECKS,
@@ -63,7 +63,7 @@ def headerless(tmp_path: Path) -> Iterator[Source]:
 
 
 def _memory(tmp_path: Path, *statements: str) -> tuple[duckdb.DuckDBPyConnection, Source]:
-    from tests.unit.intake.shapes.shapes_env import warehouse_source
+    from tests.unit.intake.structure.shapes.shapes_env import warehouse_source
 
     con = duckdb.connect(":memory:")
     con.execute("CREATE SCHEMA tl")

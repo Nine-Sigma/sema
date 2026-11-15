@@ -13,12 +13,12 @@ from typing import Any
 from pydantic import BaseModel, create_model
 
 from sema.binding.spec_sections import CodeListRoles, ConceptRoles, StatusRole, ValueSetRoles
-from sema.intake import lexicon
-from sema.intake.eligibility import Target, role_targets
-from sema.intake.eligibility_spec_utils import VALUE_SETS, RolesResult
-from sema.intake.eligibility_text_utils import CODE_LISTS, CONCEPTS
-from sema.intake.eligibility_utils import RoleEligibility, scope_of
-from sema.intake.structure_hint_utils import KEY_ROLE, SECTION_SEPARATOR
+from sema.intake.roles import lexicon
+from sema.intake.roles.eligibility import Target, role_targets
+from sema.intake.roles.eligibility_spec_utils import VALUE_SETS, RolesResult
+from sema.intake.roles.eligibility_text_utils import CODE_LISTS, CONCEPTS
+from sema.intake.roles.eligibility_utils import RoleEligibility, scope_of
+from sema.intake.structure.structure_hint_utils import KEY_ROLE, SECTION_SEPARATOR
 from sema.intake.verify.base import Failure
 from sema.intake.verify.roles_utils import BoundSection
 

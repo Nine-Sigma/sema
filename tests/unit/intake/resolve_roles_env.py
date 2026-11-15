@@ -17,15 +17,15 @@ from unittest.mock import MagicMock
 import duckdb
 from pydantic import BaseModel
 
-from sema.intake.output_models import REFERENCE_PREFIX, ROLE_PREFIX
-from sema.intake.output_models_utils import ABSTAIN, NONE
-from sema.intake.resolve_utils import text_columns
-from sema.intake.shapes import entity_model
-from sema.intake.shapes.base import SlotBinding
-from sema.intake.structure import BoundEntry
+from sema.intake.resolve.output_models import REFERENCE_PREFIX, ROLE_PREFIX
+from sema.intake.resolve.output_models_utils import ABSTAIN, NONE
+from sema.intake.resolve.resolve_utils import text_columns
+from sema.intake.structure.shapes import entity_model
+from sema.intake.structure.shapes.base import SlotBinding
+from sema.intake.structure.structure import BoundEntry
 from tests.unit.intake.eligibility_env import Env, run_roles
 from tests.unit.intake.model_calls_env import stats
-from tests.unit.intake.shapes.shapes_env import warehouse_source
+from tests.unit.intake.structure.shapes.shapes_env import warehouse_source
 from tests.unit.intake.structure_env import ACRIS, CODE_TABLES, fresh_tools, run
 
 CONFIDENCE = 0.85

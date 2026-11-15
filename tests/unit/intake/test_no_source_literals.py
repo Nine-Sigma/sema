@@ -21,8 +21,8 @@ import pytest
 from pydantic import BaseModel
 
 from sema.binding import spec_sections
-from sema.intake import lexicon
-from sema.intake.loaders.base import relation_name
+from sema.intake.roles import lexicon
+from sema.intake.land.loaders.base import relation_name
 from tests.unit.intake.source_literals_env import (
     REPO_ROOT,
     SCAN_ROOT,

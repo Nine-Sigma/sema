@@ -10,7 +10,7 @@ oracle is the loader golden: the landed tables and the staged terms. A10 is neve
 expected failure; any other known-source or held-out miss is an ``xfail(strict=True)``
 carrying the spec diff, the missed metric, or the rejection, and together they are the S3
 baseline (Dean, 2026-10-22). Every leg with a spec oracle is also scored per import cell kind
-(``sema.intake.scorecard``) and held at its floor in ``scorecard_env.BASELINE``, with the run's
+(``sema.intake.run.scorecard``) and held at its floor in ``scorecard_env.BASELINE``, with the run's
 relation and ignored counts printed beside the table; a fresh held-out is scored against its
 reviewed spec with no spec diff printed. Held-out ledger text is never printed, only counts
 and metrics.
@@ -26,7 +26,7 @@ import pytest
 import yaml
 
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
-from sema.intake.scorecard import render
+from sema.intake.run.scorecard import render
 from sema.log import logger
 from tests.support.athena_bundle import export_schema
 from tests.unit.intake.no_hint_env import (

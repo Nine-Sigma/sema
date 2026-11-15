@@ -17,17 +17,17 @@ from itertools import combinations
 
 from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import ExternalRefRole, MappingsSpec, RelationRef
-from sema.intake import lexicon
-from sema.intake.eligibility import ambiguities
-from sema.intake.eligibility_spec_utils import RolesResult
-from sema.intake.eligibility_text_utils import STAGE, VOCABULARY_ROLE
-from sema.intake.eligibility_utils import RoleEligibility, fact_of
-from sema.intake.profile import SAMPLE_CAP, ProfileTools, ValueSample
-from sema.intake.shapes import filled_sections
-from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR
-from sema.intake.shapes.base_utils import JOIN_FLOOR, failure, section_of
-from sema.intake.structure import StructureResult
-from sema.intake.structure_hint_utils import section_at
+from sema.intake.roles import lexicon
+from sema.intake.roles.eligibility import ambiguities
+from sema.intake.roles.eligibility_spec_utils import RolesResult
+from sema.intake.roles.eligibility_text_utils import STAGE, VOCABULARY_ROLE
+from sema.intake.roles.eligibility_utils import RoleEligibility, fact_of
+from sema.intake.land.profile import SAMPLE_CAP, ProfileTools, ValueSample
+from sema.intake.structure.shapes import filled_sections
+from sema.intake.structure.shapes.base import JOIN_RESOLVE_FLOOR
+from sema.intake.structure.shapes.base_utils import JOIN_FLOOR, failure, section_of
+from sema.intake.structure.structure import StructureResult
+from sema.intake.structure.structure_hint_utils import section_at
 from sema.intake.verify.base import Ambiguity, Failure, Finding, FloorValue, Verdict, classed
 from sema.intake.verify.roles_chosen_utils import (
     chosen_sections,

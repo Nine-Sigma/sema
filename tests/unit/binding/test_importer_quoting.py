@@ -81,7 +81,7 @@ ENTITY_MODEL = {
 
 @pytest.fixture
 def landed(tmp_path: Path) -> Iterator[tuple[Staging, list[str]]]:
-    from sema.intake.loaders.tabular import land_tabular
+    from sema.intake.land.loaders.tabular import land_tabular
 
     path = tmp_path / "dictionary.csv"
     path.write_text(DICTIONARY)
@@ -100,7 +100,7 @@ def landed(tmp_path: Path) -> Iterator[tuple[Staging, list[str]]]:
 
 def _import(staging: Staging, spec: ConceptSourceSpec) -> Any:
     from sema.binding.importer import import_concept_source
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.relations import RelationProvider
 
     return import_concept_source(
         spec, RelationProvider(warehouse=None, staging=staging), dataset_map={}

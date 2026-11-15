@@ -1,6 +1,6 @@
 """Sources for the graph follow-up tests: one per landed medium, a capped run, a ranked CSV.
 
-``discover_with`` calls ``sema.intake.graph.discover`` with an explicit ``IntakeModelConfig``,
+``discover_with`` calls ``sema.intake.run.graph.discover`` with an explicit ``IntakeModelConfig``,
 so a test can set the call or cost cap that ``graph_env.settings`` fixes.
 """
 

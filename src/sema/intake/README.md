@@ -14,13 +14,13 @@ The stages run in this order, each with its own verifier and each writing to one
 
 ## The generality rule
 
-The general code must handle a source nobody has seen. No module under `src/sema/intake/` outside `loaders/` may contain a relation name, sheet name, column name, header key, or phrase from any fixture. `tests/unit/intake/test_no_source_literals.py` enforces this by reading every workbook and CSV under `tests/fixtures/intake/` and scanning the general modules: a single-word literal is a hit when it is a whole string constant, a multi-word literal is a hit anywhere. Python keywords, role names read from the spec section models, single-word lexicon tokens read from `lexicon.py`, and Table Schema vocabulary read from the vendored schema are exempt.
+The general code must handle a source nobody has seen. No module under `src/sema/intake/` outside `land/loaders/` may contain a relation name, sheet name, column name, header key, or phrase from any fixture. `tests/unit/intake/test_no_source_literals.py` enforces this by reading every workbook and CSV under `tests/fixtures/intake/` and scanning the general modules: a single-word literal is a hit when it is a whole string constant, a multi-word literal is a hit anywhere. Python keywords, role names read from the spec section models, single-word lexicon tokens read from `roles/lexicon.py`, and Table Schema vocabulary read from the vendored schema are exempt.
 
 A count in a test scenario is evidence that a general rule holds, never the rule. When a fixture and a rule disagree, the disagreement is recorded in the design document and the test stays a strict `xfail`; the rule changes only when a second source shows the same shape. `tests/fixtures/intake/heldout/` holds a public source that set no rule, and `tests/unit/intake/test_heldout_gate.py` runs it through every stage with no code change.
 
 ## The landing contract
 
-Every loader writes relations through `Staging.write_table` into a schema the caller names, creates that schema when it is absent, and returns one `LandResult` (`sema.intake.landing`):
+Every loader writes relations through `Staging.write_table` into a schema the caller names, creates that schema when it is absent, and returns one `LandResult` (`sema.intake.land.landing`):
 
 - `medium`: `tabular`, `semsql`, `dictionary`, `athena`, or `warehouse`.
 - `source_identity`: what was landed, for example file names with SHA-256 digests, or an ontology IRI and version IRI.
@@ -186,7 +186,7 @@ Land first, then import with `--staging` pointing at the same DuckDB file. The A
 ```bash
 uv run python -c "
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.loaders.tabular import land_tabular
+from sema.intake.land.loaders.tabular import land_tabular
 with Staging('/tmp/a2.duckdb', schemas=()) as staging:
     land_tabular('tests/fixtures/intake/tabular/codes_a2.xlsx', staging, schema='land_a2')
 "
@@ -202,7 +202,7 @@ The ACRIS directory (15 dictionary workbooks and 5 code-table CSVs, 65 relations
 ```bash
 uv run python -c "
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.loaders.tabular import land_tabular
+from sema.intake.land.loaders.tabular import land_tabular
 with Staging('/tmp/acris.duckdb', schemas=()) as staging:
     land_tabular('tests/fixtures/intake/acris', staging, schema='land_acris')
 "
@@ -219,7 +219,7 @@ It imports 487 terms in five vocabularies and 15 entities with 6 inline value li
 
 ## The ingestion graph
 
-`graph.py` runs one ingestion as a LangGraph graph with a SQLite checkpointer. The design fixes six stages: Land, Structure, Roles, Dry run, Review, and Import. The graph runs them as these nodes, in this order:
+`run/graph.py` runs one ingestion as a LangGraph graph with a SQLite checkpointer. The design fixes six stages: Land, Structure, Roles, Dry run, Review, and Import. The graph runs them as these nodes, in this order:
 
 1. **Land** (`land`): lands the source through `loaders.detect.land_source`, or a warehouse schema through `land_warehouse`, then runs the Land verifier.
 2. **Structure** (`structure`, `resolve_structure`, `propose_layouts`): `run_structure` binds what code can, the resolver hands open entries to the model, and layout proposals cover relations no template reads. The Structure verifier runs after the resolver and after the proposals.
@@ -249,7 +249,7 @@ Every model call goes through `model_calls.ModelCalls.call(stage, prompt, output
 4. The registry row must hold fewer calls than `max_calls` and a cost below `max_cost`. Otherwise the call is refused with `BudgetExceededError`: the registry row moves to `review`, `waiting_review`, `budget_exceeded`, and the caller leaves its entries open. Cost is known only after a call, so one call can overshoot the cost cap by its own cost.
 5. One `invoke` is one call. Its tokens come from the client's `last_stats` and its cost from `prices[model]`, per 1,000 tokens. A model with no price counts at cost 0 and logs one warning. A failed invoke is counted once and logged as `call_failed` with its step errors; a successful one is recorded under `calls/` and logged as `call` with the client's fallback path.
 
-The Structure resolver sends open entries in batches of at most 50 (`output_models.MAX_STRUCTURE_BATCH`). The Roles resolver asks one role map per relation signature (`prompts/roles_v2.md`, output model `RoleMap…_v1`): one free-text field per role of every role model the binding's sections use, section-qualified when a role repeats, answered with a column name or `none`. Relations with the same signature inherit a verified map with `source: memory`. Reference entries take one call per relation, in batches of at most `MAX_REFERENCE_BATCH` (62) entries, over the members code proved. The map is verified after the answer (`column_exists`, `one_role_per_column`, the data facts, containment); a failing answer is re-asked once with every failure listed (`resolve.DEFAULT_MAX_RETRIES`, shared with Structure and layout proposals), then the failing roles are left open with the model's choice ranked first and the failure as their reason. A finding never fails a choice; it is attached to the entry.
+The Structure resolver sends open entries in batches of at most 50 (`output_models.MAX_STRUCTURE_BATCH`). The Roles resolver asks one role map per relation signature (`resolve/prompts/roles_v2.md`, output model `RoleMap…_v1`): one free-text field per role of every role model the binding's sections use, section-qualified when a role repeats, answered with a column name or `none`. Relations with the same signature inherit a verified map with `source: memory`. Reference entries take one call per relation, in batches of at most `MAX_REFERENCE_BATCH` (62) entries, over the members code proved. The map is verified after the answer (`column_exists`, `one_role_per_column`, the data facts, containment); a failing answer is re-asked once with every failure listed (`resolve.DEFAULT_MAX_RETRIES`, shared with Structure and layout proposals), then the failing roles are left open with the model's choice ranked first and the failure as their reason. A finding never fails a choice; it is attached to the entry.
 
 `IntakeModelConfig` reads the environment with the prefix `INTAKE_MODEL_`:
 

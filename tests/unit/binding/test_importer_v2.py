@@ -219,7 +219,7 @@ def test_mixed_providers_read_concepts_from_warehouse_and_mappings_from_staging(
     tmp_path: Path,
 ) -> None:
     from sema.ingest.duckdb_staging import Staging
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.relations import RelationProvider
 
     staging = Staging(str(tmp_path / "staging.duckdb"), schemas=("landed",))
     staging.write_table(

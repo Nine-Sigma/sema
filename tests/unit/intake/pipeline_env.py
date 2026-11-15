@@ -23,18 +23,18 @@ from pydantic import BaseModel, ConfigDict
 from sema.binding.importer import ConceptImport, import_concept_source
 from sema.binding.spec import ConceptSourceSpec
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.eligibility import assemble_spec, run_roles
-from sema.intake.eligibility_spec_utils import RolesResult
-from sema.intake.eligibility_utils import RunDescriptor
-from sema.intake.landing import LandResult
-from sema.intake.ledger import Ledger, RunLedger
-from sema.intake.loaders.tabular import land_tabular
-from sema.intake.profile import EvidencePolicy, ProfileTools
-from sema.intake.registry import Registry, RunRecord
-from sema.intake.relations import RelationProvider
-from sema.intake.report import DryRunReport, dry_run
-from sema.intake.shapes.base import profile_relations
-from sema.intake.structure import StructureResult, run_structure
+from sema.intake.roles.eligibility import assemble_spec, run_roles
+from sema.intake.roles.eligibility_spec_utils import RolesResult
+from sema.intake.roles.eligibility_utils import RunDescriptor
+from sema.intake.land.landing import LandResult
+from sema.intake.calls.ledger import Ledger, RunLedger
+from sema.intake.land.loaders.tabular import land_tabular
+from sema.intake.land.profile import EvidencePolicy, ProfileTools
+from sema.intake.calls.registry import Registry, RunRecord
+from sema.intake.land.relations import RelationProvider
+from sema.intake.report.report import DryRunReport, dry_run
+from sema.intake.structure.shapes.base import profile_relations
+from sema.intake.structure.structure import StructureResult, run_structure
 from sema.intake.verify.base import Ambiguity, Verdict
 from sema.intake.verify.dry_run import verify_dry_run
 from sema.intake.verify.land import verify_land

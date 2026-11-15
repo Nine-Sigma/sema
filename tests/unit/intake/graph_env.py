@@ -1,6 +1,6 @@
 """Shared setup for the ingestion graph tests: a routed mocked model, run readers, sources.
 
-``sema.intake.graph`` is imported lazily, so a missing module fails each test on its own.
+``sema.intake.run.graph`` is imported lazily, so a missing module fails each test on its own.
 The mocked client answers each call by its output model's name: batch models abstain on
 every entry unless scripted, layout proposals abstain unless scripted, the engine's stage B
 names each prompt column (``label_for``, ``synonym_for``) and stage C decodes nothing, and
@@ -21,8 +21,8 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel
 
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.output_models import ROLE_MAP_PREFIX
-from sema.intake.registry import Registry, RunRecord
+from sema.intake.resolve.output_models import ROLE_MAP_PREFIX
+from sema.intake.calls.registry import Registry, RunRecord
 from sema.models.stages import StageBBatchResult, StageBColumnResult, StageCBatchResult
 from tests.unit.intake.enrichment_env import (
     CONFIDENCE,
@@ -71,7 +71,7 @@ class ProcessExit(BaseException):  # noqa: N818 - it stands in for SystemExit, n
 
 
 def graph() -> ModuleType:
-    return importlib.import_module("sema.intake.graph")
+    return importlib.import_module("sema.intake.run.graph")
 
 
 def enum(model: type[BaseModel], field: str) -> tuple[str, ...]:

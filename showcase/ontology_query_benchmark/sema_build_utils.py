@@ -21,7 +21,7 @@ from sema.graph.concept_source import ConceptAncestor, ConceptDetail
 from sema.graph.target_graph_build import ConceptFieldSpec
 from sema.graph.target_retrieval_loader import EntityTableBinding, PhysicalSchemaBinding
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.relations import RelationProvider
+from sema.intake.land.relations import RelationProvider
 from sema.models.planner._enums import TargetArtifactKind
 from sema.models.target.completeness import (
     SemanticCompleteness,

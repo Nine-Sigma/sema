@@ -10,7 +10,7 @@ import yaml
 
 from sema.binding.importer import import_concept_source, write_import
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.relations import RelationProvider
+from sema.intake.land.relations import RelationProvider
 from sema.models.target.identity import EntityIdentity
 from sema.targets.adapters.manifest import ManifestTargetAdapter
 from sema.targets.normalizer import TargetModelNormalizer

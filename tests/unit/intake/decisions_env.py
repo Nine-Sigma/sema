@@ -1,6 +1,6 @@
 """Shared setup for the decisions tests: decision builders, ledger readers, a reviewer.
 
-``sema.intake.decisions`` is imported lazily, so a missing module fails each test on its own.
+``sema.intake.run.decisions`` is imported lazily, so a missing module fails each test on its own.
 An entry is open when it carries neither a choice nor a source; an entry a human closed
 with ``ignore`` and no member keeps ``choice: None`` with ``source: human``.
 """
@@ -17,13 +17,13 @@ from unittest.mock import MagicMock, patch
 import yaml
 
 from sema.binding.spec import ConceptSourceSpec
-from sema.intake.eligibility import assemble_spec, run_roles
-from sema.intake.eligibility_spec_utils import RolesResult
-from sema.intake.eligibility_text_utils import VOCABULARY_ROLE
-from sema.intake.ledger import RunLedger
-from sema.intake.lexicon import NO_REFERENCE
-from sema.intake.shapes.base import profile_relations
-from sema.intake.structure import StructureResult, run_structure
+from sema.intake.roles.eligibility import assemble_spec, run_roles
+from sema.intake.roles.eligibility_spec_utils import RolesResult
+from sema.intake.roles.eligibility_text_utils import VOCABULARY_ROLE
+from sema.intake.calls.ledger import RunLedger
+from sema.intake.roles.lexicon import NO_REFERENCE
+from sema.intake.structure.shapes.base import profile_relations
+from sema.intake.structure.structure import StructureResult, run_structure
 from sema.intake.verify.base import Ambiguity
 from sema.llm_client import LLMClient
 from tests.unit.intake.eligibility_env import ACRIS_RUN, descriptor
@@ -42,7 +42,7 @@ ROLE_ROUNDS = 2
 
 
 def decisions() -> Any:
-    return importlib.import_module("sema.intake.decisions")
+    return importlib.import_module("sema.intake.run.decisions")
 
 
 def decision(stage: str, subject: str, choice: str) -> Any:

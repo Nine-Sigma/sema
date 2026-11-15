@@ -14,15 +14,15 @@ from typing import Any
 import duckdb
 import pytest
 
-from sema.intake.loaders.tabular import land_tabular
-from sema.intake.resolve import resolve_structure
-from sema.intake.shapes.base import SlotBinding, profile_relations
-from sema.intake.shapes.precedence import member
-from sema.intake.structure import BoundEntry
-from sema.intake.structure_utils import group_candidates
+from sema.intake.land.loaders.tabular import land_tabular
+from sema.intake.resolve.resolve import resolve_structure
+from sema.intake.structure.shapes.base import SlotBinding, profile_relations
+from sema.intake.structure.shapes.precedence import member
+from sema.intake.structure.structure import BoundEntry
+from sema.intake.structure.structure_utils import group_candidates
 from sema.intake.verify.structure import verify_structure
 from tests.unit.intake.model_calls_env import wired_run
-from tests.unit.intake.shapes.shapes_env import Source, warehouse_source
+from tests.unit.intake.structure.shapes.shapes_env import Source, warehouse_source
 from tests.unit.intake.structure_env import (
     GROUPED_CODE_TABLE,
     copy_code_tables,
@@ -31,7 +31,7 @@ from tests.unit.intake.structure_env import (
     ref,
     run,
 )
-from tests.unit.intake.test_resolve_structure import FLAT_LIST, answering, starting
+from tests.unit.intake.resolve.test_resolve_structure import FLAT_LIST, answering, starting
 
 pytestmark = pytest.mark.unit
 
