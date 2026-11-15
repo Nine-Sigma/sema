@@ -84,15 +84,6 @@ CAP_VALUES: dict[str, int | None] = {"spec_cap": None, "stage_all": 1}
 CAPS = pytest.mark.parametrize("cap", list(CAP_VALUES.values()), ids=list(CAP_VALUES))
 MANIFEST_DIFF_LINES = 200
 UNREVIEWED_REASON = "unreviewed: the oracle is not reviewed_correct, so no floor row"
-A7_CSV_MISS = (
-    "S3 baseline: the A7 CSV manifest misses the roles type, required, primary_key,"
-    " fk_entity, fk_property, domain, description"
-)
-IMPORT_MISSES = {
-    ("a2", "stage_all"): "S3 baseline: A2 at cap 1 misses replaced_by in term staging",
-    ("a7_csv", "spec_cap"): A7_CSV_MISS,
-    ("a7_csv", "stage_all"): A7_CSV_MISS,
-}
 HELD_OUT_UNASSEMBLED = (
     "with its two ignores accepted the decided College Scorecard run settles every entry but"
     " assembles no spec: its per-file dictionaries do not share one role map and a concept"
@@ -194,7 +185,7 @@ def test_known_source_reaches_review_with_a_spec_and_no_provider_call(
 
 
 def _import_leg(name: str, cap_id: str) -> Any:
-    marks = keyed_marks(name, KEYS_MOVED, IMPORT_MISSES.get((name, cap_id)))
+    marks = keyed_marks(name, KEYS_MOVED, None)
     return pytest.param(name, CAP_VALUES[cap_id], id=f"{name}-{cap_id}", marks=marks)
 
 
