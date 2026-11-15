@@ -82,6 +82,38 @@ A hint (a hand-written spec) pins the bindings it names as `source: human` befor
 
 ## Roles
 
+**The model proposes, code verifies (S5).** Roles asks the model for the whole role map of a
+relation and checks the answer on the data afterwards. Code never removes a reading the data
+does not contradict.
+
+- **Evidence.** The prompt (`resolve/prompts/roles_v2.md`) states, per column: name, type,
+  comment, the aggregates from `describe_relation`, the lexicon claims in force, the
+  embedding rank when an embedder is configured, the findings, and the text of the
+  relations that describe the schema. Data values appear only for columns a reviewer
+  approved.
+- **Findings.** A floor reading (`constant`, `display_null_rate`, `definition_mean_length`,
+  `status_cardinality`) is a `Finding` on the column, stated in the prompt and at Review.
+  It never fails a choice. The data facts in `eligibility_utils.FACTS` and the verifier's
+  checks are the gates.
+- **Agreement.** With `IntakeModelConfig.agreement` on (`INTAKE_MODEL_AGREEMENT`, default
+  on), each role map and reference ask is made twice, the second time with the columns in
+  the relation's seeded order (`resolve/resolve_agreement_utils.py`). Two answers naming the
+  same column settle at the lower confidence with `agreement: 2/2`. Answers that differ
+  leave the entry open with both answers ranked and both reasons. A replay follows the
+  `agreement` flag in its recording's `recording.json`; a recording without the flag replays
+  with one ask.
+- **Row samples.** An approved value ask (`ProfileTools.sample_values`) also returns the
+  first landed rows of the approved columns through `ProfileTools.sample_rows`, in landed
+  order, neither distinct nor sorted, so the model sees which values travel together.
+- **Prompt budget.** A prompt above `MAX_PROMPT_TOKENS` (100,000) is refused before any
+  call. The per-source token and call budget for a recording round is measured at zero
+  calls by the prompt audit and capped by `INTAKE_MODEL_MAX_CALLS` and
+  `INTAKE_MODEL_MAX_COST`.
+- **Reader.** `sema target review <run id> --root <ledger root>` prints one line per open
+  entry, structure then roles, then each relation's disagreement count, and last the
+  entries that name why no spec assembled (decision 14). A run with nothing open prints its
+  spec path. `--settled` adds every settled entry, its choice first.
+
 `run_roles` computes one `RoleEligibility` per role of each bound binding: the `members`, the hints consulted, `excluded_by`, the `choice`, its confidence, and its `source`. Members are every column of the relation, unless the role has a data fact (`eligibility_utils.FACTS`: `key_unique_non_null` for `concept_id` and `code`, `date_shape` for `valid_from` and `valid_to`, `array_shape` for `synonyms`), in which case they are the columns that meet it. Readings that fail a fixture-measured floor (`constant`, `display_null_rate`, `definition_mean_length`, `status_cardinality`) are findings on the column, never removals. Containment (`fk_entity`, `fk_property`, `replaced_by`) and value checks run in the verifier. Roles are settled in the fixed order of `lexicon.ROLES`. A role that no role model of its target requires is optional, and its members end with `none` (`lexicon.NO_REFERENCE`). A `none` choice leaves the role unbound: it never reaches the spec, a value read, or a column check. No role settles by member count. For each role:
 
 1. A stated choice (hint, decision, or verified model answer) settles it.
@@ -259,6 +291,7 @@ The Structure resolver sends open entries in batches of at most 50 (`output_mode
 - `INTAKE_MODEL_PRICES`: JSON, model id to `{"input_per_1k": ..., "output_per_1k": ...}`.
 - `INTAKE_MODEL_RECORDINGS_DIR`: the read-only recordings directory.
 - `INTAKE_MODEL_API_KEY`, `INTAKE_MODEL_BASE_URL`, `INTAKE_MODEL_USE_STRUCTURED_OUTPUT` (default `auto`), and `INTAKE_MODEL_REQUEST_TIMEOUT` (default 120 seconds).
+- `INTAKE_MODEL_AGREEMENT` (default on): two asks per Roles role map and reference ask. A replay takes the flag from its recording instead.
 
 The CLI also builds SEMA's embedder whenever `EMBEDDING_PROVIDER` is non-empty, and the CLI loads `.env` first. The embedding rank changes the Roles prompt, so a run with an embedder misses recordings made without one, and it calls the embedding provider. Under `INTAKE_MODEL_MAX_CALLS=0` with `INTAKE_MODEL_RECORDINGS_DIR` set, the CLI builds no embedder whatever `EMBEDDING_PROVIDER` says and logs that once, unless the recording's `recording.json` holds `"embeddings": true`. A replay follows its recording: a recording made with an embedder states that flag, and its replay needs the same `EMBEDDING_PROVIDER` and `EMBEDDING_MODEL` and calls the embedding provider, though never the model. With an embedder, the Roles prompt states each role's rank-1 column and margin; the rank settles no role. To replay with no provider call of any kind, set `EMBEDDING_PROVIDER=` to empty.
 
