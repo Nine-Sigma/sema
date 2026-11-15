@@ -106,7 +106,7 @@ class TestSampleRowsNormalization:
     def test_sample_rows_assertion(self, normalizer: AssertionNormalizer) -> None:
         sr = ExtractedSampleRows(
             table_name="tbl", catalog="cat", schema="sch",
-            rows=[["1", "John"], ["2", "Jane"]],
+            rows=[{"id": "1", "name": "John"}, {"id": "2", "name": "Jane"}],
             column_names=["id", "name"],
         )
         assertions = normalizer.normalize_sample_rows(sr)
