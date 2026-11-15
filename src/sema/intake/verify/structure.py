@@ -14,31 +14,31 @@ from collections import Counter
 from collections.abc import Sequence
 
 from sema.binding.spec_sections import Provider
-from sema.intake.described_data_utils import (
+from sema.intake.structure.described_data_utils import (
     described_by,
     per_file_dictionaries,
     uses_described,
 )
-from sema.intake.landing import LandResult
-from sema.intake.profile import ProfileTools
-from sema.intake.shapes import TEMPLATES, apply_precedence, ignore
-from sema.intake.shapes.base import RelationProfile, SlotBinding, profile_relations
-from sema.intake.shapes.base_utils import failure
-from sema.intake.shapes.precedence import claims
-from sema.intake.structure import (
+from sema.intake.land.landing import LandResult
+from sema.intake.land.profile import ProfileTools
+from sema.intake.structure.shapes import TEMPLATES, apply_precedence, ignore
+from sema.intake.structure.shapes.base import RelationProfile, SlotBinding, profile_relations
+from sema.intake.structure.shapes.base_utils import failure
+from sema.intake.structure.shapes.precedence import claims
+from sema.intake.structure.structure import (
     BoundEntry,
     StructureResult,
     stage_floor_classes,
     stage_floors,
 )
-from sema.intake.structure_utils import group_candidates
+from sema.intake.structure.structure_utils import group_candidates
 from sema.intake.verify.base import Failure, Verdict
 from sema.intake.verify.structure_utils import (
     binding_key,
     boilerplate_column,
     partition_counts,
 )
-from sema.intake.views.verify_utils import verify_over
+from sema.intake.structure.views.verify_utils import verify_over
 
 PARTITION_COMPLETE = "partition_complete"
 UNKNOWN_TEMPLATE = "unknown_template"

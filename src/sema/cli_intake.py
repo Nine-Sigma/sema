@@ -36,12 +36,12 @@ from sema.cli_intake_utils import (
     written_status,
 )
 from sema.cli_target_utils import warehouse_connector
-from sema.intake.model_calls import IntakeClient, build_intake_client
-from sema.intake.profile import EvidenceTier
+from sema.intake.calls.model_calls import IntakeClient, build_intake_client
+from sema.intake.land.profile import EvidenceTier
 from sema.models.config import IntakeModelConfig
 
 if TYPE_CHECKING:
-    from sema.intake.graph import RunOutcome
+    from sema.intake.run.graph import RunOutcome
 
 EXISTING_FILE = click.Path(exists=True, dir_okay=False, path_type=Path)
 ROOT_OPTION = click.option(
@@ -102,7 +102,7 @@ def discover_cmd(
     out: Path | None,
 ) -> None:
     """Start an ingestion run from SOURCE or a warehouse schema; stop at its first interrupt."""
-    from sema.intake import graph
+    from sema.intake.run import graph
 
     named = warehouse_schema(source, warehouse, descriptor, schema)
     catalog, schema = named if named is not None else (None, schema)
@@ -173,7 +173,7 @@ def _answer(
     reject: bool,
     root: Path,
 ) -> RunOutcome:
-    from sema.intake import graph
+    from sema.intake.run import graph
 
     config = intake_model_config()
     common: dict[str, Any] = {

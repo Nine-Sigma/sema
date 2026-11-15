@@ -30,7 +30,7 @@ from sema.binding.spec import (
     ExternalRefRole,
 )
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.relations import RelationProvider
+from sema.intake.land.relations import RelationProvider
 
 
 @dataclass(frozen=True)

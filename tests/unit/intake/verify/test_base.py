@@ -185,7 +185,7 @@ def test_ambiguity_and_failure_round_trip_on_their_own() -> None:
 
 
 def test_verdict_is_a_ledger_artifact(tmp_path: Path) -> None:
-    from sema.intake.ledger import Ledger
+    from sema.intake.calls.ledger import Ledger
     from sema.intake.verify.base import Verdict
 
     verdict = Verdict.of(failures=[_failure()], ambiguities=[_ambiguity()], floors=FLOORS)

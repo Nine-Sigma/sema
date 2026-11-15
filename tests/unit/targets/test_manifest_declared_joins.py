@@ -10,7 +10,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from sema.intake.table_schema import TableSchema, to_manifest_entity
+from sema.intake.land.table_schema import TableSchema, to_manifest_entity
 from sema.targets.adapters import manifest_models
 from sema.targets.adapters.manifest import ManifestTargetAdapter
 from sema.targets.adapters.manifest_models import ManifestEntity
@@ -21,7 +21,7 @@ from sema.targets.adapters.manifest_parser import (
 )
 from sema.targets.hashing import SnapshotHasher
 from sema.targets.normalizer import TargetModelNormalizer
-from tests.unit.intake.test_acris_import import (
+from tests.unit.intake.acris_import_env import (
     DOMAINS,
     ENTITIES,
     FOREIGN_KEYS,

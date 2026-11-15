@@ -19,7 +19,7 @@ import pytest
 from click.testing import CliRunner, Result
 
 from sema.cli_target import target_group
-from sema.intake.registry import Registry
+from sema.intake.calls.registry import Registry
 
 Entry = dict[str, Any]
 
@@ -35,7 +35,7 @@ EMPTY_STRUCTURE: dict[str, Any] = {
 SEEDED_TOKENS, SEEDED_COST = 120, 0.002
 PROVIDER_ENTRY_POINTS = (
     "sema.cli_intake._intake_client",
-    "sema.intake.model_calls.build_intake_client",
+    "sema.intake.calls.model_calls.build_intake_client",
 )
 OPTIONAL_ENTRY_POINTS = (
     "sema.cli_intake.build_intake_client",

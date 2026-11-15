@@ -26,7 +26,7 @@ from sema.binding.spec import (
     ParentColumnHierarchy,
     RelationshipsSpec,
 )
-from sema.intake.relations import RelationProvider
+from sema.intake.land.relations import RelationProvider
 from sema.log import logger
 
 

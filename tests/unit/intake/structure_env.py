@@ -1,6 +1,6 @@
 """Shared setup for the structure stage tests: landed sources, hints, and result readers.
 
-``sema.intake.structure`` is imported lazily, so a missing module fails each test on its own
+``sema.intake.structure.structure`` is imported lazily, so a missing module fails each test on its own
 instead of failing collection.
 """
 
@@ -19,15 +19,15 @@ import yaml
 
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.landing import LandResult
-from sema.intake.profile import ProfileTools
-from sema.intake.shapes import TEMPLATES
-from sema.intake.shapes.base import (
+from sema.intake.land.landing import LandResult
+from sema.intake.land.profile import ProfileTools
+from sema.intake.structure.shapes import TEMPLATES
+from sema.intake.structure.shapes.base import (
     ID_DISTINCT_RATIO_FLOOR,
     JOIN_RESOLVE_FLOOR,
     LABEL_MEAN_LENGTH_BOUNDS,
 )
-from tests.unit.intake.shapes.shapes_env import FIXTURES, Source, make_tools, staging_source
+from tests.unit.intake.structure.shapes.shapes_env import FIXTURES, Source, make_tools, staging_source
 
 A2_WORKBOOK = FIXTURES / "tabular" / "codes_a2.xlsx"
 A2_SPEC = FIXTURES / "tabular" / "codes_a2.spec.yaml"
@@ -68,7 +68,7 @@ Lander = Callable[..., LandResult]
 
 
 def structure() -> ModuleType:
-    return importlib.import_module("sema.intake.structure")
+    return importlib.import_module("sema.intake.structure.structure")
 
 
 def land(root: Path, name: str, lander: Lander, path: Path) -> tuple[Staging, Source]:

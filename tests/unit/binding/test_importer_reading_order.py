@@ -10,8 +10,8 @@ import pytest
 
 from sema.binding.spec import ConceptSourceSpec, RelationRef
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.landing import LOCATOR_COLUMN
-from sema.intake.relations import RelationProvider
+from sema.intake.land.landing import LOCATOR_COLUMN
+from sema.intake.land.relations import RelationProvider
 from tests.unit.binding.fixtures.concept_library_v2 import captured_log
 
 pytestmark = pytest.mark.unit

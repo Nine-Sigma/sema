@@ -16,12 +16,12 @@ from typing import Any
 
 import yaml
 
-from sema.intake.eligibility_utils import RunDescriptor
-from sema.intake.ledger import CALLS_DIR
-from sema.intake.model_calls import IntakeProviderNotSetError
-from sema.intake.model_calls_utils import RECORDING_MANIFEST as MANIFEST_FILE
-from sema.intake.model_calls_utils import recorded_agreement
-from sema.intake.registry import RunRecord
+from sema.intake.roles.eligibility_utils import RunDescriptor
+from sema.intake.calls.ledger import CALLS_DIR
+from sema.intake.calls.model_calls import IntakeProviderNotSetError
+from sema.intake.calls.model_calls_utils import RECORDING_MANIFEST as MANIFEST_FILE
+from sema.intake.calls.model_calls_utils import recorded_agreement
+from sema.intake.calls.registry import RunRecord
 from sema.models.config import IntakeModelConfig
 
 REPO_ROOT = Path(__file__).parents[1]

@@ -134,7 +134,7 @@ def test_scalar_code_imports_as_one_element_list() -> None:
 def test_relationship_query_carries_concept_scope_predicate() -> None:
     from sema.binding.importer_utils import in_concept_scope
     from sema.binding.spec import load_concept_source_spec
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.relations import RelationProvider
 
     spec = load_concept_source_spec(SPEC_PATH)
     con = build_library()

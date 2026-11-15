@@ -14,6 +14,8 @@ Pinned contract (rulings R1 to R7), over invented relations in DuckDB:
 - C. ``Verdict.floor_classes`` classes every listed constant ``gate`` or ``finding``.
 - D. A roles verdict lists ``display_null_rate`` in ``Verdict.findings``, not in failures.
 - E. Guard: the A10 replay reaches Review with an empty structure list (decision 23).
+- F. The structure prompt and the Review entry of an open structure choice state each
+  member's findings by name and value (decision 3).
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from typing import Any
 
 import pytest
 
+from sema.intake.resolve.resolve_utils import member_bindings, open_entries, render_prompt
 from sema.intake.verify.roles import verify_roles
 from sema.intake.verify.structure import verify_structure
 from tests.unit.intake.findings_env import (
@@ -31,11 +34,11 @@ from tests.unit.intake.findings_env import (
     DICTIONARY_ROWS, FIELD_COLUMNS, FIELD_RATIO, FIELD_ROWS, FIELDS, HEADER, HEADER_COLUMNS,
     HEADER_ROWS, HOLED_ROWS, KIND_COLUMNS, KIND_ROWS, KINDS, SPARSE, SPARSE_COLUMNS,
     SPARSE_RATE, SPARSE_ROWS, TERSE, TERSE_COLUMNS, TERSE_MEAN, TERSE_ROWS, create,
-    landed, mentions, options_groups, qualified, stated,
+    findings_of, landed, mentions, options_groups, qualified, stated,
 )
 from tests.unit.intake.no_hint_env import KEYS_MOVED, replay, utils
 from tests.unit.intake.role_entries_env import concept_list, pinned, roles_of
-from tests.unit.intake.shapes.shapes_env import Source, candidates
+from tests.unit.intake.structure.shapes.shapes_env import Source, candidates
 from tests.unit.intake.structure_env import fresh_tools, run
 from tests.unit.intake.verify.verify_env import tools_for
 
@@ -210,6 +213,37 @@ def test_the_structure_verdict_classes_every_constant(tmp_path: Path) -> None:
     assert set(classes) == set(verdict.floors), set(classes) ^ set(verdict.floors)
     assert set(classes.values()) <= {GATE, FINDING}, classes
     assert {name: classes.get(name) for name in CLASSES} == CLASSES
+
+
+def _states_findings(lines: list[str], member: str, binding: Any) -> bool:
+    readings = [f"{name} {value:.4g}" for name, value in findings_of(binding)]
+    return any(member in line and all(r in line for r in readings) for line in lines)
+
+
+def _open_choice(root: Path) -> tuple[Any, dict[str, Any]]:
+    with landed(root, create(FIELDS, FIELD_COLUMNS, FIELD_ROWS)) as source:
+        tools = fresh_tools(source, root / "structure")
+        structure = run(source, tools)
+        (entry,) = open_entries(structure, member_bindings(structure, source.profiles(), tools))
+    carrying = {m: b for m, b in entry.bindings.items() if b.findings}
+    assert carrying, entry.bindings
+    return entry, carrying
+
+
+def test_the_structure_prompt_states_each_members_findings(tmp_path: Path) -> None:
+    entry, carrying = _open_choice(tmp_path)
+    prompt = render_prompt([entry], (), "", ()).splitlines()
+
+    unstated = [m for m, b in carrying.items() if not _states_findings(prompt, m, b)]
+    assert not unstated, f"the prompt omits the findings of {unstated}"
+
+
+def test_the_review_entry_lists_each_members_findings(tmp_path: Path) -> None:
+    entry, carrying = _open_choice(tmp_path)
+    hints = list(entry.ambiguity.hints)
+
+    unlisted = [m for m, b in carrying.items() if not _states_findings(hints, m, b)]
+    assert not unlisted, f"the Review entry omits the findings of {unlisted}: {hints}"
 
 
 def test_the_roles_verdict_lists_a_finding_beside_its_failures(tmp_path: Path) -> None:

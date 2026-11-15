@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from sema.binding import spec_sections
-from sema.intake import lexicon
+from sema.intake.roles import lexicon
 from tests.unit.source_literals_env import (
     FIXTURE_ROOT,
     SCAN_ROOT,

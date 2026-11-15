@@ -58,8 +58,8 @@ from sema.binding.term_staging import (
     write_term_staging,
 )
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.relations import RelationProvider
-from sema.intake.table_schema import TableSchema
+from sema.intake.land.relations import RelationProvider
+from sema.intake.land.table_schema import TableSchema
 from sema.log import logger
 
 MANIFEST_VERSION = 1

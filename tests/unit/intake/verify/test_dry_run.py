@@ -11,7 +11,7 @@ import pytest
 
 from sema.binding.importer import import_concept_source
 from sema.binding.spec import load_concept_source_spec
-from sema.intake.report_utils import TermEntry
+from sema.intake.report.report_utils import TermEntry
 from tests.unit.intake.structure_env import A2_SPEC
 from tests.unit.intake.verify.conftest import Landed
 from tests.unit.intake.verify.verify_env import (

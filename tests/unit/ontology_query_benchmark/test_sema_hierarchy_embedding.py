@@ -13,9 +13,9 @@ from showcase.ontology_query_benchmark.sema_bindings import load_sidecar
 from showcase.ontology_query_benchmark.sema_build import BuildManifest, build_scoped_graph
 from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts
 from tests.unit.ontology_query_benchmark.hierarchy_fixture import hierarchy
-from tests.unit.ontology_query_benchmark.test_sema_bindings import write_fixture
-from tests.unit.ontology_query_benchmark.test_sema_build import _catalog, _embedder
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy import _facts, _reader
+from tests.unit.ontology_query_benchmark.sema_bindings_env import write_fixture
+from tests.unit.ontology_query_benchmark.sema_build_env import _catalog, _embedder
+from tests.unit.ontology_query_benchmark.sema_hierarchy_env import _facts, _reader
 
 pytestmark = pytest.mark.unit
 

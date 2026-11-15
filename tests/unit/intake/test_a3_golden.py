@@ -22,8 +22,8 @@ GOLDEN = FIXTURES / "ontology.manifest.yaml"
 def import_a3(tmp_path: Path) -> Any:
     from sema.binding.importer import import_concept_source
     from sema.binding.spec import load_concept_source_spec
-    from sema.intake.loaders.semsql import land_semsql
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.loaders.semsql import land_semsql
+    from sema.intake.land.relations import RelationProvider
 
     with Staging(str(tmp_path / "staging.duckdb"), schemas=()) as staging:
         land_semsql(DB, staging, schema="land_a3")

@@ -82,9 +82,9 @@ def test_engine_core_and_spine_are_r29_clean() -> None:
 def test_intake_package_is_guarded_with_athena_allowlisted() -> None:
     """Landing loaders are core; only the Athena loader may name its file set."""
     assert "src/sema/intake" in R29_POLICY.core_paths
-    assert "src/sema/intake/loaders/athena.py" in R29_POLICY.allowlist
+    assert "src/sema/intake/land/loaders/athena.py" in R29_POLICY.allowlist
 
 
 def test_intake_lexicon_is_allowlisted() -> None:
     """The lexicon is the one intake module that names role literals such as the id role."""
-    assert "src/sema/intake/lexicon.py" in R29_POLICY.allowlist
+    assert "src/sema/intake/roles/lexicon.py" in R29_POLICY.allowlist

@@ -15,8 +15,8 @@ from typing import Any
 
 import pytest
 
-from sema.intake.eligibility import run_roles
-from sema.intake.eligibility_utils import StatedChoice
+from sema.intake.roles.eligibility import run_roles
+from sema.intake.roles.eligibility_utils import StatedChoice
 from sema.intake.verify.roles import verify_roles
 from tests.unit.intake.eligibility_env import by_role
 from tests.unit.intake.resolve_roles_env import (

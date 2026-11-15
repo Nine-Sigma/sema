@@ -19,18 +19,18 @@ from showcase.ontology_query_benchmark.sema_build_utils import import_library_fa
 from showcase.ontology_query_benchmark.sema_context import ManifestMismatchError
 from showcase.ontology_query_benchmark.sema_trace import open_live_provider
 from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
-from tests.unit.ontology_query_benchmark.test_sema_bindings import (
+from tests.unit.ontology_query_benchmark.sema_bindings_env import (
     CONCEPT_SPEC,
     catalog_fixture,
     write_fixture,
     write_projection,
 )
-from tests.unit.ontology_query_benchmark.test_sema_build import (
+from tests.unit.ontology_query_benchmark.sema_build_env import (
     ClientBuilt,
     clean_process,
     no_client,
 )
-from tests.unit.ontology_query_benchmark.test_sema_context import QUESTION
+from tests.unit.ontology_query_benchmark.sema_context_env import QUESTION
 
 pytestmark = pytest.mark.unit
 

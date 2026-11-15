@@ -18,17 +18,17 @@ from showcase.ontology_query_benchmark.sema_bindings import (
 from showcase.ontology_query_benchmark.sema_build import BuildManifest, build_scoped_graph
 from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts
 from showcase.ontology_query_benchmark.sema_context import SContextProvider, anchor_bounds
-from tests.unit.ontology_query_benchmark import test_sema_hierarchy_acris as acris
+from tests.unit.ontology_query_benchmark import sema_hierarchy_acris_env as acris
 from tests.unit.ontology_query_benchmark.hierarchy_fixture import hierarchy, warehouse
-from tests.unit.ontology_query_benchmark.test_sema_bindings import (
+from tests.unit.ontology_query_benchmark.sema_bindings_env import (
     CONVENTIONS,
     catalog_fixture,
     write_fixture,
 )
-from tests.unit.ontology_query_benchmark.test_sema_build import _catalog, _embedder
-from tests.unit.ontology_query_benchmark.test_sema_context import LIMITS
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy import RELATIONS, _facts, _reader
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy_anchor import (
+from tests.unit.ontology_query_benchmark.sema_build_env import _catalog, _embedder
+from tests.unit.ontology_query_benchmark.sema_context_env import LIMITS
+from tests.unit.ontology_query_benchmark.sema_hierarchy_env import RELATIONS, _facts, _reader
+from tests.unit.ontology_query_benchmark.sema_hierarchy_anchor_env import (
     EVENTS_SQL,
     deeper_facts,
     deeper_warehouse,

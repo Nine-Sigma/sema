@@ -25,9 +25,9 @@ import yaml
 from click.testing import CliRunner, Result
 
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
-from sema.intake.ledger import Ledger
-from sema.intake.metrics import RunMetrics
-from sema.intake.registry import Registry
+from sema.intake.calls.ledger import Ledger
+from sema.intake.run.metrics import RunMetrics
+from sema.intake.calls.registry import Registry
 from sema.log import logger
 from tests.unit.intake.decisions_env import open_entries, presented, write_decisions
 from tests.unit.intake.graph_env import (

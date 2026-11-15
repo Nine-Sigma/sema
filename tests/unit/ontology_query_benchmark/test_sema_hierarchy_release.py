@@ -20,12 +20,12 @@ from tests.unit.ontology_query_benchmark.hierarchy_fixture import (
     typed_hierarchy,
     warehouse,
 )
-from tests.unit.ontology_query_benchmark.test_sema_bindings import (
+from tests.unit.ontology_query_benchmark.sema_bindings_env import (
     CONCEPT_SPEC,
     ELEMENTS,
     write_projection,
 )
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy import SITE, _build, _facts, _reader
+from tests.unit.ontology_query_benchmark.sema_hierarchy_env import SITE, _build, _facts, _reader
 
 pytestmark = pytest.mark.unit
 

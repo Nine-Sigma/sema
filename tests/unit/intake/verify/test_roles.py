@@ -13,9 +13,9 @@ import yaml
 
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.loaders.tabular import land_tabular
+from sema.intake.land.loaders.tabular import land_tabular
 from tests.unit.intake.eligibility_env import COLOURS_SQL, memory_source, run_roles
-from tests.unit.intake.shapes.shapes_env import Source, staging_source
+from tests.unit.intake.structure.shapes.shapes_env import Source, staging_source
 from tests.unit.intake.structure_env import A2_SPEC, fresh_tools, ref, run
 from tests.unit.intake.verify.conftest import Landed
 from tests.unit.intake.verify.verify_env import (

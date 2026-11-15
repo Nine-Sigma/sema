@@ -12,8 +12,8 @@ import pytest
 
 from showcase.ontology_query_benchmark import runner_utils
 from showcase.ontology_query_benchmark.profile import Profile
-from tests.unit.ontology_query_benchmark.test_sema_bindings import EVENTS, PEOPLE, RID
-from tests.unit.ontology_query_benchmark.test_sema_context import (
+from tests.unit.ontology_query_benchmark.sema_bindings_env import EVENTS, PEOPLE, RID
+from tests.unit.ontology_query_benchmark.sema_context_env import (
     EVENTS_ENTITY,
     PEOPLE_ENTITY,
     PEOPLE_VALUES,

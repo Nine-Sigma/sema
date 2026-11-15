@@ -14,19 +14,19 @@ from unittest.mock import MagicMock
 
 from pydantic import BaseModel
 
-from sema.intake.decisions import Decision, apply_structure_decisions
-from sema.intake.eligibility_utils import subject_of
-from sema.intake.lexicon import NO_REFERENCE
-from sema.intake.output_models_utils import ABSTAIN
-from sema.intake.resolve import resolve_roles
-from sema.intake.shapes.base import SlotBinding
-from sema.intake.shapes.precedence import member
-from sema.intake.structure import BoundEntry
+from sema.intake.run.decisions import Decision, apply_structure_decisions
+from sema.intake.roles.eligibility_utils import subject_of
+from sema.intake.roles.lexicon import NO_REFERENCE
+from sema.intake.resolve.output_models_utils import ABSTAIN
+from sema.intake.resolve.resolve import resolve_roles
+from sema.intake.structure.shapes.base import SlotBinding
+from sema.intake.structure.shapes.precedence import member
+from sema.intake.structure.structure import BoundEntry
 from tests.unit.intake.eligibility_env import memory_source
 from tests.unit.intake.eligibility_env import run_roles as roles_over
 from tests.unit.intake.model_calls_env import WiredRun, stats, wired_run
 from tests.unit.intake.resolve_roles_env import map_claims, map_members
-from tests.unit.intake.shapes.shapes_env import Source
+from tests.unit.intake.structure.shapes.shapes_env import Source
 from tests.unit.intake.structure_env import fresh_tools, run
 
 CONFIDENCE = 0.85

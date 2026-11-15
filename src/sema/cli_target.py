@@ -42,7 +42,7 @@ from sema.targets.materializer import GraphWriter, InMemoryGraphWriter
 from sema.targets.normalizer import TargetModelNormalizer
 
 if TYPE_CHECKING:
-    from sema.intake.relations import QueryFn
+    from sema.intake.land.relations import QueryFn
 
 
 @click.group(name="target")
@@ -125,7 +125,7 @@ def import_cmd(
     from sema.binding.importer import import_concept_source, write_import
     from sema.binding.spec import load_concept_source_spec, load_dataset_map
     from sema.ingest.duckdb_staging import Staging
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.relations import RelationProvider
 
     staging: Staging | None = None
     try:

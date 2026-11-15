@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from sema.intake.registry import Registry
+from sema.intake.calls.registry import Registry
 from sema.pipeline.build import DatabricksConnectorFactory
 from tests.unit.cli_intake_env import Cli, intake_cli, open_count
 from tests.unit.intake.catalog_env import (

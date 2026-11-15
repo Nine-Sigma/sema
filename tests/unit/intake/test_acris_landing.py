@@ -34,7 +34,7 @@ COLUMN_INFO_NAMES = [
 
 @pytest.fixture(scope="module")
 def landed(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Any]:
-    from sema.intake.loaders.tabular import land_tabular
+    from sema.intake.land.loaders.tabular import land_tabular
 
     path = tmp_path_factory.mktemp("acris") / "staging.duckdb"
     with Staging(str(path), schemas=()) as staging:

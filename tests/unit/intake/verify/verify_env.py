@@ -29,9 +29,9 @@ from typing import Any
 import yaml
 
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
-from sema.intake.ledger import Ledger
-from sema.intake.profile import EvidencePolicy, EvidenceTier, ProfileTools
-from tests.unit.intake.shapes.shapes_env import Source
+from sema.intake.calls.ledger import Ledger
+from sema.intake.land.profile import EvidencePolicy, EvidenceTier, ProfileTools
+from tests.unit.intake.structure.shapes.shapes_env import Source
 
 LAND_CHECKS = frozenset(
     {

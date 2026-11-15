@@ -4,23 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
-from sema.graph.physical_catalog import PhysicalColumn, StaticPhysicalCatalogSource
-from showcase.ontology_query_benchmark import sema_build, sema_live
+from showcase.ontology_query_benchmark import sema_build
 from showcase.ontology_query_benchmark.profile import Attribution
-from showcase.ontology_query_benchmark.routing import (
-    FORBIDDEN_ENV,
-    FORBIDDEN_ENV_PREFIXES,
-    PROVIDER_ENV,
-    RoutingError,
-)
+from showcase.ontology_query_benchmark.routing import RoutingError
 from showcase.ontology_query_benchmark.sema_bindings import SpecPinError, load_sidecar
 from showcase.ontology_query_benchmark.sema_build import (
     BuildManifest,
@@ -34,7 +26,7 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     import_library_facts,
 )
 from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
-from tests.unit.ontology_query_benchmark.test_sema_bindings import (
+from tests.unit.ontology_query_benchmark.sema_bindings_env import (
     CONCEPT_SPEC,
     ELEMENTS,
     EVENTS,
@@ -46,29 +38,15 @@ from tests.unit.ontology_query_benchmark.test_sema_bindings import (
     write_fixture,
     write_projection,
 )
+from tests.unit.ontology_query_benchmark.sema_build_env import (
+    ClientBuilt,
+    _catalog,
+    _embedder,
+    clean_process,
+    no_client,
+)
 
 pytestmark = pytest.mark.unit
-
-
-class ClientBuilt(Exception):
-    """A live client was about to be built."""
-
-
-def clean_process(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A process the routing check accepts: no dotenv module and no routing variable."""
-    routed = (*FORBIDDEN_ENV, *PROVIDER_ENV, "DATABRICKS_HOST", "DATABRICKS_CONFIG_PROFILE")
-    for name in list(os.environ):
-        if name in routed or name.startswith(FORBIDDEN_ENV_PREFIXES):
-            monkeypatch.delenv(name)
-    monkeypatch.delitem(sys.modules, "dotenv", raising=False)
-
-
-def no_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    def refuse(*_args: Any, **_kwargs: Any) -> Any:
-        raise ClientBuilt
-
-    monkeypatch.setattr(sema_live, "pinned_workspace", refuse)
-    monkeypatch.setattr(sema_live, "neo4j_driver", refuse)
 
 
 def build_args(tmp_path: Path) -> list[str]:
@@ -78,19 +56,6 @@ def build_args(tmp_path: Path) -> list[str]:
         "--projection-receipt", str(tmp_path / "receipt.json"),
         "--manifest", str(tmp_path / "manifest.json"),
     ]
-
-
-def _catalog() -> StaticPhysicalCatalogSource:
-    return StaticPhysicalCatalogSource({
-        ("cat", "sch", table): [PhysicalColumn(c, t, True) for c, t in cols.items()]
-        for table, cols in catalog_fixture().items()
-    })
-
-
-def _embedder() -> MagicMock:
-    embedder = MagicMock()
-    embedder.embed_documents.side_effect = lambda texts: [[0.5] * 4 for _ in texts]
-    return embedder
 
 
 def _build_with(tmp_path: Path, facts: LibraryFacts) -> tuple[MagicMock, MagicMock, BuildManifest]:

@@ -18,14 +18,14 @@ import pytest
 
 from showcase.ontology_query_benchmark.profile import Profile
 from showcase.ontology_query_benchmark.sema_entity_utils import EntityExecutor
-from tests.unit.ontology_query_benchmark.test_sema_bindings import EVENTS, RID
-from tests.unit.ontology_query_benchmark.test_sema_context import EVENTS_ENTITY, _provider
-from tests.unit.ontology_query_benchmark.test_sema_context_identity import (
+from tests.unit.ontology_query_benchmark.sema_bindings_env import EVENTS, RID
+from tests.unit.ontology_query_benchmark.sema_context_env import EVENTS_ENTITY, _provider
+from tests.unit.ontology_query_benchmark.sema_context_identity_env import (
     EVENT_ENTITIES,
     EVENT_IDENTITY,
     _s_executor,
 )
-from tests.unit.ontology_query_benchmark.test_sema_entity_lint import ENTITIES, DuckWarehouse
+from tests.unit.ontology_query_benchmark.sema_entity_lint_env import ENTITIES, DuckWarehouse
 
 pytestmark = pytest.mark.unit
 

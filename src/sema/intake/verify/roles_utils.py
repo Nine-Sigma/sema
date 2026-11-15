@@ -15,22 +15,22 @@ from pydantic import BaseModel
 
 from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import RelationRef, StatusRole
-from sema.intake import lexicon
-from sema.intake.eligibility_spec_utils import VALUE_SETS
-from sema.intake.eligibility_text_utils import CODE_LISTS, CONCEPTS, STAGE
-from sema.intake.eligibility_utils import (
+from sema.intake.roles import lexicon
+from sema.intake.roles.eligibility_spec_utils import VALUE_SETS
+from sema.intake.roles.eligibility_text_utils import CODE_LISTS, CONCEPTS, STAGE
+from sema.intake.roles.eligibility_utils import (
     ARRAY_TYPE_MARKERS,
     DISPLAY_NULL_RATE,
     RoleEligibility,
     scope_of,
     subject_of,
 )
-from sema.intake.profile import ProfileTools
-from sema.intake.profile_utils import TEXT_TYPE, RelationProfile, sql_string
-from sema.intake.shapes import entity_model
-from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR, is_text
-from sema.intake.shapes.base_utils import failure
-from sema.intake.structure_hint_utils import KEY_ROLE, SECTION_SEPARATOR
+from sema.intake.land.profile import ProfileTools
+from sema.intake.land.profile_utils import TEXT_TYPE, RelationProfile, sql_string
+from sema.intake.structure.shapes import entity_model
+from sema.intake.structure.shapes.base import JOIN_RESOLVE_FLOOR, is_text
+from sema.intake.structure.shapes.base_utils import failure
+from sema.intake.structure.structure_hint_utils import KEY_ROLE, SECTION_SEPARATOR
 from sema.intake.verify.base import Ambiguity, Failure, Finding
 
 IDENTITY_UNIQUE = f"{KEY_ROLE}_unique"

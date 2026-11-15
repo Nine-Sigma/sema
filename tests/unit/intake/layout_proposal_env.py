@@ -1,6 +1,6 @@
 """Shared setup for the layout proposal tests: synthetic landings, a scripted model, readers.
 
-``sema.intake.proposal`` is imported lazily, so a missing module fails each test on its own
+``sema.intake.structure.proposal`` is imported lazily, so a missing module fails each test on its own
 instead of failing collection.
 """
 
@@ -16,11 +16,11 @@ from unittest.mock import MagicMock
 
 from pydantic import BaseModel
 
-from sema.intake.landing import LOCATOR_COLUMN
-from sema.intake.profile import EvidencePolicy, ProfileTools
+from sema.intake.land.landing import LOCATOR_COLUMN
+from sema.intake.land.profile import EvidencePolicy, ProfileTools
 from sema.intake.verify.base import Failure
 from tests.unit.intake.model_calls_env import WiredRun, stats
-from tests.unit.intake.shapes.shapes_env import Source, write_workbook
+from tests.unit.intake.structure.shapes.shapes_env import Source, write_workbook
 from tests.unit.intake.structure_env import fresh_tools, ref
 
 NONE = "none"
@@ -68,7 +68,7 @@ Answer = Callable[[type[BaseModel]], BaseModel]
 
 
 def proposal() -> ModuleType:
-    return importlib.import_module("sema.intake.proposal")
+    return importlib.import_module("sema.intake.structure.proposal")
 
 
 def write_book(directory: Path) -> Path:

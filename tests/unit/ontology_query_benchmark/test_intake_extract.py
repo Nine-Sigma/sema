@@ -11,7 +11,7 @@ import duckdb
 import pytest
 
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.loaders.detect import land_source
+from sema.intake.land.loaders.detect import land_source
 from showcase.ontology_query_benchmark.intake_extract import extract
 from showcase.ontology_query_benchmark.profile import Extract, load_profile
 from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH

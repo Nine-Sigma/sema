@@ -1,6 +1,6 @@
 """Record one live no-hint intake run per committed source, then replay it (task 14.3).
 
-Each source runs through ``sema.intake.graph.discover`` with no hint, no decisions, and no
+Each source runs through ``sema.intake.run.graph.discover`` with no hint, no decisions, and no
 enrichment, and must stop at Review. The run ledger's call records are copied to
 ``tests/fixtures/intake/recordings/<source>/calls/`` beside ``recording.json``; a fresh
 run over that directory as ``recordings_dir`` must reach Review with zero provider calls.
@@ -43,14 +43,14 @@ from scripts.record_intake_run_utils import (
     replace_calls,
     write_manifest,
 )
-from sema.intake import graph as intake_graph
-from sema.intake.eligibility_utils import RunDescriptor
-from sema.intake.graph_stages import REGISTRY_FILE
-from sema.intake.graph_utils import REVIEW, VALUE_ASK
-from sema.intake.ledger import Ledger
-from sema.intake.loaders.athena import VOCABULARY_SCHEMA
-from sema.intake.model_calls import BUDGET_REASON, IntakeClient, IntakeProviderNotSetError
-from sema.intake.registry import Registry
+from sema.intake.run import graph as intake_graph
+from sema.intake.roles.eligibility_utils import RunDescriptor
+from sema.intake.run.graph_stages import REGISTRY_FILE
+from sema.intake.run.graph_utils import REVIEW, VALUE_ASK
+from sema.intake.calls.ledger import Ledger
+from sema.intake.land.loaders.athena import VOCABULARY_SCHEMA
+from sema.intake.calls.model_calls import BUDGET_REASON, IntakeClient, IntakeProviderNotSetError
+from sema.intake.calls.registry import Registry
 from sema.log import logger
 from sema.models.config import IntakeModelConfig
 from tests.support.athena_bundle import make_minimal_bundle

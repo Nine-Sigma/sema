@@ -15,7 +15,7 @@ from sema.graph.loader import GraphLoader
 from sema.graph.physical_catalog import PhysicalColumn, StaticPhysicalCatalogSource
 from sema.graph.target_join_paths import DECLARED_JOIN_CONFIDENCE
 from sema.targets.registry import _clear_for_tests
-from tests.unit.intake.test_acris_import import (
+from tests.unit.intake.acris_import_env import (
     ENTITIES,
     FOREIGN_KEYS,
     _Imported,

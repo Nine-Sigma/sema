@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pytest
 
-from sema.intake.registry import Registry
+from sema.intake.calls.registry import Registry
 from tests.unit.intake.review_reader_env import (
     LIST_MEMBER,
     MISSING_RUN_ID,

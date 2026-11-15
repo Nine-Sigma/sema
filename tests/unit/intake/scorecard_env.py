@@ -1,8 +1,7 @@
 """Scorecard floors per known-source leg, and synthetic imports for the scorer's tests.
 
-``BASELINE`` is keyed ``(source, cap_id)`` with the cap ids of ``test_no_hint.CAP_VALUES``.
-A floor holds overall precision and recall at or above its values and the run's ignored
-relation count at or below its value (design decision 2).
+``BASELINE`` is keyed ``(source, cap_id)``, cap ids from ``test_no_hint.CAP_VALUES``; a floor holds
+overall precision and recall at or above, and ignored relations at or below, its values (design 2).
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from sema.intake.scorecard import Scorecard
+from sema.intake.run.scorecard import Scorecard
 from tests.unit.intake.oracle_review_env import ORACLES as ORACLES, UNREVIEWED as UNREVIEWED
 from tests.unit.intake.oracle_review_env import oracle_review as oracle_review
 from tests.unit.intake.oracle_review_env import unreviewed_floors as unreviewed_floors
@@ -38,14 +37,15 @@ BASELINE: dict[tuple[str, str], Floor] = {
     # kinds have zero cells and the stage_all floor leaves them out by construction (carried gap).
     ("a1", "spec_cap"): Floor(precision=77 / 97, recall=77 / 129, ignored=4),
     ("a1", "stage_all"): Floor(precision=1.0, recall=81 / 101, ignored=4),
-    ("a10", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=30),
-    ("a10", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=30),
-    ("a2", "spec_cap"): Floor(precision=23 / 24, recall=23 / 24, ignored=0),
-    ("a2", "stage_all"): Floor(precision=1.0, recall=24 / 25, ignored=0),
+    # 4.4 leftover, declared 13/14: PROPERTY TYPE domain reference settled none (IMPORT_LEFTOVERS)
+    ("a10", "spec_cap"): Floor(precision=1.0, recall=896 / 897, ignored=30),
+    ("a10", "stage_all"): Floor(precision=1.0, recall=896 / 897, ignored=30),
+    ("a2", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=0),
+    ("a2", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=0),
     ("a3", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=0),
     ("a3", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=0),
-    ("a7_csv", "spec_cap"): Floor(precision=291 / 903, recall=291 / 1323, ignored=0),
-    ("a7_csv", "stage_all"): Floor(precision=291 / 903, recall=291 / 1323, ignored=0),
+    ("a7_csv", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=0),
+    ("a7_csv", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=0),
     # honest floor against the correct oracle (codes are the concepts; 2026-10-23): the decided
     # run models the four levels as concepts and the codes as one value set, so one cell matches.
     # The code-prefix hierarchy is not expressible in spec_version 2 and is unscored until S6.

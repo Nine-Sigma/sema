@@ -18,20 +18,20 @@ from showcase.ontology_query_benchmark.sema_bindings import (
 from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts
 from showcase.ontology_query_benchmark.sema_context import SContextProvider
 from showcase.ontology_query_benchmark.sema_hierarchy_sql import ANCHORS_PER_COLUMN
-from tests.unit.ontology_query_benchmark import test_sema_hierarchy_acris as acris
+from tests.unit.ontology_query_benchmark import sema_hierarchy_acris_env as acris
 from tests.unit.ontology_query_benchmark.hierarchy_fixture import hierarchy, warehouse
-from tests.unit.ontology_query_benchmark.test_sema_bindings import (
+from tests.unit.ontology_query_benchmark.sema_bindings_env import (
     CONVENTIONS,
     catalog_fixture,
     write_fixture,
 )
-from tests.unit.ontology_query_benchmark.test_sema_context import (
+from tests.unit.ontology_query_benchmark.sema_context_env import (
     EVENTS_ENTITY,
     LIMITS,
     _Retriever,
 )
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy import RELATIONS, _facts
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy_anchor import (
+from tests.unit.ontology_query_benchmark.sema_hierarchy_env import RELATIONS, _facts
+from tests.unit.ontology_query_benchmark.sema_hierarchy_anchor_env import (
     EVENTS_SQL,
     anchor,
     members,

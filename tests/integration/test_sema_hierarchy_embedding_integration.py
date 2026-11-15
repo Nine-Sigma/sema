@@ -13,10 +13,10 @@ from showcase.ontology_query_benchmark.sema_bindings import load_sidecar
 from showcase.ontology_query_benchmark.sema_build import build_scoped_graph
 from tests.integration.test_sema_hierarchy_anchor_integration import ask, filled
 from tests.unit.ontology_query_benchmark.hierarchy_fixture import hierarchy, warehouse
-from tests.unit.ontology_query_benchmark.test_sema_bindings import write_fixture
-from tests.unit.ontology_query_benchmark.test_sema_build import _catalog
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy import _facts, _reader
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy_anchor import EVENTS_SQL, members
+from tests.unit.ontology_query_benchmark.sema_bindings_env import write_fixture
+from tests.unit.ontology_query_benchmark.sema_build_env import _catalog
+from tests.unit.ontology_query_benchmark.sema_hierarchy_env import _facts, _reader
+from tests.unit.ontology_query_benchmark.sema_hierarchy_anchor_env import EVENTS_SQL, members
 
 pytestmark = pytest.mark.integration
 

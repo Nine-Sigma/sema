@@ -25,8 +25,8 @@ import openpyxl
 from pydantic import BaseModel
 
 from sema.binding import spec_sections
-from sema.intake import lexicon
-from sema.intake.loaders.base import relation_name
+from sema.intake.roles import lexicon
+from sema.intake.land.loaders.base import relation_name
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCAN_ROOT = REPO_ROOT / "src" / "sema" / "intake"
@@ -107,7 +107,7 @@ def _scanned(root: Path, pattern: str) -> list[Path]:
     return sorted(
         path
         for path in root.rglob(pattern)
-        if path.relative_to(root).parts[0] not in UNSCANNED_PACKAGES
+        if not set(path.relative_to(root).parts[:-1]) & set(UNSCANNED_PACKAGES)
     )
 
 

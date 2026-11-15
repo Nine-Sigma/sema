@@ -11,10 +11,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from sema.binding.spec_sections import RelationRef
-from sema.intake import lexicon
-from sema.intake.profile import ProfileTools
-from sema.intake.profile_utils import TEXT_TYPE
-from sema.intake.shapes.base_utils import failure
+from sema.intake.roles import lexicon
+from sema.intake.land.profile import ProfileTools
+from sema.intake.land.profile_utils import TEXT_TYPE
+from sema.intake.structure.shapes.base_utils import failure
 from sema.intake.verify.base import Failure
 
 CONTAINED = "contained"

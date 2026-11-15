@@ -1,0 +1,181 @@
+"""concept_and_value_set: a concept relation, a value relation, and a resolving key pair.
+
+The value relation holds a non-null code unique within each key group, because a value set
+contributes values of its own rather than repeating or annotating its concept. Those codes do
+not resolve into the concept id: when they do, every value is a concept and the value relation
+links concepts to concepts.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator, Sequence
+from itertools import product
+
+from sema.binding.spec_sections import ConceptsSpec
+from sema.intake.land.profile import ProfileTools
+from sema.intake.land.profile_utils import ColumnProfile
+from sema.intake.structure.shapes.base import (
+    JOIN_RESOLVE_FLOOR,
+    RelationProfile,
+    Slot,
+    SlotBinding,
+    is_id,
+)
+from sema.intake.structure.shapes.base_utils import (
+    ID_FLOOR,
+    JOIN_FLOOR,
+    failure,
+    may_resolve,
+    nonnull_rows,
+    section_of,
+    slot_columns,
+    slot_relations,
+    verdict,
+)
+from sema.intake.verify.base import Failure, FloorValue, Verdict, classed
+
+ID = "concept_and_value_set"
+SECTION = section_of(ConceptsSpec)
+CONCEPT_RELATION, VALUE_RELATION = "concept_relation", "value_relation"
+CONCEPT_KEY, VALUE_KEY = "concept_key", "value_key"
+SLOTS = (
+    Slot(CONCEPT_RELATION, "relation"),
+    Slot(VALUE_RELATION, "relation"),
+    Slot(CONCEPT_KEY, "column"),
+    Slot(VALUE_KEY, "column"),
+)
+ONE_TO_MANY = "one_to_many"
+VALUES_ARE_NOT_CONCEPTS = "values_are_not_concepts"
+FLOORS: dict[str, FloorValue] = {**JOIN_FLOOR, **ID_FLOOR}
+GATES = frozenset({"JOIN_RESOLVE_FLOOR"})
+FINDINGS = frozenset({"ID_DISTINCT_RATIO_FLOOR"})
+CLASSES = classed(GATES, FINDINGS)
+
+KeyPair = tuple[RelationProfile, ColumnProfile, RelationProfile, ColumnProfile]
+
+
+def candidates(group: Sequence[RelationProfile], tools: ProfileTools) -> list[SlotBinding]:
+    return [_binding(*pair) for pair in _key_pairs(group) if not _pair_failures(*pair, tools)]
+
+
+def verify(
+    binding: SlotBinding, group: Sequence[RelationProfile], tools: ProfileTools
+) -> Verdict:
+    found, failures = slot_relations(group, binding, (CONCEPT_RELATION, VALUE_RELATION))
+    if failures:
+        return verdict(failures, FLOORS, CLASSES)
+    concepts, values = found
+    if concepts.ref.name == values.ref.name:
+        return verdict([failure("distinct_relations", values.ref.name)], FLOORS, CLASSES)
+    keys, failures = slot_columns(concepts, binding, (CONCEPT_KEY,))
+    value_keys, missing = slot_columns(values, binding, (VALUE_KEY,))
+    if failures or missing:
+        return verdict(failures + missing, FLOORS, CLASSES)
+    key, value_key = keys[0], value_keys[0]
+    if not is_id(concepts, key):
+        failures.append(failure("concept_key_is_id", concepts.ref.name, key.name))
+    failures += _pair_failures(concepts, key, values, value_key, tools)
+    return verdict(failures, FLOORS, CLASSES)
+
+
+def _key_pairs(group: Sequence[RelationProfile]) -> Iterator[KeyPair]:
+    for concepts in group:
+        keys = [column for column in concepts.columns if is_id(concepts, column)]
+        for values in (p for p in group if p.ref.name != concepts.ref.name):
+            for key, value_key in product(keys, values.columns):
+                if _repeats(value_key) and may_resolve(value_key, key):
+                    yield concepts, key, values, value_key
+
+
+def _repeats(column: ColumnProfile) -> bool:
+    return 0.0 < column.distinct_ratio < 1.0
+
+
+def _pair_failures(
+    concepts: RelationProfile,
+    key: ColumnProfile,
+    values: RelationProfile,
+    value_key: ColumnProfile,
+    tools: ProfileTools,
+) -> list[Failure]:
+    return _join_failures(concepts, key, values, value_key, tools) or _value_code_failures(
+        concepts, key, values, value_key, tools
+    )
+
+
+def _value_code_failures(
+    concepts: RelationProfile,
+    key: ColumnProfile,
+    values: RelationProfile,
+    value_key: ColumnProfile,
+    tools: ProfileTools,
+) -> list[Failure]:
+    codes = _value_codes(values, value_key, tools)
+    if not codes:
+        return [failure("value_code_unique_per_key", values.ref.name, value_key.name)]
+    failures = []
+    for code in (c for c in codes if may_resolve(c, key)):
+        joined = tools.check_join(concepts.ref, key.name, values.ref, code.name)
+        if joined.resolve_b_to_a >= JOIN_RESOLVE_FLOOR:
+            failures.append(
+                failure(
+                    VALUES_ARE_NOT_CONCEPTS,
+                    values.ref.name,
+                    code.name,
+                    resolve=joined.resolve_b_to_a,
+                )
+            )
+    return failures
+
+
+def _value_codes(
+    values: RelationProfile, value_key: ColumnProfile, tools: ProfileTools
+) -> list[ColumnProfile]:
+    keyed = nonnull_rows(values, value_key)
+    return [
+        column
+        for column in values.columns
+        if column.name != value_key.name
+        and column.null_rate == 0.0
+        and column.distinct_count * value_key.distinct_count >= keyed
+        and tools.count_distinct(values.ref, [value_key.name, column.name]) == keyed
+    ]
+
+
+def _join_failures(
+    concepts: RelationProfile,
+    key: ColumnProfile,
+    values: RelationProfile,
+    value_key: ColumnProfile,
+    tools: ProfileTools,
+) -> list[Failure]:
+    relation = values.ref.name
+    if value_key.type != key.type:
+        return [failure("key_types_match", relation, value_key.name, concept_type=key.type)]
+    joined = tools.check_join(concepts.ref, key.name, values.ref, value_key.name)
+    failures = []
+    if joined.resolve_b_to_a < JOIN_RESOLVE_FLOOR:
+        failures.append(
+            failure("join_resolves", relation, value_key.name, resolve=joined.resolve_b_to_a)
+        )
+    if joined.cardinality != ONE_TO_MANY:
+        failures.append(
+            failure("one_to_many", relation, value_key.name, cardinality=joined.cardinality)
+        )
+    return failures
+
+
+def _binding(
+    concepts: RelationProfile, key: ColumnProfile, values: RelationProfile, value_key: ColumnProfile
+) -> SlotBinding:
+    concept_ref, value_ref = concepts.ref.name, values.ref.name
+    return SlotBinding(
+        template=ID,
+        slots={
+            CONCEPT_RELATION: concept_ref,
+            VALUE_RELATION: value_ref,
+            CONCEPT_KEY: key.name,
+            VALUE_KEY: value_key.name,
+        },
+        relations=(concept_ref, value_ref),
+    )

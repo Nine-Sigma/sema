@@ -7,10 +7,10 @@ from collections.abc import Sequence
 from typing import Any
 
 from sema.binding.spec_sections import RelationRef
-from sema.intake.landing import LOCATOR_COLUMN, LandedRelation
-from sema.intake.loaders.tabular_utils import EMPTY_COLUMN_PREFIX, POSITIONAL_COLUMN_PREFIX
-from sema.intake.profile import ProfileTools
-from sema.intake.profile_utils import TEXT_TYPE, CatalogColumn, RelationProfile, sql_string
+from sema.intake.land.landing import LOCATOR_COLUMN, LandedRelation
+from sema.intake.land.loaders.tabular_utils import EMPTY_COLUMN_PREFIX, POSITIONAL_COLUMN_PREFIX
+from sema.intake.land.profile import ProfileTools
+from sema.intake.land.profile_utils import TEXT_TYPE, CatalogColumn, RelationProfile, sql_string
 
 HEADERLESS = "headerless"
 POSITIONAL = "positional"

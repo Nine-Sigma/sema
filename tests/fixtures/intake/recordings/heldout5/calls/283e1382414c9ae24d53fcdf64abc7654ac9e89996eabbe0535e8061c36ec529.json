@@ -1,0 +1,39 @@
+{
+  "model": "openai/gpt-6-luna",
+  "output": {
+    "confidences": [
+      0.58,
+      0.96,
+      0.96,
+      0.96,
+      0.96,
+      0.96,
+      0.96,
+      0.7,
+      0.96
+    ],
+    "reasons": [
+      "ADDRESS is the clearest column name for an attribute property.",
+      "No column is identified as holding a data type.",
+      "No column is identified as holding a requiredness indicator.",
+      "No column is identified as holding a primary-key indicator.",
+      "No column is identified as holding a referenced entity.",
+      "No column is identified as holding a referenced property.",
+      "No column is identified as holding a value vocabulary.",
+      "The sentence directly describes the street-address attribute.",
+      "No column describes the entity as a whole."
+    ],
+    "role_description": "Street address at which the branch is physically located.",
+    "role_domain": "none",
+    "role_entity_description": "none",
+    "role_fk_entity": "none",
+    "role_fk_property": "none",
+    "role_primary_key": "none",
+    "role_property": "ADDRESS",
+    "role_required": "none",
+    "role_type": "none"
+  },
+  "prompt": "# prompt: roles v2\n\nYou read what the columns of one relation landed from a source stand for. Code has\nprofiled the relation and lists every column below with its facts. Code checks your answer\nafter you give it.\n\n## How to answer\n\n- Each `role_<name>` field asks one role of `land_heldout5.locations_definitions`. Answer it with the exact name of\n  one column of `land_heldout5.locations_definitions` listed under Relations, or `none` when no column holds that\n  role. A required role needs a column.\n- Never name one column for two roles in one answer, except `display` and `name`.\n- A claim in force from the lexicon is code's reading of the names: answer the same\n  column to keep it, or another column to contest it. A claim settled by the binding, a\n  decision, or memory stands; answer it as stated.\n- Each `reference_<n>` field asks one entry under Fields: answer it with exactly one member\n  listed there, or `abstain` when the evidence does not separate the members.\n- Fill `confidences` and `reasons` with one item per field, in field order. A list of any\n  other length fails the whole answer.\n- A reason is one short sentence naming the evidence that decided the answer.\n- Use only the evidence given here: names, types, comments, aggregates, lexicon and\n  embedding facts, findings, and the text of relations that describe the schema. Data\n  values are shown only under Values, for the columns a reviewer approved reading, with\n  the first landed rows of those columns after them in landed order.\n- Code sends an answer back once with its failures: a name that is not a column of the\n  relation, two roles on one column, or a column that fails its role's data fact. A\n  finding is a reading, not a failure.\n\n## Claims in force\n\nnone\n\n## Failed checks from previous answers\n\nnone\n\n## Relations\n\n### land_heldout5.locations_definitions\nrows: 51\ncolumns:\n- Street address at which the branch is physically located.: type VARCHAR, distinct 51, distinct ratio 1, null rate 0, mean length 91.57, unique; findings status_cardinality 51\n- ADDRESS: type VARCHAR, distinct 29, distinct ratio 1, null rate 0.4314, mean length 7.31; findings display_null_rate 0.4314, definition_mean_length 7.31, status_cardinality 29\n- Branch Address: type VARCHAR, distinct 51, distinct ratio 1, null rate 0, mean length 16.51, unique; findings status_cardinality 51\nschema text:\n- BKCLASS | Institution Class | A classification code assigned by the FDIC based on the institution's charter type (commercial bank or savings institution), charter agent (state or federal), Federal Reserve membership status (Fed member, Fed nonmember) and its primary federal regulator (state chartered institutions are subject to both federal and state supervision).\n- CBSA | Core Based Statistical Area Name (Branch) | Name of the Core Based Statistical Area (CBSA) as defined by the US Census Bureau Office of Management and Budget.\n- CBSA_DIV | Metropolitan Divisions Name (Branch) | Name of the Core Based Statistical Division as defined by the US Census Bureau Office of Management and Budget.\n- CBSA_DIV_FLG | Metropolitan Divisions Flag (Branch) | A flag (1=Yes) indicating member of a Core Based Statistical Division as defined by the US Census Bureau Office of Management and Budget.\n- CBSA_DIV_NO | Metropolitan Divisions Number (Branch) | Numeric code of the Core Based Statistical Division as defined by the US Census Bureau Office of Management and Budget.\n- CBSA_METRO | Metropolitan Division Number (Branch) | Numeric code of the Metropolitan Statistical Area as defined by the US Census Bureau Office of Management and Budget\n- CBSA_METRO_FLG | Metropolitan Division Flag (Branch) | A flag (1=Yes) used to indicate whether an branch is in a Metropolitan Statistical Area as defined by the US Census Bureau Office of Management and Budget\n- CBSA_METRO_NAME | Metropolitan Division Name (Branch) | Name of the Metropolitan Statistical Area as defined by the US Census Bureau Office of Management and Budget\n- CBSA_MICRO_FLG | Micropolitan Division Flag (Branch) | A flag (1=Yes) used to indicate whether an branch is in a Micropolitan Statistical Area as defined by the US Census Bureau Office of Management and Budget\n- CBSA_NO | Core Based Statistical Areas (Branch) | Numeric code of the Core Based Statistical Area (CBSA) as defined by the US Census Bureau Office of Management and Budget.\n- CERT | Institution FDIC Certificate # | A unique number assigned by the FDIC used to identify institutions and for the issuance of insurance certificates.\n- CITY | Branch City | City in which branch is physically located.\n- COUNTY | Branch County | County where the branch is physically located.\n- CSA | Combined Statistical Area Name (Branch) | Name of the Combined Statistical Area (CSA) as defined by the US Census Bureau Office of Management and Budget\n- CSA_FLG | Combined Statistical Area Flag  (Branch) | Flag (1=Yes) indicating member of a Combined Statistical Area (CSA) as defined by the US Census Bureau Office of Management and Budget\n- CSA_NO | Combined Statistical Area Number  (Branch) | Numeric code of the Combined Statistical Area (CSA) as defined by the US Census Bureau Office of Management and Budget\n- ESTYMD | Branch Established Date | The date on which the branch began operations.\n- FI_UNINUM | FDIC UNINUM of the Owner Institution | This is the FDIC UNINUM of the institution that owns the branch.  A UNINUM is a unique sequentially number added to the FDIC database for both banks and  branches.  There is no pattern imbedded within the number.  The FI_UNINUM is updated with every merger or purchase of branches to reflect the most current owner.  \n- MAINOFF | Main Office | The main office for the institution.\n- NAME | Institution Name | Legal name of the FDIC-Insured Institution\n31 more rows not shown; the rows above come first in text order\n\n## Values\n\nnone\n\n## Fields\n\n- `role_property`: the name of one attribute an entity holds; required\n- `role_type`: the data type of one attribute; optional\n- `role_required`: whether an attribute must hold a value; optional\n- `role_primary_key`: whether an attribute is part of its entity's key; optional\n- `role_fk_entity`: the entity an attribute refers to; optional\n- `role_fk_property`: the attribute of the referred entity an attribute joins on; optional\n- `role_domain`: the vocabulary an attribute's values are drawn from; optional\n- `role_description`: prose explaining one attribute of an entity; optional\n- `role_entity_description`: prose explaining the entity itself; optional\n",
+  "schema_name": "RoleMapEntityModelRoles_v1",
+  "tokens": 3424
+}

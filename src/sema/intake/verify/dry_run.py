@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING, Any
 from sema.binding.importer import ConceptImport
 from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import RelationRef
-from sema.intake.profile import ProfileTools
-from sema.intake.shapes.base_utils import failure
-from sema.intake.structure import StructureResult
+from sema.intake.land.profile import ProfileTools
+from sema.intake.structure.shapes.base_utils import failure
+from sema.intake.structure.structure import StructureResult
 from sema.intake.verify.base import Failure, Verdict
 from sema.models.target.refs import VocabularySource
 from sema.targets.adapters.manifest_exceptions import ManifestError
@@ -23,7 +23,7 @@ from sema.targets.adapters.manifest_models import ParsedManifest
 from sema.targets.adapters.manifest_parser import parse_manifest_raw
 
 if TYPE_CHECKING:
-    from sema.intake.report_utils import TermEntry
+    from sema.intake.report.report_utils import TermEntry
 
 IMPORT_COMPLETED = "import_completed"
 COUNTS_IN_RANGE = "counts_in_range"

@@ -53,7 +53,7 @@ class Env:
     issued: list[str] = field(default_factory=list)
 
     def provider(self) -> Any:
-        from sema.intake.relations import RelationProvider
+        from sema.intake.land.relations import RelationProvider
 
         run = query_fn(self.warehouse)
 
@@ -108,8 +108,8 @@ def _extra_relations(staging: Staging) -> None:
 
 
 def open_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Env]:
-    from sema.intake.loaders.semsql import land_semsql
-    from sema.intake.loaders.tabular import land_tabular
+    from sema.intake.land.loaders.semsql import land_semsql
+    from sema.intake.land.loaders.tabular import land_tabular
 
     staging = Staging(str(tmp_path / "staging.duckdb"), schemas=())
     land_tabular(A2_WORKBOOK, staging, schema="land_a2")
@@ -132,14 +132,14 @@ def open_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Env]:
 
 
 def make_policy(tier: str = "metadata_only", **kwargs: Any) -> Any:
-    from sema.intake.profile import EvidencePolicy
+    from sema.intake.land.profile import EvidencePolicy
 
     return EvidencePolicy(tier=tier, **kwargs)
 
 
 def make_tools(env: Env, policy: Any = None, stage: str = "structure", **kwargs: Any) -> Any:
-    from sema.intake.ledger import Ledger
-    from sema.intake.profile import ProfileTools
+    from sema.intake.calls.ledger import Ledger
+    from sema.intake.land.profile import ProfileTools
 
     ledger = Ledger(env.ledger_dir.parent).run(env.ledger_dir.name)
     return ProfileTools(

@@ -9,13 +9,13 @@ from typing import Any
 import pytest
 
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.loaders.tabular import land_tabular
-from sema.intake.shapes import concept_list
-from sema.intake.shapes.base import SlotBinding, profile_relations
-from sema.intake.shapes.precedence import member
-from sema.intake.structure import BoundEntry
-from sema.intake.structure_utils import group_candidates
-from tests.unit.intake.shapes.shapes_env import Source, staging_source, write_workbook
+from sema.intake.land.loaders.tabular import land_tabular
+from sema.intake.structure.shapes import concept_list
+from sema.intake.structure.shapes.base import SlotBinding, profile_relations
+from sema.intake.structure.shapes.precedence import member
+from sema.intake.structure.structure import BoundEntry
+from sema.intake.structure.structure_utils import group_candidates
+from tests.unit.intake.structure.shapes.shapes_env import Source, staging_source, write_workbook
 from tests.unit.intake.structure_env import (
     CODE_TABLES,
     fresh_tools,
@@ -87,7 +87,7 @@ def test_checks_are_the_documented_list() -> None:
 
 
 def test_a2_structure_output_passes(a2: Landed, a2_structure: Any, tmp_path: Path) -> None:
-    from sema.intake.structure import stage_floors
+    from sema.intake.structure.structure import stage_floors
 
     verdict = _verify(a2_structure, a2.source, tmp_path / "ledger" / "verify")
 

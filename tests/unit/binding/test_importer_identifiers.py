@@ -67,8 +67,8 @@ def _spec(release: str = "1") -> ConceptSourceSpec:
 
 def _import(tmp_path: Path, spec: ConceptSourceSpec, dictionary: str = DICTIONARY) -> Any:
     from sema.binding.importer import import_concept_source
-    from sema.intake.loaders.tabular import land_tabular
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.loaders.tabular import land_tabular
+    from sema.intake.land.relations import RelationProvider
 
     path = tmp_path / "dictionary.csv"
     path.write_text(dictionary, encoding="utf-8")
@@ -209,8 +209,8 @@ def test_invalid_release_fails_the_import_naming_it(tmp_path: Path) -> None:
 def acris(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Any]:
     from sema.binding.importer import import_concept_source
     from sema.binding.spec import load_concept_source_spec
-    from sema.intake.loaders.tabular import land_tabular
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.loaders.tabular import land_tabular
+    from sema.intake.land.relations import RelationProvider
 
     directory = FIXTURES / "acris"
     spec = load_concept_source_spec(directory / "acris.spec.yaml")
@@ -253,8 +253,8 @@ def test_acris_cards_keep_the_source_names(acris: Any) -> None:
 def test_semsql_import_normalizes(tmp_path: Path) -> None:
     from sema.binding.importer import import_concept_source
     from sema.binding.spec import load_concept_source_spec
-    from sema.intake.loaders.semsql import land_semsql
-    from sema.intake.relations import RelationProvider
+    from sema.intake.land.loaders.semsql import land_semsql
+    from sema.intake.land.relations import RelationProvider
 
     directory = FIXTURES / "semsql"
     with Staging(str(tmp_path / "staging.duckdb"), schemas=()) as staging:

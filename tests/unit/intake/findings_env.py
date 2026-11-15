@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from tests.unit.intake.eligibility_env import memory_source
-from tests.unit.intake.shapes.shapes_env import Source
+from tests.unit.intake.structure.shapes.shapes_env import Source
 
 SCHEMA = "fd"
 Rows = Sequence[tuple[object, ...]]

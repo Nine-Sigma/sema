@@ -18,15 +18,15 @@ from tests.unit.ontology_query_benchmark.hierarchy_fixture import (
     repin,
     warehouse,
 )
-from tests.unit.ontology_query_benchmark.test_intake_extract_hierarchy import _extract, _slice
-from tests.unit.ontology_query_benchmark.test_sema_bindings import (
+from tests.unit.ontology_query_benchmark.intake_extract_hierarchy_env import _extract, _slice
+from tests.unit.ontology_query_benchmark.sema_bindings_env import (
     CONCEPT_SPEC,
     ELEMENTS,
     write_projection,
 )
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy import _bridges, _build, _reader
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy import _facts as _mapped_facts
-from tests.unit.ontology_query_benchmark.test_sema_hierarchy_anchor import (
+from tests.unit.ontology_query_benchmark.sema_hierarchy_env import _bridges, _build, _reader
+from tests.unit.ontology_query_benchmark.sema_hierarchy_env import _facts as _mapped_facts
+from tests.unit.ontology_query_benchmark.sema_hierarchy_anchor_env import (
     EVENTS_SQL,
     READABLE,
     anchor,

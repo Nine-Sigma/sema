@@ -1,6 +1,6 @@
 """Shared setup for the role eligibility tests: sources, fake embedders, readers.
 
-``sema.intake.eligibility`` and ``eligibility_utils`` are imported lazily, so a missing
+``sema.intake.roles.eligibility`` and ``eligibility_utils`` are imported lazily, so a missing
 module fails each test on its own instead of failing collection.
 
 The contract the tests pin (design Decisions 5, 6, 7, 20):
@@ -41,9 +41,9 @@ import yaml
 
 from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.loaders.tabular import land_tabular
-from sema.intake.shapes.base import SlotBinding
-from tests.unit.intake.shapes.shapes_env import FIXTURES, Source, warehouse_source
+from sema.intake.land.loaders.tabular import land_tabular
+from sema.intake.structure.shapes.base import SlotBinding
+from tests.unit.intake.structure.shapes.shapes_env import FIXTURES, Source, warehouse_source
 from tests.unit.intake.structure_env import (
     A2_WORKBOOK,
     ACRIS,
@@ -110,15 +110,15 @@ COLOURS_SQL = (
 
 
 def eligibility() -> ModuleType:
-    return importlib.import_module("sema.intake.eligibility")
+    return importlib.import_module("sema.intake.roles.eligibility")
 
 
 def eligibility_utils() -> ModuleType:
-    return importlib.import_module("sema.intake.eligibility_utils")
+    return importlib.import_module("sema.intake.roles.eligibility_utils")
 
 
 def lexicon() -> ModuleType:
-    return importlib.import_module("sema.intake.lexicon")
+    return importlib.import_module("sema.intake.roles.lexicon")
 
 
 class KeywordEmbedder:

@@ -11,7 +11,7 @@ import pytest
 from showcase.ontology_query_benchmark import runner, runner_live_utils
 from showcase.ontology_query_benchmark.routing import RoutingError
 from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH, write_settings
-from tests.unit.ontology_query_benchmark.test_runner import (
+from tests.unit.ontology_query_benchmark.runner_env import (
     GOLD,
     R01_SQL,
     FakeExecutor,

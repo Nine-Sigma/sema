@@ -8,10 +8,9 @@ import pytest
 
 from sema.ingest.duckdb_staging import Staging
 from tests.support.athena_bundle import export_schema, make_minimal_bundle
+from tests.unit.intake.athena_golden_env import GOLDEN
 
 pytestmark = pytest.mark.unit
-
-GOLDEN = Path(__file__).parents[2] / "fixtures" / "intake" / "athena" / "golden_export.csv"
 
 
 def showcase_export(tmp_path: Path) -> str:

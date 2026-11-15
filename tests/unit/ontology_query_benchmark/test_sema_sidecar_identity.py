@@ -10,7 +10,7 @@ import pytest
 from sema.models.target.identity import EntityIdentity
 from showcase.ontology_query_benchmark.product_spec import ProductSpecDoc, ProductSpecError
 from showcase.ontology_query_benchmark.sema_bindings import load_products, load_sidecar
-from tests.unit.ontology_query_benchmark.test_sema_bindings import RID, write_fixture
+from tests.unit.ontology_query_benchmark.sema_bindings_env import RID, write_fixture
 
 pytestmark = pytest.mark.unit
 

@@ -12,9 +12,9 @@ import pytest
 
 from sema.binding.spec import load_concept_source_spec
 from sema.ingest.duckdb_staging import Staging
-from sema.intake.loaders.semsql import land_semsql
-from sema.intake.loaders.tabular import land_tabular
-from tests.unit.intake.shapes.shapes_env import OMOP_CSV, Source
+from sema.intake.land.loaders.semsql import land_semsql
+from sema.intake.land.loaders.tabular import land_tabular
+from tests.unit.intake.structure.shapes.shapes_env import OMOP_CSV, Source
 from tests.unit.intake.structure_env import (
     A2_WORKBOOK,
     A3_DB,
