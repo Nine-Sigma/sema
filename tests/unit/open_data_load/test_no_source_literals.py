@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import duckdb
 import pytest
@@ -34,10 +35,25 @@ def _values(node: object) -> Iterator[str]:
         yield str(node)
 
 
+def duckdb_default_schema() -> str:
+    with duckdb.connect() as con:
+        row = con.execute("SELECT current_schema()").fetchone()
+    assert row is not None
+    return str(row[0])
+
+
+def _source_values(profile: dict[str, Any]) -> dict[str, Any]:
+    build = profile.get("build")
+    if not isinstance(build, dict) or build.get("schema") != duckdb_default_schema():
+        return profile
+    # DuckDB gives every database file this schema, so as `build.schema` it names no source.
+    return {**profile, "build": {k: v for k, v in build.items() if k != "schema"}}
+
+
 def profile_literals(profiles: Path = PROFILES) -> set[str]:
     found: set[str] = set()
     for path in sorted(profiles.glob("*.yaml")):
-        profile = yaml.safe_load(path.read_text(encoding="utf-8"))
+        profile = _source_values(yaml.safe_load(path.read_text(encoding="utf-8")))
         found |= set(profile.get("relations", {})) | set(_values(profile))
     return {literal for literal in found if len(literal.strip()) >= MIN_LITERAL_LENGTH}
 
@@ -73,13 +89,6 @@ def test_profile_literals_include_relation_names_and_leaf_values(tmp_path: Path)
     )
 
 
-def _duckdb_default_schema() -> str:
-    with duckdb.connect() as con:
-        row = con.execute("SELECT current_schema()").fetchone()
-    assert row is not None
-    return str(row[0])
-
-
 def test_a_planted_build_schema_is_reported(tmp_path: Path) -> None:
     (tmp_path / "p.yaml").write_text(
         "build: {database: /data/w.duckdb, catalog: widgets, schema: parts_schema}\n"
@@ -88,7 +97,7 @@ def test_a_planted_build_schema_is_reported(tmp_path: Path) -> None:
 
 
 def test_duckdbs_default_schema_as_build_schema_names_no_source(tmp_path: Path) -> None:
-    default = _duckdb_default_schema()
+    default = duckdb_default_schema()
     (tmp_path / "p.yaml").write_text(
         f"build: {{database: /data/w.duckdb, catalog: widgets, schema: {default}}}\n"
     )
@@ -98,7 +107,7 @@ def test_duckdbs_default_schema_as_build_schema_names_no_source(tmp_path: Path) 
 
 
 def test_the_default_schema_name_elsewhere_in_a_profile_is_still_reported(tmp_path: Path) -> None:
-    default = _duckdb_default_schema()
+    default = duckdb_default_schema()
     (tmp_path / "p.yaml").write_text(
         f"build: {{schema: {default}}}\nrelations:\n  {default}:\n    dataset: abcd-1234\n"
     )

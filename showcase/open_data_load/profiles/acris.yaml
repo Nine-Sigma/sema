@@ -87,3 +87,9 @@ relations:
     file: docs/poc/acris/code_tables/State_Codes.csv
   country_codes:
     file: docs/poc/acris/code_tables/Country_Codes.csv
+# What `python -m showcase.open_data_load.build` builds: the file `load` wrote, its catalog
+# (the file name up to its first dot) and the schema the load wrote into.
+build:
+  database: ~/.sema/acris.duckdb
+  catalog: acris
+  schema: main

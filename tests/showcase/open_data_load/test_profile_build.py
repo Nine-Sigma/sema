@@ -22,7 +22,6 @@ from tests.support.connector_fixture import (
     CATALOG,
     EXPECTED_DETECTED_JOINS,
     MAIN_SCHEMA,
-    FixtureJoin,
     fake_model_environment,
     write_fixture_database,
 )
@@ -57,15 +56,12 @@ def report(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, Any]]
         driver.close()
 
 
-def _predicate(report: dict[str, Any], join: FixtureJoin) -> dict[str, Any] | None:
-    for found in report["joins"]:
-        for predicate in found["predicates"]:
-            if (predicate["referenced_table"], predicate["referenced_column"],
-                    predicate["referencing_table"], predicate["referencing_column"]) == (
-                    join.referenced_table, join.referenced_column,
-                    join.referencing_table, join.referencing_column):
-                return predicate
-    return None
+def _predicates(report: dict[str, Any]) -> dict[tuple[str, ...], dict[str, Any]]:
+    return {
+        (p["referenced_table"], p["referenced_column"],
+         p["referencing_table"], p["referencing_column"]): p
+        for join in report["joins"] for p in join["predicates"]
+    }  # fmt: skip
 
 
 def test_the_build_finds_joins(report: dict[str, Any]) -> None:
@@ -93,8 +89,12 @@ def test_every_stored_reference_parses(report: dict[str, Any]) -> None:
 
 def test_the_recheck_confirms_each_expected_detected_join(report: dict[str, Any]) -> None:
     coverage = report["thresholds"]["coverage"]
+    predicates = _predicates(report)
     for join in EXPECTED_DETECTED_JOINS:
-        predicate = _predicate(report, join)
+        predicate = predicates.get((
+            str(join.referenced_table), str(join.referenced_column),
+            join.referencing_table, join.referencing_column,
+        ))
         assert predicate is not None, f"no JoinPath predicate for {join}"
         recheck = predicate["recheck"]
         referenced = recheck["referenced"]
