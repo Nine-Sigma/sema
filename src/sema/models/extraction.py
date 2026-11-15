@@ -72,7 +72,7 @@ class ExtractedSampleRows:
     table_name: str
     catalog: str
     schema: str
-    rows: list[list[str]]
+    rows: list[dict[str, str]]
     column_names: list[str]
 
 

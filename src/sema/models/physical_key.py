@@ -47,7 +47,7 @@ class PhysicalKey:
 # ---------------------------------------------------------------------------
 
 _DATABRICKS_RE: Final[re.Pattern[str]] = re.compile(
-    r"^databricks://(?P<ws>[^/]+)/(?P<cat>[^/]+)"
+    r"^(?:databricks|duckdb)://(?P<ws>[^/]+)/(?P<cat>[^/]+)"
     r"/(?P<sch>[^/]+)/(?P<tbl>[^/]+)(?:/(?P<col>.+))?$"
 )
 
@@ -68,7 +68,7 @@ _UNITY_RE: Final[re.Pattern[str]] = re.compile(
 
 # Handles dotted column refs: databricks://ws/cat/sch/table.column
 _DATABRICKS_DOTTED_RE: Final[re.Pattern[str]] = re.compile(
-    r"^databricks://(?P<ws>[^/]+)/(?P<cat>[^/]+)"
+    r"^(?:databricks|duckdb)://(?P<ws>[^/]+)/(?P<cat>[^/]+)"
     r"/(?P<sch>[^/]+)/(?P<tbl>[^./]+)\.(?P<col>.+)$"
 )
 
@@ -133,7 +133,7 @@ def _try_unity(
 _PARSERS = [_try_databricks, _try_postgres, _try_mysql, _try_unity]
 
 # Schemes whose parse reads back <datasource>/<catalog>/<schema>/<table>[/<column>].
-_RENDERED_SCHEMES: Final[frozenset[str]] = frozenset({"databricks"})
+_RENDERED_SCHEMES: Final[frozenset[str]] = frozenset({"databricks", "duckdb"})
 
 
 def _ref_part(value: str | None) -> str:

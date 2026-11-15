@@ -41,9 +41,9 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     from sema.circuit_breaker import CircuitBreaker
     from sema.graph.loader import GraphLoader
     from sema.pipeline.build import (
-        DatabricksConnectorFactory,
         LLMClientFactory,
         aggregate_report,
+        resolve_connector_factory,
     )
     import uuid
 
@@ -51,9 +51,7 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     driver = _get_neo4j_driver(config.neo4j)
     loader = GraphLoader(driver)
 
-    connector_factory = DatabricksConnectorFactory(
-        config=config.databricks, profiling=config.profiling,
-    )
+    connector_factory = resolve_connector_factory(config)
     discovery_connector = connector_factory.create()
     _register_datasource(discovery_connector, loader)
     work_items = _discover_tables(discovery_connector, config)

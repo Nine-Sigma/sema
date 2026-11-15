@@ -21,6 +21,14 @@ class DatabricksConfig(BaseSettings):
     http_path: str = ""
 
 
+class DuckDBConfig(BaseSettings):
+    """File path of the DuckDB database."""
+
+    model_config = SettingsConfigDict(env_prefix="DUCKDB_")
+
+    path: str = ""
+
+
 class Neo4jConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NEO4J_")
 
@@ -181,6 +189,7 @@ class BuildConfig(BaseSettings):
     quality_budget_min_processed: int = 5
 
     databricks: DatabricksConfig = Field(default_factory=DatabricksConfig)
+    duckdb: DuckDBConfig = Field(default_factory=DuckDBConfig)
     neo4j: Neo4jConfig = Field(default_factory=Neo4jConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
