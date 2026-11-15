@@ -13,7 +13,7 @@ from sema.intake.profile_utils import ColumnProfile
 from sema.intake.shapes import TEMPLATES, apply_precedence, ignore
 from sema.intake.shapes.base import JOIN_RESOLVE_FLOOR, RelationProfile, SlotBinding
 from sema.intake.shapes.base_utils import may_resolve
-from sema.intake.shapes.precedence import STAGE, member
+from sema.intake.shapes.precedence import STAGE, finding_hints, member
 from sema.intake.verify.base import Ambiguity, Failure
 
 TABULAR = "tabular"
@@ -75,8 +75,11 @@ def settle(
 
 
 def _left_open(relation: str, bindings: Sequence[SlotBinding]) -> Ambiguity:
-    touching = sorted({member(binding) for binding in bindings if relation in binding.relations})
-    return Ambiguity(stage=STAGE, subject=relation, members=tuple(touching) or (NO_TEMPLATE,))
+    touching = [binding for binding in bindings if relation in binding.relations]
+    members = tuple(sorted({member(binding) for binding in touching})) or (NO_TEMPLATE,)
+    return Ambiguity(
+        stage=STAGE, subject=relation, members=members, hints=finding_hints(touching)
+    )
 
 
 def describe_failure(found: Failure) -> str:

@@ -304,7 +304,7 @@ def _entry(index: int, entry: OpenEntry) -> str:
             f"### entry {index}: {ambiguity.subject}",
             "members:",
             *members,
-            f"hints: {', '.join(ambiguity.hints) or NOTHING}",
+            f"hints:\n{bullets(ambiguity.hints)}" if ambiguity.hints else f"hints: {NOTHING}",
             f"exclusions: {'; '.join(exclusions) or NOTHING}",
         ]
     )

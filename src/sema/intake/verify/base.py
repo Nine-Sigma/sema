@@ -57,6 +57,17 @@ class Finding(BaseModel):
         return value
 
 
+def stated_findings(readings: Iterable[tuple[str, float | str | None]]) -> str:
+    """Readings as every prompt and Review entry states them: ``findings name value, ...``."""
+    return "findings " + ", ".join(_reading(name, value) for name, value in readings)
+
+
+def _reading(name: str, value: float | str | None) -> str:
+    if value is None:
+        return name
+    return f"{name} {value:.4g}" if isinstance(value, float) else f"{name} {value}"
+
+
 class Ambiguity(BaseModel):
     model_config = ConfigDict(frozen=True)
 

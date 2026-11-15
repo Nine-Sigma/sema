@@ -36,6 +36,7 @@ from sema.intake.resolve_utils import (
     text_columns,
 )
 from sema.intake.shapes.base import RelationProfile
+from sema.intake.verify.base import stated_findings
 from sema.log import logger
 
 ROLES_PROMPT = "prompts/roles_v2.md"
@@ -176,12 +177,8 @@ def _role_facts(column: ColumnProfile, roles: Sequence[str], ranks: Sequence[str
     if ranks:
         found.append(f"embedding {', '.join(ranks)}")
     if readings := column_findings(column):
-        found.append("findings " + ", ".join(_reading(n, v) for n, v in readings))
+        found.append(stated_findings(readings))
     return found
-
-
-def _reading(name: str, value: float | None) -> str:
-    return name if value is None else f"{name} {value:.4g}"
 
 
 def _ranks(entries: Iterable[RoleEligibility]) -> dict[str, list[str]]:

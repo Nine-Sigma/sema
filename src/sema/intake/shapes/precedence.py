@@ -11,7 +11,7 @@ prefers a template by identity.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from sema.intake.shapes import (
@@ -22,7 +22,7 @@ from sema.intake.shapes import (
     semsql,
 )
 from sema.intake.shapes.base import SlotBinding
-from sema.intake.verify.base import Ambiguity
+from sema.intake.verify.base import Ambiguity, stated_findings
 
 MULTI_RELATION = frozenset(
     {
@@ -67,6 +67,15 @@ def member(binding: SlotBinding) -> str:
     return f"{binding.template}({slots})"
 
 
+def finding_hints(bindings: Iterable[SlotBinding]) -> tuple[str, ...]:
+    """Each member's findings, as its entry's Review lists them and the prompt states them."""
+    by_member = {member(binding): binding for binding in bindings if binding.findings}
+    return tuple(
+        f"`{name}` {stated_findings((f.name, f.value) for f in by_member[name].findings)}"
+        for name in sorted(by_member)
+    )
+
+
 def _without_loader_fixed_relations(bindings: Sequence[SlotBinding]) -> list[SlotBinding]:
     fixed = {r for b in bindings if b.template in LOADER_FIXED for r in b.relations}
     return [b for b in bindings if b.template in LOADER_FIXED or not set(b.relations) & fixed]
@@ -81,7 +90,10 @@ def _by_relation(bindings: Sequence[SlotBinding]) -> dict[str, list[SlotBinding]
 
 
 def _ambiguity(relation: str, members: Sequence[SlotBinding]) -> Ambiguity:
-    return Ambiguity(stage=STAGE, subject=relation, members=tuple(sorted(map(member, members))))
+    return Ambiguity(
+        stage=STAGE, subject=relation, members=tuple(sorted(map(member, members))),
+        hints=finding_hints(members),
+    )
 
 
 def _order(binding: SlotBinding) -> tuple[str, tuple[str, ...], str]:
