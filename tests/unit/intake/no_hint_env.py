@@ -272,20 +272,12 @@ def marked_param(name: str, reasons: Mapping[str, str], **xfail: Any) -> Any:
 
 
 KEYS_MOVED_REASON = (
-    "the roles prompt v2 moved every recorded call key (task 2.2, 2026-10-23); re-recorded at"
-    " task 4.2"
+    "the roles prompt v2 moved every recorded call key (task 2.2, 2026-10-23); the task 4.2"
+    " re-record (2026-11-15) reached its cap of 8 calls before Review, so the old recording"
+    " stays and the leg waits for Dean"
 )
-# Measured at task 2.2 (decision 26): every source whose replay misses a moved Roles key.
-KEYS_MOVED = {
-    **dict.fromkeys(
-        ("a1", "a7_csv", "a10", "heldout", "heldout3", "heldout4", "heldout5"),
-        KEYS_MOVED_REASON,
-    ),
-    "a2": f"{KEYS_MOVED_REASON}; a2's Concepts and Values relations now each make a"
-    " role-map call",
-    "heldout2": "the layout prompt v2 moved heldout2's recorded call keys (task 3.5, 2026-10-24);"
-    " re-recorded at task 4.2",
-}
+# Measured at task 2.2 (decision 26); emptied at task 4.2 except the source that parked.
+KEYS_MOVED = {"heldout4": KEYS_MOVED_REASON}
 
 
 def keyed_param(

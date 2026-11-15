@@ -3,11 +3,12 @@
   "provider": "openrouter",
   "model": "openai/gpt-6-luna",
   "prompt_versions": [
-    "layout v1"
+    "layout v2"
   ],
-  "calls": 3,
-  "tokens": 11346,
-  "cost": 0.002409,
+  "calls": 2,
+  "tokens": 7424,
+  "cost": 0.0014404,
   "approver": "dean",
-  "value_asks": 1
+  "value_asks": 1,
+  "agreement": true
 }

@@ -1,0 +1,39 @@
+{
+  "model": "openai/gpt-6-luna",
+  "output": {
+    "confidences": [
+      0.99,
+      0.94,
+      0.92,
+      0.91,
+      0.83,
+      0.93,
+      0.97,
+      0.9,
+      0.9
+    ],
+    "reasons": [
+      "The claim in force identifies given_value as the attribute.",
+      "No column describes the data type of given_value.",
+      "No column states whether given_value is required.",
+      "No column indicates that an attribute forms a primary key.",
+      "The claim in force identifies data_element_prt_id as the referenced entity.",
+      "No column identifies the referenced entity's joined attribute.",
+      "mapped_permissible_value_prt_ids contains the permissible-value mappings for given_value.",
+      "No column provides prose explaining an attribute.",
+      "No column provides prose describing the entity."
+    ],
+    "role_description": "none",
+    "role_domain": "mapped_permissible_value_prt_ids",
+    "role_entity_description": "none",
+    "role_fk_entity": "data_element_prt_id",
+    "role_fk_property": "none",
+    "role_primary_key": "none",
+    "role_property": "given_value",
+    "role_required": "none",
+    "role_type": "none"
+  },
+  "prompt": "# prompt: roles v2\n\nYou read what the columns of one relation landed from a source stand for. Code has\nprofiled the relation and lists every column below with its facts. Code checks your answer\nafter you give it.\n\n## How to answer\n\n- Each `role_<name>` field asks one role of `standard_library.permissible_value_mappings_edited`. Answer it with the exact name of\n  one column of `standard_library.permissible_value_mappings_edited` listed under Relations, or `none` when no column holds that\n  role. A required role needs a column.\n- Never name one column for two roles in one answer, except `display` and `name`.\n- A claim in force from the lexicon is code's reading of the names: answer the same\n  column to keep it, or another column to contest it. A claim settled by the binding, a\n  decision, or memory stands; answer it as stated.\n- Each `reference_<n>` field asks one entry under Fields: answer it with exactly one member\n  listed there, or `abstain` when the evidence does not separate the members.\n- Fill `confidences` and `reasons` with one item per field, in field order. A list of any\n  other length fails the whole answer.\n- A reason is one short sentence naming the evidence that decided the answer.\n- Use only the evidence given here: names, types, comments, aggregates, lexicon and\n  embedding facts, findings, and the text of relations that describe the schema. Data\n  values are shown only under Values, for the columns a reviewer approved reading, with\n  the first landed rows of those columns after them in landed order.\n- Code sends an answer back once with its failures: a name that is not a column of the\n  relation, two roles on one column, or a column that fails its role's data fact. A\n  finding is a reading, not a failure.\n\n## Claims in force\n\n- `entity`: `data_element_prt_id` (code)\n- `property`: `given_value` (code)\n\n## Failed checks from previous answers\n\nnone\n\n## Relations\n\n### standard_library.permissible_value_mappings_edited\nrows: 3\ncolumns:\n- data_element_prt_id: type VARCHAR, distinct 2, distinct ratio 0.6667, null rate 0, mean length 11.33; lexicon tokens of property; findings definition_mean_length 11.33\n- given_value: type VARCHAR, distinct 3, distinct ratio 1, null rate 0, mean length 8, unique; findings definition_mean_length 8\n- mapped_permissible_value_prt_ids: type VARCHAR[], distinct 3, distinct ratio 1, null rate 0, mean length 13.33, unique\n- mapping_status: type VARCHAR, distinct 3, distinct ratio 1, null rate 0, mean length 16, unique\nschema text:\n- PRT4013886 | opt 2 | Awaiting Review - LLM Prediction\n- PRT4013886 | option one | Reviewed\n- PRTL2140000129 | free text | Unmapped\n\n## Values\n\nnone\n\n## Fields\n\n- `role_property`: the name of one attribute an entity holds; required; claim in force: `given_value` (code)\n- `role_type`: the data type of one attribute; optional\n- `role_required`: whether an attribute must hold a value; optional\n- `role_primary_key`: whether an attribute is part of its entity's key; optional\n- `role_fk_entity`: the entity an attribute refers to; optional\n- `role_fk_property`: the attribute of the referred entity an attribute joins on; optional\n- `role_domain`: the vocabulary an attribute's values are drawn from; optional\n- `role_description`: prose explaining one attribute of an entity; optional\n- `role_entity_description`: prose explaining the entity itself; optional\n",
+  "schema_name": "RoleMapEntityModelRoles_v1",
+  "tokens": 2388
+}
