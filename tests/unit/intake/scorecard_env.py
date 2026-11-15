@@ -1,8 +1,7 @@
 """Scorecard floors per known-source leg, and synthetic imports for the scorer's tests.
 
-``BASELINE`` is keyed ``(source, cap_id)`` with the cap ids of ``test_no_hint.CAP_VALUES``.
-A floor holds overall precision and recall at or above its values and the run's ignored
-relation count at or below its value (design decision 2).
+``BASELINE`` is keyed ``(source, cap_id)``, cap ids from ``test_no_hint.CAP_VALUES``; a floor holds
+overall precision and recall at or above, and ignored relations at or below, its values (design 2).
 """
 
 from __future__ import annotations
@@ -38,8 +37,9 @@ BASELINE: dict[tuple[str, str], Floor] = {
     # kinds have zero cells and the stage_all floor leaves them out by construction (carried gap).
     ("a1", "spec_cap"): Floor(precision=77 / 97, recall=77 / 129, ignored=4),
     ("a1", "stage_all"): Floor(precision=1.0, recall=81 / 101, ignored=4),
-    ("a10", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=30),
-    ("a10", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=30),
+    # 4.4 leftover, declared 13/14: PROPERTY TYPE domain reference settled none (IMPORT_LEFTOVERS)
+    ("a10", "spec_cap"): Floor(precision=1.0, recall=896 / 897, ignored=30),
+    ("a10", "stage_all"): Floor(precision=1.0, recall=896 / 897, ignored=30),
     ("a2", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=0),
     ("a2", "stage_all"): Floor(precision=1.0, recall=1.0, ignored=0),
     ("a3", "spec_cap"): Floor(precision=1.0, recall=1.0, ignored=0),

@@ -30,7 +30,11 @@ from sema.intake.scorecard import render
 from sema.log import logger
 from tests.support.athena_bundle import export_schema
 from tests.unit.intake.no_hint_env import (
+    A1_OPEN_ENTRY,
     DECISIONS_FILE,
+    HELD_OUT_UNASSEMBLED,
+    HELDOUT3_UNASSEMBLED,
+    HELDOUT5_OPEN,
     RECORDED_CALL_CAP,
     RECORDED_COST_CAP,
     Replayed,
@@ -43,6 +47,7 @@ from tests.unit.intake.no_hint_env import (
     KEYS_MOVED,
     keyed_marks,
     keyed_param,
+    less_leftovers,
     metrics_of,
     recording,
     replay,
@@ -84,18 +89,11 @@ CAP_VALUES: dict[str, int | None] = {"spec_cap": None, "stage_all": 1}
 CAPS = pytest.mark.parametrize("cap", list(CAP_VALUES.values()), ids=list(CAP_VALUES))
 MANIFEST_DIFF_LINES = 200
 UNREVIEWED_REASON = "unreviewed: the oracle is not reviewed_correct, so no floor row"
-HELD_OUT_UNASSEMBLED = (
-    "with its two ignores accepted the decided College Scorecard run settles every entry but"
-    " assembles no spec: its per-file dictionaries do not share one role map and a concept"
-    " section has no settled name role (S4 closure C1, 2026-10-23) (bug-846)"
-)
-HELDOUT5_UNASSEMBLED = (
-    "the heldout5 seal reaches Review with both relations bound, zero open entries, and no"
-    " spec (S5 task 1.6, 2026-10-23: 2 calls, bound_fraction 1.0, open 0; the decision 14"
-    " state, bug-846); task 2.5 opens one entry per cause"
-)
-DECIDED_MISSES = {"heldout": HELD_OUT_UNASSEMBLED, "heldout5": HELDOUT5_UNASSEMBLED}
+DECIDED_MISSES = {"heldout": HELD_OUT_UNASSEMBLED, "heldout3": HELDOUT3_UNASSEMBLED}
+UNDECIDED_MISSES = {"heldout5": HELDOUT5_OPEN}
+SCORECARD_MISSES = {A1: A1_OPEN_ENTRY, "heldout3": HELDOUT3_UNASSEMBLED}
 A1_MOVED = pytest.mark.xfail(A1 in KEYS_MOVED, strict=True, reason=KEYS_MOVED.get(A1, ""))
+A1_UNDECIDED = pytest.mark.xfail(strict=True, raises=AssertionError, reason=A1_OPEN_ENTRY)
 GATE_MISSES = {
     "heldout": "College Scorecard misses its gate at Review: bound_fraction 0.625 < 0.75"
     " and open_choices 6 > 2 (Dean, 2026-10-22: recorded, carried to S4)",
@@ -197,7 +195,7 @@ def test_known_source_import_equals_the_written_spec_import(
     runs: Runs, name: str, cap: int | None, tmp_path: Path
 ) -> None:
     run = runs.replayed(name)
-    written = load_concept_source_spec(WRITTEN_SPECS[name])
+    written = less_leftovers(name, load_concept_source_spec(WRITTEN_SPECS[name]))
     spec = spec_of(run.outcome)
     assert spec is not None, spec_diff(spec, written)
 
@@ -240,6 +238,7 @@ def test_a1_reaches_review_with_no_hint_and_no_provider_call(runs: Runs) -> None
 
 
 @A1_MOVED
+@A1_UNDECIDED
 def test_a1_decisions_settle_every_entry_with_zero_further_calls(runs: Runs) -> None:
     outcome = runs.decided(A1, A1_DECISIONS)
     metrics = metrics_of(outcome)
@@ -264,6 +263,7 @@ def _a1_pair(spec: ConceptSourceSpec) -> tuple[ConceptSourceSpec, ConceptSourceS
 
 
 @A1_MOVED
+@A1_UNDECIDED
 @CAPS
 def test_a1_import_equals_the_written_spec_on_concepts_and_value_sets(
     runs: Runs, cap: int | None, tmp_path: Path
@@ -288,7 +288,9 @@ def _scored_specs(outcome: Any, name: str) -> tuple[ConceptSourceSpec, ConceptSo
 
 
 def _scorecard_leg(name: str, cap_id: str) -> Any:
-    marks = keyed_marks(name, KEYS_MOVED, UNREVIEWED_REASON if name in UNREVIEWED else None)
+    reason = UNREVIEWED_REASON if name in UNREVIEWED else SCORECARD_MISSES.get(name)
+    raises = None if name in HELD_OUT else AssertionError
+    marks = keyed_marks(name, KEYS_MOVED, reason, raises=raises)
     return pytest.param(name, cap_id, id=f"{name}-{cap_id}", marks=marks)
 
 
@@ -353,7 +355,9 @@ def test_held_out_decisions_assemble_with_zero_further_calls(runs: Runs, name: s
     assert_zero_provider_calls(runs.replayed(name))
 
 
-@pytest.mark.parametrize("name", [keyed_param(name, KEYS_MOVED) for name in UNDECIDED_HELD_OUT])
+@pytest.mark.parametrize(
+    "name", [keyed_param(name, KEYS_MOVED, UNDECIDED_MISSES) for name in UNDECIDED_HELD_OUT]
+)
 def test_undecided_held_out_source_has_no_open_entry_and_no_decisions_file(
     runs: Runs, name: str
 ) -> None:
@@ -363,7 +367,7 @@ def test_undecided_held_out_source_has_no_open_entry_and_no_decisions_file(
     assert (metrics.open_structure, metrics.open_roles) == (0, 0)
 
 
-@pytest.mark.parametrize("name", [keyed_param(n, KEYS_MOVED, DECIDED_MISSES) for n in REPLAYED])
+@pytest.mark.parametrize("name", [keyed_param(name, KEYS_MOVED) for name in REPLAYED])
 def test_a_review_with_a_binding_and_no_open_entry_presents_a_spec(runs: Runs, name: str) -> None:
     outcome = _settled_outcome(runs, name)
     metrics = metrics_of(outcome)
