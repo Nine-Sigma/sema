@@ -6,149 +6,33 @@ later is covered without editing this test.
 
 from __future__ import annotations
 
-import csv
 import dataclasses
-import inspect
-import io
-import json
-import keyword
 import re
-from collections.abc import Collection, Iterator, Mapping, Sequence
+from collections.abc import Mapping
 from pathlib import Path
 
-import openpyxl
 import pytest
-from pydantic import BaseModel
 
 from sema.binding import spec_sections
 from sema.intake import lexicon
-from sema.intake.loaders.base import relation_name
-from tests.unit.intake.source_literals_env import (
-    REPO_ROOT,
+from tests.unit.source_literals_env import (
+    FIXTURE_ROOT,
     SCAN_ROOT,
     TOKEN,
     Hit,
-    collapse,
+    _grid_literals,
+    _lexicon_token_groups,
+    _table_schema_vocabulary,
+    excluded_names,
     find_hits,
+    fixture_files,
+    fixture_literals,
+    literals_of,
     scanned_prompts,
     tokens_of,
 )
 
 pytestmark = pytest.mark.unit
-
-FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "intake"
-MIN_LITERAL_LENGTH = 3
-TABULAR_SUFFIXES = (".xlsx", ".csv")
-SEE_PHRASE = re.compile(r"\bsee\s+(.+?)\s+dataset\b", re.IGNORECASE | re.DOTALL)
-KEY_VALUE_WIDTH = 2
-TABLE_SCHEMA = FIXTURE_ROOT / "frictionless" / "table-schema.json"
-
-
-def _texts(cells: tuple[object, ...]) -> list[str]:
-    return [str(cell) for cell in cells if isinstance(cell, str) and cell.strip()]
-
-
-def _see_phrases(text: str) -> Iterator[str]:
-    for match in SEE_PHRASE.finditer(text):
-        yield match.group(0)
-        yield match.group(1)
-
-
-def _filled(row: tuple[object, ...]) -> int:
-    return sum(cell not in (None, "") for cell in row)
-
-
-def _header_cells(rows: Sequence[tuple[object, ...]]) -> Iterator[str]:
-    """Every text cell down to the first row holding two or more texts."""
-    for row in rows:
-        texts = _texts(row)
-        yield from texts
-        if len(texts) >= 2:
-            return
-
-
-def _all_see_phrases(rows: Sequence[tuple[object, ...]]) -> Iterator[str]:
-    for row in rows:
-        for text in _texts(row):
-            yield from _see_phrases(text)
-
-
-def _grid_literals(rows: Sequence[tuple[object, ...]]) -> Iterator[str]:
-    yield from _header_cells(rows)
-    yield from _all_see_phrases(rows)
-    if all(_filled(row) <= KEY_VALUE_WIDTH for row in rows):
-        yield from (str(row[0]) for row in rows if _texts(row[:1]))
-
-
-def _xlsx_literals(path: Path) -> Iterator[str]:
-    workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    try:
-        for sheet in workbook.worksheets:
-            yield sheet.title
-            yield relation_name(f"{path.stem}__{sheet.title}")
-            yield from _grid_literals(list(sheet.iter_rows(values_only=True)))
-    finally:
-        workbook.close()
-
-
-def _csv_literals(path: Path) -> Iterator[str]:
-    text = path.read_text(encoding="utf-8-sig", errors="replace")
-    try:
-        dialect: type[csv.Dialect] | csv.Dialect = csv.Sniffer().sniff(text[:4096])
-    except csv.Error:
-        dialect = csv.excel
-    rows = [tuple(row) for row in csv.reader(io.StringIO(text), dialect)]
-    yield relation_name(path.stem)
-    yield from _header_cells(rows)
-    yield from _all_see_phrases(rows)
-
-
-def fixture_files(root: Path = FIXTURE_ROOT) -> list[Path]:
-    return sorted(p for p in root.rglob("*") if p.suffix.lower() in TABULAR_SUFFIXES)
-
-
-def literals_of(path: Path) -> set[str]:
-    reader = _xlsx_literals if path.suffix.lower() == ".xlsx" else _csv_literals
-    return {collapse(text) for text in reader(path)}
-
-
-def _table_schema_vocabulary(node: object) -> Iterator[str]:
-    """Property names and enumerated values of the vendored Table Schema."""
-    if isinstance(node, list):
-        for item in node:
-            yield from _table_schema_vocabulary(item)
-    if not isinstance(node, dict):
-        return
-    for key, value in node.items():
-        if key == "properties" and isinstance(value, dict):
-            yield from value
-        if key == "enum" and isinstance(value, list):
-            yield from (item for item in value if isinstance(item, str))
-        yield from _table_schema_vocabulary(value)
-
-
-def excluded_names() -> set[str]:
-    names = set(keyword.kwlist) | set(keyword.softkwlist)
-    for _, model in inspect.getmembers(spec_sections, inspect.isclass):
-        if issubclass(model, BaseModel) and model.__name__.endswith("Roles"):
-            for field_name, field in model.model_fields.items():
-                names.add(field_name)
-                names.update(alias for alias in (field.alias,) if alias)
-    schema = json.loads(TABLE_SCHEMA.read_text(encoding="utf-8"))
-    names.update(_table_schema_vocabulary(schema))
-    names.update(word for group in _lexicon_token_groups() for word in group)
-    return {name.casefold() for name in names}
-
-
-def fixture_literals(root: Path = FIXTURE_ROOT) -> dict[tuple[str, ...], str]:
-    excluded = excluded_names()
-    found: dict[tuple[str, ...], str] = {}
-    for path in fixture_files(root):
-        for literal in literals_of(path):
-            tokens = tokens_of(literal)
-            if len(literal) >= MIN_LITERAL_LENGTH and tokens and literal not in excluded:
-                found.setdefault(tokens, literal)
-    return found
 
 
 def test_every_fixture_file_contributes_literals() -> None:
@@ -180,11 +64,6 @@ def test_key_value_sheet_yields_its_keys_and_wide_sheet_its_header() -> None:
     assert set(_grid_literals(wide)) == {
         "Name", "Kind", "Note", "see Other Thing dataset", "Other Thing"
     }
-
-
-def _lexicon_token_groups() -> list[Collection[str]]:
-    groups: list[Collection[str]] = [entry.tokens for entry in lexicon.ROLES]
-    return [*groups, *lexicon.HEADER_KEY_TOKENS.values(), *lexicon.STATUS_VALUE_WORDS.values()]
 
 
 def _lexicon_words() -> set[str]:

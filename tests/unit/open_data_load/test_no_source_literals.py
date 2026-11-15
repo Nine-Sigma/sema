@@ -6,13 +6,14 @@ covered without editing this test.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import duckdb
 import pytest
 import yaml
+
+from tests.unit.source_literals_env import structured_literals
 
 pytestmark = pytest.mark.unit
 
@@ -22,17 +23,6 @@ PROFILES = PACKAGE / "profiles"
 TESTS = Path(__file__).parent
 SHOWCASE_TESTS = REPO / "tests" / "showcase" / "open_data_load"
 MIN_LITERAL_LENGTH = 3
-
-
-def _values(node: object) -> Iterator[str]:
-    if isinstance(node, dict):
-        for value in node.values():
-            yield from _values(value)
-    elif isinstance(node, list):
-        for item in node:
-            yield from _values(item)
-    elif node is not None:
-        yield str(node)
 
 
 def duckdb_default_schema() -> str:
@@ -54,7 +44,7 @@ def profile_literals(profiles: Path = PROFILES) -> set[str]:
     found: set[str] = set()
     for path in sorted(profiles.glob("*.yaml")):
         profile = _source_values(yaml.safe_load(path.read_text(encoding="utf-8")))
-        found |= set(profile.get("relations", {})) | set(_values(profile))
+        found |= structured_literals(profile)
     return {literal for literal in found if len(literal.strip()) >= MIN_LITERAL_LENGTH}
 
 
