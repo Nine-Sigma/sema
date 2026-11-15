@@ -61,8 +61,8 @@ from tests.unit.intake.no_hint_env import (
     utils,
 )
 from tests.unit.intake.scorecard_env import BASELINE, ORACLES, UNREVIEWED, floor_misses
-from tests.unit.intake.test_athena_golden import GOLDEN
-from tests.unit.intake.test_heldout_gate import GATE_THRESHOLDS, gate_misses
+from tests.unit.intake.athena_golden_env import GOLDEN
+from tests.unit.intake.heldout_gate_env import GATE_THRESHOLDS, gate_misses
 
 pytestmark = pytest.mark.unit
 

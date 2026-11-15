@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import json
 import re
 from pathlib import Path
@@ -12,28 +11,11 @@ from unittest.mock import MagicMock
 import duckdb
 import pytest
 
-from showcase.ontology_query_benchmark.profile import (
-    Attribution,
-    ConceptHierarchy,
-    ConceptRelation,
-)
-from showcase.ontology_query_benchmark.sema_bindings import (
-    load_products,
-    load_sidecar,
-    resolve_bindings,
-)
-from showcase.ontology_query_benchmark.sema_build import (
-    BuildManifest,
-    build_scoped_graph,
-    read_manifest,
-    write_manifest,
-)
-from showcase.ontology_query_benchmark.sema_build_utils import LibraryFacts, import_library_facts
-from showcase.ontology_query_benchmark.sema_context import SContext, SContextProvider
+from showcase.ontology_query_benchmark.profile import Attribution, ConceptHierarchy
+from showcase.ontology_query_benchmark.sema_build import read_manifest, write_manifest
+from showcase.ontology_query_benchmark.sema_build_utils import import_library_facts
 from showcase.ontology_query_benchmark.sema_hierarchy_sql import membership_sql
 from tests.unit.ontology_query_benchmark.hierarchy_fixture import (
-    MEMBERS,
-    add_hierarchy_slice,
     add_typed_vocabulary,
     closure_rows,
     hierarchy,
@@ -41,58 +23,25 @@ from tests.unit.ontology_query_benchmark.hierarchy_fixture import (
     typed_hierarchy,
     warehouse,
 )
-from tests.unit.ontology_query_benchmark.test_sema_bindings import (
+from tests.unit.ontology_query_benchmark.sema_bindings_env import (
     CONCEPT_SPEC,
-    CONVENTIONS,
     ELEMENTS,
     EVENTS,
-    catalog_fixture,
-    write_fixture,
     write_projection,
 )
-from tests.unit.ontology_query_benchmark.test_sema_build import _catalog, _embedder
-from tests.unit.ontology_query_benchmark.test_sema_context import (
-    EVENTS_ENTITY,
-    LIMITS,
-    _Retriever,
+from tests.unit.ontology_query_benchmark.sema_hierarchy_env import (
+    RELATIONS,
+    SITE,
+    _bridges,
+    _build,
+    _context,
+    _facts,
+    _fragment,
+    _reader,
+    require_name_keyed_template,
 )
 
 pytestmark = pytest.mark.unit
-
-RELATIONS = ("wh.voc.relationship", "wh.voc.ancestor", "wh.voc.concept")
-SITE = ("Site of event", "Site code.", [(m, f"site {m}") for m in MEMBERS])
-
-
-def _facts(tmp_path: Path, spec: ConceptHierarchy | None = None) -> LibraryFacts:
-    projection, receipt = write_projection(tmp_path, {**ELEMENTS, "S1": SITE})
-    add_hierarchy_slice(projection, receipt)
-    return import_library_facts(CONCEPT_SPEC, projection, receipt,
-                                spec_attribution=Attribution.ASSISTED, hierarchy=spec)  # fmt: skip
-
-
-def _reader(unreadable: str | None = None) -> MagicMock:
-    def read(sql: str) -> list[Any]:
-        if unreadable and unreadable in sql:
-            raise RuntimeError(f"TABLE_OR_VIEW_NOT_FOUND {unreadable}")
-        return [(1,)]
-
-    return MagicMock(side_effect=read)
-
-
-def _build(
-    tmp_path: Path, facts: LibraryFacts, reader: Any = None
-) -> tuple[MagicMock, BuildManifest]:
-    loader = MagicMock()
-    manifest = build_scoped_graph(
-        loader, _catalog(), load_sidecar(write_fixture(tmp_path), tmp_path), facts, _embedder(),
-        dimensions=4, embedder_model="toy-embed", relation_reader=reader,
-    )
-    return loader, manifest
-
-
-def _bridges(loader: MagicMock) -> set[tuple[str, str, str, str]]:
-    return {(k["sv"], k["sc"], k["cv"], k["cc"]) for c in loader._run.call_args_list
-            if "MAPS_TO_CONCEPT" in c.args[0] for k in [c.kwargs]}  # fmt: skip
 
 
 def _edges(loader: MagicMock) -> set[tuple[str, str, str]]:
@@ -144,23 +93,6 @@ def test_without_a_hierarchy_the_build_writes_no_edge_bridge_or_manifest_key(
     assert not _edges(loader) and not _bridges(loader)
     write_manifest(manifest, tmp_path / "manifest.json")
     assert "hierarchy_relations" not in json.loads((tmp_path / "manifest.json").read_text())
-
-
-def _context(tmp_path: Path, facts: LibraryFacts, readable: dict[str, bool] | None) -> SContext:
-    sidecar = load_sidecar(write_fixture(tmp_path), tmp_path)
-    products = load_products(sidecar)
-    provider = SContextProvider(
-        _Retriever([EVENTS_ENTITY]), sidecar, products,
-        resolve_bindings(sidecar, products, catalog_fixture()), facts,
-        graph_identity="graph-1", conventions=CONVENTIONS, limits=LIMITS,
-        hierarchy_relations=readable,
-    )
-    return provider("Which events sit under a broader concept?")
-
-
-def _fragment(text: str, column: str) -> str:
-    lines = [x.strip().removeprefix("WHERE ") for x in text.splitlines()]
-    return next(x for x in lines if "{column} IN" in x).replace("{column}", column)
 
 
 def test_the_fragment_returns_the_descendant_members_including_the_replaced_one(
@@ -220,8 +152,6 @@ def test_a_projection_without_the_slice_is_refused_with_the_remedy(tmp_path: Pat
         )
 
 
-NAME_KEYED_PARAMETERS = {"name", "vocabulary", "concept_class"}
-QUALIFIER_COLUMNS = {"vocabulary_column", "class_column"}
 LOAN_SPEC: dict[str, Any] = {
     "attribution": "assisted",
     "closure": {"relation": "wh.kb.closure", "ancestor_column": "anc",
@@ -238,14 +168,6 @@ LOAN_CONCEPTS = [
     ("K10", "Branch", "alpha", "Channel", "S"),
 ]
 LOAN_EDGES = [("K1", "K4"), ("K1", "K5"), ("K2", "K6"), ("K3", "K8"), ("K7", "K10")]
-
-
-def require_name_keyed_template() -> None:
-    """The template API the name-keyed predicate needs; absent, the red is an assertion."""
-    missing = NAME_KEYED_PARAMETERS - set(inspect.signature(membership_sql).parameters)
-    assert not missing, f"membership_sql has no name-keyed parameters {sorted(missing)}"
-    absent = QUALIFIER_COLUMNS - set(ConceptRelation.model_fields)
-    assert not absent, f"ConceptRelation has no qualifier columns {sorted(absent)}"
 
 
 def _loan_warehouse() -> duckdb.DuckDBPyConnection:

@@ -8,7 +8,7 @@ import pytest
 
 from sema.ingest.duckdb_staging import Staging
 from tests.support.athena_bundle import export_schema, make_minimal_bundle
-from tests.unit.intake.test_athena_golden import GOLDEN
+from tests.unit.intake.athena_golden_env import GOLDEN
 
 pytestmark = pytest.mark.unit
 

@@ -3,7 +3,6 @@ import itertools
 import json
 import os
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -14,54 +13,17 @@ from showcase.ontology_query_benchmark import runner, runner_utils, scorer
 from showcase.ontology_query_benchmark.profile import Limits, Profile
 from showcase.ontology_query_benchmark.routing import RoutingError
 from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH, write_settings
+from tests.unit.ontology_query_benchmark.runner_env import (
+    GOLD,
+    R01_SQL,
+    FakeExecutor,
+    FakeFinding,
+    FakeModel,
+    FakeSContext,
+    s_provider,
+)
 
 pytestmark = pytest.mark.unit
-
-R01_SQL = "```sql\nSELECT count(DISTINCT rid) AS people FROM main.s.person\n```"
-GOLD = 42
-
-
-@dataclass(frozen=True)
-class FakeFinding:
-    message: str
-    relation: str | None = None
-    column: str | None = None
-
-
-@dataclass(frozen=True)
-class FakeSContext:
-    text: str
-    identity: str
-    findings: tuple[FakeFinding, ...] = ()
-
-
-class FakeModel:
-    def __init__(self, harness: SimpleNamespace, replies: list[str], prompt: int | None = 900,
-                 completion: int | None = 40) -> None:  # fmt: skip
-        self.harness, self.replies = harness, replies
-        self.prompt, self.completion = prompt, completion
-        self.calls: list[list[dict[str, Any]]] = []
-
-    def complete(self, messages: list[dict[str, Any]]) -> Any:
-        self.calls.append(messages)
-        text = self.replies[min(len(self.calls), len(self.replies)) - 1]
-        return self.harness.models.Generation(text, self.prompt, self.completion, 0.01)
-
-
-class FakeExecutor:
-    def __init__(self, harness: SimpleNamespace, rows: tuple[tuple[Any, ...], ...]) -> None:
-        self.harness, self.rows = harness, rows
-        self.sqls: list[str] = []
-
-    def execute(self, sql: str, row_limit: int) -> Any:
-        self.sqls.append(sql)
-        return self.harness.models.Execution(True, ("people",), self.rows, 0.01)
-
-
-def s_provider(
-    findings: tuple[FakeFinding, ...] = (), text: str = "TABLE main.s.person\n  rid string"
-):
-    return lambda question, is_denied: FakeSContext(text, "s-identity-1", findings)
 
 
 PRICES = runner_utils.Prices(input_usd_per_1m=2.0, output_usd_per_1m=10.0)

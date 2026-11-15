@@ -15,7 +15,7 @@ from pydantic import SecretStr
 from sema.connectors.databricks import DatabricksConnector
 from sema.models.assertions import Assertion, AssertionPredicate
 from sema.models.config import DatabricksConfig, ProfilingConfig
-from tests.unit.test_databricks_sql_pin import CATALOG, RecordingConnection
+from tests.unit.databricks_sql_pin_env import CATALOG, RecordingConnection
 
 pytestmark = pytest.mark.unit
 

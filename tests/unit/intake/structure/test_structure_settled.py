@@ -57,7 +57,7 @@ from tests.unit.intake.structure_env import (
     ref,
     run,
 )
-from tests.unit.intake.resolve.test_resolve_structure import (
+from tests.unit.intake.resolve.resolve_structure_env import (
     CONFIDENCE,
     FLAT_LIST,
     answering,

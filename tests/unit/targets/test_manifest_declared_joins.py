@@ -21,7 +21,7 @@ from sema.targets.adapters.manifest_parser import (
 )
 from sema.targets.hashing import SnapshotHasher
 from sema.targets.normalizer import TargetModelNormalizer
-from tests.unit.intake.test_acris_import import (
+from tests.unit.intake.acris_import_env import (
     DOMAINS,
     ENTITIES,
     FOREIGN_KEYS,

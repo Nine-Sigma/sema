@@ -31,7 +31,7 @@ from tests.unit.intake.structure_env import (
     ref,
     run,
 )
-from tests.unit.intake.resolve.test_resolve_structure import FLAT_LIST, answering, starting
+from tests.unit.intake.resolve.resolve_structure_env import FLAT_LIST, answering, starting
 
 pytestmark = pytest.mark.unit
 

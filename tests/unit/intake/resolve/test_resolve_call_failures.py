@@ -39,8 +39,8 @@ from tests.unit.intake.resolve_roles_env import (
 )
 from tests.unit.intake.structure.shapes.shapes_env import Source, warehouse_source
 from tests.unit.intake.structure_env import fresh_tools, run
-from tests.unit.intake.resolve.test_resolve_structure import CONFLICT_SQL, claim_own, open_subjects
-from tests.unit.intake.resolve.test_resolve_structure import answering as structure_answering
+from tests.unit.intake.resolve.resolve_structure_env import CONFLICT_SQL, claim_own, open_subjects
+from tests.unit.intake.resolve.resolve_structure_env import answering as structure_answering
 
 pytestmark = pytest.mark.unit
 
