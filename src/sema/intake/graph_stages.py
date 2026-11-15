@@ -21,8 +21,8 @@ from sema.binding.spec_sections import Provider
 from sema.connectors.base import Connector
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.decisions import Decision, apply_structure_decisions, stated_choices
-from sema.intake.eligibility import assemble_spec, run_roles
-from sema.intake.eligibility_spec_utils import RolesResult
+from sema.intake.eligibility import run_roles
+from sema.intake.eligibility_spec_utils import RolesResult, assembly
 from sema.intake.eligibility_utils import (
     EligibilitySource,
     Embedder,
@@ -98,13 +98,15 @@ class Reviewed:
 
 @dataclass(frozen=True)
 class Current:
-    """The run as Review sees it: the latest structure, roles, and spec."""
+    """The run as Review sees it: the latest structure, roles, and spec, and why no spec
+    assembled when none did."""
 
     land: LandResult
     structure: StructureResult
     proposal: ProposalResult | None
     roles: RolesResult | None
     spec: ConceptSourceSpec | None
+    unassembled: str | None = None
 
 
 class Stages:
@@ -221,14 +223,16 @@ class Stages:
             roles = self.resolved_roles(approvals)
         elif ROLES in reached:
             roles = self.roles(approvals)
-        spec = self._spec(reviewed.spec_path, roles, decided=bool(reviewed.decisions))
-        return Current(self.land(), structure, proposal, roles, spec)
+        built = assembly(self.descriptor(), roles) if roles is not None else None
+        assembled = built if isinstance(built, ConceptSourceSpec) else None
+        spec = self._spec(reviewed.spec_path, assembled, decided=bool(reviewed.decisions))
+        unassembled = built if isinstance(built, str) else None
+        return Current(self.land(), structure, proposal, roles, spec, unassembled)
 
     def _spec(
-        self, edited: Path | None, roles: RolesResult | None, *, decided: bool = False
+        self, edited: Path | None, assembled: ConceptSourceSpec | None, *, decided: bool = False
     ) -> ConceptSourceSpec | None:
         """An edited spec wins; beside decisions, only where it sets a value."""
-        assembled = assemble_spec(self.descriptor(), roles) if roles is not None else None
         if edited is None:
             return assembled
         spec = load_concept_source_spec(edited)

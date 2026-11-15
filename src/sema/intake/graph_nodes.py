@@ -358,7 +358,7 @@ def _presented(current: Current) -> Current:
     """With no spec, the entries naming each cause are open, so the metrics count them."""
     if current.spec is not None or current.roles is None:
         return current
-    return dataclasses.replace(current, roles=with_causes(current.roles))
+    return dataclasses.replace(current, roles=with_causes(current.roles, current.unassembled))
 
 
 def _asking(state: IngestState, node: str, requests: Sequence[NeedsValues]) -> Update:

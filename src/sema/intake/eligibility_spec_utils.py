@@ -99,10 +99,18 @@ class RolesResult:
 
 
 def assemble(descriptor: RunDescriptor, roles: RolesResult) -> ConceptSourceSpec | None:
+    built = assembly(descriptor, roles)
+    if isinstance(built, str):
+        logger.info("no spec assembled: {}", built)
+        return None
+    return built
+
+
+def assembly(descriptor: RunDescriptor, roles: RolesResult) -> ConceptSourceSpec | str:
+    """The assembled spec, or why none assembles (Review names it, decision 14)."""
     structure = roles.structure
     if structure.ambiguities or any(not filled_sections(e.binding) for e in structure.bound):
-        logger.info("no spec assembled: the structure still lists open bindings or sections")
-        return None
+        return "the structure still lists open bindings or sections"
     parts: list[Part | None] = []
     models = [e.binding for e in structure.bound if e.binding.template == entity_model.ID]
     if models:
@@ -114,11 +122,10 @@ def assemble(descriptor: RunDescriptor, roles: RolesResult) -> ConceptSourceSpec
         elif builder is not None:
             parts.append(builder(entry.binding, roles))
         elif entry.binding.template != entity_model.ID:
-            logger.info("no spec assembled: {} has no assembly rule", entry.binding.template)
-            return None
+            return f"{entry.binding.template} has no assembly rule"
     sections = _merge(parts)
     if sections is None:
-        return None
+        return "the bound sections do not assemble"
     try:
         return ConceptSourceSpec(
             spec_version=ASSEMBLED_SPEC_VERSION,
@@ -132,8 +139,8 @@ def assemble(descriptor: RunDescriptor, roles: RolesResult) -> ConceptSourceSpec
             **sections,
         )
     except ValidationError as error:
-        logger.info("no spec assembled: the sections do not validate: {}", error)
-        return None
+        found = "; ".join(str(detail["msg"]) for detail in error.errors())
+        return f"the sections do not validate: {found}"
 
 
 def _scheme(descriptor: RunDescriptor) -> SchemeSpec:

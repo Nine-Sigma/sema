@@ -3,7 +3,9 @@
 Three sources, all invented: two workbooks whose per-file dictionaries read the same roles
 from differently named columns; a warehouse concept and value set pair that assembles until a
 reviewer states ``none`` for its required ``name`` role; and two warehouse tables a mocked
-Structure answer binds into the same ``concepts`` section. A raising client stands in for the
+Structure answer binds into the same ``concepts`` section; and one warehouse table of nested
+levels a mocked Structure answer binds as a ``hierarchy`` alone, which settles every entry
+and makes no spec. A raising client stands in for the
 provider wherever the run needs no model answer; the books run's Roles answers keep every claim
 in force and answer ``none`` elsewhere, so its divergence is the dictionaries' own; the conflict
 run's answers are mocked outputs, and the members each Structure ask offered are recorded as
@@ -43,6 +45,7 @@ from tests.unit.intake.graph_env import (
     STRUCTURE_BATCH,
     Answer,
     batch_answer,
+    choosing,
     graph,
     model_names,
     routed_client,
@@ -54,6 +57,7 @@ from tests.unit.intake.warehouse_env import CATALOG, SCHEMA, FakeConnector
 STRUCTURE, ROLES, IGNORE, NONE = "structure", "roles", "ignore", "none"
 CLAIMS_HEADING, CLAIMED_ROLE = "## Claims in force", re.compile(r"^- `([^`]+)`:", re.MULTILINE)
 REQUIRED_ROLE_NONE = "required_role_none"
+SPEC_UNASSEMBLED = "spec_unassembled"
 CONCEPTS_SECTION = "concepts"
 CONCEPT_LIST = "concept_list("
 DENORMALIZED = "concept_with_values_denormalized("
@@ -95,6 +99,17 @@ MASS_ROWS: tuple[tuple[Any, ...], ...] = (
     ("Q1", "Weight", "How heavy a thing is", "W02", "Heavy"),
     ("Q2", "Depth", "How deep a thing goes", "D01", "Shallow"),
     ("Q2", "Depth", "How deep a thing goes", "D02", "Deep"),
+)
+
+PLACES, HIERARCHY_SECTION, LEVEL_COLUMNS = "places", "hierarchy", "level_columns("
+PLACE_ROWS: tuple[tuple[Any, ...], ...] = (
+    ("zone", "district", "block"),
+    ("North", "N1", "N1a"),
+    ("North", "N1", "N1b"),
+    ("North", "N2", "N2a"),
+    ("South", "S1", "S1a"),
+    ("South", "S1", "S1b"),
+    ("South", "S2", "S2a"),
 )
 
 Entry = dict[str, Any]
@@ -212,6 +227,16 @@ def facet_pair() -> Warehouse:
 
 def grouped_pair() -> Warehouse:
     return warehouse_tables({SOUNDS: SOUND_ROWS, MASSES: MASS_ROWS})
+
+
+def level_table() -> Warehouse:
+    return warehouse_tables({PLACES: PLACE_ROWS})
+
+
+def levels_client() -> MagicMock:
+    """A mocked Structure answer that settles the table on its level-columns member."""
+    pick = choosing(lambda member: member.startswith(LEVEL_COLUMNS))
+    return routed_client(defaults={STRUCTURE_BATCH: pick})
 
 
 @dataclass

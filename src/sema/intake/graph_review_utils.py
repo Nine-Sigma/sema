@@ -3,7 +3,8 @@
 A run that reaches Review with bindings and no spec names why: each required role settled
 ``none`` and each role the per-file dictionaries read from differently named columns reopens
 as an entry carrying its ``cause``. A section two bindings fill is already open at Structure
-with the section in its reason and every member offered, so it needs no entry here.
+with the section in its reason and every member offered, so it needs no entry here. Any other
+failure of a run with no open entry names each bound section with the assembler's reason.
 """
 
 from __future__ import annotations
@@ -20,14 +21,17 @@ from sema.intake.eligibility_spec_utils import RolesResult, roles_of
 from sema.intake.eligibility_target_utils import Target, role_targets
 from sema.intake.eligibility_text_utils import STAGE as ROLES_STAGE
 from sema.intake.eligibility_utils import RoleEligibility, scope_of, subject_of
-from sema.intake.shapes import entity_model
+from sema.intake.shapes import entity_model, filled_sections
 from sema.intake.shapes.base import SlotBinding
 from sema.intake.verify.base import Ambiguity
 
-__all__ = ["REQUIRED_ROLE_NONE", "DIVERGENT_ROLE_MAP", "CauseEntry", "with_causes"]
+__all__ = [
+    "REQUIRED_ROLE_NONE", "DIVERGENT_ROLE_MAP", "SPEC_UNASSEMBLED", "CauseEntry", "with_causes",
+]
 
 REQUIRED_ROLE_NONE = "required_role_none"
 DIVERGENT_ROLE_MAP = "divergent_role_map"
+SPEC_UNASSEMBLED = "spec_unassembled"
 
 
 class CauseEntry(Ambiguity):
@@ -36,9 +40,12 @@ class CauseEntry(Ambiguity):
     cause: str
 
 
-def with_causes(roles: RolesResult) -> RolesResult:
-    """``roles`` with every entry a cause names reopened, or a new entry where none is listed."""
+def with_causes(roles: RolesResult, unassembled: str | None = None) -> RolesResult:
+    """``roles`` with every entry a cause names reopened, or a new entry where none is listed;
+    ``unassembled`` is the assembler's reason, named only where nothing else is open."""
     causes = {entry.subject: entry for entry in _causes(roles)}
+    if not causes and unassembled is not None and not _any_open(roles):
+        causes = {entry.subject: entry for entry in _unassembled(roles, unassembled)}
     if not causes:
         return roles
     listed = {entry.subject: entry for entry in roles.ambiguities}
@@ -64,6 +71,21 @@ def _causes(roles: RolesResult) -> Iterator[CauseEntry]:
         for target in role_targets(binding):
             yield from _required_none(target, roles)
     yield from _divergent([b for b in bound if _per_file(b)], roles)
+
+
+def _any_open(roles: RolesResult) -> bool:
+    listed = (*roles.structure.ambiguities, *roles.ambiguities)
+    return any(entry.choice is None and entry.source is None for entry in listed)
+
+
+def _unassembled(roles: RolesResult, reason: str) -> Iterator[CauseEntry]:
+    for entry in roles.structure.bound:
+        relation = entry.binding.relations[0]
+        for section in filled_sections(entry.binding) or (entry.binding.template,):
+            yield CauseEntry(
+                stage=ROLES_STAGE, subject=f"{relation}.{section}", members=(), reason=reason,
+                cause=SPEC_UNASSEMBLED,
+            )
 
 
 def _per_file(binding: SlotBinding) -> bool:

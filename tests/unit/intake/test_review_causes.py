@@ -7,7 +7,10 @@ Pinned contract, read through what Review presents:
 - When assembly fails, Review lists one open entry per cause, naming the relation, the role or
   section, and the cause: a required role settled ``none`` names ``required_role_none``;
   per-file dictionaries whose role maps differ name the differing role; a section two
-  bindings fill names the section. ``run_metrics`` counts each entry as open.
+  bindings fill names the section; any other assembly failure of a run whose entries are
+  all settled (a bound section that makes no spec on its own) names the relation, the
+  section, and ``spec_unassembled`` with the assembler's reason. A run that assembles lists
+  no such entry. ``run_metrics`` counts each entry as open.
 - An entry a section conflict opens carries every member of the Structure ask that settled
   it, the settled choice first, and ``validate_decisions`` admits any of them, so a reviewer
   can choose the member the model rejected.
@@ -35,12 +38,15 @@ from tests.unit.intake.review_causes_env import (
     CONCEPTS_SECTION,
     DIVERGENT_ROLE,
     FACETS,
+    HIERARCHY_SECTION,
     IGNORE,
     MASSES,
+    PLACES,
     REQUIRED_ROLE,
     REQUIRED_ROLE_NONE,
     ROLES,
     SOUNDS,
+    SPEC_UNASSEMBLED,
     STRUCTURE,
     Offered,
     approve_warehouse,
@@ -52,6 +58,8 @@ from tests.unit.intake.review_causes_env import (
     facet_pair,
     grouped_client,
     grouped_pair,
+    level_table,
+    levels_client,
     naming,
     open_count,
     open_entries,
@@ -139,6 +147,28 @@ def test_a_section_two_bindings_fill_opens_one_entry_per_relation_naming_the_sec
     for table in (SOUNDS, MASSES):
         found = [e for e in naming(listed, CONCEPTS_SECTION) if e["subject"] == qualified(table)]
         assert len(found) == 1, summary(listed)
+
+
+def test_a_settled_binding_whose_sections_make_no_spec_opens_an_entry_naming_the_cause(
+    tmp_path: Path,
+) -> None:
+    with warehouse(level_table) as connector:
+        outcome = discover_warehouse(tmp_path, connector, levels_client())
+
+    _assert_no_spec_lists_a_cause(outcome)
+    listed = open_entries(outcome)
+    found = naming(listed, qualified(PLACES), HIERARCHY_SECTION, SPEC_UNASSEMBLED)
+    assert len(found) == 1, summary(listed)
+    assert found[0]["reason"], "the entry does not say why no spec assembled"
+
+
+def test_a_settled_run_that_assembles_lists_no_unassembled_entry(tmp_path: Path) -> None:
+    with warehouse(facet_pair) as connector:
+        outcome = discover_warehouse(tmp_path, connector, raising_client())
+
+    assert outcome.payload["spec"] is not None, "the decoy must assemble"
+    assert open_count(outcome) == 0, outcome.payload["run_metrics"]
+    assert not naming(outcome.payload["ambiguities"], SPEC_UNASSEMBLED)
 
 
 def _conflict(root: Path) -> tuple[Any, Offered, Any]:
