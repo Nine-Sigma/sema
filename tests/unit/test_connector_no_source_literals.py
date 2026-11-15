@@ -70,7 +70,13 @@ PREDATING_HITS = {
 
 
 def literal_files(roots: Iterable[Path] = LITERAL_ROOTS) -> list[Path]:
-    return sorted(path for root in roots for path in root.rglob("*") if path.is_file())
+    """Source files only: bytecode that importing a fixture builder leaves is skipped."""
+    return sorted(
+        path
+        for root in roots
+        for path in root.rglob("*")
+        if path.is_file() and "__pycache__" not in path.relative_to(root).parts
+    )
 
 
 def _catalog_names(path: Path) -> set[str]:
@@ -134,12 +140,26 @@ def test_the_scan_covers_every_file_the_unit_changes() -> None:
     assert not missing, f"renamed or removed, update the scanned set: {missing}"
 
 
+def files_without_reader(roots: Iterable[Path] = LITERAL_ROOTS) -> list[Path]:
+    known = TABULAR_SUFFIXES + STRUCTURED_SUFFIXES + DATABASE_SUFFIXES + UNREAD_SUFFIXES
+    return [path for path in literal_files(roots) if path.suffix.lower() not in known]
+
+
 def test_every_literal_file_is_read_or_its_type_is_named_unread() -> None:
-    read_suffixes = TABULAR_SUFFIXES + STRUCTURED_SUFFIXES + DATABASE_SUFFIXES
+    assert files_without_reader() == [], "no reader for these literal files"
     for path in literal_files():
-        suffix = path.suffix.lower()
-        assert suffix in read_suffixes + UNREAD_SUFFIXES, f"no reader for {path}"
-        assert suffix in UNREAD_SUFFIXES or file_literals(path), f"{path} yielded no literal"
+        unread = path.suffix.lower() in UNREAD_SUFFIXES
+        assert unread or file_literals(path), f"{path} yielded no literal"
+
+
+def test_bytecode_caches_are_skipped_and_an_unknown_type_still_fails(tmp_path: Path) -> None:
+    cache = tmp_path / "__pycache__"
+    cache.mkdir()
+    (cache / "build_fixture.cpython-312.pyc").write_bytes(b"\xa7\r\r\n\xff\xfe\x00")
+    (tmp_path / "p.yaml").write_text("relation: gadget_log\n")
+    assert set(source_literals([tmp_path]).values()) == {"gadget_log"}
+    (tmp_path / "notes.weird").write_text("gadget_log\n")
+    assert files_without_reader([tmp_path]) == [tmp_path / "notes.weird"]
 
 
 def test_database_files_yield_their_table_and_column_names(tmp_path: Path) -> None:
