@@ -21,6 +21,7 @@ from sema.consumers.nl2sql.prompting import build_sql_prompt
 from sema.models.context import GovernedValue, PhysicalAsset, SemanticContextObject
 from sema.graph.queries import CypherQueries
 from sema.pipeline.context import prune_to_sco
+from sema.pipeline.dedup_utils import states_name
 from sema.pipeline.retrieval import RetrievalEngine
 from tests.support.connector_fixture import CATALOG, MAIN_SCHEMA, MAIN_TABLES
 from tests.support.connector_fixture_context import (
@@ -382,4 +383,16 @@ def test_d2_a_value_reached_through_a_term_with_no_label_renders_no_label() -> N
     assert rendered and all("no label" in line.lower() for line in rendered), text
     members = {**dict(LABELLED_REGIONS), UNLABELLED_REGION: ""}
     assert label_breaches(text, members) == [], text
+
+
+@pytest.mark.parametrize(("asked", "name", "same"), [
+    ("lithium battery packs", "Lithium batteries", True), ("batteries", "battery", True),
+    ("boxes", "box", True), ("box", "boxes", True), ("classes", "class", True),
+    ("class", "classes", True), ("tool", "Tools", True),
+    ("bus", "bu", False), ("bu", "bus", False), ("cares", "car", False),
+])
+def test_the_name_matcher_takes_s_es_ies_plurals_as_one_word_never_below_three_letters(
+    asked: str, name: str, same: bool,
+) -> None:
+    assert states_name(asked, name) is same
 
