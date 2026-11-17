@@ -20,17 +20,23 @@ one row per cell, key and arm: `class` (question class), `hop_class`, `hops` (ho
 `excluded` (keyed by question id; a question `scoring.json` excludes from the rate is counted
 only there). Counts are attempts; `strict_rate` is strict / n with two decimals. A section
 whose heading holds `Open decisions` lists each `scoring.json` flag on a line with its
-question id and flag name. No question text, SQL or row reaches stdout, a log line or any
-file outside `sealed/`.
+question id and flag name. No question text, SQL or row reaches stdout, a log line at any
+level or any file outside `sealed/`.
+
+Scoring: expected rows are author A's. Each executed attempt is scored twice by
+`scorer.score`, strict and with `order_free=True`; the receipt keeps the second verdict in
+`order_free` beside `strict`, and the report's `order_free` counts come from it. A question
+whose author A record has `rows_truncated` true is refused: none of its attempts is scored,
+and the report names it on a line holding its id and the word `refused`. Every statement
+executes through the connector's `Connector.execute_query_with_columns(query) ->
+tuple[list[str], list[tuple[Any, ...]]]` (column names, rows), once per statement.
 """
 
 import importlib
-import io
 import json
 import socket
+from collections import Counter
 from collections.abc import Callable
-from contextlib import redirect_stderr, redirect_stdout
-from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -38,30 +44,38 @@ from typing import Any
 import duckdb
 import pytest
 
+from sema.connectors.base import Connector
 from sema.connectors.duckdb import DuckDBConnector
-from sema.log import logger
-from showcase.ontology_query_benchmark import runner
+from sema.models.config import DuckDBConfig
 from tests.support.connector_fixture import write_fixture_database
 from tests.unit.ontology_query_benchmark.sealed_set_env import (
     ARM_REPLIES,
+    AUTHOR_SPLIT,
+    CONNECTOR_READ,
     MARKERS,
+    NEAR_MISS,
     ROW_MARKER,
     SEALED_SET_FIXTURE,
+    SINK_CANARY,
     SQL_MARKERS,
     TEXT_MARKER,
-    ScriptedModel,
+    WIDE,
+    SealedRun,
     expected_cells,
     materialize,
     question_texts,
     read_jsonl,
+    rename_question_ids,
     report_cells,
-    stub_s_provider,
+    run_sealed,
+    truncate_expected,
 )
 
 pytestmark = pytest.mark.unit
 
 ARMS = ("A", "S")
 REPORT_CELLS = ("class", "hop_class", "hops", "joins", "join", "excluded")
+SCORED = ("correct", "wrong", "context_incomplete")
 QUESTION_FIELDS = {"id": str, "text": str, "question_class": str, "hop_class": int,
                    "hops": int, "answer_columns": list, "difficulty": int,
                    "underspecified": bool}  # fmt: skip
@@ -71,61 +85,9 @@ def _sealed_set() -> ModuleType:
     return importlib.import_module("showcase.ontology_query_benchmark.sealed_set")
 
 
-@dataclass(frozen=True)
-class SealedRun:
-    root: Path
-    set_dir: Path
-    report: str
-    receipts: list[dict[str, Any]]
-    output: str
-    logs: str
-    model: ScriptedModel
-    opened: list[Path]
-    calls: list[str]
-
-    def receipt(self, slot_id: str) -> dict[str, Any]:
-        return next(r for r in self.receipts if r["slot_id"] == slot_id)
-
-
-def _spy(mp: pytest.MonkeyPatch, module: Any, name: str, calls: list[str]) -> None:
-    original = getattr(module, name)
-
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        calls.append(name)
-        return original(*args, **kwargs)
-
-    mp.setattr(module, name, wrapper)
-
-
-def _spy_connector(mp: pytest.MonkeyPatch, opened: list[Path]) -> None:
-    original = DuckDBConnector.__init__
-
-    def init(self: DuckDBConnector, config: Any, *args: Any, **kwargs: Any) -> None:
-        opened.append(Path(config.path).resolve())
-        original(self, config, *args, **kwargs)
-
-    mp.setattr(DuckDBConnector, "__init__", init)
-
-
-def _run(harness: SimpleNamespace, root: Path, profile_path: Path) -> SealedRun:
-    sealed_set = _sealed_set()
-    set_dir = root / "neutral"
-    model = ScriptedModel(harness, question_texts(set_dir))
-    output, logs, opened, calls = io.StringIO(), [], [], []
-    sink = logger.add(lambda message: logs.append(str(message)), level="INFO")
-    try:
-        with pytest.MonkeyPatch.context() as mp, redirect_stdout(output), redirect_stderr(output):
-            _spy(mp, runner, "schedule", calls)
-            _spy(mp, runner, "run", calls)
-            _spy_connector(mp, opened)
-            sealed_set.run_sealed_set(profile_path, ARMS, 1, model=model,
-                                      s_provider=stub_s_provider, report=root / "report.md")
-    finally:
-        logger.remove(sink)
-    receipts = [r for path in sorted((set_dir / "sealed").rglob("receipts.jsonl"))
-                for r in read_jsonl(path)]  # fmt: skip
-    return SealedRun(root, set_dir, (root / "report.md").read_text(), receipts,
-                     output.getvalue(), "".join(logs), model, opened, calls)  # fmt: skip
+def _run(harness: SimpleNamespace, root: Path, profile_path: Path,
+         arms: tuple[str, ...] = ARMS) -> SealedRun:  # fmt: skip
+    return run_sealed(_sealed_set(), harness, root, profile_path, arms)
 
 
 @pytest.fixture(scope="module")
@@ -274,6 +236,7 @@ def test_planted_markers_reach_no_stdout_log_or_unsealed_file(
     sealed_run: Callable[[], SealedRun],
 ) -> None:
     run = sealed_run()
+    assert SINK_CANARY in run.logs, "the log sink must see every level from TRACE"
     receipts_text = json.dumps(run.receipts)
     assert ROW_MARKER in receipts_text and SQL_MARKERS[0] in receipts_text
     assert TEXT_MARKER in json.dumps(run.model.calls)
@@ -284,3 +247,104 @@ def test_planted_markers_reach_no_stdout_log_or_unsealed_file(
     leaks = [(name, marker) for name, text in surfaces.items() for marker in MARKERS
              if marker.lower() in text.lower()]  # fmt: skip
     assert leaks == []
+
+
+def test_order_free_is_the_scorers_order_free_verdict_on_every_scored_attempt(
+    sealed_run: Callable[[], SealedRun],
+) -> None:
+    run = sealed_run()
+    near, wide = run.receipt(f"S:{NEAR_MISS}:1"), run.receipt(f"S:{WIDE}:1")
+    assert near["tolerant"] is True and near["order_free"] is False
+    assert wide["order_free"] is True and len(wide["answer"]) < len(_rows_of(run, WIDE, "A"))
+    assert {r["slot_id"]: r["order_free"] for r in run.receipts} == {
+        f"{arm}:{qid}:1": reply.order_free
+        for qid, replies in ARM_REPLIES.items() for arm, reply in replies.items()}
+    scored = Counter(r["question_id"] for r in run.receipts if r["outcome"] in SCORED)
+    asked = Counter(qid for qid, order_free in run.scores if order_free)
+    assert scored and all(asked[qid] >= n for qid, n in scored.items()), (scored, asked)
+
+
+def _rows_of(run: SealedRun, qid: str, author: str) -> list[Any]:
+    path = run.set_dir / "sealed" / "expected_answers.jsonl"
+    return next(r["rows"] for r in read_jsonl(path) if (r["id"], r["author"]) == (qid, author))
+
+
+def test_expected_rows_are_author_as_when_author_b_disagrees(
+    sealed_run: Callable[[], SealedRun],
+) -> None:
+    run = sealed_run()
+    assert _rows_of(run, AUTHOR_SPLIT, "A") != _rows_of(run, AUTHOR_SPLIT, "B")
+    assert (run.receipt(f"A:{AUTHOR_SPLIT}:1")["outcome"],
+            run.receipt(f"A:{AUTHOR_SPLIT}:1")["strict"]) == ("correct", True)  # fmt: skip
+    assert run.receipt(f"S:{AUTHOR_SPLIT}:1")["strict"] is False
+
+
+def test_the_connector_read_returns_column_names_with_the_rows(tmp_path: Path) -> None:
+    assert callable(getattr(Connector, CONNECTOR_READ, None))
+    connector = DuckDBConnector(DuckDBConfig(path=str(write_fixture_database(tmp_path))))
+    try:
+        columns, rows = connector.execute_query_with_columns(
+            "SELECT region_code, count(*) AS customers FROM shop.customer "
+            "GROUP BY region_code ORDER BY region_code")
+    finally:
+        connector.close()
+    assert (list(columns), [tuple(r) for r in rows]) == (
+        ["region_code", "customers"], [("N", 66), ("S", 67), ("W", 67)])
+
+
+def _squash(sql: str) -> str:
+    return "".join(sql.lower().split())
+
+
+def test_every_statement_executes_once_through_the_connector_read(
+    sealed_run: Callable[[], SealedRun],
+) -> None:
+    run = sealed_run()
+    assert len(run.model.replies) == len(run.receipts) == sum(
+        r["sql_executions"] for r in run.receipts)
+    for k, statement in enumerate(run.model.replies, start=1):
+        hits = [sql for after, sql in run.reads
+                if after == k and _squash(statement) in _squash(sql)]  # fmt: skip
+        assert len(hits) == 1, (k, len(hits))
+
+
+def test_a_truncated_expected_record_is_refused_by_id_and_status_word(
+    frozen: Path, harness: SimpleNamespace, tmp_path: Path,
+) -> None:
+    root = tmp_path / "sealed_set"
+    profile_path = materialize(root, frozen)
+    truncate_expected(root / "neutral", WIDE, keep=5)
+
+    run = _run(harness, root, profile_path, arms=("A",))
+
+    assert [r["slot_id"] for r in run.receipts
+            if r["question_id"] == WIDE and r["outcome"] in SCORED] == []  # fmt: skip
+    assert WIDE not in {qid for qid, _ in run.scores}
+    assert run.receipt("A:N01:1")["outcome"] == "correct"
+    assert any(WIDE in line and "refused" in line for line in run.report.splitlines())
+
+
+def test_renamed_question_ids_give_the_same_per_rule_results(
+    sealed_run: Callable[[], SealedRun], frozen: Path, harness: SimpleNamespace, tmp_path: Path,
+) -> None:
+    neutral = sealed_run()
+    root = tmp_path / "sealed_set"
+    profile_path = materialize(root, frozen)
+    renamed = rename_question_ids(root / "neutral")
+    back = {new: old for old, new in renamed.items()}
+
+    decoy = _run(harness, root, profile_path)
+
+    def verdicts(run: SealedRun, to_neutral: dict[str, str]) -> dict[tuple[str, str], Any]:
+        return {(r["arm"], to_neutral.get(r["question_id"], r["question_id"])):
+                (r["outcome"], r["strict"], r.get("order_free")) for r in run.receipts}  # fmt: skip
+
+    assert verdicts(decoy, back) == verdicts(neutral, {})
+    assert report_cells(decoy.report) == {
+        (cell, renamed[key] if cell == "excluded" else key, arm): value
+        for (cell, key, arm), value in report_cells(neutral.report).items()}
+    flags = json.loads((root / "neutral" / "scoring.json").read_text())["questions"]
+    lines = decoy.report.splitlines()
+    assert all(any(qid in line and flag in line for line in lines)
+               for qid, flagged in flags.items() for flag in flagged if flagged[flag] is True)
+    assert not any(old in decoy.report for old in renamed)

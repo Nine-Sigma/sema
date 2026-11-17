@@ -6,17 +6,22 @@ and `reference_sql_b.jsonl` on the connector fixture's DuckDB file. `ARM_REPLIES
 mocked model: per question, the statement each arm writes and what scoring must give it.
 """
 
+import io
 import json
 import shutil
 from collections import defaultdict
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
+import pytest
 import yaml
 
-from showcase.ontology_query_benchmark import freeze
+from sema.connectors.duckdb import DuckDBConnector
+from sema.log import logger
+from showcase.ontology_query_benchmark import freeze, runner, scorer
 from showcase.ontology_query_benchmark.profile import load_profile
 from tests.support.connector_fixture import write_fixture_database
 
@@ -24,6 +29,8 @@ FIXTURES = Path(__file__).parents[2] / "fixtures"
 SEALED_SET_FIXTURE = FIXTURES / "sealed_set"
 TOY_PROFILE = FIXTURES / "ontology_query_benchmark" / "profile.yaml"
 S_CONTEXT_MARK = "S-STUB-CONTEXT"
+CONNECTOR_READ = "execute_query_with_columns"
+SINK_CANARY = "sealed-set-trace-sink-canary"
 # Planted in N10's text, in the mocked statement N10 gets and in the row that statement returns.
 TEXT_MARKER, SQL_MARKERS, ROW_MARKER = "ZQXTEXTMARK", ("zqxsqlmark", "WORXQZ"), "ZQXROW"
 MARKERS = (TEXT_MARKER, *SQL_MARKERS, ROW_MARKER)
@@ -60,6 +67,12 @@ _JAN = ("SELECT count(*) AS transfers FROM shop.transfer WHERE transfer_date >= 
 _COUNTS = "count(DISTINCT c.customer_id) AS customers, count(a.account_id) AS accounts"
 _SWAPPED = "count(a.account_id) AS accounts, count(DISTINCT c.customer_id) AS customers"
 _N10 = f"SELECT reverse('{SQL_MARKERS[1]}') AS {SQL_MARKERS[0]}, count(*) AS n FROM shop.supplier"
+_N13 = ("SELECT product_id, {} FROM shop.order_line WHERE product_id < 9 "
+        "GROUP BY product_id ORDER BY product_id")
+# N12: S is within 1% of the expected count (tolerant, neither strict nor order-free).
+# N13: eight result rows, more than a receipt's answer keeps; S swaps the numeric columns.
+# N14: author B's rows differ from author A's; A writes A's statement, S writes B's.
+NEAR_MISS, WIDE, AUTHOR_SPLIT = "N12", "N13", "N14"
 
 ARM_REPLIES: dict[str, dict[str, Reply]] = {
     "N01": {arm: _right("SELECT count(*) AS customers FROM shop.customer") for arm in "AS"},
@@ -82,6 +95,14 @@ ARM_REPLIES: dict[str, dict[str, Reply]] = {
     # The expected result is empty; scoring.json excludes it from every rate.
     "N11": {"A": _right(_N11.format("l.product_id = 0 AND "), 2),
             "S": _wrong(_N11.format(""), 2)},
+    NEAR_MISS: {"A": _right("SELECT count(*) AS accounts FROM shop.account"),
+                "S": _wrong("SELECT count(*) + 2 AS accounts FROM shop.account")},
+    WIDE: {"A": _right(_N13.format("count(*) AS order_lines, sum(qty) AS total_qty")),
+           "S": _wrong(_N13.format("sum(qty) AS total_qty, count(*) AS order_lines"),
+                       order_free=True)},
+    AUTHOR_SPLIT: {"A": _right("SELECT count(DISTINCT customer_id) AS customers "
+                               "FROM shop.order_header"),
+                   "S": _wrong("SELECT count(customer_id) AS n FROM shop.order_header")},
 }
 
 
@@ -93,6 +114,7 @@ class ScriptedModel:
                  arm: str | None = None) -> None:  # fmt: skip
         self.harness, self.texts, self.arm = harness, texts, arm
         self.calls: list[list[dict[str, Any]]] = []
+        self.replies: list[str] = []
 
     def complete(self, messages: list[dict[str, Any]]) -> Any:
         self.calls.append(messages)
@@ -100,7 +122,8 @@ class ScriptedModel:
         qid = max((q for q, text in self.texts.items() if text in prompt),
                   key=lambda q: len(self.texts[q]))  # fmt: skip
         arm = self.arm or ("S" if S_CONTEXT_MARK in prompt else "A")
-        reply = f"```sql\n{ARM_REPLIES[qid][arm].sql}\n```"
+        self.replies.append(ARM_REPLIES[qid][arm].sql)
+        reply = f"```sql\n{self.replies[-1]}\n```"
         return self.harness.models.Generation(reply, 900, 40, 0.01)
 
 
@@ -134,6 +157,32 @@ def materialize(root: Path, frozen: Path) -> Path:
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
+    path.write_text("".join(json.dumps(r) + "\n" for r in records))
+
+
+def rename_question_ids(set_dir: Path) -> dict[str, str]:
+    """Rewrite every question id in the set's files and `scoring.json`; return old -> new.
+    New ids run in reverse, so no old id survives and none keeps its position."""
+    sealed = set_dir / "sealed"
+    ids = [q["id"] for q in read_jsonl(sealed / "questions.jsonl")]
+    renamed = {old: f"D{len(ids) - i:02d}x" for i, old in enumerate(ids)}
+    for path in sealed.glob("*.jsonl"):
+        write_jsonl(path, [{**r, "id": renamed[r["id"]]} for r in read_jsonl(path)])
+    scoring = json.loads((set_dir / "scoring.json").read_text())
+    scoring["questions"] = {renamed[q]: flags for q, flags in scoring["questions"].items()}
+    (set_dir / "scoring.json").write_text(json.dumps(scoring))
+    return renamed
+
+
+def truncate_expected(set_dir: Path, qid: str, keep: int) -> None:
+    """Author A's record of `qid` keeps its first `keep` rows and says it was cut."""
+    path = set_dir / "sealed" / "expected_answers.jsonl"
+    write_jsonl(path, [{**r, "rows": r["rows"][:keep], "rows_truncated": True}
+                       if (r["id"], r["author"]) == (qid, "A") else r
+                       for r in read_jsonl(path)])  # fmt: skip
 
 
 def question_texts(set_dir: Path) -> dict[str, str]:
@@ -170,3 +219,92 @@ def report_cells(report: str) -> dict[tuple[str, str, str], tuple]:
             cell, key, arm, strict, order_free, n, rate = parts
             cells[(cell, key, arm)] = (int(strict), int(order_free), int(n), rate)
     return cells
+
+
+@dataclass(frozen=True)
+class SealedRun:
+    root: Path
+    set_dir: Path
+    report: str
+    receipts: list[dict[str, Any]]
+    output: str
+    logs: str
+    model: ScriptedModel
+    opened: list[Path]
+    calls: list[str]
+    scores: list[tuple[str, bool]]
+    reads: list[tuple[int, str]]
+
+    def receipt(self, slot_id: str) -> dict[str, Any]:
+        return next(r for r in self.receipts if r["slot_id"] == slot_id)
+
+
+def _spy(mp: pytest.MonkeyPatch, module: Any, name: str, calls: list[str]) -> None:
+    original = getattr(module, name)
+
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        calls.append(name)
+        return original(*args, **kwargs)
+
+    mp.setattr(module, name, wrapper)
+
+
+def _spy_connector(mp: pytest.MonkeyPatch, opened: list[Path]) -> None:
+    original = DuckDBConnector.__init__
+
+    def init(self: DuckDBConnector, config: Any, *args: Any, **kwargs: Any) -> None:
+        opened.append(Path(config.path).resolve())
+        original(self, config, *args, **kwargs)
+
+    mp.setattr(DuckDBConnector, "__init__", init)
+
+
+def _spy_scores(mp: pytest.MonkeyPatch, scores: list[tuple[str, bool]]) -> None:
+    """Each `scorer.score` call: the contract's question id and whether it was order-free."""
+    original = scorer.score
+
+    def score(*args: Any, **kwargs: Any) -> Any:
+        contract = args[0] if args else kwargs["contract"]
+        scores.append((contract.question_id, bool(kwargs.get("order_free"))))
+        return original(*args, **kwargs)
+
+    mp.setattr(scorer, "score", score)
+
+
+def _spy_reads(mp: pytest.MonkeyPatch, model: ScriptedModel, reads: list[tuple[int, str]]) -> None:
+    """Each connector read, with the number of model calls made before it."""
+    original = getattr(DuckDBConnector, CONNECTOR_READ, None)
+    if original is None:
+        return
+
+    def read(self: DuckDBConnector, query: str, *args: Any, **kwargs: Any) -> Any:
+        reads.append((len(model.calls), str(query)))
+        return original(self, query, *args, **kwargs)
+
+    mp.setattr(DuckDBConnector, CONNECTOR_READ, read)
+
+
+def run_sealed(sealed_set: ModuleType, harness: SimpleNamespace, root: Path, profile_path: Path,
+               arms: tuple[str, ...]) -> SealedRun:  # fmt: skip
+    """One `run_sealed_set` call with the stub S provider, every surface captured."""
+    set_dir = root / "neutral"
+    model = ScriptedModel(harness, question_texts(SEALED_SET_FIXTURE / "neutral"))
+    output, logs, opened, calls, scores, reads = io.StringIO(), [], [], [], [], []
+    sink = logger.add(lambda message: logs.append(str(message)), level="TRACE")
+    logger.trace(SINK_CANARY)
+    try:
+        with pytest.MonkeyPatch.context() as mp, redirect_stdout(output), redirect_stderr(output):
+            _spy(mp, runner, "schedule", calls)
+            _spy(mp, runner, "run", calls)
+            _spy_connector(mp, opened)
+            _spy_scores(mp, scores)
+            _spy_reads(mp, model, reads)
+            sealed_set.run_sealed_set(profile_path, arms, 1, model=model,
+                                      s_provider=stub_s_provider, report=root / "report.md")
+    finally:
+        logger.remove(sink)
+    receipts = [r for path in sorted((set_dir / "sealed").rglob("receipts.jsonl"))
+                for r in read_jsonl(path)]  # fmt: skip
+    return SealedRun(root, set_dir, (root / "report.md").read_text(), receipts,
+                     output.getvalue(), "".join(logs), model, opened, calls, scores,
+                     reads)  # fmt: skip

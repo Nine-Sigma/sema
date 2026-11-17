@@ -9,6 +9,11 @@ renderer, without the core prompt frame or the question. These tests pass `embed
 so retrieval reaches the context through the lexical path alone: the question's tokens
 match entity and property names in the graph. The mocked statement then executes through
 the DuckDB connector inside `sealed_set.run_sealed_set`, and the attempt is scored.
+
+The provider's text is exactly `"\\n".join(prompting.render_sections(sco, dialect))` for
+`sco = prune_to_sco(RetrievalEngine(driver, embedder=None).retrieve(question))` and the
+DuckDB dialect: `render_sections(sco, dialect) -> list[str]` is the part of
+`build_sql_prompt` between its frame and its rules, shared by both.
 """
 
 from __future__ import annotations
@@ -22,8 +27,12 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
+from sema.connectors.duckdb import DuckDBConnector
+from sema.consumers.nl2sql import prompting
 from sema.models.config import Neo4jConfig
+from sema.pipeline.context import prune_to_sco
 from sema.pipeline.orchestrate import run_build
+from sema.pipeline.retrieval import RetrievalEngine
 from showcase.ontology_query_benchmark import runner_utils
 from showcase.ontology_query_benchmark.profile import load_profile
 from tests.support.connector_fixture import (
@@ -46,6 +55,7 @@ pytestmark = pytest.mark.integration
 QUESTION = "How many customer records are there?"
 CUSTOMER_TABLE, CUSTOMER_COLUMN = "fixcat.shop.customer", "customer_name"
 CORE_FRAME = "You are a SQL expert"
+NOT_SECTIONS = (CORE_FRAME, "RULES:", "Return ONLY the SQL query", "SEMA CONTEXT")
 
 
 def _module(name: str) -> ModuleType:
@@ -98,6 +108,20 @@ def test_the_core_path_gives_arm_s_a_context_without_the_core_frame(built: Any) 
     assert context.identity
 
 
+def test_the_provider_text_is_the_core_sections_for_the_same_sco(built: Any) -> None:
+    provider = _module("core_s_provider").CoreSContextProvider(built, embedder=None)
+    dialect = DuckDBConnector.sql_dialect
+
+    context = provider(QUESTION, lambda _name: False)
+
+    sco = prune_to_sco(RetrievalEngine(built, embedder=None).retrieve(QUESTION))
+    sections = "\n".join(prompting.render_sections(sco, dialect))
+    assert CUSTOMER_TABLE in sections
+    assert context.text == sections
+    assert sections in prompting.build_sql_prompt(sco, QUESTION, dialect, max_chars=10**6)
+    assert [part for part in (*NOT_SECTIONS, QUESTION) if part in context.text] == []
+
+
 def test_a_denied_column_never_reaches_the_core_context(built: Any) -> None:
     provider = _module("core_s_provider").CoreSContextProvider(built, embedder=None)
 
@@ -112,9 +136,15 @@ def test_arm_s_executes_the_mocked_statement_through_the_connector_and_is_scored
     set_dir = profile_path.parent / "neutral"
     provider = _module("core_s_provider").CoreSContextProvider(built, embedder=None)
     model = ScriptedModel(harness, question_texts(set_dir), arm="S")
+    supplied: list[Any] = []
+
+    def recording_provider(question: str, is_denied: Any) -> Any:
+        supplied.append(provider(question, is_denied))
+        return supplied[-1]
 
     _module("sealed_set").run_sealed_set(profile_path, ("S",), 1, model=model,
-                                         s_provider=provider, report=tmp_path / "report.md")
+                                         s_provider=recording_provider,
+                                         report=tmp_path / "report.md")
 
     paths = (set_dir / "sealed").rglob("receipts.jsonl")
     receipts = [r for path in paths for r in read_jsonl(path)]
@@ -125,3 +155,7 @@ def test_arm_s_executes_the_mocked_statement_through_the_connector_and_is_scored
     assert {(r["generation_calls"], r["sql_executions"]) for r in receipts} == {(1, 1)}
     assert all(r["context_identity"] for r in receipts)
     assert (tmp_path / "report.md").read_text().strip()
+    prompts = ["\n".join(str(m.get("content") or "") for m in call) for call in model.calls]
+    assert len(supplied) == len(prompts) == len(receipts) and any(c.text for c in supplied)
+    assert all(context.text in prompt for context, prompt in zip(supplied, prompts, strict=True))
+    assert sorted(r["context_identity"] for r in receipts) == sorted(c.identity for c in supplied)

@@ -9,3 +9,6 @@
 {"id": "N09", "sql": "SELECT count(*) AS order_lines FROM shop.order_line l JOIN shop.order_header o ON o.order_id = l.order_id JOIN shop.customer c ON c.customer_id = o.customer_id WHERE c.region_code = 'W'"}
 {"id": "N10", "sql": "SELECT 'ZQXROW' AS tag, count(*) AS suppliers FROM shop.supplier"}
 {"id": "N11", "sql": "SELECT DISTINCT c.customer_id FROM shop.order_line l JOIN shop.order_header o ON o.order_id = l.order_id JOIN shop.customer c ON c.customer_id = o.customer_id WHERE l.product_id = 0 AND c.region_code = 'N' ORDER BY c.customer_id"}
+{"id": "N12", "sql": "SELECT count(*) AS accounts FROM shop.account"}
+{"id": "N13", "sql": "SELECT product_id, count(*) AS order_lines, sum(qty) AS total_qty FROM shop.order_line WHERE product_id < 9 GROUP BY product_id ORDER BY product_id"}
+{"id": "N14", "sql": "SELECT count(DISTINCT customer_id) AS customers FROM shop.order_header"}
