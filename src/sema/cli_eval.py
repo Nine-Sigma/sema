@@ -159,7 +159,7 @@ def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> N
     connector = resolve_connector_factory(config).create()
     driver = _get_neo4j_driver(config.neo4j)
     try:
-        produced = facts_from_graph(driver)
+        produced = facts_from_graph(driver, config.catalog, config.schemas)
     finally:
         driver.close()
     oracle = (

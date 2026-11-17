@@ -19,9 +19,13 @@ from sema.log import logger
 from sema.models.extraction import ExtractedForeignKey
 
 COLUMN_SEPARATOR = "+"
-# Map access, so a graph where no join has a cardinality yet raises no unknown-key warning.
+# Only the build's join writer (`batch_upsert_join_paths`) sets `status`; the target loader's
+# does not. Map access, so a graph where no join has a cardinality raises no unknown-key warning.
 GRAPH_JOINS = (
-    "MATCH (jp:JoinPath) "
+    "MATCH (jp:JoinPath {status: 'ACTIVE'}) "
+    "WHERE ($schemas IS NULL OR jp.source_schema IN $schemas) "
+    "AND ($catalog IS NULL OR EXISTS { "
+    "MATCH (jp)-[:USES]->(:Table {catalog: $catalog, schema_name: jp.source_schema}) }) "
     "RETURN jp.join_predicates AS predicates, properties(jp).cardinality_hint AS cardinality"
 )
 
@@ -75,6 +79,15 @@ def unique_keys(rows: Iterable[tuple[Any, ...]]) -> set[Key]:
     return {(table.lower(), columns_key(names)) for (table, _), names in columns.items()}
 
 
+def duplicate_count_query(catalog: str, column: tuple[str, str, str]) -> str:
+    """Non-null values of one (schema, table, column) beyond the first of each value."""
+    schema, table, name = column
+    return (
+        f"SELECT COUNT(`{name}`) - COUNT(DISTINCT `{name}`) "
+        f"FROM `{catalog}`.`{schema}`.`{table}`"
+    )
+
+
 def orphan_count_query(
     catalog: str, referencing: tuple[str, str, str], referenced: tuple[str, str, str],
 ) -> str:
@@ -92,7 +105,8 @@ def orphan_count_query(
 def join_holds(
     connector: Connector, catalog: str, tables: Mapping[str, tuple[str, str]], key: Key,
 ) -> bool:
-    """Whether every referencing value of a one-column join occurs on the referenced side.
+    """Whether a one-column join's referenced column is unique on the data and holds every
+    non-NULL referencing value.
 
     shortcut: a composite key's columns are stored sorted, not paired, so a composite join is
     never rechecked; upgrade when the fact keeps its column pairs.
@@ -100,15 +114,17 @@ def join_holds(
     relation, columns, referenced, referenced_columns = key
     if COLUMN_SEPARATOR in columns or relation not in tables or referenced not in tables:
         return False
-    query = orphan_count_query(
-        catalog, (*tables[relation], columns), (*tables[referenced], referenced_columns),
+    referenced_column = (*tables[referenced], referenced_columns)
+    queries = (
+        duplicate_count_query(catalog, referenced_column),
+        orphan_count_query(catalog, (*tables[relation], columns), referenced_column),
     )
     try:
-        rows = connector.execute_query(query)
+        counts = [connector.execute_query(query) for query in queries]
     except Exception as exc:  # each connector raises its own driver's error type
         logger.warning("Join recheck on {} failed: {}", key, exc)
         return False
-    return bool(rows) and int(rows[0][0]) == 0
+    return all(rows and int(rows[0][0]) == 0 for rows in counts)
 
 
 def read_oracle(path: Path, kinds: Iterable[str]) -> dict[str, Cells]:

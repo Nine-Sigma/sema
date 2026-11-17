@@ -96,10 +96,13 @@ def _cells(row: KindRow) -> tuple[str, ...]:
     return (produced, *(str(getattr(row.score, v)) for v in VERDICTS), str(row.rechecked))
 
 
-def facts_from_graph(driver: Any) -> dict[str, Cells]:
-    """The graph's facts in oracle keys; a join with no recorded cardinality is key-only."""
+def facts_from_graph(
+    driver: Any, catalog: str | None = None, schemas: list[str] | None = None,
+) -> dict[str, Cells]:
+    """The build's facts for the catalog and schemas, in oracle keys; no schemas means every
+    schema of the catalog. A join with no recorded cardinality is key-only."""
     with driver.session() as session:
-        records = list(session.run(GRAPH_JOINS))
+        records = list(session.run(GRAPH_JOINS, catalog=catalog, schemas=schemas or None))
     return {JOIN: {
         graph_join_key(record["predicates"]): record["cardinality"] or KEY_ONLY
         for record in records
