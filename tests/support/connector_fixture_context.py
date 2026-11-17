@@ -72,6 +72,12 @@ PROPERTY_SCORES: dict[str, dict[CaseColumn, float]] = {
     NAMED_TERM_QUESTION: {DEFINED_COLUMN: 0.93, NAMED_COLUMN: 0.71},
     DEFINITION_ONLY_QUESTION: {DEFINED_COLUMN: 0.88, NAMED_COLUMN: 0.40},
 }
+ENTITY_HITS: dict[str, tuple[str, ...]] = {
+    NAMED_TERM_QUESTION: (NAMED_COLUMN.table, DEFINED_COLUMN.table),
+}
+# One score for every entity hit, so no score gate keeps one relation and drops another.
+ENTITY_SCORE = 0.8
+CLOSEST_SCORE = 0.95
 
 RESULT_COLUMNS = ("region_code", "customer_count")
 SHAPE_QUESTION = "How many customers are in each region?"
@@ -225,17 +231,23 @@ def case_engine(graph: CaseGraph) -> RetrievalEngine:
 
 
 def hierarchy_graph() -> CaseGraph:
-    """The goods hierarchy, whose nearest term to any question is a leaf of it."""
+    """The goods hierarchy, whose nearest term to any question is a leaf of it.
+
+    The leaf is the closest hit of any index, above the entity hit the context must keep, so no
+    vector-score cutoff drops it: only whether the question names a concept of it can.
+    """
     nearest = next(t for t in GOODS_TERMS if t.parent)
-    return CaseGraph({TERM_INDEX: [(term_node(nearest), 0.41)],
-                      ENTITY_INDEX: [(entity_node("transfer"), 0.8)]})
+    return CaseGraph({TERM_INDEX: [(term_node(nearest), CLOSEST_SCORE)],
+                      ENTITY_INDEX: [(entity_node("transfer"), ENTITY_SCORE)]})
 
 
 def ranking_graph(question: str) -> CaseGraph:
     """Two columns a question term can bind to, scored by how close each definition is."""
     hits = [(property_node(c.table, c.column), score)
             for c, score in PROPERTY_SCORES[question].items()]
-    return CaseGraph({PROPERTY_INDEX: sorted(hits, key=lambda hit: -hit[1])})
+    entities = [(entity_node(table), ENTITY_SCORE) for table in ENTITY_HITS.get(question, ())]
+    return CaseGraph({PROPERTY_INDEX: sorted(hits, key=lambda hit: -hit[1]),
+                      ENTITY_INDEX: entities})
 
 
 def lines_naming(text: str, token: str) -> list[str]:

@@ -115,6 +115,11 @@ def test_d2_decoy_a_value_with_no_label_renders_its_code_and_says_so() -> None:
 def test_d3_a_named_column_ranks_before_a_column_whose_definition_is_closer() -> None:
     text = _context(ranking_graph(NAMED_TERM_QUESTION), NAMED_TERM_QUESTION)
 
+    for column in (NAMED_COLUMN, DEFINED_COLUMN):
+        assert lines_naming(text, column.column), f"{column.column} is not in the context"
+    reversed_ = [x for x in text.splitlines()
+                 if ranks_before_alternative(x, DEFINED_COLUMN.column, NAMED_COLUMN.column)]
+    assert reversed_ == []
     ranked = [x for x in text.splitlines()
               if ranks_before_alternative(x, NAMED_COLUMN.column, DEFINED_COLUMN.column)]
     assert ranked, text
