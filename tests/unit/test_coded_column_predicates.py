@@ -1,10 +1,13 @@
 """The containment predicate and the data-shape nominator for coded columns.
 
-Both are properties of any source. `CONTAINMENT_FLOOR` is the least share of a column's
-distinct non-null values, and of its non-null rows, that a value set must list before
-other evidence can verify the binding: a code list may miss a legacy code, never most of
-the column. `LOW_CARDINALITY_BOUND` is the most distinct values a column may hold and still
-be nominated as coded by its data alone: past it the column is an identifier or a measure.
+Both are properties of any source. The floor is the join detector's `COVERAGE_THRESHOLD`
+(0.8): the least share of a column's distinct non-null values, and of its non-null rows, that
+a value set must list before other evidence can verify the binding, the same share the
+detector already asks of a foreign key: a code list may miss a legacy code, never most of the
+column. `LOW_CARDINALITY_BOUND` is the profiler's categorical threshold: the most distinct
+values a coded column may hold, and the most rows a code relation may hold, on every
+nomination route. Past it the column is an identifier or a measure, and the relation an
+entity, not a code list.
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from __future__ import annotations
 import pytest
 
 from sema.engine import join_detector_utils as detector
+from sema.models.config import ProfilingConfig
 from sema.models.extraction import ExtractedColumn
 
 pytestmark = pytest.mark.unit
@@ -20,9 +24,10 @@ SCHEMA = "s"
 Profiles = dict[tuple[str, str, str], tuple[int, int]]
 
 
-def test_the_floor_and_the_bound_are_fixed() -> None:
-    assert detector.CONTAINMENT_FLOOR == 0.8
-    assert detector.LOW_CARDINALITY_BOUND == 1000
+def test_the_bound_is_the_profilers_categorical_threshold() -> None:
+    assert detector.LOW_CARDINALITY_BOUND == (
+        ProfilingConfig.model_fields["categorical_threshold"].default
+    )
 
 
 def test_every_observed_value_listed() -> None:
@@ -116,13 +121,22 @@ def test_a_low_distinct_column_is_nominated_against_a_small_labelled_key_without
     assert NOMINATED in _pairs(*_shape())
 
 
-def test_the_bound_is_inclusive() -> None:
-    assert NOMINATED in _pairs(*_shape(
-        coded_distinct=detector.LOW_CARDINALITY_BOUND, key_rows=2000, key_distinct=2000,
-    ))
+def test_the_bound_is_inclusive_for_the_column_and_the_code_relation() -> None:
+    bound = detector.LOW_CARDINALITY_BOUND
+    assert NOMINATED in _pairs(*_shape(coded_distinct=bound, key_rows=bound, key_distinct=bound))
+
+
+def test_a_column_one_past_the_bound_is_not_nominated() -> None:
+    bound = detector.LOW_CARDINALITY_BOUND
     assert NOMINATED not in _pairs(*_shape(
-        coded_distinct=detector.LOW_CARDINALITY_BOUND + 1, key_rows=2000, key_distinct=2000,
+        coded_distinct=bound + 1, key_rows=bound, key_distinct=bound,
     ))
+
+
+def test_a_code_relation_one_past_the_bound_is_not_a_code_relation() -> None:
+    bound = detector.LOW_CARDINALITY_BOUND
+    assert NOMINATED in _pairs(*_shape(key_rows=bound, key_distinct=bound))
+    assert NOMINATED not in _pairs(*_shape(key_rows=bound + 1, key_distinct=bound + 1))
 
 
 def test_a_key_with_duplicates_or_nulls_is_not_a_code_relation() -> None:

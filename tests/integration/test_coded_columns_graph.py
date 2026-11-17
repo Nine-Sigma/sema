@@ -1,8 +1,7 @@
 """Done-when 1: coded columns, value sets and labels in the graph the build writes.
 
-The coded fixture is built through the DuckDB connector with the dictionary's concept spec,
-the model mocked and embeddings skipped. Every expected number is derived from the fixture's
-rows. One test per case or decoy, so a red run names each one that fails.
+Built through the DuckDB connector with the dictionary's concept spec, model mocked, no
+embeddings. Expected numbers come from the fixture's rows; one test per case or decoy.
 """
 
 from __future__ import annotations
@@ -28,8 +27,11 @@ from tests.support.connector_fixture_codes import (
     CODE_LISTS,
     CODES_CATALOG,
     CODES_SCHEMA,
+    CREW,
     FINISH,
+    GLAZE,
     GRIT,
+    SHEEN,
     SHIFT_SLOT,
     TONE_NAMES,
     UNPLACED_PROPERTY,
@@ -87,6 +89,13 @@ class Graph:
 
     def containment(self, column: Column) -> list[Evidence]:
         return [e for e in self.evidence_of(column) if e.kind == "containment"]
+
+    def objects(self, column: Column, kind: str) -> set[str | None]:
+        return {e.object_ref for e in self.evidence_of(column) if e.kind == kind}
+
+    def verified_labels(self, column: Column) -> list[tuple[Column, dict[str, Any]]]:
+        return [(label, props) for label, props in self.labeled_by.get(column, [])
+                if props.get("verification") == "verified"]
 
 
 def _payload(raw: Any) -> dict[str, Any]:
@@ -206,10 +215,6 @@ def _one_verified(graph: Graph, column: Column, listed: Collection[object]) -> L
     return links[0]
 
 
-def _labeled_by(graph: Graph, column: Column) -> list[tuple[Column, dict[str, Any]]]:
-    return graph.labeled_by.get(column, [])
-
-
 def test_the_build_reads_the_dictionary() -> None:
     assert DICTIONARY_FIELDS <= set(BuildConfig.model_fields), "the build takes no concept spec"
 
@@ -218,9 +223,8 @@ def test_sibling_label_by_declared_key(graph: Graph) -> None:
     column = ("fitting", "tone_code")
     link = _one_verified(graph.built(), column, TONE_NAMES)
     assert link.members == _members(column, dict(TONE_NAMES))
-    ((label_column, props),) = _labeled_by(graph, column)
+    ((label_column, props),) = graph.verified_labels(column)
     assert label_column == ("fitting", "tone_name")
-    assert props.get("verification") == "verified"
     assert props.get("violation_rate") == 0.0
     assert not props.get("via")
     assert {"declared_key", "containment"} <= graph.kinds(column)
@@ -232,9 +236,8 @@ def test_label_relation_by_join_counts_nulls(graph: Graph) -> None:
     assert link.props["null_rows"] == 250
     assert link.members == _members(column, dict(FINISH))
     assert link.members["POL"] == ("Polished", 0, True)
-    ((label_column, props),) = _labeled_by(graph, column)
+    ((label_column, props),) = graph.verified_labels(column)
     assert label_column == ("finish", "finish_label")
-    assert props.get("verification") == "verified"
     assert props.get("violation_rate") == 0.0
     via = props.get("via") or []
     assert via and all({"panel", "finish"} <= graph.join_paths.get(name, set()) for name in via)
@@ -245,9 +248,9 @@ def test_dictionary_only_label_by_stated_domain_counts_unlisted_values(graph: Gr
     column = ("panel", "coat_kind")
     link = _one_verified(graph.built(), column, CODE_LISTS["coat_kinds"])
     assert link.members == _members(column, dict(CODE_LISTS["coat_kinds"]))
-    assert link.members["CK-Z"] == (None, 50, False)
+    assert link.members["CK-Z"] == (None, column_values(*column).count("CK-Z"), False)
     assert link.members["CK-F"] == ("Anodised", 0, True)
-    assert _labeled_by(graph, column) == []
+    assert graph.verified_labels(column) == []
     assert {"stated_domain", "containment"} <= graph.kinds(column)
 
 
@@ -259,14 +262,29 @@ def test_data_only_containment_stays_unverified_with_its_numbers(graph: Graph) -
     expected = _coverage(column, SHIFT_SLOT)
     assert any({k: link.props.get(k) for k in expected} == expected for link in links)
     assert "containment" in graph.kinds(column)
+    assert not {"declared_key", "stated_domain", "name_match"} & graph.kinds(column)
+
+
+def test_a_name_match_the_data_agrees_with_verifies(graph: Graph) -> None:
+    column = ("fitting", "glaze_code")
+    _one_verified(graph.built(), column, GLAZE)
+    assert {"name_match", "containment"} <= graph.kinds(column)
     assert not {"declared_key", "stated_domain"} & graph.kinds(column)
+    assert graph.objects(column, "name_match") == {graph.refs[("glaze", "glaze_code")]}
 
 
 def test_several_text_columns_link_with_the_label_unset(graph: Graph) -> None:
     column = ("panel", "grit_code")
     link = _one_verified(graph.built(), column, GRIT)
     assert link.members == _members(column, dict.fromkeys(GRIT))
-    assert _labeled_by(graph, column) == []
+    assert graph.verified_labels(column) == []
+
+
+def test_two_determined_sibling_columns_leave_the_label_unset(graph: Graph) -> None:
+    column = ("fitting", "sheen_code")
+    link = _one_verified(graph.built(), column, SHEEN)
+    assert link.members == _members(column, dict.fromkeys(SHEEN))
+    assert graph.verified_labels(column) == []
 
 
 @pytest.mark.parametrize(
@@ -281,9 +299,15 @@ def test_a_name_alike_column_outside_the_value_set_does_not_link(
     assert graph.verified(decoy) == []
 
 
+def test_a_name_match_the_data_refutes_does_not_link(graph: Graph) -> None:
+    column = ("fitting", "grit_code")
+    assert graph.built().objects(column, "name_match") == {graph.refs[("grit", "grit_code")]}
+    assert graph.verified(column) == []
+
+
 @pytest.mark.parametrize(
     ("column", "vocabulary", "share"),
-    [(("panel", "trim"), "trim_kinds", 1 / 6), (("fitting", "coat_kind"), "coat_kinds", 6 / 10)],
+    [(("panel", "trim"), "trim_kinds", 1 / 7), (("fitting", "coat_kind"), "coat_kinds", 6 / 10)],
 )
 def test_a_stated_domain_below_the_floor_stays_unverified_with_its_numbers(
     graph: Graph, column: Column, vocabulary: str, share: float,
@@ -304,16 +328,48 @@ def test_coincidental_containment_stays_unverified(graph: Graph) -> None:
 def test_a_tie_stays_unverified_with_both_alternatives(graph: Graph) -> None:
     column = ("panel", "rack_no")
     assert graph.built().verified(column) == []
+    alternatives = {graph.refs[("rack", "rack_no")], graph.refs[("rack_spare", "rack_no")]}
     full = {e.object_ref for e in graph.containment(column)
             if e.payload.get("listed_value_share") == 1.0}
-    assert {graph.refs[("rack", "rack_no")], graph.refs[("rack_spare", "rack_no")]} <= full
+    assert alternatives <= full
+    assert alternatives <= graph.objects(column, "name_match")
+
+
+def test_a_column_and_a_code_relation_at_the_bound_link(graph: Graph) -> None:
+    _one_verified(graph.built(), ("panel", "crew_ref"), CREW)
+    assert {"name_match", "containment"} <= graph.kinds(("panel", "crew_ref"))
 
 
 def test_a_column_past_the_cardinality_bound_is_not_nominated(graph: Graph) -> None:
     column = ("panel", "assigned_crew")
     assert graph.built().containment(("panel", "crew_size")), "the nominator never ran"
+    assert graph.verified(("panel", "crew_ref")), "the relation at the bound never linked"
     assert graph.links.get(column, []) == []
     assert graph.containment(column) == []
+
+
+def test_a_declared_key_to_a_relation_past_the_bound_is_no_value_set(graph: Graph) -> None:
+    assert graph.built().verified(("panel", "finish_code")), "no declared key linked"
+    assert graph.links.get(("panel", "pallet_no"), []) == []
+
+
+@pytest.mark.parametrize(
+    ("column", "vocabulary"),
+    [(("panel", "seal_kind"), "seal_kinds"), (("fitting", "seal_kind"), "seal_kinds"),
+     (("panel", "bevel_kind"), "bevel_kinds")],
+)
+def test_a_stated_domain_lands_on_each_normalized_name_match(
+    graph: Graph, column: Column, vocabulary: str,
+) -> None:
+    link = _one_verified(graph.built(), column, CODE_LISTS[vocabulary])
+    assert link.members == _members(column, dict(CODE_LISTS[vocabulary]))
+    assert {"stated_domain", "containment"} <= graph.kinds(column)
+
+
+def test_an_entity_naming_a_table_limits_placement_to_it(graph: Graph) -> None:
+    assert "stated_domain" in graph.built().kinds(("panel", "trim"))
+    assert "stated_domain" not in graph.kinds(("fitting", "trim"))
+    assert graph.verified(("fitting", "trim")) == []
 
 
 def test_an_unmatched_stated_domain_is_listed_as_unplaced(graph: Graph) -> None:
