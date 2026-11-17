@@ -5,7 +5,9 @@ The build runs with the model mocked and embeddings skipped, over the fixture's 
 catalog, schemas)` reads the constraints the DuckDB connector declares, each as `Cells` per
 fact kind keyed as the oracle file format keys them. The fixture's shape: the graph holds
 every declared key and every detected join, twelve joins in all, none with a cardinality; the
-connector declares six keys, none on columns declared unique, so each is `many_to_one`.
+connector declares six keys, none on columns declared unique, so each is `many_to_one`. The
+coded fixture, built with its dictionary, is scored on the coded-column kinds against its
+claims (`coded_claims`).
 """
 
 from __future__ import annotations
@@ -57,11 +59,11 @@ from tests.support.connector_fixture_codes import (
     write_dictionary,
 )
 from tests.support.connector_fixture_scorecard import (
-    CODED_CLAIMS,
     DECLARED_JOIN_KEYS,
     DECLARED_JOIN_VALUES,
     DETECTED_JOIN_KEYS,
     card_rows,
+    coded_claims,
     join_key,
 )
 
@@ -75,6 +77,7 @@ KEY_ONLY = "key_only"
 # The graph records no cardinality, so every produced join is key_only, and key_only is equal
 # to an oracle claim on the same key whatever the oracle's cardinality.
 JOIN_SHAPE = {"produced": 12, "equal": 6, "missing": 0, "wrong": 0, "extra": 6}
+CODED_CLAIMS = coded_claims()
 
 
 def _scorecard() -> Any:

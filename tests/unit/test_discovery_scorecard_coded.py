@@ -30,18 +30,19 @@ from tests.support.connector_fixture_codes import (
 )
 from tests.support.connector_fixture_scorecard import (
     BINDING_CLAIMS,
-    CODED_CLAIMS,
     COVERAGE_CLAIMS,
-    DICTIONARY_ONLY,
-    LABEL_CLAIMS,
     Key,
     card_rows,
+    coded_claims,
     listed_codes,
     present_values,
 )
 
 pytestmark = pytest.mark.unit
 
+CODED_CLAIMS = coded_claims()
+LABEL_CLAIMS = CODED_CLAIMS["label_source"]
+DICTIONARY_ONLY = "dictionary_only"
 VERIFIED, UNVERIFIED = "verified", "unverified"
 # Decoys the build leaves unverified: data-only containment, containment by chance, a tie.
 UNVERIFIED_DECOYS = {("panel", "shift"): "shift_slot", ("panel", "crew_size"): "bay",
