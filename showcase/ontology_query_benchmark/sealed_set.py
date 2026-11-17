@@ -58,8 +58,9 @@ def run_sealed_set(profile_path: Path, arms: Sequence[str], repetitions: int, *,
         layout = su.source_layout(connector, run_dir, profile.harness.package, profile.knobs)
         executors = {arm: ConnectorExecutor(harness, connector, profile.limits.statement_timeout_s)
                      for arm in arms}  # fmt: skip
-        runtimes = ru.arm_runtimes(harness, run_dir, layout, executors, s_provider,
-                                   profile.limits, profile.knobs)  # fmt: skip
+        runtimes = su.in_dialect(harness, ru.arm_runtimes(
+            harness, run_dir, layout, executors, s_provider, profile.limits, profile.knobs,
+        ), connector.sql_dialect)  # fmt: skip
         summary = runner.run(slots, su.harness_questions(harness, sealed_set), runtimes, model,
                              su.contracts(sealed_set), harness, settings,
                              run_dir / "receipts.jsonl", pins={}, read_version=_unpinned)

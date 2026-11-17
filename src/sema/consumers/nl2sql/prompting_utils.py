@@ -261,6 +261,13 @@ def _add_dialect_notes(
         parts.append(
             "- String comparisons are case-sensitive"
         )
+    elif dialect == "duckdb":
+        parts.append("\nDIALECT NOTES (DuckDB SQL):")
+        parts.append("- Use the table names as listed: catalog.schema.table")
+        parts.append(
+            "- Use double quotes for an identifier that is a reserved word "
+            "or holds a character other than letters, digits or underscores"
+        )
     else:
         parts.append("\nDIALECT NOTES (ANSI SQL):")
         parts.append(

@@ -6,12 +6,13 @@ inside `sealed/`. The report prints ids, class names, counts and status words, n
 question, a statement or a row.
 """
 
+import dataclasses
 import datetime as dt
 import json
 import math
 import re
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -144,6 +145,44 @@ def _top_values(connector: Connector, item: Any, columns: Sequence[Any],
             found[column.name] = {"values": [[v["value"], v["frequency"]] for v in top.values],
                                   "distinct": top.approx_distinct}  # fmt: skip
     return found
+
+
+class DialectFrame:
+    """An arm's context builder whose frame names the executor's dialect and no other.
+
+    The harness frames both arms in its own dialect; the connector runs statements as
+    written, so the frame's dialect field and its leading note name the connector's
+    dialect and identifier quote, and the harness's own dialect note, if any, is dropped.
+    """
+
+    def __init__(self, harness: SimpleNamespace, context: Callable[[str], Any],
+                 dialect: str | None) -> None:  # fmt: skip
+        sql = sqlglot.Dialect.get_or_raise(dialect)
+        quote, self.name = sql.IDENTIFIER_START, f"{type(sql).__name__} SQL"
+        self.note = (f"{self.name}, run as written. Quote an identifier as {quote}name{quote} "
+                     "when it is a reserved word or holds a character other than letters, "
+                     "digits or underscores.")  # fmt: skip
+        self.harness, self.context = harness, context
+
+    @property
+    def last(self) -> Any:
+        """The S provider's last context, read by the runner for its identity."""
+        return getattr(self.context, "last", None)
+
+    def __call__(self, question: str) -> Any:
+        built = self.context(question)
+        own = getattr(self.harness.context, "ARM_A_NOTE", None)
+        body = built.text.replace(f"{own}\n\n", "", 1) if own else built.text
+        text = f"{self.note}\n\n{body}"
+        return dataclasses.replace(built, dialect=self.name, text=text,
+                                   tokens=self.harness.context.estimate_tokens(text))
+
+
+def in_dialect(harness: SimpleNamespace, runtimes: Mapping[str, Any],
+               dialect: str | None) -> dict[str, Any]:  # fmt: skip
+    return {arm: dataclasses.replace(runtime, context=DialectFrame(harness, runtime.context,
+                                                                   dialect))
+            for arm, runtime in runtimes.items()}  # fmt: skip
 
 
 def latest_receipts(path: Path) -> list[dict[str, Any]]:
