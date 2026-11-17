@@ -39,7 +39,11 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     LibraryFacts,
     absent_elements,
 )
-from showcase.ontology_query_benchmark.sema_hierarchy_sql import add_hierarchy, named_columns
+from showcase.ontology_query_benchmark.sema_hierarchy_sql import (
+    add_hierarchy,
+    hierarchy_asked,
+    named_columns,
+)
 
 TableColumn = tuple[str, str]
 
@@ -105,10 +109,12 @@ def render(
     _add_values(rendering, selected, _governed_values(rendering.sco), sidecar, facts)
     _add_grain(rendering, products, sidecar, exposure)
     hierarchy: list[str] = []
-    add_hierarchy(hierarchy, rendering.findings, selected, facts, readable,
-                  rendering.sco.hierarchy_anchors, question=question,
-                  dialect=sidecar.sql_dialect)  # fmt: skip
-    _add_rules(rendering.parts, sidecar, hierarchy_prose=not hierarchy)
+    asked = hierarchy_asked(question, facts, rendering.sco.hierarchy_anchors)
+    if asked:
+        add_hierarchy(hierarchy, rendering.findings, selected, facts, readable,
+                      rendering.sco.hierarchy_anchors, question=question,
+                      dialect=sidecar.sql_dialect)  # fmt: skip
+    _add_rules(rendering.parts, sidecar, hierarchy_prose=asked and not hierarchy)
     spec = facts.hierarchy.spec if facts.hierarchy else None
     if hierarchy and spec and _hierarchy_kept(rendering, exposure, spec):
         rendering.parts.extend(hierarchy)

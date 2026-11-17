@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from sqlglot import exp
 
 from sema.models.context import HierarchyAnchor
-from sema.pipeline.dedup_utils import tokenize_query
+from sema.pipeline.dedup_utils import states_name, tokenize_query
 from showcase.ontology_query_benchmark.profile import ConceptHierarchy
 from showcase.ontology_query_benchmark.sema_bindings import SuppliedBinding
 from showcase.ontology_query_benchmark.sema_build_utils import Finding, LibraryFacts
@@ -139,6 +139,17 @@ def add_hierarchy(
     for b in columns:
         parts.append(f"  {b.table}.{b.column} holds {kind}:")
         parts.extend(_anchor_lines(b.column, found[(b.table, b.column)], dialect, names))
+
+
+def hierarchy_asked(
+    question: str, facts: LibraryFacts, anchors: Sequence[HierarchyAnchor],
+) -> bool:
+    """False only when the facts hold a hierarchy and the question names none of its
+    concepts, neither one the slice holds nor a retrieved anchor."""
+    if facts.hierarchy is None:
+        return True
+    concepts = [*facts.hierarchy.names.values(), *(a.label for a in anchors)]
+    return any(states_name(question, concept) for concept in concepts)
 
 
 def ranked(anchors: Sequence[HierarchyAnchor], question: str) -> list[HierarchyAnchor]:
