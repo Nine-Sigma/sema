@@ -76,7 +76,7 @@ def states_name(question: str, name: str) -> bool:
 def _word_stems(text: str) -> list[str]:
     return [
         w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w
-        for w in re.findall(r"[a-z0-9]+", text.lower())
+        for w in _TOKEN_SPLIT_RE.split(text.lower()) if w
     ]
 
 
