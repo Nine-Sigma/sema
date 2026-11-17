@@ -117,13 +117,19 @@ def _format_join_predicates(jp: Any) -> str:
     return "(unknown join condition)"
 
 
+def _format_value(value: dict[str, str]) -> str:
+    """The code to filter on, with its label when the label says more than the code."""
+    code, label = value["code"], value.get("label")
+    return f"'{code}' ({label})" if label and label != code else f"'{code}'"
+
+
 def _format_values_line(
     values: list[dict[str, str]], max_values: int | None,
 ) -> str:
     truncated = max_values is not None and len(values) > max_values
     if truncated:
         values = values[:max_values]
-    values_str = ", ".join(f"'{v['code']}'" for v in values)
+    values_str = ", ".join(_format_value(v) for v in values)
     suffix = " [truncated]" if truncated else ""
     return f"[{values_str}]{suffix}"
 

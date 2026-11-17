@@ -297,7 +297,9 @@ class GraphLoader:
         schema_name: str, catalog: str,
         source_schema: str | None = None,
         column_ref: str | None = None,
+        edge: dict[str, Any] | None = None,
     ) -> None:
+        """``edge`` sets `HAS_VALUE_SET` properties: verification and coverage."""
         _require_source_schema("upsert_value_set", source_schema)
         id_ = str(uuid.uuid4())
         ref = column_ref or (
@@ -312,11 +314,12 @@ class GraphLoader:
             "table_name: $table_name, "
             "schema_name: $schema_name, catalog: $catalog}) "
             "MERGE (c)-[hvs:HAS_VALUE_SET "
-            "{source_schema: $source_schema}]->(vs)",
+            "{source_schema: $source_schema}]->(vs) "
+            "SET hvs += $edge",
             name=name, column_name=column_name,
             table_name=table_name, schema_name=schema_name,
             catalog=catalog, id=id_, column_ref=ref,
-            source_schema=source_schema,
+            source_schema=source_schema, edge=edge or {},
         )
 
     def add_term_to_value_set(
@@ -324,8 +327,11 @@ class GraphLoader:
         source_schema: str | None = None,
         vocabulary_name: str | None = None,
         value_set_ref: str | None = None,
+        rows: int | None = None,
+        listed: bool | None = None,
     ) -> None:
-        """Link a Term to its ValueSet via MEMBER_OF.
+        """Link a Term to its ValueSet via MEMBER_OF, with its observed ``rows`` and whether
+        the value set ``listed`` it, when known.
 
         When ``value_set_ref`` (a column_ref) is given, the ValueSet is
         matched on ``column_ref`` — the canonical identity used by
@@ -347,10 +353,11 @@ class GraphLoader:
             "code: $term_code}) "
             + vs_clause +
             "MERGE (t)-[m:MEMBER_OF "
-            "{source_schema: $source_schema}]->(vs)",
+            "{source_schema: $source_schema}]->(vs) "
+            "SET m.rows = coalesce($rows, m.rows), m.listed = coalesce($listed, m.listed)",
             term_code=term_code, value_set_name=value_set_name,
             value_set_ref=value_set_ref,
-            source_schema=source_schema,
+            source_schema=source_schema, rows=rows, listed=listed,
             vocabulary_name=term_namespace(vocabulary_name),
         )
 
