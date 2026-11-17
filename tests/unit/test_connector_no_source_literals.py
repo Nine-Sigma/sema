@@ -35,6 +35,10 @@ SRC = REPO_ROOT / "src" / "sema"
 UNIT_FILES = tuple(
     SRC / relative
     for relative in (
+        "cli_eval.py",
+        "eval/discovery_scorecard.py",
+        "eval/discovery_scorecard_utils.py",
+        "intake/run/scorecard.py",
         "connectors/duckdb.py",
         "connectors/duckdb_utils.py",
         "models/config.py",
@@ -60,6 +64,9 @@ SQLITE_CATALOG = (
 DUCKDB_CATALOG = "SELECT table_name, column_name FROM information_schema.columns"
 # Hits that predate this unit, kept exact so a new hit fails and a moved default shrinks it.
 PREDATING_HITS = {
+    ("discovery_scorecard.py", "hierarchy"): (
+        "fact kind id fixed in the unit 6 contract; intake fixture specs use it as a section word"
+    ),
     ("config.py", "databricks-bge-large-en"): (
         "d395b094 embedding model default; predates unit 3, see unit-3 STATE.md Waiting on Dean"
     ),

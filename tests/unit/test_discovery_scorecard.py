@@ -114,6 +114,13 @@ def test_a_kind_absent_from_both_sides_prints_not_produced_and_no_oracle() -> No
     assert "not produced" in cells and "no oracle" in cells
 
 
+def test_a_key_only_join_is_equal_to_an_oracle_one_to_one_on_the_same_key() -> None:
+    key = join_key("holder", ["account_id"], "account", ["account_id"])
+    row = card_rows(_card({"join": {key: "key_only"}}, {"join": {key: "one_to_one"}}))["join"]
+
+    assert (row["equal"], row["wrong"]) == ("1", "0")
+
+
 def test_a_kind_with_no_oracle_prints_no_oracle_and_its_recheck_count() -> None:
     produced = {"join": PRODUCED_JOINS, "candidate_key": CANDIDATE_KEYS}
     rows = card_rows(_card(produced, {"join": DECLARED_JOINS}))
