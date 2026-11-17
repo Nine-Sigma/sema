@@ -152,6 +152,40 @@ class TestPlanTypedAPI:
         assert any("LLM error" in e for e in plan.errors)
 
 
+DX = "cdm.clinical.cancer_diagnosis"
+
+
+def _planned_columns(sco: SemanticContextObject, sql: str) -> list[str]:
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value = MagicMock(content=sql)
+    plan = NL2SQLConsumer().plan(
+        ConsumerRequest(question="test", operation="plan"), sco, ConsumerDeps(llm=mock_llm),
+    )
+    assert plan.valid, plan.errors
+    return plan.columns
+
+
+class TestPlanOutputColumns:
+    """`SQLPlan.columns` holds one entry per output column, in order: the alias, else the
+    bare column's name, else the expression's SQL text."""
+
+    def test_an_unaliased_expression_records_its_sql_text(self, sample_sco):
+        sql = f"SELECT tnm_stage || dx_type_cd, dx_type_cd FROM {DX}"
+        assert _planned_columns(sample_sco, sql) == ["tnm_stage || dx_type_cd", "dx_type_cd"]
+
+    def test_an_unaliased_aggregate_keeps_its_place(self, sample_sco):
+        sql = f"SELECT dx_type_cd, COUNT(*) FROM {DX} GROUP BY 1"
+        assert _planned_columns(sample_sco, sql) == ["dx_type_cd", "COUNT(*)"]
+
+    def test_a_star_is_recorded_as_written(self, sample_sco):
+        assert _planned_columns(sample_sco, f"SELECT * FROM {DX}") == ["*"]
+
+    def test_a_union_records_the_first_branch_columns(self, sample_sco):
+        sql = (f"SELECT dx_type_cd AS kind, COUNT(*) FROM {DX} GROUP BY 1 "
+               f"UNION ALL SELECT tnm_stage, COUNT(*) FROM {DX} GROUP BY 1")
+        assert _planned_columns(sample_sco, sql) == ["kind", "COUNT(*)"]
+
+
 class TestExplainTypedAPI:
     def test_explain_returns_str(self):
         consumer = NL2SQLConsumer()
