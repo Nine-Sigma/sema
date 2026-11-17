@@ -31,10 +31,10 @@ from sema.engine.coded_column_utils import (
     StatedDomain,
     binding_assertions,
     decide,
-    determines,
-    majority_labels,
+    label_reading,
     place,
     unplaced_assertion,
+    unread_key_assertion,
 )
 from sema.engine.join_detector import TIER_1, FKAssertion, to_fk_assertion
 from sema.engine.join_detector_utils import (
@@ -68,9 +68,9 @@ from sema.log import logger
 from sema.models.assertions import Assertion, AssertionPredicate
 from sema.models.config import BuildConfig
 from sema.models.extraction import ExtractedColumn
+from sema.models.physical_key import CanonicalRef
 
 _VERIFIED_TERM_CONFIDENCE = 0.95
-_UNVERIFIED_TERM_CONFIDENCE = 0.5
 
 
 @dataclass(frozen=True)
@@ -95,6 +95,7 @@ class _Run:
     values: WarehouseValues
     dictionary: Dictionary | None
     columns: list[ExtractedColumn]
+    by_ref: dict[str, ExtractedColumn]
     run_id: str
     schema: str
     joins: list[Assertion] = field(default_factory=list)
@@ -134,14 +135,15 @@ def run_coded_columns(
     values = WarehouseValues(connector.execute_query, config.catalog)
     bound = config.profiling.categorical_threshold
     by_schema = {schema: fetch_columns_by_schema(loader, schema) for schema in schemas}
+    by_ref = {c.ref: c for columns in by_schema.values() for c in columns if c.ref}
+    profiles = {
+        column_key(c): stats for c in by_ref.values()
+        if (stats := profile_lookup(column_key(c))) is not None
+    }
     placed = _place(loader, dictionary, by_schema, run_id)
     joins: dict[str, list[Assertion]] = {}
     for schema, columns in by_schema.items():
-        profiles = {
-            column_key(c): stats for c in columns
-            if (stats := profile_lookup(column_key(c))) is not None
-        }
-        run = _Run(loader, values, dictionary, columns, run_id, schema)
+        run = _Run(loader, values, dictionary, columns, by_ref, run_id, schema)
         stated = [(domain, c) for domain, c in placed if c.schema == schema]
         for column, candidates in _candidates(run, profiles, bound, stated).items():
             _bind(run, column, candidates)
@@ -230,19 +232,30 @@ def _candidates(
 def _declared(
     run: _Run, profiles: Profiles, bound: int,
 ) -> Iterable[tuple[ExtractedColumn, ExtractedColumn, str]]:
-    """Single-column declared keys to a code relation within the bound."""
-    by_name = {(c.table_name, c.name): c for c in run.columns}
+    """Single-column declared keys to a code relation within the bound, found by reference.
+
+    A key to a relation the run did not read is recorded for a coded column, never matched.
+    """
     for a in fetch_join_assertions(run.loader, run.schema):
         predicates = a.payload.get("join_predicates") or []
-        constraint = a.payload.get("constraint_name")
-        if a.predicate != AssertionPredicate.JOINS_TO or not constraint or len(predicates) != 1:
+        constraint, refs = a.payload.get("constraint_name"), (a.object_ref, a.subject_ref)
+        if (a.predicate != AssertionPredicate.JOINS_TO or not constraint
+                or len(predicates) != 1 or not all(refs)):
             continue
         (p,) = predicates
-        key = by_name.get((p["left_table"], p["left_column"]))
-        column = by_name.get((p["right_table"], p["right_column"]))
-        if key is None or column is None or key.table_name == column.table_name:
+        key_ref = CanonicalRef.with_column(a.object_ref or "", p["left_column"])
+        column = run.by_ref.get(CanonicalRef.with_column(a.subject_ref, p["right_column"]))
+        key = run.by_ref.get(key_ref)
+        same_relation = key is not None and column is not None and (
+            (key.schema, key.table_name) == (column.schema, column.table_name))
+        if column is None or same_relation:
             continue
-        if is_code_key(profiles.get(column_key(key)), bound):
+        if key is None:
+            if _uncoded(run, profiles, column, bound) is None:
+                run.loader.store_assertion(unread_key_assertion(
+                    column.ref or "", key_ref, str(constraint), run.run_id, run.schema,
+                ), source_schema=run.schema)
+        elif is_code_key(profiles.get(column_key(key)), bound):
             yield column, key, str(constraint)
 
 
@@ -279,10 +292,11 @@ def _link(
     verified = binding.verification == VERIFIED
     labels, label_edge = _labels(run, binding, listed) if verified else ({}, None)
     observed = sorted(code for code in counts if code is not None and code not in listed)
+    # An unverified binding is no governed value set: its numbers only, never its codes.
     members = [
         CodedMember(code, labels.get(code), counts.get(code, 0), code in listed)
         for code in [*listed, *observed]
-    ]
+    ] if verified else []
     measured = binding.containment
     edge = {
         "verification": binding.verification,
@@ -294,7 +308,7 @@ def _link(
         run.loader,
         column=ValueSetColumn(column.catalog, column.schema, column.table_name, column.name),
         vocabulary=source.vocabulary, members=members, edge=edge, source_schema=run.schema,
-        confidence=_VERIFIED_TERM_CONFIDENCE if verified else _UNVERIFIED_TERM_CONFIDENCE,
+        confidence=_VERIFIED_TERM_CONFIDENCE,
     )
     if label_edge is not None:
         link_label_column(
@@ -320,30 +334,33 @@ def _labels(
         if len(texts) > 1:
             return {}, None
         if texts:
-            rate, labels = majority_labels(_pairs(run, key, texts[0]))
-            return labels, LabelEdge(texts[0], rate or 0.0, (_join_name(join),))
+            reading = label_reading(_pairs(run, key, texts[0]))
+            if reading is None:
+                return {}, None
+            rate, labels = reading
+            return labels, LabelEdge(texts[0], rate, (_join_name(join),))
     determined = [
-        (text, rate, labels) for text in _texts(run, column)
-        for rate, labels in [majority_labels(_pairs(run, column, text))]
-        if rate is not None and determines(rate)
+        (text, reading) for text in _texts(run, column)
+        if (reading := label_reading(_pairs(run, column, text))) is not None
     ]
     if len(determined) != 1:
         return {}, None
-    ((text, rate, labels),) = determined
+    ((text, (rate, labels)),) = determined
     return labels, LabelEdge(text, rate, ())
 
 
 def _texts(run: _Run, beside: ExtractedColumn) -> list[ExtractedColumn]:
     return [
-        c for c in run.columns
-        if c.table_name == beside.table_name and c.name != beside.name and is_text(c)
+        c for c in run.by_ref.values()
+        if (c.schema, c.table_name) == (beside.schema, beside.table_name)
+        and c.name != beside.name and is_text(c)
     ]
 
 
 def _pairs(
     run: _Run, code: ExtractedColumn, text: ExtractedColumn,
-) -> dict[tuple[str | None, str | None], int]:
-    return run.values.pairs(run.schema, code.table_name, code.name, text.name) or {}
+) -> dict[tuple[str | None, str | None], int] | None:
+    return run.values.pairs(code.schema, code.table_name, code.name, text.name)
 
 
 def _join_name(join: Assertion) -> str:

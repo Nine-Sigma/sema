@@ -8,9 +8,11 @@ unverified; holding candidates with equal evidence tie, and none links. Every ca
 evidence nominates, and every data-shape candidate that holds, is recorded as
 `has_value_set` assertions with its numbers, its alternatives and the reason.
 
-A label column is a text column the code determines: its most common text per code agrees
-with at least `COVERAGE_THRESHOLD` of the rows. Exactly one such column labels; several, and
-no metadata naming one, leave the label unset.
+A label column is a text column the code determines: its non-NULL texts fill at least
+`COVERAGE_THRESHOLD` of the coded rows, and its most common text per code agrees with at
+least that share of them. Exactly one such column labels; several, and no metadata naming
+one, leave the label unset. A declared key resolves by its reference; a key to a relation
+the run did not read is recorded with the reason.
 """
 from __future__ import annotations
 
@@ -39,6 +41,7 @@ PAST_BOUND = "past the low-cardinality bound"
 OWN_KEY = "every non-null value is distinct: its relation's key, not a code"
 NO_VALUES = "the column holds no non-null value"
 NO_PROFILE = "the column could not be profiled"
+UNREAD_RELATION = "the referenced relation was not read in this run"
 _SOURCE = "coded_columns"
 _VERIFIED_CONFIDENCE = 0.95
 _UNVERIFIED_CONFIDENCE = 0.5
@@ -123,24 +126,32 @@ def _reason(measured: Containment, linked: bool, verified: bool, *, tied: bool) 
     return "a candidate with more evidence outranks it"
 
 
-def majority_labels(
-    pairs: Mapping[tuple[str | None, str | None], int],
-) -> tuple[float | None, dict[str, str | None]]:
-    """Share of non-null-code rows whose text is not their code's most common one, and that text."""
-    by_code: dict[str, Counter[str | None]] = {}
-    for (code, text), rows in pairs.items():
-        if code is not None:
+def label_reading(
+    pairs: Mapping[tuple[str | None, str | None], int] | None,
+) -> tuple[float, dict[str, str | None]] | None:
+    """The violation rate and each code's label when the code determines the text, else None.
+
+    Only non-NULL texts count: they must fill at least the floor share of the coded rows, and
+    the share of them that is not their code's most common text is the violation rate. A
+    failed read (None) or an empty one determines nothing.
+    """
+    by_code: dict[str, Counter[str]] = {}
+    coded_rows = 0
+    for (code, text), rows in (pairs or {}).items():
+        if code is None:
+            continue
+        coded_rows += rows
+        if text is not None:
             by_code.setdefault(code, Counter())[text] += rows
-    total = sum(sum(counts.values()) for counts in by_code.values())
-    if not total:
-        return None, {}
+    texted = sum(sum(counts.values()) for counts in by_code.values())
+    if not texted or texted / coded_rows < COVERAGE_THRESHOLD:
+        return None
     majority = {code: counts.most_common(1)[0] for code, counts in by_code.items()}
-    agreeing = sum(rows for _, rows in majority.values())
-    return 1 - agreeing / total, {code: text for code, (text, _) in majority.items()}
-
-
-def determines(violation_rate: float | None) -> bool:
-    return violation_rate is not None and 1 - violation_rate >= COVERAGE_THRESHOLD
+    violation_rate = 1 - sum(rows for _, rows in majority.values()) / texted
+    if 1 - violation_rate < COVERAGE_THRESHOLD:
+        return None
+    labels: dict[str, str | None] = {code: text for code, (text, _) in majority.items()}
+    return violation_rate, labels
 
 
 def _assertion(
@@ -190,3 +201,14 @@ def unplaced_assertion(
         "reason": reason or f"no column's normalized name equals property {domain.property!r}",
     }
     return _assertion(subject, payload, domain.vocabulary, _UNVERIFIED_CONFIDENCE, run_id, schema)
+
+
+def unread_key_assertion(
+    subject: str, key_ref: str, constraint: str, run_id: str, schema: str,
+) -> Assertion:
+    """A declared key whose referenced relation the run did not read: no data decides it."""
+    payload = {
+        "evidence": DECLARED_KEY, "value_set": key_ref, "constraint": constraint,
+        "linked": False, "verification": UNVERIFIED, "reason": UNREAD_RELATION,
+    }
+    return _assertion(subject, payload, key_ref, _UNVERIFIED_CONFIDENCE, run_id, schema)
