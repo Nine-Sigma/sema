@@ -6,11 +6,12 @@ and `reference_sql_b.jsonl` on the connector fixture's DuckDB file. `ARM_REPLIES
 mocked model: per question, the statement each arm writes and what scoring must give it.
 """
 
+import importlib
 import io
 import json
 import shutil
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,7 @@ from tests.support.connector_fixture import write_fixture_database
 FIXTURES = Path(__file__).parents[2] / "fixtures"
 SEALED_SET_FIXTURE = FIXTURES / "sealed_set"
 TOY_PROFILE = FIXTURES / "ontology_query_benchmark" / "profile.yaml"
+ARMS = ("A", "S")
 S_CONTEXT_MARK = "S-STUB-CONTEXT"
 CONNECTOR_READ = "execute_query_with_columns"
 SINK_CANARY = "sealed-set-trace-sink-canary"
@@ -322,6 +324,39 @@ def _spy_reads(mp: pytest.MonkeyPatch, model: ScriptedModel, reads: list[tuple[i
         return original(self, query, *args, **kwargs)
 
     mp.setattr(DuckDBConnector, CONNECTOR_READ, read)
+
+
+def sealed_set_module() -> ModuleType:
+    return importlib.import_module("showcase.ontology_query_benchmark.sealed_set")
+
+
+def writer_cell(value: Any) -> Any:
+    """The expected-answer writer's normalization (M5), as the sealed-set path applies it."""
+    from showcase.ontology_query_benchmark.sealed_set_utils import normalize
+
+    return normalize(value)
+
+
+def run_arms(harness: SimpleNamespace, root: Path, profile_path: Path,
+             arms: tuple[str, ...] = ARMS) -> SealedRun:  # fmt: skip
+    return run_sealed(sealed_set_module(), harness, root, profile_path, arms)
+
+
+@pytest.fixture(scope="module")
+def sealed_run(
+    frozen: Path, harness: SimpleNamespace, tmp_path_factory: pytest.TempPathFactory
+) -> Callable[[], SealedRun]:
+    """One run of both arms over the neutral set, made by the first test that asks."""
+    root = tmp_path_factory.mktemp("sealed") / "sealed_set"
+    profile_path = materialize(root, frozen)
+    done: list[SealedRun] = []
+
+    def get() -> SealedRun:
+        if not done:
+            done.append(run_arms(harness, root, profile_path))
+        return done[0]
+
+    return get
 
 
 def run_sealed(sealed_set: ModuleType, harness: SimpleNamespace, root: Path, profile_path: Path,
