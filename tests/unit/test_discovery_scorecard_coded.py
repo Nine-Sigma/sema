@@ -26,6 +26,8 @@ from tests.support.connector_fixture_codes import (
     CODED_TABLES,
     CODES_CATALOG,
     CODES_SCHEMA,
+    LOADED_LIST_TABLES,
+    ROWS,
     write_coded_database,
 )
 from tests.support.connector_fixture_scorecard import (
@@ -183,3 +185,48 @@ def test_a_miscounted_observed_value_does_not_recheck(connector: DuckDBConnector
                                             read.member_rows.items() if rows})
 
     assert _rechecked(connector, [miscounted])["observed_values"] == 0
+
+
+@pytest.fixture
+def loaded_connector(tmp_path: Path) -> Iterator[DuckDBConnector]:
+    path = write_coded_database(tmp_path, (*CODED_TABLES, *LOADED_LIST_TABLES))
+    opened = DuckDBConnector(DuckDBConfig(path=str(path)))
+    yield opened
+    opened.close()
+
+
+def _loaded_bindings(connector: DuckDBConnector) -> dict[Key, str]:
+    scorecard = _scorecard()
+    reads = _claimed_reads() + _decoy_reads()
+    loaded = scorecard.loaded_code_lists(connector, CODES_CATALOG, [CODES_SCHEMA], reads,
+                                         CODE_LISTS)
+    return dict(scorecard.coded_facts(reads, loaded)["column_to_concept_binding"])
+
+
+def test_a_dictionary_code_list_loaded_as_a_relation_is_named_by_that_relation(
+    loaded_connector: DuckDBConnector,
+) -> None:
+    assert {str(row[0]) for row in ROWS["seal_kind_codes"]} == listed_codes("seal_kinds")
+
+    bindings = _loaded_bindings(loaded_connector)
+
+    assert bindings == {
+        key: "seal_kind_codes" if name == "seal_kinds" else name
+        for key, name in BINDING_CLAIMS.items()
+    }
+
+
+def test_a_key_column_holding_more_than_the_codes_or_repeating_them_is_not_the_code_list(
+    loaded_connector: DuckDBConnector,
+) -> None:
+    keys, repeats = ([str(row[i]) for row in ROWS["bevel_superset"]] for i in (0, 1))
+    assert set(present_values(("panel", "bevel_kind"))) < set(keys)
+    assert set(repeats) == listed_codes("bevel_kinds") and len(repeats) > len(set(repeats))
+
+    assert _loaded_bindings(loaded_connector)[("panel", "bevel_kind")] == "bevel_kinds"
+
+
+def test_a_code_list_loaded_nowhere_keeps_its_vocabulary_name(
+    loaded_connector: DuckDBConnector,
+) -> None:
+    assert _loaded_bindings(loaded_connector)[("panel", "coat_kind")] == "coat_kinds"

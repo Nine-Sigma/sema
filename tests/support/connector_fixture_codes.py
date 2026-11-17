@@ -213,6 +213,8 @@ ROWS: dict[str, list[Row]] = {
     "kiln": [(1 + i, _cycle(tuple(SEAL_KINDS), i)) for i in range(SPLIT_ROWS)],
     "vat": [(1 + i, _cycle(tuple(SEAL_KINDS), i), _cycle(tuple(BEVEL_KINDS), i))
             for i in range(SPLIT_ROWS)],
+    "seal_kind_codes": list(SEAL_KINDS.items()),
+    "bevel_superset": [("BV-1", "BV-1"), ("BV-2", "BV-2"), ("BV-3", "BV-1")],
 }
 
 
@@ -296,6 +298,12 @@ NULL_LABEL_TABLES: tuple[FixtureTable, ...] = (
     _table("notch", (("notch_code", _TEXT),)),
     _table("ledge", (("ledge_no", _INT), ("notch_code", _TEXT), ("notch_name", _TEXT),
                      ("notch_title", _TEXT)), (_key("notch_code", "notch"),)),
+)
+
+# A dictionary code list loaded under another name; a decoy holds a superset, or repeats.
+LOADED_LIST_TABLES: tuple[FixtureTable, ...] = (
+    _table("seal_kind_codes", (("kind_code", _TEXT), ("kind_text", _TEXT))),
+    _table("bevel_superset", (("bevel_code", _TEXT), ("bevel_repeat", _TEXT))),
 )
 # No key is declared here: DuckDB refuses a key across schemas, so a test states it.
 CROSS_SCHEMA_TABLES: dict[str, tuple[FixtureTable, ...]] = {

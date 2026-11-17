@@ -53,8 +53,10 @@ from tests.support.connector_fixture import (
     write_fixture_database,
 )
 from tests.support.connector_fixture_codes import (
+    CODED_TABLES,
     CODES_CATALOG,
     CODES_SCHEMA,
+    LOADED_LIST_TABLES,
     write_coded_database,
     write_dictionary,
 )
@@ -364,3 +366,35 @@ def test_the_discovery_command_scores_and_rechecks_the_coded_kinds(
         assert [rows[kind][cell] for cell in ("equal", "missing", "wrong", "extra")] == [
             str(len(CODED_CLAIMS[kind])), "0", "0", "0"]
     assert rows["time_roles"]["produced"] == "not produced"
+
+
+def test_the_discovery_command_names_a_loaded_code_list_by_its_relation(
+    coded_config: Path, tmp_path: Path,
+) -> None:
+    """The graph built from the coded fixture, scored through a warehouse that also loads one
+    dictionary code list under another name, beside a decoy relation for another list."""
+    from sema.cli_eval import eval_group
+
+    loaded = tmp_path / "loaded"
+    loaded.mkdir()
+    settings = yaml.safe_load(coded_config.read_text())
+    settings["duckdb"]["path"] = str(
+        write_coded_database(loaded, (*CODED_TABLES, *LOADED_LIST_TABLES)))
+    config, oracle, out = tmp_path / "loaded.yaml", tmp_path / "oracle.jsonl", tmp_path / "card.md"
+    config.write_text(yaml.safe_dump(settings))
+    claims = {key: "seal_kind_codes" if name == "seal_kinds" else name
+              for key, name in CODED_CLAIMS["column_to_concept_binding"].items()}
+    oracle.write_text("".join(
+        json.dumps({"kind": "column_to_concept_binding", "key": list(key), "value": value,
+                    "basis": "data", "cite": "fixture"}) + "\n"
+        for key, value in claims.items()
+    ))
+    result = CliRunner().invoke(eval_group, [
+        "discovery", "--config", str(config), "--oracle-spec", str(oracle), "--out", str(out),
+    ])
+    assert result.exit_code == 0, result.output
+
+    row = card_rows(out.read_text())["column_to_concept_binding"]
+    assert [row[cell] for cell in ("produced", "equal", "missing", "wrong", "extra",
+                                   "rechecked")] == [str(len(claims)), str(len(claims)),
+                                                     "0", "0", "0", str(len(claims))]
