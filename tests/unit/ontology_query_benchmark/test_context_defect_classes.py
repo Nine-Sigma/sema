@@ -53,7 +53,10 @@ from tests.unit.ontology_query_benchmark.sema_context_env import (
     _Retriever,
 )
 from tests.unit.ontology_query_benchmark.sema_hierarchy_anchor_env import READABLE, anchor
-from tests.unit.pipeline.test_context_defect_classes import label_breaches
+from tests.unit.pipeline.test_context_defect_classes import (
+    definition_only_breaches,
+    label_breaches,
+)
 from tests.unit.ontology_query_benchmark.sema_hierarchy_env import _facts
 
 pytestmark = pytest.mark.unit
@@ -164,6 +167,15 @@ def test_d3_decoy_a_term_matching_only_a_definition_still_reaches_that_column(
     demoted = [x for x in text.splitlines()
                if ranks_before_alternative(x, NAMED_COLUMN.column, DEFINED_COLUMN.column)]
     assert demoted == []
+
+
+def test_k2_a_definition_only_match_reaches_its_own_relation_and_no_unrelated_one(
+    tmp_path: Path,
+) -> None:
+    engine = case_engine(ranking_graph(DEFINITION_ONLY_QUESTION))
+    text = _s_text(tmp_path, engine, DEFINITION_ONLY_QUESTION)
+
+    assert definition_only_breaches(text) == [], text
 
 
 def _customer() -> PhysicalAsset:

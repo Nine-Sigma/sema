@@ -158,6 +158,23 @@ def test_d3_decoy_a_term_matching_only_a_definition_still_reaches_that_column() 
     assert demoted == []
 
 
+def definition_only_breaches(text: str) -> list[str]:
+    """Ruling K2: the definition-only target is listed under its own relation, and the
+    relation only the unrelated low-score hit reaches stays out of the context."""
+    own = f"{CATALOG}.{MAIN_SCHEMA}.{DEFINED_COLUMN.table}:"
+    listed = [x for x in lines_naming(text, DEFINED_COLUMN.column) if own in x]
+    breaches = [] if listed else [f"{DEFINED_COLUMN.column} is not listed under {own}"]
+    if f"{CATALOG}.{MAIN_SCHEMA}.{NAMED_COLUMN.table}" in text:
+        breaches.append(f"{NAMED_COLUMN.table} entered through a low-score hit")
+    return breaches
+
+
+def test_k2_a_definition_only_match_reaches_its_own_relation_and_no_unrelated_one() -> None:
+    text = _context(ranking_graph(DEFINITION_ONLY_QUESTION), DEFINITION_ONLY_QUESTION)
+
+    assert definition_only_breaches(text) == [], text
+
+
 def _shaped_sco() -> SemanticContextObject:
     from sema.models.context import ResultShape
 
