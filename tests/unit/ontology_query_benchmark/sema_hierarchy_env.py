@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
+from sema.pipeline.dedup_utils import tokenize_query
 from showcase.ontology_query_benchmark.profile import Attribution, ConceptHierarchy, ConceptRelation
 from showcase.ontology_query_benchmark.sema_bindings import (
     load_products,
@@ -74,7 +76,18 @@ def _context(tmp_path: Path, facts: LibraryFacts, readable: dict[str, bool] | No
         graph_identity="graph-1", conventions=CONVENTIONS, limits=LIMITS,
         hierarchy_relations=readable,
     )
-    return provider("Which events sit under a broader concept?")
+    return provider(asking(facts))
+
+
+def asking(facts: LibraryFacts, labels: Iterable[str] = ()) -> str:
+    """A question naming a concept of the facts' hierarchy that shares no word with
+    ``labels``, the retrieved anchors, so they rank as for a question naming none."""
+    if facts.hierarchy is None:
+        return "Which events sit under a broader concept?"
+    taken = {w for label in labels for w in tokenize_query(label)}
+    concept = next(n for n in sorted(facts.hierarchy.names.values())
+                   if not taken & set(tokenize_query(n)))  # fmt: skip
+    return f"Which events sit under {concept}?"
 
 
 def _fragment(text: str, column: str) -> str:

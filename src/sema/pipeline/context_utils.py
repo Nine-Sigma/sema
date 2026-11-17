@@ -11,6 +11,7 @@ import json
 
 from sema.models.context import (
     AncestryTerm,
+    ColumnMatch,
     GovernedValue,
     HierarchyAnchor,
     JoinPath,
@@ -22,6 +23,7 @@ from sema.models.context import (
     ResolvedProperty,
     SemanticCandidateSet,
 )
+from sema.pipeline.dedup_utils import states_name
 
 
 def _filter_entity_candidates(
@@ -86,6 +88,37 @@ def _build_entities_and_assets(
             ))
 
     return entities, physical_assets
+
+
+def _build_column_matches(
+    candidate_set: SemanticCandidateSet,
+    physical_assets: list[PhysicalAsset],
+) -> list[ColumnMatch]:
+    """Each listed column the question names, paired with every other listed column a
+    property hit reached whose definition states that same name. A column the question
+    names is never another's alternative."""
+    listed = {(a.table, c) for a in physical_assets for c in a.columns}
+    hits = {
+        place: c for c in candidate_set.candidates
+        if c.get("type") == "property"
+        and (place := (c.get("physical_table", ""), c.get("physical_column", ""))) in listed
+    }
+    named = {
+        place: term for place, c in hits.items()
+        if (term := _named_term(candidate_set.query, c.get("name", ""), place[1]))
+    }
+    return [
+        ColumnMatch(table=table, column=column,
+                    alternative_table=other[0], alternative_column=other[1])
+        for (table, column), term in named.items()
+        for other, c in hits.items()
+        if other not in named and states_name(c.get("description") or "", term)
+    ]
+
+
+def _named_term(question: str, *names: str) -> str:
+    """The first of ``names`` the question states, or ''."""
+    return next((n for n in names if states_name(question, n)), "")
 
 
 def _parse_join_predicates(

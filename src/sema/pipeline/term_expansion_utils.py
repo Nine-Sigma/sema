@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from sema.graph.queries import CypherQueries
 from sema.graph.term_identity_utils import UNSCOPED_VOCAB
 from sema.log import logger
+from sema.pipeline.dedup_utils import states_name
 
 if TYPE_CHECKING:
     from sema.pipeline.retrieval import RetrievalEngine
@@ -55,6 +56,28 @@ def _expand_ancestry(
         except Exception:
             pass
     return ancestry
+
+
+def keep_asked_ancestry(
+    candidates: list[dict[str, Any]], question: str,
+) -> list[dict[str, Any]]:
+    """A term hit's ancestry stays only when the question names a concept of
+    that chain, the hit term or one of its ancestors: a nearest-neighbour hit
+    alone does not ask for its hierarchy."""
+    chains: dict[str, list[str]] = {}
+    for c in candidates:
+        if c.get("type") == "term":
+            chains.setdefault(c.get("code", ""), []).append(c.get("label", ""))
+        elif c.get("type") == "ancestry":
+            chains.setdefault(c.get("parent_code", ""), []).append(c.get("label", ""))
+    asked = {
+        code for code, labels in chains.items()
+        if any(states_name(question, label) for label in labels)
+    }
+    return [
+        c for c in candidates
+        if c.get("type") != "ancestry" or c.get("parent_code") in asked
+    ]
 
 
 def _expand_term_hit(
@@ -327,7 +350,7 @@ def _expand_term_governed_values(
             "column": col,
             "table": table,
             "code": code,
-            "label": label or code,
+            "label": label,
             "source": "retrieval_term_expansion",
             "status": status,
             "confidence": confidence,

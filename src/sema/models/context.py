@@ -104,6 +104,22 @@ class HierarchyAnchor(BaseModel):
     score: float = 0.0
 
 
+class ColumnMatch(BaseModel):
+    """A column the question names, and another listed column whose definition states
+    that same name: the named column ranks first, the other is its alternative."""
+
+    table: str
+    column: str
+    alternative_table: str
+    alternative_column: str
+
+
+class ResultShape(BaseModel):
+    """The answer's output columns, in order."""
+
+    columns: list[str] = Field(default_factory=list)
+
+
 class SemanticCandidateSet(BaseModel):
     query: str
     candidates: list[dict[str, Any]] = Field(default_factory=list)
@@ -119,6 +135,12 @@ class SemanticContextObject(BaseModel):
     ancestry: list[AncestryTerm] = Field(default_factory=list)
     hierarchy_anchors: list[HierarchyAnchor] = Field(
         default_factory=list, exclude_if=lambda anchors: not anchors,
+    )
+    column_matches: list[ColumnMatch] = Field(
+        default_factory=list, exclude_if=lambda matches: not matches,
+    )
+    result_shape: ResultShape | None = Field(
+        default=None, exclude_if=lambda shape: shape is None,
     )
     consumer: str = "nl2sql"
     retrieval_rationale: str | None = None

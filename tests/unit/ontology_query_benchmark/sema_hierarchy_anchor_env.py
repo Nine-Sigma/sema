@@ -35,7 +35,7 @@ from tests.unit.ontology_query_benchmark.sema_bindings_env import (
     write_projection,
 )
 from tests.unit.ontology_query_benchmark.sema_context_env import EVENTS_ENTITY, LIMITS, _Retriever
-from tests.unit.ontology_query_benchmark.sema_hierarchy_env import RELATIONS, SITE
+from tests.unit.ontology_query_benchmark.sema_hierarchy_env import RELATIONS, SITE, asking
 
 READABLE = dict.fromkeys(RELATIONS, True)
 DEEPER_CONCEPTS = [("C0", "Disorder", "S"), ("R", "Clinical finding", "S")]
@@ -61,7 +61,7 @@ def context(tmp_path: Path, facts: LibraryFacts, readable: dict[str, bool] | Non
         graph_identity="graph-1", conventions=CONVENTIONS, limits=LIMITS,
         hierarchy_relations=readable,
     )
-    return provider("Which events sit under a broader concept?", is_denied)
+    return provider(asking(facts, [a["label"] for a in anchors]), is_denied)
 
 
 def fragments(text: str, column: str, *, filled: bool = True) -> list[str]:

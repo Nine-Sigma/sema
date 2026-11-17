@@ -16,6 +16,7 @@ from sema.models.context import (
 from sema.pipeline.context_utils import (
     _apply_visibility_policy,
     _build_ancestry,
+    _build_column_matches,
     _build_entities_and_assets,
     _build_governed_values,
     _build_hierarchy_anchors,
@@ -50,6 +51,7 @@ def prune_to_sco(
         entities=entities,
         metrics=metrics,
         physical_assets=physical_assets,
+        column_matches=_build_column_matches(visible_set, physical_assets),
         join_paths=join_paths,
         governed_values=governed_values,
         ancestry=ancestry,

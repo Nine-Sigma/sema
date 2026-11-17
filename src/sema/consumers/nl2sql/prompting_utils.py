@@ -60,6 +60,23 @@ def _add_tables_and_columns(
                 cols, fqn, prop_map,
             ) if annotate else cols
             parts.append(f"  {fqn}: {', '.join(annotated)}")
+    _add_column_choice(parts, sco)
+
+
+def _add_column_choice(
+    parts: list[str], sco: SemanticContextObject,
+) -> None:
+    """One line per column the question names that another column's definition
+    competes for: the named column, then its alternatives."""
+    alternatives: dict[str, list[str]] = {}
+    for m in sco.column_matches:
+        alternatives.setdefault(f"{m.table}.{m.column}", []).append(
+            f"{m.alternative_table}.{m.alternative_column}"
+        )
+    parts.extend(
+        f"  Column the question names: {named}; alternative: {', '.join(others)}"
+        for named, others in alternatives.items()
+    )
 
 
 def _build_property_map(
@@ -123,7 +140,9 @@ def _format_values_line(
     truncated = max_values is not None and len(values) > max_values
     if truncated:
         values = values[:max_values]
-    values_str = ", ".join(f"'{v['code']}'" for v in values)
+    values_str = ", ".join(
+        f"'{v['code']}' ({v.get('label') or 'no label'})" for v in values
+    )
     suffix = " [truncated]" if truncated else ""
     return f"[{values_str}]{suffix}"
 
@@ -133,6 +152,11 @@ def _add_governed_values_section(
     sco: SemanticContextObject,
     max_values: int | None = None,
 ) -> None:
+    if sco.governed_values:
+        parts.append(
+            "\nCoded values show each code's label in parentheses: "
+            "filter on the code; answers show the label."
+        )
     authoritative = [
         gv for gv in sco.governed_values if not gv.ambiguous
     ]
@@ -200,6 +224,20 @@ def _add_ancestry_section(
             parts.append(
                 f"  {term.code} ({term.label}) [root]"
             )
+
+
+def _add_result_shape(
+    parts: list[str], sco: SemanticContextObject,
+) -> None:
+    if sco.result_shape is None or not sco.result_shape.columns:
+        return
+    parts.append(
+        "\nRESULT SHAPE (return exactly these columns, in this order):"
+    )
+    parts.extend(
+        f"  {n}. {column}"
+        for n, column in enumerate(sco.result_shape.columns, start=1)
+    )
 
 
 def _add_dialect_notes(

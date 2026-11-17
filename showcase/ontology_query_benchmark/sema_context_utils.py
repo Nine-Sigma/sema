@@ -16,7 +16,11 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 from sema.compile.entity_identity import entity_key_name, key_clash
-from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
+from sema.consumers.nl2sql.prompting_utils import (
+    _add_join_section,
+    _add_result_shape,
+    _add_tables_and_columns,
+)
 from sema.models.context import SemanticContextObject
 from showcase.ontology_query_benchmark.product_spec import (
     CompanionRole,
@@ -35,7 +39,11 @@ from showcase.ontology_query_benchmark.sema_build_utils import (
     LibraryFacts,
     absent_elements,
 )
-from showcase.ontology_query_benchmark.sema_hierarchy_sql import add_hierarchy, named_columns
+from showcase.ontology_query_benchmark.sema_hierarchy_sql import (
+    add_hierarchy,
+    hierarchy_asked,
+    named_columns,
+)
 
 TableColumn = tuple[str, str]
 
@@ -101,13 +109,16 @@ def render(
     _add_values(rendering, selected, _governed_values(rendering.sco), sidecar, facts)
     _add_grain(rendering, products, sidecar, exposure)
     hierarchy: list[str] = []
-    add_hierarchy(hierarchy, rendering.findings, selected, facts, readable,
-                  rendering.sco.hierarchy_anchors, question=question,
-                  dialect=sidecar.sql_dialect)  # fmt: skip
-    _add_rules(rendering.parts, sidecar, hierarchy_prose=not hierarchy)
+    asked = hierarchy_asked(question, facts, rendering.sco.hierarchy_anchors)
+    if asked:
+        add_hierarchy(hierarchy, rendering.findings, selected, facts, readable,
+                      rendering.sco.hierarchy_anchors, question=question,
+                      dialect=sidecar.sql_dialect)  # fmt: skip
+    _add_rules(rendering.parts, sidecar, hierarchy_prose=asked and not hierarchy)
     spec = facts.hierarchy.spec if facts.hierarchy else None
     if hierarchy and spec and _hierarchy_kept(rendering, exposure, spec):
         rendering.parts.extend(hierarchy)
+    _add_result_shape(rendering.parts, rendering.sco)
     return rendering
 
 
@@ -136,8 +147,11 @@ def _without_denied(rendering: Rendering, exposure: Exposure) -> SemanticContext
         names += [(jp.from_table, w) for w in re.findall(r"\w+", jp.sql_snippet or "")]
         if _kept(rendering, exposure, names, jp.from_table, "join path"):
             joins.append(jp)
+    matches = [m for m in sco.column_matches if not exposure.hides(m.table, m.column)
+               and not exposure.hides(m.alternative_table, m.alternative_column)]
     return sco.model_copy(
-        update={"physical_assets": assets, "governed_values": values, "join_paths": joins}
+        update={"physical_assets": assets, "governed_values": values, "join_paths": joins,
+                "column_matches": matches}  # fmt: skip
     )
 
 
@@ -228,7 +242,8 @@ def _add_values(
         return
     template = sidecar.membership_sql.format(relation=sidecar.membership_relation, element_id="E")
     rendering.parts.append(
-        "\nGOVERNED VALUES (complete lists only; code = label). Unlisted sets: "
+        "\nGOVERNED VALUES (complete lists only; code = label; answers show the label). "
+        "Unlisted sets: "
         f"membership query E = {template}"
     )
     for b in governed:
@@ -244,7 +259,9 @@ def _add_values(
                 f"({reference})"
             )
         elif set(got) == {c for c, _ in element.members}:
-            listing = "; ".join(f"{code} = {got[code]}" for code, _ in element.members)
+            listing = "; ".join(
+                f"{code} = {got[code] or 'no label'}" for code, _ in element.members
+            )
             rendering.parts.append(f"  {b.column}: {listing}")
             rendering.listed[(b.table, b.column)] = len(element.members)
         else:

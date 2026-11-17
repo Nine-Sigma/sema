@@ -8,6 +8,7 @@ from sema.log import logger
 from sema.models.hierarchy_anchor import HierarchyAnchorConfig
 from sema.models.constants import MATCH_TYPE_BOOST
 from sema.models.context import SemanticCandidateSet
+from sema.pipeline.term_expansion_utils import keep_asked_ancestry
 from sema.pipeline.retrieval_utils import (
     _dedup_artifacts,
     _dedup_seeds,
@@ -20,6 +21,7 @@ from sema.pipeline.retrieval_utils import (
     _expand_term_hit,
     _expand_values,
     _normalize_vector_hit,
+    mark_properties_defining_question,
     merge_and_rank_candidates,
     tokenize_query,
 )
@@ -306,6 +308,7 @@ class RetrievalEngine:
         all_seeds = vector_candidates + lexical_candidates
         ranked = merge_and_rank_candidates(all_seeds)
         deduped_seeds = _dedup_seeds(ranked)
+        mark_properties_defining_question(question, deduped_seeds)
 
         # Phase 3: Type-aware expansion
         all_candidates: list[dict[str, Any]] = []
@@ -325,7 +328,9 @@ class RetrievalEngine:
             )
 
         # Phase 4: Artifact deduplication
-        all_candidates = _dedup_artifacts(all_candidates)
+        all_candidates = keep_asked_ancestry(
+            _dedup_artifacts(all_candidates), question,
+        )
 
         return SemanticCandidateSet(
             query=question,
