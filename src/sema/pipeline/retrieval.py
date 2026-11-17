@@ -8,6 +8,7 @@ from sema.log import logger
 from sema.models.hierarchy_anchor import HierarchyAnchorConfig
 from sema.models.constants import MATCH_TYPE_BOOST
 from sema.models.context import SemanticCandidateSet
+from sema.pipeline.term_expansion_utils import keep_asked_ancestry
 from sema.pipeline.retrieval_utils import (
     _dedup_artifacts,
     _dedup_seeds,
@@ -325,7 +326,9 @@ class RetrievalEngine:
             )
 
         # Phase 4: Artifact deduplication
-        all_candidates = _dedup_artifacts(all_candidates)
+        all_candidates = keep_asked_ancestry(
+            _dedup_artifacts(all_candidates), question,
+        )
 
         return SemanticCandidateSet(
             query=question,

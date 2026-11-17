@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from types import MappingProxyType
 from typing import Any
 
@@ -61,6 +62,12 @@ def tokenize_query(query: str) -> list[str]:
         t for t in raw_tokens
         if len(t) >= 3 and t not in _STOP_WORDS
     ]
+
+
+def names_any(question: str, labels: Iterable[str]) -> bool:
+    """The question holds a whole word of one of ``labels``."""
+    asked = set(tokenize_query(question))
+    return any(asked.intersection(tokenize_query(label)) for label in labels)
 
 
 def normalize_vector_hit(
