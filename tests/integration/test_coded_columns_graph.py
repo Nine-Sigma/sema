@@ -40,13 +40,9 @@ from tests.support.connector_fixture_codes import (
     write_dictionary,
 )
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.xfail(
-        strict=True,
-        reason="unit 5 N3 (mechanism) blocked; see unit-5/STATE.md Waiting on Dean 2",
-    ),
-]
+pytestmark = [pytest.mark.integration, pytest.mark.xfail(
+    strict=True, reason="unit 5 N3 (mechanism) blocked; see unit-5/STATE.md Waiting on Dean 2",
+)]
 
 Column = tuple[str, str]
 DICTIONARY_FIELDS = {"concept_spec", "concept_staging"}
@@ -125,10 +121,8 @@ _LABELED_BY = (
     "RETURN c.table_name AS t, c.name AS c, lc.table_name AS lt, lc.name AS lc, "
     "properties(l) AS props"
 )
-_COLUMNS = (
-    "MATCH (c:Column {schema_name: $schema}) "
-    "RETURN c.table_name AS t, c.name AS c, c.ref AS ref"
-)
+_COLUMNS = ("MATCH (c:Column {schema_name: $schema}) "
+            "RETURN c.table_name AS t, c.name AS c, c.ref AS ref")
 _ASSERTIONS = (
     "MATCH (a:Assertion) RETURN a.subject_ref AS subject, a.predicate AS predicate, "
     "a.payload AS payload, a.object_ref AS object_ref"

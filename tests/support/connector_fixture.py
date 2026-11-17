@@ -22,7 +22,7 @@ import sqlglot
 from pydantic import SecretStr
 
 from sema.llm_client import LLMClient, SynonymExpansion, TableSummary, VocabularyDetection
-from sema.models.config import BuildConfig, DatabricksConfig, Neo4jConfig
+from sema.models.config import BuildConfig, DatabricksConfig, DuckDBConfig, Neo4jConfig
 from sema.models.stages import (
     StageAResult,
     StageBBatchResult,
@@ -160,7 +160,8 @@ DECOY_TABLES: tuple[FixtureTable, ...] = (
     FixtureTable(_ACCOUNT.name, _ACCOUNT.columns, _ACCOUNT.primary_key, _ACCOUNT.rows),
 )
 
-SCHEMA_TABLES: dict[str, tuple[FixtureTable, ...]] = {
+SchemaTables = dict[str, tuple[FixtureTable, ...]]
+SCHEMA_TABLES: SchemaTables = {
     MAIN_SCHEMA: MAIN_TABLES,
     DECOY_SCHEMA: DECOY_TABLES,
 }
@@ -213,10 +214,7 @@ def _create_table_sql(schema: str, table: FixtureTable) -> str:
     return f"CREATE TABLE {schema}.{table.name} ({', '.join(parts)})"
 
 
-def _create_tables(
-    con: duckdb.DuckDBPyConnection,
-    schema_tables: dict[str, tuple[FixtureTable, ...]] = SCHEMA_TABLES,
-) -> None:
+def _create_tables(con: duckdb.DuckDBPyConnection, schema_tables: SchemaTables) -> None:
     """Every schema, table, key and row, in the connection's current catalog."""
     for schema, tables in schema_tables.items():
         con.execute(f"CREATE SCHEMA {schema}")
@@ -225,11 +223,8 @@ def _create_tables(
             con.execute(f"INSERT INTO {schema}.{table.name} {table.rows}")
 
 
-def write_fixture_database(
-    directory: Path,
-    schema_tables: dict[str, tuple[FixtureTable, ...]] = SCHEMA_TABLES,
-    catalog: str = CATALOG,
-) -> Path:
+def write_fixture_database(directory: Path, schema_tables: SchemaTables = SCHEMA_TABLES,
+                           catalog: str = CATALOG) -> Path:
     """The fixture as a DuckDB file whose catalog, its file stem, is `catalog`."""
     path = directory / f"{catalog}.duckdb"
     con = duckdb.connect(str(path))
@@ -245,7 +240,7 @@ def build_warehouse() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect(":memory:")
     con.execute(f"ATTACH ':memory:' AS {CATALOG}")
     con.execute(f"USE {CATALOG}")
-    _create_tables(con)
+    _create_tables(con, SCHEMA_TABLES)
     con.execute("USE memory")
     con.execute(f"CREATE SCHEMA {COMPAT_SCHEMA}")
     for view, body in _COMPAT_VIEWS.items():
@@ -372,8 +367,6 @@ def fixture_build_config(neo4j: Neo4jConfig, *, database: Path | None = None) ->
     )
     if database is None:
         return config
-    from sema.models.config import DuckDBConfig
-
     return config.model_copy(
         update={"source": "duckdb", "duckdb": DuckDBConfig(path=str(database))},
     )
