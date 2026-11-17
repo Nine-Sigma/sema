@@ -1,0 +1,11 @@
+{"id": "N01", "sql": "SELECT count(customer_id) AS n FROM shop.customer"}
+{"id": "N02", "sql": "SELECT sum(CASE WHEN region_code = 'N' THEN 1 ELSE 0 END) AS n FROM shop.customer"}
+{"id": "N03", "sql": "SELECT region_code, count(customer_id) AS n FROM shop.customer GROUP BY 1 ORDER BY 1"}
+{"id": "N04", "sql": "SELECT count(*) AS n FROM shop.transfer WHERE year(transfer_date) = 2024 AND month(transfer_date) = 1"}
+{"id": "N05", "sql": "SELECT sum(t.amount) AS total FROM shop.transfer t"}
+{"id": "N06", "sql": "SELECT c.region_code, count(DISTINCT c.customer_id) AS customers, count(*) AS accounts FROM shop.account a JOIN shop.customer c USING (customer_id) GROUP BY 1 ORDER BY 1"}
+{"id": "N07", "sql": "SELECT h.order_id, (SELECT x.customer_name FROM shop.customer x WHERE x.customer_id = h.legacy_customer_id) AS name FROM shop.order_header h WHERE h.order_id = 7"}
+{"id": "N08", "sql": "SELECT h.order_id, (SELECT x.customer_name FROM shop.customer x WHERE x.customer_id = h.legacy_customer_id) AS name FROM shop.order_header h WHERE h.order_id = 8"}
+{"id": "N09", "sql": "SELECT count(*) AS n FROM shop.order_line l WHERE l.order_id IN (SELECT o.order_id FROM shop.order_header o JOIN shop.customer c USING (customer_id) WHERE c.region_code = 'W')"}
+{"id": "N10", "sql": "SELECT 'ZQXROW' AS tag, count(supplier_id) AS n FROM shop.supplier"}
+{"id": "N11", "sql": "SELECT DISTINCT o.customer_id FROM shop.order_header o JOIN shop.order_line l USING (order_id) WHERE l.product_id = 0 AND o.customer_id IN (SELECT customer_id FROM shop.customer WHERE region_code = 'N') ORDER BY 1"}

@@ -1,0 +1,72 @@
+{
+  "generated": "2026-11-17T21:08:09+00:00",
+  "database": "/private/tmp/claude-501/-Users-deanb-dev-ai-graphrag-semantic-ontology/4ce7d2d4-07a5-41f1-8b8e-f41f8037580c/scratchpad/n6/db/fixcat.duckdb",
+  "duckdb_version": "1.5.2",
+  "timeout_s": 600.0,
+  "row_cap": 1000,
+  "elapsed_s": 0.0,
+  "counts": {
+    "strict": 11,
+    "orderfree": 0,
+    "disagree": 0,
+    "error": 0,
+    "timeout": 0
+  },
+  "per_id": {
+    "N01": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    },
+    "N02": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    },
+    "N03": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    },
+    "N04": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    },
+    "N05": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    },
+    "N06": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    },
+    "N07": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    },
+    "N08": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    },
+    "N09": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    },
+    "N10": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    },
+    "N11": {
+      "status": "strict",
+      "A": "-",
+      "B": "-"
+    }
+  }
+}

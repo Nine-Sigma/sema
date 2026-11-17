@@ -1,0 +1,33 @@
+# Neutral sealed-set profile for the --profile entry: the neutral question set over the
+# connector fixture's DuckDB file, run on the toy harness. Relative paths resolve against
+# this file's directory. Tests write the DuckDB file beside this profile and point
+# harness.frozen at the toy harness closure they freeze.
+profile_version: 1
+name: neutral
+
+set_dir: neutral
+duckdb: fixcat.duckdb
+
+harness:
+  frozen: frozen
+  package: toy_harness
+
+model:
+  provider: openrouter
+  name: neutral-stub-model
+
+limits:
+  input_ceiling: 16000
+  repair_reserve: 2066
+  output_ceiling: 8192
+  guard_chars_per_token: 2.334
+  conservative_chars_per_token: 2.08
+  row_limit: 1000
+  max_repairs: 2
+
+knobs: {budget_tokens: 12000}
+
+settings:
+  prices: {input_usd_per_1m: 2.0, output_usd_per_1m: 10.0}
+  max_cost_usd: 1.0
+  max_wall_s: 600
