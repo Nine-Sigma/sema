@@ -170,7 +170,28 @@ def _strip_row(i: int) -> Row:
     return (30001 + i, hue, hue_name, dye, dye_name, _cycle(("GL-1", "GL-2"), i))
 
 
+# Attempt 3's cases. `notch_name` holds a text on 3 rows in 40 and NULL on the rest;
+# `notch_title` on 9 rows in 10. A key in one schema names a relation of another, beside a
+# same-named relation of other codes in its own schema.
+NOTCH = {"N-1": ("Shallow notch", "shallow"), "N-2": ("Deep notch", "deep"),
+         "N-3": ("Keyed notch", "keyed")}
+LEDGE_ROWS = 200
+LATCH = {"LT-1": "Spring latch", "LT-2": "Cam latch", "LT-3": "Hook latch"}
+LATCH_DECOY = {"LX-1": "decoy one", "LX-2": "decoy two"}
+
+
+def _ledge_row(i: int) -> Row:
+    code = _cycle(tuple(NOTCH), i)
+    name, title = NOTCH[code]
+    return (40001 + i, code, name if i % 40 < 3 else None, title if i % 10 else None)
+
+
 ROWS: dict[str, list[Row]] = {
+    "notch": [(code,) for code in NOTCH],
+    "ledge": [_ledge_row(i) for i in range(LEDGE_ROWS)],
+    "bin": [(1 + i, _cycle(tuple(LATCH), i)) for i in range(SPLIT_ROWS)],
+    "latch": list(LATCH.items()),
+    "latch_decoy": list(LATCH_DECOY.items()),
     "hue": [(code,) for code in HUE],
     "dye": [(code,) for code in DYE],
     "glint": list(GLINT.items()),
@@ -268,6 +289,22 @@ SPLIT_SCHEMA_TABLES: dict[str, tuple[FixtureTable, ...]] = {
     ANNEX_SCHEMA: (
         _table("vat", (("vat_no", _INT), ("seal_kind", _TEXT), ("bevel_kind", _TEXT))),
     ),
+}
+
+
+NULL_LABEL_TABLES: tuple[FixtureTable, ...] = (
+    _table("notch", (("notch_code", _TEXT),)),
+    _table("ledge", (("ledge_no", _INT), ("notch_code", _TEXT), ("notch_name", _TEXT),
+                     ("notch_title", _TEXT)), (_key("notch_code", "notch"),)),
+)
+# No key is declared here: DuckDB refuses a key across schemas, so a test states it.
+CROSS_SCHEMA_TABLES: dict[str, tuple[FixtureTable, ...]] = {
+    CODES_SCHEMA: (
+        _table("bin", (("bin_no", _INT), ("latch_ref", _TEXT))),
+        FixtureTable("latch", (("latch_code", _TEXT), ("latch_note", _TEXT)), ("latch_code",),
+                     _values_sql(ROWS["latch_decoy"])),
+    ),
+    ANNEX_SCHEMA: (_table("latch", (("latch_code", _TEXT), ("latch_title", _TEXT))),),
 }
 
 
