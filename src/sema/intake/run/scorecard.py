@@ -111,10 +111,10 @@ def score(
     actual = _cells(manifest, staged, authored)
     terms = sorted((expected.keys() | actual.keys()) - set(FIXED_KINDS))
     kinds = {
-        kind: _kind_score(_verdicts(expected.get(kind, {}), actual.get(kind, {})))
+        kind: kind_score(verdicts(expected.get(kind, {}), actual.get(kind, {})))
         for kind in (*FIXED_KINDS, *terms)
     }
-    overall = _kind_score(_totals(kinds.values()))
+    overall = kind_score(_totals(kinds.values()))
     return Scorecard(kinds=kinds, precision=overall.precision, recall=overall.recall)
 
 
@@ -154,7 +154,7 @@ def _totals(kinds: Iterable[KindScore]) -> Counter[str]:
     return totals
 
 
-def _kind_score(counts: Counter[str]) -> KindScore:
+def kind_score(counts: Counter[str]) -> KindScore:
     equal, missing, wrong, extra = (counts[verdict] for verdict in VERDICTS)
     return KindScore(
         precision=_ratio(equal, equal + wrong + extra),
@@ -170,7 +170,7 @@ def _ratio(part: int, whole: int) -> float:
     return part / whole if whole else 1.0
 
 
-def _verdicts(expected: Cells, actual: Cells) -> Counter[str]:
+def verdicts(expected: Cells, actual: Cells) -> Counter[str]:
     verdicts: Counter[str] = Counter()
     for key in expected.keys() | actual.keys():
         verdict = _verdict(expected.get(key), actual.get(key))

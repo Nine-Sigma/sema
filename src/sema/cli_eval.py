@@ -127,6 +127,50 @@ def report_cmd(
     _emit_json(report, output_path)
 
 
+@eval_group.command("discovery")
+@click.option(
+    "--config", "config_path", required=True, type=click.Path(exists=True, dir_okay=False),
+    help="BuildConfig YAML of the build that wrote the graph (source, catalog, schemas, Neo4j).",
+)
+@click.option(
+    "--oracle-spec", "oracle_path", default=None, type=click.Path(exists=True, dir_okay=False),
+    help="Oracle claims as JSON Lines; default: the constraints the source declares.",
+)
+@click.option(
+    "--out", "out_path", required=True, type=click.Path(dir_okay=False),
+    help="Write the markdown scorecard here.",
+)
+def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> None:
+    """Score the graph's facts per fact kind against an oracle, with data rechecks."""
+    from sema.cli_factories import _get_neo4j_driver
+    from sema.eval.discovery_scorecard import (
+        FACT_KINDS,
+        declared_constraints,
+        facts_from_graph,
+        recheck,
+        render,
+        score_discovery,
+    )
+    from sema.eval.discovery_scorecard_utils import read_oracle
+    from sema.models.config import BuildConfig
+    from sema.pipeline.build import resolve_connector_factory
+
+    config = BuildConfig.from_file(config_path)
+    connector = resolve_connector_factory(config).create()
+    driver = _get_neo4j_driver(config.neo4j)
+    try:
+        produced = facts_from_graph(driver)
+    finally:
+        driver.close()
+    oracle = (
+        read_oracle(Path(oracle_path), FACT_KINDS) if oracle_path
+        else declared_constraints(connector, config.catalog, config.schemas)
+    )
+    rechecked = recheck(connector, config.catalog, config.schemas, produced)
+    Path(out_path).write_text(render(score_discovery(produced, oracle, rechecked)))
+    click.echo(out_path)
+
+
 def _execute_run(
     *,
     slice_path: str,
