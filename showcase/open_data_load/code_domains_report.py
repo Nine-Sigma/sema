@@ -1,181 +1,95 @@
-"""Report every binding SEMA proposes for a coded column, whether the build graph links it, and
-how much of the column's data its value set lists.
+"""Report every binding the build proposes for a coded column, whether the build graph links
+it, with its verification and how much of the column's data its value set lists.
 
-Run as `python -m showcase.open_data_load.code_domains_report --profile <yaml> --spec <yaml>
---out <md>`. The profile's `build:` keys name the DuckDB file, catalog and schema; the spec
-is intake's spec for the source (a `concept_source` file); Neo4j comes from the `NEO4J_*`
-environment. Proposals come from the spec's stated domains, the declared keys the connector
-reads, and the build graph's own value-set links. The command builds nothing.
+Run as `python -m showcase.open_data_load.code_domains_report --profile <yaml> --out <md>`.
+The profile's `build:` keys name the catalog and schema; Neo4j comes from the `NEO4J_*`
+environment. Everything comes from the graph the build wrote: the `has_value_set` assertions
+(declared keys, stated domains, name matches, containment, unplaced domains) and the
+`HAS_VALUE_SET` links with their `MEMBER_OF` members. The command builds nothing.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections import Counter
-from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from neo4j import GraphDatabase, RoutingControl
 
-from sema.binding.spec import ConceptSourceSpec, load_concept_source_spec
-from sema.connectors.duckdb import DuckDBConnector
-from sema.models.config import DuckDBConfig, Neo4jConfig
-from showcase.open_data_load.build import BuildTarget, read_build_target
-from showcase.open_data_load.build_utils import table_prefix
+from sema.models.config import Neo4jConfig
+from showcase.open_data_load.build import read_build_target
 from showcase.open_data_load.code_domains_report_utils import (
-    BUILD_GRAPH,
-    Proposal,
-    WarehouseTable,
-    code_values,
-    coverage,
-    declared_keys,
-    merged,
-    stated_domains,
+    Evidence,
+    GraphLink,
+    Member,
+    Row,
+    binding_row,
+    bindings,
+    link_row,
 )
 
+__all__ = ["Evidence", "GraphLink", "Member", "Row", "main", "read_evidence", "read_links",
+           "render", "report"]
+
+EVIDENCE_QUERY = (
+    "MATCH (a:Assertion {predicate: 'has_value_set', source_schema: $schema}) "
+    "OPTIONAL MATCH (c:Column {ref: a.subject_ref}) "
+    "RETURN c.table_name AS table, c.name AS column, a.object_ref AS value_set, "
+    "a.payload AS payload"
+)
 LINKS_QUERY = (
-    "MATCH (c:Column)-[:HAS_VALUE_SET]->(vs:ValueSet) WHERE c.ref STARTS WITH $prefix "
-    "OPTIONAL MATCH (t:Term)-[:MEMBER_OF]->(vs) "
-    "RETURN c.ref AS ref, vs.name AS value_set, collect(DISTINCT t.code) AS codes, "
-    "count(DISTINCT CASE WHEN t.label IS NOT NULL THEN t END) AS labeled"
+    "MATCH (c:Column {schema_name: $schema, catalog: $catalog})-[h:HAS_VALUE_SET]->"
+    "(vs:ValueSet) "
+    "OPTIONAL MATCH (t:Term)-[m:MEMBER_OF]->(vs) "
+    "RETURN c.table_name AS table, c.name AS column, vs.name AS value_set, "
+    "properties(h) AS props, "
+    "collect(CASE WHEN t IS NULL THEN NULL ELSE [t.code, t.label, m.rows, m.listed] END) "
+    "AS members"
 )
 COLUMNS = (
-    "column", "proposed value set", "evidence", "linked", "labels",
+    "column", "proposed value set", "evidence", "linked", "verification", "labels",
     "listed_value_share", "listed_row_share", "null_rows", "reason",
 )
 
 
-@dataclass(frozen=True)
-class GraphLink:
-    ref: str
-    value_set: str
-    codes: frozenset[str]
-    labeled: int
+def _records(neo4j: Neo4jConfig, query: str, **params: Any) -> list[Any]:
+    auth = (neo4j.user, neo4j.password.get_secret_value())
+    with GraphDatabase.driver(neo4j.uri, auth=auth) as driver:
+        return list(driver.execute_query(query, routing_=RoutingControl.READ, **params).records)
 
 
-@dataclass(frozen=True)
-class Row:
-    column: str | None
-    value_set: str
-    evidence: tuple[str, ...]
-    linked: bool
-    labels: bool
-    listed_value_share: float | None
-    listed_row_share: float | None
-    null_rows: int | None
-    reason: str
-
-
-def _connector(target: BuildTarget) -> DuckDBConnector:
-    return DuckDBConnector(DuckDBConfig(path=str(target.database)))
-
-
-def _tables(connector: DuckDBConnector, target: BuildTarget) -> dict[str, WarehouseTable]:
-    found = {}
-    for item in connector.discover_tables(target.catalog, [target.schema]):
-        columns = connector.extract_columns_dto(target.catalog, target.schema, item.table_name)
-        found[item.table_name] = WarehouseTable(
-            item.table_name, item.fqn, tuple(c.name for c in columns)
-        )
+def read_evidence(neo4j: Neo4jConfig, schema: str) -> list[Evidence]:
+    found = []
+    for r in _records(neo4j, EVIDENCE_QUERY, schema=schema):
+        payload = json.loads(r["payload"]) if isinstance(r["payload"], str) else r["payload"]
+        column = f"{r['table']}.{r['column']}" if r["column"] else None
+        found.append(Evidence(column, r["value_set"], payload.get("evidence", ""), payload))
     return found
 
 
-def warehouse_tables(target: BuildTarget) -> list[WarehouseTable]:
-    connector = _connector(target)
-    try:
-        return list(_tables(connector, target).values())
-    finally:
-        connector.close()
-
-
-def read_links(neo4j: Neo4jConfig, prefix: str) -> list[GraphLink]:
-    auth = (neo4j.user, neo4j.password.get_secret_value())
-    with GraphDatabase.driver(neo4j.uri, auth=auth) as driver:
-        records = driver.execute_query(
-            LINKS_QUERY, prefix=prefix, routing_=RoutingControl.READ
-        ).records
+def read_links(neo4j: Neo4jConfig, catalog: str, schema: str) -> list[GraphLink]:
     return [
-        GraphLink(r["ref"], r["value_set"], frozenset(r["codes"]), r["labeled"]) for r in records
+        GraphLink(
+            f"{r['table']}.{r['column']}", r["value_set"], dict(r["props"]),
+            tuple(Member(str(code), label, rows, listed)
+                  for code, label, rows, listed in r["members"]),
+        )
+        for r in _records(neo4j, LINKS_QUERY, catalog=catalog, schema=schema)
     ]
 
 
-def _column_refs(tables: dict[str, WarehouseTable]) -> dict[tuple[str, str], str]:
-    return {(t.name, c): f"{t.ref}/{c}" for t in tables.values() for c in t.columns}
-
-
-def _with_links(
-    proposed: list[Proposal], links: list[GraphLink], tables: dict[str, WarehouseTable],
-) -> list[tuple[Proposal, GraphLink | None]]:
-    """Each proposal with the graph link on its column; a link nothing proposed is its own."""
-    refs = _column_refs(tables)
-    link_of = {link.ref: link for link in links}
-    pairs: list[tuple[Proposal, GraphLink | None]] = []
-    placed = set()
-    for p in proposed:
-        ref = refs.get((p.table or "", p.column or ""))
-        placed.add(ref)
-        pairs.append((p, link_of.get(ref) if ref else None))
-    column_of = {ref: key for key, ref in refs.items()}
-    for link in links:
-        if link.ref in placed:
-            continue
-        table, column = column_of.get(link.ref, (None, None))
-        problems = () if column else (f"linked column {link.ref} is not in the warehouse",)
-        pairs.append((
-            Proposal(table, column, link.value_set, None, frozenset({BUILD_GRAPH}), problems),
-            link,
-        ))  # fmt: skip
-    return pairs
-
-
-def _link_reasons(link: GraphLink | None) -> list[str]:
-    if link is None:
-        return ["no HAS_VALUE_SET"]
-    if not link.codes:
-        return [f"value set {link.value_set} has no members"]
-    if link.labeled < len(link.codes):
-        return [f"{link.labeled} of {len(link.codes)} members of {link.value_set} carry a label"]
-    return []
-
-
-def _row(
-    proposal: Proposal, link: GraphLink | None, connector: DuckDBConnector, target: BuildTarget,
-) -> Row:
-    linked = link is not None and bool(link.codes)
-    codes = link.codes if link is not None and link.codes else None
-    if codes is None and proposal.codes_at is not None:
-        codes = frozenset(code_values(connector, target.catalog, target.schema, proposal.codes_at))
-    numbers = None
-    if proposal.table and proposal.column:
-        numbers = coverage(
-            connector, target.catalog, target.schema, proposal.table, proposal.column, codes
-        )
-    return Row(
-        column=f"{proposal.table}.{proposal.column}" if proposal.column else None,
-        value_set=proposal.value_set,
-        evidence=tuple(sorted(proposal.evidence)),
-        linked=linked,
-        labels=linked and link is not None and link.labeled == len(link.codes),
-        listed_value_share=numbers.listed_value_share if numbers else None,
-        listed_row_share=numbers.listed_row_share if numbers else None,
-        null_rows=numbers.null_rows if numbers else None,
-        reason="; ".join([*proposal.problems, *_link_reasons(link)]),
-    )
-
-
-def report(target: BuildTarget, spec: ConceptSourceSpec, links: list[GraphLink]) -> list[Row]:
-    connector = _connector(target)
-    try:
-        tables = _tables(connector, target)
-        proposed = merged([
-            *stated_domains(spec, tables),
-            *declared_keys(connector, target.catalog, target.schema, tables),
-        ])  # fmt: skip
-        pairs = _with_links(proposed, links, tables)
-        rows = [_row(proposal, link, connector, target) for proposal, link in pairs]
-    finally:
-        connector.close()
+def report(evidence: list[Evidence], links: list[GraphLink]) -> list[Row]:
+    proposed = bindings(evidence)
+    linked = {b.column: b for b in proposed if b.linked and b.column is not None}
+    linked_columns = {link.column for link in links}
+    rows = [link_row(link, linked.get(link.column)) for link in links]
+    rows += [
+        binding_row(b) for b in proposed
+        if not (b.linked and b.column in linked_columns)
+    ]
     return sorted(rows, key=lambda r: (r.column or "", r.value_set, r.reason))
 
 
@@ -193,10 +107,12 @@ def _cell(value: object) -> str:
 
 def render(rows: list[Row], heading: list[str]) -> str:
     by_evidence = Counter(kind for row in rows for kind in row.evidence)
+    verified = sum(row.linked and row.verification == "verified" for row in rows)
     summary = [
         f"- proposed bindings: {len(rows)}",
         *(f"- proposed by {kind}: {n}" for kind, n in sorted(by_evidence.items())),
         f"- linked: {sum(row.linked for row in rows)}",
+        f"- linked and verified: {verified}",
         f"- linked with labels: {sum(row.labels for row in rows)}",
     ]
     table = [
@@ -204,8 +120,9 @@ def render(rows: list[Row], heading: list[str]) -> str:
         "|" + "---|" * len(COLUMNS),
         *(
             "| " + " | ".join(_cell(v) for v in (
-                row.column, row.value_set, row.evidence, row.linked, row.labels,
-                row.listed_value_share, row.listed_row_share, row.null_rows, row.reason,
+                row.column, row.value_set, row.evidence, row.linked, row.verification,
+                row.labels, row.listed_value_share, row.listed_row_share, row.null_rows,
+                row.reason,
             )) + " |"
             for row in rows
         ),
@@ -216,17 +133,17 @@ def render(rows: list[Row], heading: list[str]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, required=True)
-    parser.add_argument("--spec", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     target = read_build_target(args.profile)
-    prefix = table_prefix(target.database, target.catalog, target.schema)
-    rows = report(target, load_concept_source_spec(args.spec), read_links(Neo4jConfig(), prefix))
+    neo4j = Neo4jConfig()
+    rows = report(
+        read_evidence(neo4j, target.schema), read_links(neo4j, target.catalog, target.schema),
+    )
     heading = [
-        f"- profile: `{args.profile}`", f"- spec: `{args.spec}`",
-        f"- warehouse: `{target.database}`, catalog `{target.catalog}`, schema `{target.schema}`",
-        f"- graph columns under: `{prefix}`",
-    ]  # fmt: skip
+        f"- profile: `{args.profile}`",
+        f"- graph: catalog `{target.catalog}`, schema `{target.schema}`",
+    ]
     args.out.write_text(render(rows, heading), encoding="utf-8")
     return 0
 

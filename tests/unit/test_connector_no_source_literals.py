@@ -1,4 +1,5 @@
-"""Generality gate: the source files the DuckDB connector unit changes name no source.
+"""Generality gate: the source files the DuckDB connector unit and the coded-column unit
+change name no source.
 
 The literals are read at test time from every source fixture and profile, so a source
 added later is covered without editing this test.
@@ -37,10 +38,19 @@ UNIT_FILES = tuple(
     for relative in (
         "connectors/duckdb.py",
         "connectors/duckdb_utils.py",
+        "consumers/nl2sql/prompting_utils.py",
+        "engine/coded_column_utils.py",
+        "engine/join_detector.py",
+        "engine/join_detector_utils.py",
+        "engine/warehouse_lookup.py",
+        "graph/concept_value_set.py",
+        "graph/loader.py",
+        "models/assertions.py",
         "models/config.py",
         "models/extraction.py",
         "models/physical_key.py",
         "pipeline/build.py",
+        "pipeline/coded_columns.py",
         "pipeline/orchestrate.py",
     )
 )
@@ -66,6 +76,9 @@ PREDATING_HITS = {
     ("config.py", "5.4"): (
         "aed40d37 cdm_version default; predates unit 3, see unit-3 STATE.md Waiting on Dean"
     ),
+    ("loader.py", "column name"): "Column node keys in Cypher; predates unit 5",
+    ("loader.py", "predicate"): "Assertion field name; predates unit 5",
+    ("loader.py", "source"): "Assertion field name; predates unit 5",
 }
 
 

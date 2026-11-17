@@ -78,6 +78,24 @@ DICTIONARY_ENTRIES = (
     DictionaryEntry("wall_fitting", "Wall Fitting", {"Bevel Kind.": "bevel_kinds"}),
 )
 UNPLACED_PROPERTY = "Edge Treatment"
+# A token and a substring of column names that equal none: names only nominate on equality.
+# Then a property placed on a column one past the low-distinct bound.
+PAST_BOUND_PROPERTY = "Assigned Crew"
+CASE_ENTRIES = (
+    DictionaryEntry("loose", None, {"Kind": "trim_kinds", "Coat": "coat_kinds"}),
+    DictionaryEntry("wide", None, {PAST_BOUND_PROPERTY: "trim_kinds"}),
+)
+# Two schemas in one run: the entity names a relation of the first schema only, a property
+# lands in the second schema only, and one property lands nowhere.
+ANNEX_SCHEMA = "annex"
+SPLIT_PLACED_PROPERTY = "Bevel Kind"
+SPLIT_UNPLACED_PROPERTY = "Rim Kind"
+SPLIT_ENTRIES = (
+    DictionaryEntry("kiln", "Kiln", {"Seal Kind": "seal_kinds"}),
+    DictionaryEntry("vat_notes", None, {SPLIT_PLACED_PROPERTY: "bevel_kinds",
+                                        SPLIT_UNPLACED_PROPERTY: "edge_kinds"}),
+)
+SPLIT_ROWS = 12
 
 
 def normalized_name(name: str) -> str:
@@ -132,7 +150,53 @@ def _fitting_row(i: int) -> Row:
             _cycle(_FITTING_SEALS, i), _cycle(_FITTING_TRIMS, i))
 
 
+# The second review's cases, in relations of their own so the tables above keep their numbers.
+STRIP_ROWS = 200
+HUE = {"H-1": "Ash", "H-2": "Birch", "H-3": "Cedar"}
+DYE = {"D-1": "Ochre", "D-2": "Umber", "D-3": "Sienna", "D-4": "Indigo", "D-5": "Madder"}
+GLINT = {"GL-1": "Faint glint", "GL-2": "Bright glint", "GL-3": "Blinding glint"}
+SPARK = {"GL-1": "spark one", "GL-2": "spark two", "SP-3": "spark three", "SP-4": "spark four"}
+HUE_NOISE_PERIOD = 20
+DYE_NOISE = (0, 1)
+DYE_NOISE_PERIOD = 7
+
+
+def _strip_row(i: int) -> Row:
+    """`hue_name` names another hue on one row in 20; `dye_name` another dye on two in 7."""
+    hues, dyes = tuple(HUE), tuple(DYE)
+    hue, dye = _cycle(hues, i), _cycle(dyes, i)
+    hue_name = HUE[_cycle(hues, i + 1)] if i % HUE_NOISE_PERIOD == 0 else HUE[hue]
+    dye_name = DYE[_cycle(dyes, i + 1)] if i % DYE_NOISE_PERIOD in DYE_NOISE else DYE[dye]
+    return (30001 + i, hue, hue_name, dye, dye_name, _cycle(("GL-1", "GL-2"), i))
+
+
+# Attempt 3's cases. `notch_name` holds a text on 3 rows in 40 and NULL on the rest;
+# `notch_title` on 9 rows in 10. A key in one schema names a relation of another, beside a
+# same-named relation of other codes in its own schema.
+NOTCH = {"N-1": ("Shallow notch", "shallow"), "N-2": ("Deep notch", "deep"),
+         "N-3": ("Keyed notch", "keyed")}
+LEDGE_ROWS = 200
+LATCH = {"LT-1": "Spring latch", "LT-2": "Cam latch", "LT-3": "Hook latch"}
+LATCH_DECOY = {"LX-1": "decoy one", "LX-2": "decoy two"}
+
+
+def _ledge_row(i: int) -> Row:
+    code = _cycle(tuple(NOTCH), i)
+    name, title = NOTCH[code]
+    return (40001 + i, code, name if i % 40 < 3 else None, title if i % 10 else None)
+
+
 ROWS: dict[str, list[Row]] = {
+    "notch": [(code,) for code in NOTCH],
+    "ledge": [_ledge_row(i) for i in range(LEDGE_ROWS)],
+    "bin": [(1 + i, _cycle(tuple(LATCH), i)) for i in range(SPLIT_ROWS)],
+    "latch": list(LATCH.items()),
+    "latch_decoy": list(LATCH_DECOY.items()),
+    "hue": [(code,) for code in HUE],
+    "dye": [(code,) for code in DYE],
+    "glint": list(GLINT.items()),
+    "spark": list(SPARK.items()),
+    "strip": [_strip_row(i) for i in range(STRIP_ROWS)],
     "finish": list(FINISH.items()),
     "tone": [(code,) for code in TONE_NAMES],
     "sheen": [(code,) for code in SHEEN],
@@ -146,6 +210,9 @@ ROWS: dict[str, list[Row]] = {
     "pallet": list(PALLET.items()),
     "panel": [_panel_row(i) for i in range(PANEL_ROWS)],
     "fitting": [_fitting_row(i) for i in range(FITTING_ROWS)],
+    "kiln": [(1 + i, _cycle(tuple(SEAL_KINDS), i)) for i in range(SPLIT_ROWS)],
+    "vat": [(1 + i, _cycle(tuple(SEAL_KINDS), i), _cycle(tuple(BEVEL_KINDS), i))
+            for i in range(SPLIT_ROWS)],
 }
 
 
@@ -205,18 +272,55 @@ CODED_TABLES: tuple[FixtureTable, ...] = (
 )
 CODED_SCHEMA_TABLES = {CODES_SCHEMA: CODED_TABLES}
 FACT_TABLES = ("panel", "fitting")
+CASE_TABLES: tuple[FixtureTable, ...] = (
+    _table("hue", (("hue_code", _TEXT),)),
+    _table("dye", (("dye_code", _TEXT),)),
+    _table("glint", (("glint_code", _TEXT), ("glint_title", _TEXT))),
+    _table("spark", (("spark_code", _TEXT), ("spark_title", _TEXT))),
+    _table(
+        "strip",
+        (("strip_no", _INT), ("hue_code", _TEXT), ("hue_name", _TEXT), ("dye_code", _TEXT),
+         ("dye_name", _TEXT), ("glint_code", _TEXT)),
+        (_key("hue_code", "hue"), _key("dye_code", "dye")),
+    ),
+)
+SPLIT_SCHEMA_TABLES: dict[str, tuple[FixtureTable, ...]] = {
+    CODES_SCHEMA: (_table("kiln", (("kiln_no", _INT), ("seal_kind", _TEXT))),),
+    ANNEX_SCHEMA: (
+        _table("vat", (("vat_no", _INT), ("seal_kind", _TEXT), ("bevel_kind", _TEXT))),
+    ),
+}
+
+
+NULL_LABEL_TABLES: tuple[FixtureTable, ...] = (
+    _table("notch", (("notch_code", _TEXT),)),
+    _table("ledge", (("ledge_no", _INT), ("notch_code", _TEXT), ("notch_name", _TEXT),
+                     ("notch_title", _TEXT)), (_key("notch_code", "notch"),)),
+)
+# No key is declared here: DuckDB refuses a key across schemas, so a test states it.
+CROSS_SCHEMA_TABLES: dict[str, tuple[FixtureTable, ...]] = {
+    CODES_SCHEMA: (
+        _table("bin", (("bin_no", _INT), ("latch_ref", _TEXT))),
+        FixtureTable("latch", (("latch_code", _TEXT), ("latch_note", _TEXT)), ("latch_code",),
+                     _values_sql(ROWS["latch_decoy"])),
+    ),
+    ANNEX_SCHEMA: (_table("latch", (("latch_code", _TEXT), ("latch_title", _TEXT))),),
+}
 
 
 def column_values(table: str, column: str) -> list[Any]:
     """Every value of one fixture column, in row order, NULLs included."""
-    (fixture,) = (t for t in CODED_TABLES if t.name == table)
+    split = [t for tables in SPLIT_SCHEMA_TABLES.values() for t in tables]
+    (fixture,) = (t for t in (*CODED_TABLES, *CASE_TABLES, *split) if t.name == table)
     index = fixture.column_names.index(column)
     return [row[index] for row in ROWS[table]]
 
 
-def write_coded_database(directory: Path) -> Path:
+def write_coded_database(
+    directory: Path, tables: tuple[FixtureTable, ...] = CODED_TABLES,
+) -> Path:
     """The coded warehouse as a DuckDB file whose catalog, its file stem, is `CODES_CATALOG`."""
-    return write_fixture_database(directory, CODED_SCHEMA_TABLES, CODES_CATALOG)
+    return write_fixture_database(directory, {CODES_SCHEMA: tables}, CODES_CATALOG)
 
 
 @dataclass(frozen=True)
@@ -247,7 +351,7 @@ def _entity_entry(entry: DictionaryEntry) -> dict[str, Any]:
             "domains": entry.domains}
 
 
-def _spec() -> dict[str, Any]:
+def _spec(entries: tuple[DictionaryEntry, ...]) -> dict[str, Any]:
     return {"concept_source": {
         "spec_version": 2,
         "id": "fixcodes-dictionary",
@@ -257,7 +361,7 @@ def _spec() -> dict[str, Any]:
         "entity_model": {
             "layout": "per_file",
             "roles": {"property": "field_name", "description": "field_note"},
-            "entities": [_entity_entry(entry) for entry in DICTIONARY_ENTRIES],
+            "entities": [_entity_entry(entry) for entry in entries],
         },
         "code_lists": [
             {"vocabulary_id": vocabulary, "relation": f"{DICTIONARY_SCHEMA}.{vocabulary}",
@@ -267,12 +371,14 @@ def _spec() -> dict[str, Any]:
     }}
 
 
-def write_dictionary(directory: Path) -> DictionaryFiles:
+def write_dictionary(
+    directory: Path, entries: tuple[DictionaryEntry, ...] = DICTIONARY_ENTRIES,
+) -> DictionaryFiles:
     """The dictionary's staging file and the concept spec that reads it."""
     staging_path = directory / "dictionary.duckdb"
     with Staging(str(staging_path), schemas=()) as staging:
         staging.execute(f"CREATE SCHEMA {DICTIONARY_SCHEMA}")
-        for entry in DICTIONARY_ENTRIES:
+        for entry in entries:
             relation = f"{DICTIONARY_SCHEMA}.{entry.stem}_fields"
             staging.execute(f"CREATE TABLE {relation} (field_name VARCHAR, field_note VARCHAR)")
             staging.execute(f"INSERT INTO {relation} {_values_sql(list(_field_rows(entry)))}")
@@ -281,5 +387,5 @@ def write_dictionary(directory: Path) -> DictionaryFiles:
             staging.execute(f"CREATE TABLE {relation} (kind_code VARCHAR, kind_text VARCHAR)")
             staging.execute(f"INSERT INTO {relation} {_values_sql(list(codes.items()))}")
     spec_path = directory / "dictionary_spec.yaml"
-    spec_path.write_text(yaml.safe_dump(_spec(), sort_keys=False), encoding="utf-8")
+    spec_path.write_text(yaml.safe_dump(_spec(entries), sort_keys=False), encoding="utf-8")
     return DictionaryFiles(spec_path, staging_path)

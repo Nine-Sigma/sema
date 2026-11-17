@@ -162,6 +162,9 @@ class BuildConfig(BaseSettings):
 
     enable_fk_detection: bool = True
     materialize_structural_fk: bool = False
+    # Intake's concept spec and the staging file its relations live in: stated domains, code lists.
+    concept_spec: str | None = None
+    concept_staging: str | None = None
 
     evidence_policy: EvidenceTier = "full"
     max_distinct_values_read: int = 200
