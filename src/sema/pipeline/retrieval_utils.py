@@ -15,6 +15,7 @@ from sema.pipeline.dedup_utils import (
     dedup_artifacts as _dedup_artifacts,
     dedup_seeds as _dedup_seeds,
     merge_and_rank_candidates,
+    _seed_identity_key as seed_identity_key,
     normalize_vector_hit as _normalize_vector_hit,
     tokenize_query,
 )
@@ -27,7 +28,7 @@ from sema.pipeline.term_expansion_utils import (
 if TYPE_CHECKING:
     from sema.pipeline.retrieval import RetrievalEngine
 
-_LEXICAL_PROPERTY_OWNER_CONFIDENCE = 0.6
+_PROPERTY_OWNER_CONFIDENCE = 0.6
 
 __all__ = [
     "_dedup_artifacts",
@@ -193,17 +194,17 @@ def _property_vocabulary(
 def _property_owners(
     engine: RetrievalEngine, hit: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """The owning entity's tables. A vector hit's table is as credible as the
-    hit at its similarity, so a close definition reaches its table and a far
-    one does not; a lexical substring hit on a column name, which matches
-    every column sharing a word, does not bring its table alone."""
+    """The owning entity's tables. The property the vector index ranks nearest
+    the question brings its table at the property's own confidence; any other
+    property hit's table keeps the expansion confidence, below the semantic
+    threshold, so it does not enter alone."""
     entity_name = hit.get("entity_name", "")
     if not entity_name:
         return []
     confidence = (
-        hit.get("confidence", 0.5) * hit.get("score", 0.0)
-        if hit.get("match_type") == "vector"
-        else _LEXICAL_PROPERTY_OWNER_CONFIDENCE
+        hit.get("confidence", 0.5)
+        if hit.get("nearest_property")
+        else _PROPERTY_OWNER_CONFIDENCE
     )
     return [
         {
@@ -221,6 +222,20 @@ def _property_owners(
         }
         for r in _expand_physical(engine, [entity_name])
     ]
+
+
+def mark_nearest_property(
+    vector_hits: list[dict[str, Any]], seeds: list[dict[str, Any]],
+) -> None:
+    """Flag the seed of the property hit the vector index ranks nearest the
+    question. An index returns its nearest nodes for any question, and only
+    their order, never the level of their similarity, holds across embedders."""
+    properties = [h for h in vector_hits if h.get("node_type") == "property"]
+    top = max((h.get("score", 0.0) for h in properties), default=None)
+    nearest = {seed_identity_key(h) for h in properties if h.get("score", 0.0) == top}
+    for seed in seeds:
+        if seed.get("node_type") == "property" and seed_identity_key(seed) in nearest:
+            seed["nearest_property"] = True
 
 
 def _physical_column(
