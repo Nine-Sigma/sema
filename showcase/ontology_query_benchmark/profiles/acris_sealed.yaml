@@ -13,7 +13,7 @@ harness:
 
 model:
   provider: openrouter
-  name: openai/gpt-6-luna          # the intake model Dean chose 2026-10-21
+  name: openai/gpt-5.4             # Dean's production query model; the partner baselines ran on it
 
 limits:
   input_ceiling: 36000
@@ -31,8 +31,8 @@ limits:
 knobs: {budget_tokens: 16000, values_top_k: 25}
 
 settings:
-  # Upper-bound prices, not read from OpenRouter (no network call here): an overestimate
-  # stops a run early instead of overspending. LS2 confirms them before its first call.
-  prices: {input_usd_per_1m: 2.5, output_usd_per_1m: 10.0}
-  max_cost_usd: 15.0               # LS2 ceiling, approved 2026-11-17
+  # OpenRouter catalog prices for the model, read 2026-11-17. The run stops at max_cost_usd,
+  # below the approved $15 ceiling, leaving room for embedding calls the meter does not count.
+  prices: {input_usd_per_1m: 2.5, output_usd_per_1m: 15.0}
+  max_cost_usd: 13.5
   max_wall_s: 10800
