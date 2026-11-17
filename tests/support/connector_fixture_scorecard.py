@@ -32,6 +32,11 @@ DECLARED_JOIN_KEYS = frozenset(
     join_key(t.name, k.columns, k.referenced_table, k.referenced_columns)
     for t in MAIN_TABLES for k in t.declared_keys
 )
+DECLARED_JOIN_VALUES = {
+    join_key(t.name, k.columns, k.referenced_table, k.referenced_columns):
+        "one_to_one" if set(k.columns) == set(t.primary_key) else "many_to_one"
+    for t in MAIN_TABLES for k in t.declared_keys
+}
 DETECTED_JOIN_KEYS = frozenset(_single(j) for j in EXPECTED_DETECTED_JOINS)
 UNDETECTED_JOIN_KEY = _single(UNDETECTABLE_DECLARED_JOIN)
 COMPOSITE_JOIN_KEYS = frozenset(k for k in DECLARED_JOIN_KEYS if "+" in k[1])

@@ -4,8 +4,8 @@ The build runs with the model mocked and embeddings skipped, over the fixture's 
 `facts_from_graph(driver)` reads the graph's facts and `declared_constraints(connector,
 catalog, schemas)` reads the constraints the DuckDB connector declares, each as `Cells` per
 fact kind keyed as the oracle file format keys them. The fixture's shape: the graph holds
-every declared key and every detected join, twelve joins in all, and contradicts no
-declared key; the connector declares six keys.
+every declared key and every detected join, twelve joins in all, none with a cardinality; the
+connector declares six keys, none on columns declared unique, so each is `many_to_one`.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ from tests.support.connector_fixture import (
 )
 from tests.support.connector_fixture_scorecard import (
     DECLARED_JOIN_KEYS,
+    DECLARED_JOIN_VALUES,
     DETECTED_JOIN_KEYS,
     card_rows,
 )
@@ -38,6 +39,10 @@ from tests.support.connector_fixture_scorecard import (
 pytestmark = pytest.mark.integration
 
 GRAPH_JOIN_KEYS = DECLARED_JOIN_KEYS | DETECTED_JOIN_KEYS
+KEY_ONLY = "key_only"
+# The graph records no cardinality, so every produced join is key_only, and key_only is equal
+# to an oracle claim on the same key whatever the oracle's cardinality.
+JOIN_SHAPE = {"produced": 12, "equal": 6, "missing": 0, "wrong": 0, "extra": 6}
 
 
 def _scorecard() -> Any:
@@ -75,10 +80,26 @@ def connector(database: Path) -> Iterator[DuckDBConnector]:
     opened.close()
 
 
+def _join_paths_without_cardinality(driver: Any) -> int:
+    with driver.session() as session:
+        record = session.run(
+            "MATCH (jp:JoinPath) WHERE jp.cardinality_hint IS NULL RETURN count(jp) AS n"
+        ).single()
+    return int(record["n"])
+
+
+def test_the_fixture_reading_behind_the_expected_counts(built: Any) -> None:
+    assert (len(GRAPH_JOIN_KEYS), len(DECLARED_JOIN_KEYS & GRAPH_JOIN_KEYS)) == (12, 6)
+    assert _join_paths_without_cardinality(built) == len(GRAPH_JOIN_KEYS)
+    assert set(DECLARED_JOIN_VALUES.values()) == {"many_to_one"}
+
+
 def test_the_graph_adapter_reads_every_join_the_build_wrote(built: Any) -> None:
     produced = _scorecard().facts_from_graph(built)
 
     assert set(produced["join"]) == GRAPH_JOIN_KEYS
+    key_only = [key for key, value in produced["join"].items() if value == KEY_ONLY]
+    assert len(key_only) == _join_paths_without_cardinality(built)
 
 
 def test_the_declared_constraint_adapter_reads_every_declared_key(
@@ -86,7 +107,7 @@ def test_the_declared_constraint_adapter_reads_every_declared_key(
 ) -> None:
     oracle = _scorecard().declared_constraints(connector, CATALOG, [MAIN_SCHEMA])
 
-    assert set(oracle["join"]) == DECLARED_JOIN_KEYS
+    assert oracle["join"] == DECLARED_JOIN_VALUES
 
 
 def test_the_fixture_scored_from_its_graph_matches_its_shape(
@@ -100,6 +121,6 @@ def test_the_fixture_scored_from_its_graph_matches_its_shape(
 
     assert tuple(rows) == tuple(scorecard.FACT_KINDS)
     join = rows["join"]
-    assert (join["produced"], join["wrong"]) == (str(len(GRAPH_JOIN_KEYS)), "0")
-    assert int(join["equal"]) + int(join["missing"]) == len(DECLARED_JOIN_KEYS)
-    assert int(join["extra"]) <= len(GRAPH_JOIN_KEYS - DECLARED_JOIN_KEYS)
+    assert {cell: join[cell] for cell in JOIN_SHAPE} == {
+        cell: str(count) for cell, count in JOIN_SHAPE.items()
+    }

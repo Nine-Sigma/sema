@@ -97,6 +97,23 @@ def test_a_kind_with_no_producer_prints_not_produced() -> None:
     assert "not produced" not in " ".join(rows["join"].values())
 
 
+def test_a_kind_only_the_oracle_covers_prints_not_produced_and_misses_every_claim() -> None:
+    oracle = {"join": DECLARED_JOINS, "candidate_key": CANDIDATE_KEYS}
+    rows = card_rows(_card({"join": PRODUCED_JOINS}, oracle))
+
+    row = rows["candidate_key"]
+    assert "not produced" in " ".join(row.values())
+    assert row["missing"] == str(len(CANDIDATE_KEYS))
+    assert "no oracle" not in " ".join(row.values())
+
+
+def test_a_kind_absent_from_both_sides_prints_not_produced_and_no_oracle() -> None:
+    rows = card_rows(_card({"join": PRODUCED_JOINS}, {"join": DECLARED_JOINS}))
+
+    cells = " ".join(rows["hierarchy"].values())
+    assert "not produced" in cells and "no oracle" in cells
+
+
 def test_a_kind_with_no_oracle_prints_no_oracle_and_its_recheck_count() -> None:
     produced = {"join": PRODUCED_JOINS, "candidate_key": CANDIDATE_KEYS}
     rows = card_rows(_card(produced, {"join": DECLARED_JOINS}))
