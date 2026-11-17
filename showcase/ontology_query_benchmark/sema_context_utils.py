@@ -16,7 +16,11 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 from sema.compile.entity_identity import entity_key_name, key_clash
-from sema.consumers.nl2sql.prompting_utils import _add_join_section, _add_tables_and_columns
+from sema.consumers.nl2sql.prompting_utils import (
+    _add_join_section,
+    _add_result_shape,
+    _add_tables_and_columns,
+)
 from sema.models.context import SemanticContextObject
 from showcase.ontology_query_benchmark.product_spec import (
     CompanionRole,
@@ -108,6 +112,7 @@ def render(
     spec = facts.hierarchy.spec if facts.hierarchy else None
     if hierarchy and spec and _hierarchy_kept(rendering, exposure, spec):
         rendering.parts.extend(hierarchy)
+    _add_result_shape(rendering.parts, rendering.sco)
     return rendering
 
 

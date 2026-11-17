@@ -114,6 +114,12 @@ class ColumnMatch(BaseModel):
     score: float = 0.0
 
 
+class ResultShape(BaseModel):
+    """The answer's output columns, in order."""
+
+    columns: list[str] = Field(default_factory=list)
+
+
 class SemanticCandidateSet(BaseModel):
     query: str
     candidates: list[dict[str, Any]] = Field(default_factory=list)
@@ -132,6 +138,9 @@ class SemanticContextObject(BaseModel):
     )
     column_matches: list[ColumnMatch] = Field(
         default_factory=list, exclude_if=lambda matches: not matches,
+    )
+    result_shape: ResultShape | None = Field(
+        default=None, exclude_if=lambda shape: shape is None,
     )
     consumer: str = "nl2sql"
     retrieval_rationale: str | None = None

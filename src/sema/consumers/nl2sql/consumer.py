@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import sqlglot
+from sqlglot import exp
+
 from sema.consumers.base import (
     ConsumerDeps,
     ConsumerRequest,
@@ -22,6 +25,7 @@ class SQLPlan:
     valid: bool
     errors: list[str] = field(default_factory=list)
     attempts: int = 1
+    columns: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -126,6 +130,7 @@ class NL2SQLConsumer:
                 if not errors:
                     return SQLPlan(
                         sql=sql, valid=True, attempts=attempt + 1,
+                        columns=_output_columns(sql, self.dialect),
                     )
             except Exception as e:
                 errors = [f"LLM error: {e}"]
@@ -155,6 +160,12 @@ class NL2SQLConsumer:
             request.question, plan.sql, exec_data, deps.llm,
         )
         return SQLResult(data=exec_data, summary=summary)
+
+
+def _output_columns(sql: str, dialect: str) -> list[str]:
+    """The statement's output column names, in order."""
+    parsed = sqlglot.parse_one(sql, dialect=dialect)
+    return list(parsed.named_selects) if isinstance(parsed, exp.Query) else []
 
 
 def _extract_sql(response: Any) -> str:

@@ -10,6 +10,7 @@ from sema.consumers.nl2sql.prompting_utils import (
     _add_governed_values_section,
     _add_join_section,
     _add_metrics_section,
+    _add_result_shape,
     _add_rules_and_question,
     _add_tables_and_columns,
     _dialect_label,
@@ -59,6 +60,7 @@ def _build_prompt_parts(
     _add_governed_values_section(parts, sco)
     _add_metrics_section(parts, sco)
     _add_ancestry_section(parts, sco)
+    _add_result_shape(parts, sco)
     _add_dialect_notes(parts, dialect)
     _add_rules_and_question(parts, question)
     return parts
@@ -170,6 +172,7 @@ def _build_with_cuts(
         _add_metrics_section(parts, sco)
     if not skip_ancestry:
         _add_ancestry_section(parts, sco)
+    _add_result_shape(parts, sco)
     if not skip_dialect:
         _add_dialect_notes(parts, dialect)
     _add_rules_and_question(parts, question)

@@ -224,6 +224,20 @@ def _add_ancestry_section(
             )
 
 
+def _add_result_shape(
+    parts: list[str], sco: SemanticContextObject,
+) -> None:
+    if sco.result_shape is None or not sco.result_shape.columns:
+        return
+    parts.append(
+        "\nRESULT SHAPE (return exactly these columns, in this order):"
+    )
+    parts.extend(
+        f"  {n}. {column}"
+        for n, column in enumerate(sco.result_shape.columns, start=1)
+    )
+
+
 def _add_dialect_notes(
     parts: list[str], dialect: str,
 ) -> None:
