@@ -8,6 +8,7 @@ is a mock. Graph cases and their questions live in `tests/support/connector_fixt
 
 from __future__ import annotations
 
+import re
 from unittest.mock import MagicMock
 
 import pytest
@@ -110,6 +111,29 @@ def test_d2_decoy_a_value_with_no_label_renders_its_code_and_says_so() -> None:
     rendered = lines_naming(text, UNLABELLED_REGION)
     assert rendered, f"{UNLABELLED_REGION} is not rendered"
     assert all("no label" in line.lower() for line in rendered), rendered
+
+
+def label_breaches(text: str, members: dict[str, str]) -> list[str]:
+    """Ruling K1: the text from each rendered code to the next code (or the line end) holds
+    that code's own label, or `no label`, and no other member's label."""
+    found = sorted((m.start(), code) for code in members
+                   for m in re.finditer(rf"(?<![\w-]){re.escape(code)}(?![\w-])", text))
+    ends = [start for start, _ in found[1:]] + [len(text)]
+    breaches = [] if found else ["no code is rendered"]
+    for (start, code), end in zip(found, ends):
+        line_end = text.find("\n", start)
+        segment = text[start:min(end, line_end if line_end >= 0 else len(text))]
+        others = [label for other, label in members.items() if other != code and label]
+        if (members[code] or "no label") not in segment or any(o in segment for o in others):
+            breaches.append(segment)
+    return breaches
+
+
+def test_k1_each_rendered_code_holds_its_own_label_and_no_other_members() -> None:
+    sco = _values_sco()
+    members = {v["code"]: v["label"] for gv in sco.governed_values for v in gv.values}
+
+    assert label_breaches(build_sql_prompt(sco, VALUES_QUESTION), members) == []
 
 
 def test_d3_a_named_column_ranks_before_a_column_whose_definition_is_closer() -> None:

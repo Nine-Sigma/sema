@@ -53,6 +53,7 @@ from tests.unit.ontology_query_benchmark.sema_context_env import (
     _Retriever,
 )
 from tests.unit.ontology_query_benchmark.sema_hierarchy_anchor_env import READABLE, anchor
+from tests.unit.pipeline.test_context_defect_classes import label_breaches
 from tests.unit.ontology_query_benchmark.sema_hierarchy_env import _facts
 
 pytestmark = pytest.mark.unit
@@ -125,6 +126,16 @@ def test_d2_decoy_a_value_with_no_label_renders_its_code_and_says_so(tmp_path: P
     rendered = lines_naming(text, unlabelled["code"])
     assert rendered, f"{unlabelled['code']} is not rendered"
     assert all("no label" in line.lower() for line in rendered), rendered
+
+
+def test_k1_each_rendered_code_holds_its_own_label_and_no_other_members(
+    tmp_path: Path,
+) -> None:
+    *labelled, unlabelled = PEOPLE_VALUES
+    values = [*labelled, _value(unlabelled, "")]
+    text = _s_text(tmp_path, _Retriever([PEOPLE_ENTITY, *values]), QUESTION)
+
+    assert label_breaches(text, {v["code"]: v["label"] for v in values}) == []
 
 
 def test_d3_a_named_column_ranks_before_a_column_whose_definition_is_closer(
