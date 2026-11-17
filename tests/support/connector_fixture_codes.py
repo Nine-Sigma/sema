@@ -79,7 +79,23 @@ DICTIONARY_ENTRIES = (
 )
 UNPLACED_PROPERTY = "Edge Treatment"
 # A token and a substring of column names that equal none: names only nominate on equality.
-CASE_ENTRIES = (DictionaryEntry("loose", None, {"Kind": "trim_kinds", "Coat": "coat_kinds"}),)
+# Then a property placed on a column one past the low-distinct bound.
+PAST_BOUND_PROPERTY = "Assigned Crew"
+CASE_ENTRIES = (
+    DictionaryEntry("loose", None, {"Kind": "trim_kinds", "Coat": "coat_kinds"}),
+    DictionaryEntry("wide", None, {PAST_BOUND_PROPERTY: "trim_kinds"}),
+)
+# Two schemas in one run: the entity names a relation of the first schema only, a property
+# lands in the second schema only, and one property lands nowhere.
+ANNEX_SCHEMA = "annex"
+SPLIT_PLACED_PROPERTY = "Bevel Kind"
+SPLIT_UNPLACED_PROPERTY = "Rim Kind"
+SPLIT_ENTRIES = (
+    DictionaryEntry("kiln", "Kiln", {"Seal Kind": "seal_kinds"}),
+    DictionaryEntry("vat_notes", None, {SPLIT_PLACED_PROPERTY: "bevel_kinds",
+                                        SPLIT_UNPLACED_PROPERTY: "edge_kinds"}),
+)
+SPLIT_ROWS = 12
 
 
 def normalized_name(name: str) -> str:
@@ -173,6 +189,9 @@ ROWS: dict[str, list[Row]] = {
     "pallet": list(PALLET.items()),
     "panel": [_panel_row(i) for i in range(PANEL_ROWS)],
     "fitting": [_fitting_row(i) for i in range(FITTING_ROWS)],
+    "kiln": [(1 + i, _cycle(tuple(SEAL_KINDS), i)) for i in range(SPLIT_ROWS)],
+    "vat": [(1 + i, _cycle(tuple(SEAL_KINDS), i), _cycle(tuple(BEVEL_KINDS), i))
+            for i in range(SPLIT_ROWS)],
 }
 
 
@@ -244,11 +263,18 @@ CASE_TABLES: tuple[FixtureTable, ...] = (
         (_key("hue_code", "hue"), _key("dye_code", "dye")),
     ),
 )
+SPLIT_SCHEMA_TABLES: dict[str, tuple[FixtureTable, ...]] = {
+    CODES_SCHEMA: (_table("kiln", (("kiln_no", _INT), ("seal_kind", _TEXT))),),
+    ANNEX_SCHEMA: (
+        _table("vat", (("vat_no", _INT), ("seal_kind", _TEXT), ("bevel_kind", _TEXT))),
+    ),
+}
 
 
 def column_values(table: str, column: str) -> list[Any]:
     """Every value of one fixture column, in row order, NULLs included."""
-    (fixture,) = (t for t in (*CODED_TABLES, *CASE_TABLES) if t.name == table)
+    split = [t for tables in SPLIT_SCHEMA_TABLES.values() for t in tables]
+    (fixture,) = (t for t in (*CODED_TABLES, *CASE_TABLES, *split) if t.name == table)
     index = fixture.column_names.index(column)
     return [row[index] for row in ROWS[table]]
 
