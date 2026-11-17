@@ -15,7 +15,7 @@ from typing import Any, NamedTuple
 from sema.connectors.base import Connector
 from sema.connectors.databricks_utils import METADATA_SOURCE, sql_string_literal
 from sema.engine.coded_column_utils import CONTAINMENT, label_reading
-from sema.engine.warehouse_lookup import WarehouseValues
+from sema.engine.warehouse_lookup import ColumnKey, WarehouseProfileLookup, WarehouseValues
 from sema.intake.run.scorecard import Cells, Key
 from sema.log import logger
 from sema.models.extraction import ExtractedForeignKey
@@ -101,6 +101,23 @@ def label_holds(values: WarehouseValues, read: BindingRead) -> bool:
             return False
         code = key.column or ""
     return label_reading(values.pairs(schema, relation, code, column)) is not None
+
+
+def columns_by_row_count(
+    connector: Connector, catalog: str, schemas: list[str] | None, sizes: set[int],
+) -> dict[int, list[ColumnKey]]:
+    """Every column of the scope's relations whose row count is one of `sizes`, by that count."""
+    profile = WarehouseProfileLookup(connector.execute_query, catalog)
+    found: dict[int, list[ColumnKey]] = {}
+    for table in connector.discover_tables(catalog, schemas or None):
+        columns = [(table.schema, table.table_name, column.name) for column in
+                   connector.extract_columns_dto(catalog, table.schema, table.table_name)]
+        measured = profile(columns[0]) if columns else None
+        if measured is not None and measured[1] in sizes:
+            found.setdefault(measured[1], []).extend(columns)
+    return found
+
+
 # Only the build's join writer (`batch_upsert_join_paths`) sets `status`; the target loader's
 # does not. Map access, so a graph where no join has a cardinality raises no unknown-key warning.
 GRAPH_JOINS = (

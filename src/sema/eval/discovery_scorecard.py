@@ -23,6 +23,7 @@ from sema.eval.discovery_scorecard_utils import (
     BindingRead,
     binding_read,
     code_relation,
+    columns_by_row_count,
     declared_join_key,
     graph_join_key,
     join_holds,
@@ -171,11 +172,41 @@ def read_coded_bindings(
     return [read for record in records if (read := binding_read(record)) is not None]
 
 
-def coded_facts(reads: Iterable[BindingRead]) -> dict[str, Cells]:
-    """The verified bindings' facts in oracle keys; an unverified binding states none."""
+def loaded_code_lists(
+    connector: Connector, catalog: str, schemas: list[str] | None,
+    reads: Iterable[BindingRead], code_lists: Mapping[str, Mapping[str, Any]],
+) -> dict[str, str]:
+    """Each verified binding's dictionary code list that is loaded as a relation, to that
+    relation's name: the one relation of the scope with a key column on the data whose values
+    are exactly the list's codes. A column that merely contains the codes is a chance match.
+    A column of n rows whose values are exactly n codes holds each code once: it is a key."""
+    values = WarehouseValues(connector.execute_query, catalog)
+    wanted = {
+        read.code_source: codes for read in reads
+        if read.verification == VERIFIED and code_relation(read.code_source) is None
+        and (codes := listed_codes(values, code_lists, read.code_source))
+    }
+    if not wanted:
+        return {}
+    sized = columns_by_row_count(connector, catalog, schemas,
+                                 {len(codes) for codes in wanted.values()})
+    loaded: dict[str, str] = {}
+    for source, codes in wanted.items():
+        relations = {table.lower() for schema, table, column in sized.get(len(codes), [])
+                     if set(values.counts((schema, table, column)) or {}) == codes}
+        if len(relations) == 1:
+            loaded[source] = relations.pop()
+    return loaded
+
+
+def coded_facts(
+    reads: Iterable[BindingRead], loaded: Mapping[str, str] | None = None,
+) -> dict[str, Cells]:
+    """The verified bindings' facts in oracle keys; an unverified binding states none. A
+    dictionary code list in `loaded` is named by the relation it is loaded as."""
     verified = [read for read in reads if read.verification == VERIFIED]
     return {
-        BINDING: {_column(read): _code_list(read.code_source) for read in verified},
+        BINDING: {_column(read): _code_list(read.code_source, loaded or {}) for read in verified},
         LABEL_SOURCE: {
             _column(read): label for read in verified if (label := _label(read)) is not None
         },
@@ -191,10 +222,10 @@ def _column(read: BindingRead) -> Key:
     return (read.relation.lower(), read.column.lower())
 
 
-def _code_list(code_source: str) -> str:
-    """A code relation's name, or the dictionary vocabulary's."""
+def _code_list(code_source: str, loaded: Mapping[str, str]) -> str:
+    """A code relation's name, or the dictionary vocabulary's loaded relation or its own."""
     key = code_relation(code_source)
-    return (key.table if key else code_source).lower()
+    return (key.table if key else loaded.get(code_source, code_source)).lower()
 
 
 def _label(read: BindingRead) -> list[str] | str | None:

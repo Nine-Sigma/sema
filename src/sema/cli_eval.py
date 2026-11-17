@@ -148,6 +148,7 @@ def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> N
         coded_facts,
         declared_constraints,
         facts_from_graph,
+        loaded_code_lists,
         read_coded_bindings,
         recheck,
         recheck_coded,
@@ -167,16 +168,17 @@ def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> N
         coded = read_coded_bindings(driver, config.catalog, config.schemas)
     finally:
         driver.close()
-    produced = {**joins, **coded_facts(coded)}
+    dictionary = read_dictionary(config.concept_spec, config.concept_staging)
+    code_lists = dictionary.code_lists if dictionary else {}
+    loaded = loaded_code_lists(connector, config.catalog, config.schemas, coded, code_lists)
+    produced = {**joins, **coded_facts(coded, loaded)}
     oracle = (
         read_oracle(Path(oracle_path), FACT_KINDS) if oracle_path
         else declared_constraints(connector, config.catalog, config.schemas)
     )
-    dictionary = read_dictionary(config.concept_spec, config.concept_staging)
     rechecked = {
         **recheck(connector, config.catalog, config.schemas, produced),
-        **recheck_coded(connector, config.catalog, coded,
-                        dictionary.code_lists if dictionary else {}),
+        **recheck_coded(connector, config.catalog, coded, code_lists),
     }
     Path(out_path).write_text(render(score_discovery(produced, oracle, rechecked)))
     click.echo(out_path)
