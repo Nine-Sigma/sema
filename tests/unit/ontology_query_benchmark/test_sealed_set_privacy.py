@@ -13,9 +13,11 @@ from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
+from sema.log import logger
 from tests.unit.ontology_query_benchmark.sealed_set_env import (
     ARM_REPLIES,
     ARMS,
@@ -42,6 +44,22 @@ from tests.unit.ontology_query_benchmark.sealed_set_env import sealed_set_module
 from tests.unit.ontology_query_benchmark.sealed_set_env import writer_cell as _cell
 
 pytestmark = pytest.mark.unit
+
+
+def test_a_failing_lexical_query_logs_no_question_text() -> None:
+    from sema.pipeline.retrieval import RetrievalEngine
+
+    def failing_run(query: str, **params: Any) -> Any:
+        raise RuntimeError(f"lexical query failed for {params}")
+
+    driver = MagicMock()
+    driver.session.return_value.__enter__.return_value.run.side_effect = failing_run
+    with captured_logs() as logs:
+        logger.trace(SINK_CANARY)
+        RetrievalEngine(driver, embedder=None).retrieve(f"How many {LEAK_TEXT} rows?")
+
+    assert SINK_CANARY in "".join(logs) and driver.session.called
+    assert [line for line in logs if LEAK_TEXT.lower() in line.lower()] == []
 
 
 def test_markers_in_a_wrong_a_flagged_and_a_refused_question_reach_no_unsealed_surface(
