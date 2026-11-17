@@ -11,10 +11,11 @@ import json
 from collections.abc import Iterator
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from sema.connectors.duckdb import DuckDBConnector
-from sema.eval.discovery_scorecard import declared_constraints, recheck
+from sema.eval.discovery_scorecard import declared_constraints, recheck, render, score_discovery
 from sema.eval.discovery_scorecard_utils import read_oracle, unique_keys
 from sema.models.config import DuckDBConfig
 from tests.support.connector_fixture import (
@@ -30,6 +31,7 @@ from tests.support.connector_fixture_scorecard import (
     DECLARED_JOIN_KEYS,
     DETECTED_JOIN_KEYS,
     Key,
+    card_rows,
     join_key,
 )
 
@@ -129,6 +131,28 @@ def test_a_foreign_key_on_declared_unique_columns_is_one_to_one(
         ("parent", "parent_id"): "unique", ("extension", "parent_id"): "unique",
         ("child", "child_id"): "unique",
     }
+
+
+def test_a_source_declaring_no_constraints_scores_no_oracle(tmp_path: Path) -> None:
+    path = tmp_path / "plain.duckdb"
+    con = duckdb.connect(str(path))
+    con.execute(f"CREATE SCHEMA {SCHEMA}")
+    con.execute(f"CREATE TABLE {SCHEMA}.parent AS SELECT i AS parent_id FROM range(1, 11) t(i)")
+    con.execute(f"CREATE TABLE {SCHEMA}.child AS "
+                "SELECT i AS child_id, 1 + (i % 10) AS parent_id FROM range(1, 31) t(i)")
+    con.close()
+    produced = {"join": {join_key("child", ["parent_id"], "parent", ["parent_id"]): "key_only"}}
+
+    for connector in _connector(path):
+        oracle = declared_constraints(connector, "plain", [SCHEMA])
+        rechecked = recheck(connector, "plain", [SCHEMA], produced)
+    rows = card_rows(render(score_discovery(produced, oracle, rechecked)))
+
+    no_oracle = ["no oracle"] * 4
+    assert list(rows["join"].values()) == ["join", "1", *no_oracle, "1"]
+    assert list(rows["candidate_key"].values()) == [
+        "candidate_key", "not produced", *no_oracle, "0",
+    ]
 
 
 def _claim(kind: str, key: list[str], value: object) -> str:
