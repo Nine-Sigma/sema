@@ -1,7 +1,7 @@
 {
- "relations": [
-  "main.s.person",
-  "main.s.visit"
+ "sources": [
+  {"relation": "main.s.person"},
+  {"relation": "main.s.visit"}
  ],
  "row_concepts": [
   "person"
@@ -9,7 +9,6 @@
  "always_concepts": [
   "visit"
  ],
- "policy": {},
  "budget_tokens": 3000,
  "values_top_k": 25,
  "near_miss_pct": 1.0,
