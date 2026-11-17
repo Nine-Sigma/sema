@@ -27,6 +27,8 @@ from sema.pipeline.term_expansion_utils import (
 if TYPE_CHECKING:
     from sema.pipeline.retrieval import RetrievalEngine
 
+_LEXICAL_PROPERTY_OWNER_CONFIDENCE = 0.6
+
 __all__ = [
     "_dedup_artifacts",
     "_dedup_seeds",
@@ -150,61 +152,88 @@ def _expand_property_hit(
     (PROPERTY_ON_COLUMN), governed ValueSet (HAS_VALUE_SET),
     Vocabulary (CLASSIFIED_AS).
     """
-    results: list[dict[str, Any]] = []
     name = hit.get("name", "")
-    entity_name = hit.get("entity_name", "")
-    datasource_id = hit.get("datasource_id", "")
-    column_key = hit.get("column_key", "")
-
-    hit_confidence = hit.get("confidence", 0.5)
-    hit_status = hit.get("status", "auto")
-
     prop_candidate: dict[str, Any] = {
         "type": "property",
         "name": name,
-        "entity_name": entity_name,
+        "entity_name": hit.get("entity_name", ""),
         "score": hit.get("final_score", 0.0),
         "source": "retrieval",
-        "status": hit_status,
-        "confidence": hit_confidence,
+        "status": hit.get("status", "auto"),
+        "confidence": hit.get("confidence", 0.5),
         "confidence_policy": "semantic",
+        **_property_vocabulary(engine, hit),
     }
+    owners = _property_owners(engine, hit)
+    prop_candidate.update(_physical_column(owners, name))
+    return [prop_candidate, *owners]
 
-    # Try to get vocabulary classification via CLASSIFIED_AS
-    if datasource_id and column_key:
-        try:
-            vocab_results = engine._run_query(
-                CypherQueries.find_property_vocabulary(),
-                ds=datasource_id, ck=column_key,
-            )
-            if vocab_results:
-                prop_candidate["vocabulary"] = vocab_results[0].get(
-                    "vocabulary_name"
-                )
-        except Exception:
-            pass
 
-    results.append(prop_candidate)
+def _property_vocabulary(
+    engine: RetrievalEngine, hit: dict[str, Any],
+) -> dict[str, Any]:
+    """Vocabulary classification via CLASSIFIED_AS, when the hit is scoped."""
+    datasource_id = hit.get("datasource_id", "")
+    column_key = hit.get("column_key", "")
+    if not (datasource_id and column_key):
+        return {}
+    try:
+        vocab_results = engine._run_query(
+            CypherQueries.find_property_vocabulary(),
+            ds=datasource_id, ck=column_key,
+        )
+    except Exception:
+        return {}
+    if not vocab_results:
+        return {}
+    return {"vocabulary": vocab_results[0].get("vocabulary_name")}
 
-    # Expand owning entity if known
-    if entity_name:
-        physical = _expand_physical(engine, [entity_name])
-        for r in physical:
-            results.append({
-                "type": "entity",
-                "name": entity_name,
-                "table": r.get("table_name", ""),
-                "schema": r.get("schema_name", ""),
-                "catalog": r.get("catalog", ""),
-                "description": None,
-                "confidence": 0.6,
-                "source": "retrieval_property_expansion",
-                "columns": r.get("columns", []),
-                "status": hit_status,
-                "confidence_policy": "semantic",
-            })
 
-    return results
+def _property_owners(
+    engine: RetrievalEngine, hit: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """The owning entity's tables. A vector hit's table is as credible as the
+    hit at its similarity, so a close definition reaches its table and a far
+    one does not; a lexical substring hit on a column name, which matches
+    every column sharing a word, does not bring its table alone."""
+    entity_name = hit.get("entity_name", "")
+    if not entity_name:
+        return []
+    confidence = (
+        hit.get("confidence", 0.5) * hit.get("score", 0.0)
+        if hit.get("match_type") == "vector"
+        else _LEXICAL_PROPERTY_OWNER_CONFIDENCE
+    )
+    return [
+        {
+            "type": "entity",
+            "name": entity_name,
+            "table": r.get("table_name", ""),
+            "schema": r.get("schema_name", ""),
+            "catalog": r.get("catalog", ""),
+            "description": None,
+            "confidence": confidence,
+            "source": "retrieval_property_expansion",
+            "columns": r.get("columns", []),
+            "status": hit.get("status", "auto"),
+            "confidence_policy": "semantic",
+        }
+        for r in _expand_physical(engine, [entity_name])
+    ]
+
+
+def _physical_column(
+    owners: list[dict[str, Any]], name: str,
+) -> dict[str, str]:
+    """Where the property sits: the first owning table with a column for it."""
+    for owner in owners:
+        for col in owner.get("columns", []):
+            if col.get("property") == name and col.get("column"):
+                return {
+                    "physical_table": owner["table"],
+                    "physical_column": col["column"],
+                }
+    return {}
 
 
 def _expand_alias_hit(

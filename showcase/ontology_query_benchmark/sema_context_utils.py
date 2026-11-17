@@ -136,8 +136,10 @@ def _without_denied(rendering: Rendering, exposure: Exposure) -> SemanticContext
         names += [(jp.from_table, w) for w in re.findall(r"\w+", jp.sql_snippet or "")]
         if _kept(rendering, exposure, names, jp.from_table, "join path"):
             joins.append(jp)
+    matches = [m for m in sco.column_matches if not exposure.hides(m.table, m.column)]
     return sco.model_copy(
-        update={"physical_assets": assets, "governed_values": values, "join_paths": joins}
+        update={"physical_assets": assets, "governed_values": values, "join_paths": joins,
+                "column_matches": matches}  # fmt: skip
     )
 
 

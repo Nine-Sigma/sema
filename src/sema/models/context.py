@@ -104,6 +104,16 @@ class HierarchyAnchor(BaseModel):
     score: float = 0.0
 
 
+class ColumnMatch(BaseModel):
+    """A listed column a question term reached; ``named`` when the question states
+    the column's name, so it outranks a column reached by definition alone."""
+
+    table: str
+    column: str
+    named: bool = False
+    score: float = 0.0
+
+
 class SemanticCandidateSet(BaseModel):
     query: str
     candidates: list[dict[str, Any]] = Field(default_factory=list)
@@ -119,6 +129,9 @@ class SemanticContextObject(BaseModel):
     ancestry: list[AncestryTerm] = Field(default_factory=list)
     hierarchy_anchors: list[HierarchyAnchor] = Field(
         default_factory=list, exclude_if=lambda anchors: not anchors,
+    )
+    column_matches: list[ColumnMatch] = Field(
+        default_factory=list, exclude_if=lambda matches: not matches,
     )
     consumer: str = "nl2sql"
     retrieval_rationale: str | None = None

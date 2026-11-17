@@ -11,6 +11,7 @@ import json
 
 from sema.models.context import (
     AncestryTerm,
+    ColumnMatch,
     GovernedValue,
     HierarchyAnchor,
     JoinPath,
@@ -22,6 +23,7 @@ from sema.models.context import (
     ResolvedProperty,
     SemanticCandidateSet,
 )
+from sema.pipeline.dedup_utils import states_name
 
 
 def _filter_entity_candidates(
@@ -86,6 +88,29 @@ def _build_entities_and_assets(
             ))
 
     return entities, physical_assets
+
+
+def _build_column_matches(
+    candidate_set: SemanticCandidateSet,
+    physical_assets: list[PhysicalAsset],
+) -> list[ColumnMatch]:
+    """Listed columns a property hit reached: a column the question names first,
+    then by hit score, so a closer definition never outranks a named column."""
+    listed = {(a.table, c) for a in physical_assets for c in a.columns}
+    found: dict[tuple[str, str], ColumnMatch] = {}
+    for c in candidate_set.candidates:
+        place = (c.get("physical_table", ""), c.get("physical_column", ""))
+        if c.get("type") != "property" or place not in listed:
+            continue
+        named = any(
+            states_name(candidate_set.query, n) for n in (c.get("name", ""), place[1])
+        )
+        match = ColumnMatch(table=place[0], column=place[1], named=named,
+                            score=c.get("score", 0.0))
+        kept = found.get(place)
+        if kept is None or (match.named, match.score) > (kept.named, kept.score):
+            found[place] = match
+    return sorted(found.values(), key=lambda m: (not m.named, -m.score))
 
 
 def _parse_join_predicates(

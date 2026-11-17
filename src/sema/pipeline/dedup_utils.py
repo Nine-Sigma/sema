@@ -64,6 +64,14 @@ def tokenize_query(query: str) -> list[str]:
     ]
 
 
+def states_name(question: str, name: str) -> bool:
+    """The question holds ``name`` as a phrase, its words in order, plural allowed."""
+    words = [re.escape(w) for w in re.split(r"[\s_]+", name.lower()) if w]
+    if not words:
+        return False
+    return re.search(rf"\b{r'[\s_]+'.join(words)}s?\b", question.lower()) is not None
+
+
 def names_any(question: str, labels: Iterable[str]) -> bool:
     """The question holds a whole word of one of ``labels``."""
     asked = set(tokenize_query(question))

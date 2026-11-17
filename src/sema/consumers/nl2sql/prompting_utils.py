@@ -60,6 +60,21 @@ def _add_tables_and_columns(
                 cols, fqn, prop_map,
             ) if annotate else cols
             parts.append(f"  {fqn}: {', '.join(annotated)}")
+    _add_column_choice(parts, sco)
+
+
+def _add_column_choice(
+    parts: list[str], sco: SemanticContextObject,
+) -> None:
+    """One line: the column the question names, then the others it reached."""
+    if len(sco.column_matches) < 2 or not sco.column_matches[0].named:
+        return
+    named, *others = sco.column_matches
+    listed = ", ".join(f"{m.table}.{m.column}" for m in others)
+    parts.append(
+        f"  Column the question names: {named.table}.{named.column}; "
+        f"alternative: {listed}"
+    )
 
 
 def _build_property_map(
