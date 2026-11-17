@@ -123,7 +123,9 @@ def _format_values_line(
     truncated = max_values is not None and len(values) > max_values
     if truncated:
         values = values[:max_values]
-    values_str = ", ".join(f"'{v['code']}'" for v in values)
+    values_str = ", ".join(
+        f"'{v['code']}' ({v.get('label') or 'no label'})" for v in values
+    )
     suffix = " [truncated]" if truncated else ""
     return f"[{values_str}]{suffix}"
 
@@ -133,6 +135,11 @@ def _add_governed_values_section(
     sco: SemanticContextObject,
     max_values: int | None = None,
 ) -> None:
+    if sco.governed_values:
+        parts.append(
+            "\nCoded values show each code's label in parentheses: "
+            "filter on the code; answers show the label."
+        )
     authoritative = [
         gv for gv in sco.governed_values if not gv.ambiguous
     ]

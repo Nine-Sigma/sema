@@ -228,7 +228,8 @@ def _add_values(
         return
     template = sidecar.membership_sql.format(relation=sidecar.membership_relation, element_id="E")
     rendering.parts.append(
-        "\nGOVERNED VALUES (complete lists only; code = label). Unlisted sets: "
+        "\nGOVERNED VALUES (complete lists only; code = label; answers show the label). "
+        "Unlisted sets: "
         f"membership query E = {template}"
     )
     for b in governed:
@@ -244,7 +245,9 @@ def _add_values(
                 f"({reference})"
             )
         elif set(got) == {c for c, _ in element.members}:
-            listing = "; ".join(f"{code} = {got[code]}" for code, _ in element.members)
+            listing = "; ".join(
+                f"{code} = {got[code] or 'no label'}" for code, _ in element.members
+            )
             rendering.parts.append(f"  {b.column}: {listing}")
             rendering.listed[(b.table, b.column)] = len(element.members)
         else:
