@@ -72,6 +72,12 @@ class Connector(ABC):
         """
         ...
 
+    def execute_query_with_columns(
+        self, query: str,
+    ) -> tuple[list[str], list[tuple[Any, ...]]]:
+        """Run one read statement as written and return its column names and rows."""
+        raise NotImplementedError
+
     # --- Per-table orchestration contract ---
 
     def discover_tables(

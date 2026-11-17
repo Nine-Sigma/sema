@@ -63,6 +63,13 @@ class DuckDBConnector(Connector):
         """Run a Databricks-dialect read, translated to DuckDB."""
         return self._execute(sqlglot.transpile(query, read="databricks", write="duckdb")[0])
 
+    def execute_query_with_columns(
+        self, query: str,
+    ) -> tuple[list[str], list[tuple[Any, ...]]]:
+        """Run a DuckDB-dialect read as written, untranslated."""
+        cursor = self._cursor().execute(query)
+        return [d[0] for d in cursor.description or []], cursor.fetchall()
+
     def close(self) -> None:
         if self._connection is not None:
             self._connection.close()
