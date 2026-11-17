@@ -14,7 +14,7 @@ def arm_a_context(schema: Any, relations: Any, policy: Any, budget: int, values:
     lines = []
     for relation in relations:
         lines.append(f"TABLE {relation}")
-        lines += [f"  {name} {kind}" for name, kind in schema["relations"][relation]["columns"]]
+        lines += [f"  {c['name']} {c['type']}" for c in schema[relation]["columns"]]
     for relation in relations:
         profiles = values["relations"].get(relation, {}).get("values", {})
         for column, profile in profiles.items():

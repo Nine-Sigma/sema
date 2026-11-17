@@ -35,7 +35,7 @@
  ],
  "conventions": {
   "path": "config/bench.json",
-  "file_sha256": "eaee86782ff30b08508b5faae5c2e75a7b6d03d1006473e7c2ed93908b2dd77c",
+  "file_sha256": "7329e0f1c9e3aa34a791ead268256baa39ff7f5d02a3d751055dba8f7c8797bf",
   "conventions_sha256": "9e0affef98f78d1260ef37ee523472c83d93949a5a11a4d603c8e7e5801aaffb"
  },
  "spec_name": "SPEC",
