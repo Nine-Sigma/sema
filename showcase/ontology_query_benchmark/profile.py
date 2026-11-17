@@ -107,6 +107,12 @@ class Limits(_Frozen):
         return self.input_ceiling - self.repair_reserve
 
 
+class SealedLimits(Limits):
+    """A sealed-set run's limits: `row_limit` caps each statement's rows, this its seconds."""
+
+    statement_timeout_s: float = Field(gt=0)
+
+
 class Knobs(_Frozen):
     """Common context knobs; None keeps the harness config value."""
 
@@ -321,7 +327,7 @@ class SealedSetProfile(_Frozen):
     duckdb: Path
     harness: FrozenHarness
     model: ModelRoute
-    limits: Limits
+    limits: SealedLimits
     knobs: Knobs
     settings: RunCeilings
 

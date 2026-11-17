@@ -22,7 +22,11 @@ limits:
   output_ceiling: 8192
   guard_chars_per_token: 2.334
   conservative_chars_per_token: 2.08
+  # Bounds on every executed statement, properties of any source: row_limit caps its rows
+  # (a result of row_limit or more already scores incomplete, so more are never kept), and
+  # a single analytic read over a local file runs in seconds, so 60 s stops only a runaway.
   row_limit: 1000
+  statement_timeout_s: 60
   max_repairs: 2
 
 knobs: {budget_tokens: 12000}

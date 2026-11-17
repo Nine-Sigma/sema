@@ -56,7 +56,8 @@ def run_sealed_set(profile_path: Path, arms: Sequence[str], repetitions: int, *,
     connector = DuckDBConnector(DuckDBConfig(path=str(profile.duckdb)))
     try:
         layout = su.source_layout(connector, run_dir, profile.harness.package, profile.knobs)
-        executors = {arm: ConnectorExecutor(harness, connector) for arm in arms}
+        executors = {arm: ConnectorExecutor(harness, connector, profile.limits.statement_timeout_s)
+                     for arm in arms}  # fmt: skip
         runtimes = ru.arm_runtimes(harness, run_dir, layout, executors, s_provider,
                                    profile.limits, profile.knobs)  # fmt: skip
         summary = runner.run(slots, su.harness_questions(harness, sealed_set), runtimes, model,

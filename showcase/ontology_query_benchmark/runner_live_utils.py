@@ -18,7 +18,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from sema.cli_factories_utils import OPENROUTER_BASE_URL
-from sema.connectors.base import Connector
+from sema.connectors.base import Connector, RowCapExceeded, StatementTimeout
 from showcase.ontology_query_benchmark.profile import Limits, ModelRoute, Profile
 from showcase.ontology_query_benchmark.routing import (
     RoutingError,
@@ -83,19 +83,27 @@ def model_client(harness: SimpleNamespace, route: ModelRoute, limits: Limits,
 
 
 class ConnectorExecutor:
-    """The harness executor protocol on a `sema` Connector, one connector read per statement.
+    """The harness executor protocol on a `sema` Connector, one bounded read per statement.
 
     Rows leave in the expected-answer writer's normal form, so the scorer compares like with
-    like. As the Databricks executor, it returns every row; the runner checks the row limit.
+    like. A result past `row_limit` rows or a statement past the timeout fails with the
+    status word `row_cap` or `timeout`, which the harness does not repair.
     """
 
-    def __init__(self, harness: SimpleNamespace, connector: Connector) -> None:
+    def __init__(self, harness: SimpleNamespace, connector: Connector,
+                 statement_timeout_s: float) -> None:  # fmt: skip
         self.harness, self.connector = harness, connector
+        self.statement_timeout_s = statement_timeout_s
 
     def execute(self, sql: str, row_limit: int) -> Any:
         start = time.perf_counter()
         try:
-            columns, rows = self.connector.execute_query_with_columns(sql)
+            columns, rows = self.connector.execute_query_with_columns(
+                sql, max_rows=row_limit, timeout_s=self.statement_timeout_s)
+        except (RowCapExceeded, StatementTimeout) as exc:
+            word = "row_cap" if isinstance(exc, RowCapExceeded) else "timeout"
+            return self.harness.models.Execution(False, (), (), time.perf_counter() - start,
+                                                 word, str(exc))  # fmt: skip
         except Exception as exc:  # noqa: BLE001 - every failure becomes a classified outcome
             return self.harness.clients.failed_execution(exc, time.perf_counter() - start)
         normal = tuple(tuple(normalize(cell) for cell in row) for row in rows)

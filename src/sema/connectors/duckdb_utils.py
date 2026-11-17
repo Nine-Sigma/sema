@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import re
+import threading
+import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import duckdb
 
+from sema.connectors.base import RowCapExceeded, StatementTimeout
 from sema.log import logger
 from sema.models.assertions import Assertion
 from sema.models.config import ProfilingConfig
@@ -20,6 +24,7 @@ if TYPE_CHECKING:
     from sema.connectors.duckdb import DuckDBConnector
 
 DUCKDB_PLATFORM = "duckdb"
+FETCH_BATCH = 1000
 
 # DuckDB spellings of the types Databricks' connector declines to profile.
 TEMPORAL_TYPES = frozenset({
@@ -60,6 +65,32 @@ def open_read_only(path: str) -> duckdb.DuckDBPyConnection:
     if not resolved.is_file():
         raise FileNotFoundError(f"DuckDB database not found: {resolved}")
     return duckdb.connect(str(resolved), read_only=True)
+
+
+def bounded_read(
+    connection: duckdb.DuckDBPyConnection, query: str,
+    max_rows: int | None, timeout_s: float | None,
+) -> tuple[list[str], list[tuple[Any, ...]]]:
+    """Fetch in batches; stop past ``max_rows`` rows, interrupt past ``timeout_s``."""
+    deadline = math.inf if timeout_s is None else time.monotonic() + timeout_s
+    timer = None if timeout_s is None else threading.Timer(timeout_s, connection.interrupt)
+    if timer is not None:
+        timer.start()
+    rows: list[tuple[Any, ...]] = []
+    try:
+        cursor = connection.execute(query)
+        while batch := cursor.fetchmany(FETCH_BATCH):
+            rows.extend(batch)
+            if max_rows is not None and len(rows) > max_rows:
+                raise RowCapExceeded(f"more than {max_rows} rows")
+            if time.monotonic() > deadline:
+                raise StatementTimeout(f"past {timeout_s} s")
+    except duckdb.InterruptException:
+        raise StatementTimeout(f"past {timeout_s} s") from None
+    finally:
+        if timer is not None:
+            timer.cancel()
+    return [d[0] for d in cursor.description or []], rows
 
 
 def quote_ident(name: str) -> str:
