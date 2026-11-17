@@ -49,6 +49,7 @@ from sema.connectors.duckdb import DuckDBConnector
 from sema.models.config import DuckDBConfig
 from tests.support.connector_fixture import write_fixture_database
 from tests.unit.ontology_query_benchmark.sealed_set_env import (
+    ACRIS_PROFILE,
     ARM_REPLIES,
     ARMS,
     AUTHOR_SPLIT,
@@ -63,6 +64,7 @@ from tests.unit.ontology_query_benchmark.sealed_set_env import (
     WIDE,
     ScriptedModel,
     SealedRun,
+    dialects_named,
     expected_cells,
     materialize,
     question_texts,
@@ -78,8 +80,6 @@ from tests.unit.ontology_query_benchmark.sealed_set_env import writer_cell as _c
 
 pytestmark = pytest.mark.unit
 
-ACRIS_PROFILE = (Path(__file__).parents[3] / "showcase" / "ontology_query_benchmark"
-                 / "profiles" / "acris_sealed.yaml")  # fmt: skip
 REPORT_CELLS = ("class", "hop_class", "hops", "joins", "join", "excluded")
 SCORED = ("correct", "wrong", "context_incomplete")
 QUESTION_FIELDS = {"id": str, "text": str, "question_class": str, "hop_class": int,
@@ -385,3 +385,16 @@ def test_a_statement_past_the_row_cap_or_the_timeout_returns_promptly_with_its_s
     assert [(e.ok, e.error_class) for e in done] == [
         (False, "row_cap"), (False, "timeout"), (True, None)]
     assert done[2].rows == ((200,),)
+
+
+def test_both_arms_prompts_name_the_executors_dialect_and_no_other(
+    frozen: Path, harness: SimpleNamespace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    framed, build = [], harness.workflow.build_messages
+    monkeypatch.setattr(harness.workflow, "build_messages", lambda context, *rest: (
+        framed.append(context.dialect) or build(context, *rest)))  # fmt: skip
+    run = _run(harness, tmp_path / "sealed_set", materialize(tmp_path / "sealed_set", frozen))
+    prompts = ["\n".join(str(m["content"]) for m in call) for call in run.model.calls]
+    assert len(framed) == len(prompts) == len(run.receipts) > 0
+    assert {frozenset(dialects_named(text)) for text in (*framed, *prompts)} == {
+        frozenset({DuckDBConnector.sql_dialect})}

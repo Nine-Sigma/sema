@@ -9,6 +9,7 @@ mocked model: per question, the statement each arm writes and what scoring must 
 import importlib
 import io
 import json
+import re
 import shutil
 from collections import defaultdict
 from collections.abc import Callable, Iterator
@@ -30,7 +31,11 @@ from tests.support.connector_fixture import write_fixture_database
 FIXTURES = Path(__file__).parents[2] / "fixtures"
 SEALED_SET_FIXTURE = FIXTURES / "sealed_set"
 TOY_PROFILE = FIXTURES / "ontology_query_benchmark" / "profile.yaml"
+ACRIS_PROFILE = (Path(__file__).parents[3] / "showcase" / "ontology_query_benchmark"
+                 / "profiles" / "acris_sealed.yaml")  # fmt: skip
 ARMS = ("A", "S")
+DIALECT_WORDS = re.compile(r"\b(ansi|bigquery|databricks|duckdb|mysql|postgre\w*|snowflake|"
+                           r"spark|sqlite|trino|backtick)\b|`", re.IGNORECASE)  # fmt: skip
 S_CONTEXT_MARK = "S-STUB-CONTEXT"
 CONNECTOR_READ = "execute_query_with_columns"
 SINK_CANARY = "sealed-set-trace-sink-canary"
@@ -324,6 +329,11 @@ def _spy_reads(mp: pytest.MonkeyPatch, model: ScriptedModel, reads: list[tuple[i
         return original(self, query, *args, **kwargs)
 
     mp.setattr(DuckDBConnector, CONNECTOR_READ, read)
+
+
+def dialects_named(text: str) -> set[str]:
+    """Each SQL dialect a prompt names, lowercased; a backtick counts as `backtick`."""
+    return {(m.group(1) or "backtick").lower() for m in DIALECT_WORDS.finditer(text)}
 
 
 def sealed_set_module() -> ModuleType:
