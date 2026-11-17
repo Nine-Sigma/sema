@@ -29,7 +29,7 @@ from sema.graph.loader import GraphLoader
 from sema.graph.target_join_paths import materialize_target_join_paths
 from sema.graph.target_retrieval_loader import EntityTableBinding, PhysicalSchemaBinding
 from sema.models.assertions import Assertion, AssertionPredicate, AssertionStatus
-from sema.models.config import DuckDBConfig, Neo4jConfig
+from sema.models.config import BuildConfig, DuckDBConfig, Neo4jConfig
 from sema.models.planner._enums import TargetArtifactKind
 from sema.models.target.completeness import (
     SemanticCompleteness,
@@ -50,7 +50,14 @@ from tests.support.connector_fixture import (
     fixture_build_config,
     write_fixture_database,
 )
+from tests.support.connector_fixture_codes import (
+    CODES_CATALOG,
+    CODES_SCHEMA,
+    write_coded_database,
+    write_dictionary,
+)
 from tests.support.connector_fixture_scorecard import (
+    CODED_CLAIMS,
     DECLARED_JOIN_KEYS,
     DECLARED_JOIN_VALUES,
     DETECTED_JOIN_KEYS,
@@ -294,3 +301,63 @@ def test_the_discovery_command_scores_the_graph_against_an_oracle_file(
         cell: str(count) for cell, count in JOIN_SHAPE.items()
     }
     assert "no oracle" in rows["candidate_key"].values()
+
+
+@pytest.fixture
+def coded_config(clean_neo4j: Any, tmp_path: Path) -> Path:
+    """The coded fixture built with its dictionary, and the build config file that built it."""
+    dictionary = write_dictionary(tmp_path)
+    neo4j = _neo4j_config()
+    path = tmp_path / "coded.yaml"
+    path.write_text(yaml.safe_dump({
+        "source": "duckdb", "catalog": CODES_CATALOG, "schemas": [CODES_SCHEMA],
+        "duckdb": {"path": str(write_coded_database(tmp_path))}, "skip_embeddings": True,
+        "table_workers": 1, "concept_spec": str(dictionary.spec),
+        "concept_staging": str(dictionary.staging),
+        "neo4j": {"uri": neo4j.uri, "user": neo4j.user,
+                  "password": neo4j.password.get_secret_value()},
+    }))
+    with fake_model_environment():
+        report = run_build(BuildConfig.from_file(str(path)))
+    assert report["tables_failed"] == 0, report["failed_tables"]
+    return path
+
+
+def test_the_coded_adapters_read_every_verified_binding_the_build_wrote(
+    coded_config: Path, clean_neo4j: Any,
+) -> None:
+    scorecard = _scorecard()
+    reads = scorecard.read_coded_bindings(clean_neo4j, CODES_CATALOG, [CODES_SCHEMA])
+
+    assert scorecard.coded_facts(reads) == CODED_CLAIMS
+    assert any(read.verification != "verified" for read in reads)
+
+
+def test_the_discovery_command_scores_and_rechecks_the_coded_kinds(
+    coded_config: Path, tmp_path: Path,
+) -> None:
+    from sema.cli_eval import eval_group
+
+    oracle, out = tmp_path / "oracle.jsonl", tmp_path / "card.md"
+    oracle.write_text("".join(
+        json.dumps({"kind": kind, "key": list(key), "value": value, "basis": "data",
+                    "cite": "fixture"}) + "\n"
+        for kind in ("column_to_concept_binding", "label_source")
+        for key, value in CODED_CLAIMS[kind].items()
+    ))
+    result = CliRunner().invoke(eval_group, [
+        "discovery", "--config", str(coded_config), "--oracle-spec", str(oracle),
+        "--out", str(out),
+    ])
+    assert result.exit_code == 0, result.output
+    rows = card_rows(out.read_text())
+
+    labelled = sum(isinstance(value, list) for value in CODED_CLAIMS["label_source"].values())
+    for kind, claims in CODED_CLAIMS.items():
+        rechecked = labelled if kind == "label_source" else len(claims)
+        assert (rows[kind]["produced"], rows[kind]["rechecked"]) == (str(len(claims)),
+                                                                     str(rechecked))
+    for kind in ("column_to_concept_binding", "label_source"):
+        assert [rows[kind][cell] for cell in ("equal", "missing", "wrong", "extra")] == [
+            str(len(CODED_CLAIMS[kind])), "0", "0", "0"]
+    assert rows["time_roles"]["produced"] == "not produced"
