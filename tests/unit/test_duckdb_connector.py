@@ -105,6 +105,13 @@ class TestDiscovery:
                 workspace, CATALOG, "s1", item.table_name,
             )
 
+    def test_discover_tables_with_no_schemas_includes_the_default_schema(
+        self, connector: DuckDBConnector,
+    ) -> None:
+        found = {(item.schema, item.table_name) for item in connector.discover_tables(CATALOG)}
+        assert found == {("s1", "parent"), ("s1", "child"), ("main", "odd table")}
+        assert not {schema for schema, _ in found} & {"information_schema", "pg_catalog"}
+
     def test_factory_opens_one_connection_per_connector(self, db_path: Path) -> None:
         factory = DuckDBConnectorFactory(DuckDBConfig(path=str(db_path)), ProfilingConfig())
         first, second = factory.create(), factory.create()

@@ -93,10 +93,12 @@ class DuckDBConnector(Connector):
             raise ValueError(f"Catalog {catalog!r} is not attached; available: {attached}")
 
     def _discover_schemas(self, catalog: str) -> list[str]:
+        # Read from the relations: duckdb_schemas() marks the default schema `main` internal.
         rows = self._execute(
-            "SELECT schema_name FROM duckdb_schemas() "
-            "WHERE database_name = ? AND NOT internal ORDER BY 1",
-            [catalog],
+            "SELECT schema_name FROM duckdb_tables() WHERE database_name = ? AND NOT internal "
+            "UNION SELECT schema_name FROM duckdb_views() WHERE database_name = ? AND NOT internal "
+            "ORDER BY 1",
+            [catalog, catalog],
         )
         return [row[0] for row in rows]
 
