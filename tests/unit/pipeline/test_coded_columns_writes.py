@@ -3,8 +3,9 @@
 The step runs over the neutral fixture in DuckDB, through the real connector; only the graph
 is a stand-in. It answers the step's reads (the run's columns, the declared keys, a value
 set's current members) and keeps its writes the way the loader's Cypher merges them: a
-`Term` per vocabulary and code whose label a write replaces only with a higher confidence,
-`MEMBER_OF` per term and value set, `HAS_VALUE_SET` per column, and `LABELED_BY` per pair.
+`Term` per vocabulary and code whose label a write replaces only with a higher confidence and a
+label of its own, `MEMBER_OF` per term and value set, `HAS_VALUE_SET` per column, and
+`LABELED_BY` per pair.
 """
 
 from __future__ import annotations
@@ -84,6 +85,7 @@ class Graph:
                 (params["label_ref"], dict(params["edge"])))
             return
         if "rows" in params and "Term" in cypher:
+            assert "r.label IS NOT NULL" in cypher, "the stand-in's label rule left the term write"
             for r in params["rows"]:
                 self.term(r["vocabulary_name"], r["code"], r["label"], r["confidence"])
             return
@@ -91,7 +93,7 @@ class Graph:
 
     def term(self, vocabulary: str, code: str, label: str | None, confidence: float) -> None:
         held = self.terms.get((vocabulary, code))
-        if held is None or confidence > held[1]:
+        if held is None or (confidence > held[1] and (label is not None or held[0] is None)):
             self.terms[(vocabulary, code)] = (label, confidence)
 
     def store_assertion(self, assertion: Assertion, source_schema: str | None = None) -> None:
