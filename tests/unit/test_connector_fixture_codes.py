@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterator
+from collections.abc import Set as AbstractSet
 from pathlib import Path
 
 import duckdb
@@ -11,6 +13,7 @@ import pytest
 from sema.binding.importer import import_concept_source
 from sema.binding.spec import load_concept_source_spec
 from sema.connectors.duckdb import DuckDBConnector
+from sema.engine.join_detector import COVERAGE_THRESHOLD
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.land.relations import RelationProvider
 from sema.models.config import DuckDBConfig
@@ -19,9 +22,13 @@ from tests.support.connector_fixture_codes import (
     CODED_TABLES,
     CODES_CATALOG,
     CODES_SCHEMA,
-    STATED_DOMAINS,
+    DICTIONARY_ENTRIES,
+    FACT_TABLES,
+    LOW_DISTINCT_BOUND,
     UNPLACED_PROPERTY,
     column_values,
+    named_table,
+    normalized_name,
     write_coded_database,
     write_dictionary,
 )
@@ -51,7 +58,7 @@ def _key(table: str) -> set[object]:
     return _observed(table, TABLES[table].primary_key[0])
 
 
-def _value_share(table: str, column: str, listed: set[object]) -> float:
+def _value_share(table: str, column: str, listed: AbstractSet[object]) -> float:
     observed = _observed(table, column)
     return len(observed & listed) / len(observed)
 
@@ -79,51 +86,119 @@ def test_declared_keys_are_read_one_column_each(database: Path) -> None:
     assert found == {
         ("panel", "finish", (("finish_code", "finish_code"),)),
         ("panel", "grit", (("grit_code", "grit_code"),)),
+        ("panel", "pallet", (("pallet_no", "pallet_no"),)),
         ("fitting", "tone", (("tone_code", "tone_code"),)),
+        ("fitting", "sheen", (("sheen_code", "sheen_code"),)),
     }
 
 
 def test_code_relations_have_unique_keys_and_their_text_columns() -> None:
     text_columns = {
         name: [c for c, kind in table.columns[1:] if kind == "VARCHAR"]
-        for name, table in TABLES.items() if name not in ("panel", "fitting")
+        for name, table in TABLES.items() if name not in FACT_TABLES
     }
     assert text_columns == {
-        "finish": ["finish_label"], "tone": [], "grit": ["grit_note", "grit_alias"],
-        "shift_slot": ["slot_title"], "rack": ["rack_title"], "rack_spare": ["spare_title"],
-        "bay": ["bay_title"], "crew": ["crew_name"],
+        "finish": ["finish_label"], "tone": [], "sheen": [], "glaze": ["glaze_title"],
+        "grit": ["grit_note", "grit_alias"], "shift_slot": ["slot_title"],
+        "rack": ["rack_title"], "rack_spare": ["spare_title"], "bay": ["bay_title"],
+        "crew": ["crew_name"], "pallet": ["pallet_title"],
     }
     for name in text_columns:
         keys = column_values(name, TABLES[name].primary_key[0])
         assert None not in keys and len(set(keys)) == len(keys), name
 
 
-def test_the_sibling_label_is_a_function_of_the_code() -> None:
-    pairs = set(zip(column_values("fitting", "tone_code"), column_values("fitting", "tone_name")))
-    assert len(pairs) == len({code for code, _ in pairs}) == len(_key("tone"))
+def _violation_rate(table: str, code: str, text: str) -> float:
+    """Share of rows whose text differs from the most common text for their code."""
+    pairs = list(zip(column_values(table, code), column_values(table, text)))
+    by_code: dict[object, Counter[object]] = {}
+    for code_value, text_value in pairs:
+        by_code.setdefault(code_value, Counter())[text_value] += 1
+    agreeing = sum(counts.most_common(1)[0][1] for counts in by_code.values())
+    return 1 - agreeing / len(pairs)
+
+
+def _determined_pairs() -> set[tuple[str, str, str]]:
+    found = set()
+    for name in FACT_TABLES:
+        table = TABLES[name]
+        texts = [c for c, kind in table.columns if kind == "VARCHAR"]
+        for code in table.column_names[1:]:
+            for text in texts:
+                if text != code and _violation_rate(name, code, text) <= 1 - COVERAGE_THRESHOLD:
+                    found.add((name, code, text))
+    return found
+
+
+def test_only_the_sibling_label_cases_hold_a_text_column_the_code_determines() -> None:
+    siblings = {("fitting", "tone_code", "tone_name"), ("fitting", "tone_name", "tone_code")}
+    sheen = ("sheen_code", "sheen_name", "sheen_hint")
+    siblings |= {("fitting", a, b) for a in sheen for b in sheen if a != b}
+    assert _determined_pairs() == siblings
 
 
 def test_each_decoy_tempts_its_predicate() -> None:
     assert _observed("panel", "shift") <= _key("shift_slot")
     assert _observed("panel", "crew_size") <= _key("bay")
     assert _observed("panel", "rack_no") <= _key("rack") & _key("rack_spare")
-    assert _observed("panel", "assigned_crew") <= _key("crew")
-    assert len(_observed("panel", "assigned_crew")) == 1100
     every_key = set().union(*(_key(name) for name in TABLES))
     assert not _observed("panel", "finish_cd") & every_key
     assert not _observed("fitting", "grit_code") & _key("grit")
 
 
+def test_name_match_cases_share_their_key_column_name() -> None:
+    assert _observed("fitting", "glaze_code") <= _key("glaze")
+    keyed_glaze = [t for t in TABLES.values() if t.primary_key == ("glaze_code",)]
+    assert [t.name for t in keyed_glaze] == ["glaze"]
+    assert TABLES["rack"].primary_key == TABLES["rack_spare"].primary_key == ("rack_no",)
+
+
+def test_the_bound_cases_sit_at_and_one_past_the_bound() -> None:
+    assert len(_key("crew")) == len(_observed("panel", "crew_ref")) == LOW_DISTINCT_BOUND
+    assert _observed("panel", "crew_ref") <= _key("crew")
+    assert len(_observed("panel", "assigned_crew")) == LOW_DISTINCT_BOUND + 1
+    assert len(_observed("panel", "assigned_crew") - _key("crew")) == 1
+    assert len(_key("pallet")) == LOW_DISTINCT_BOUND + 1
+    assert _observed("panel", "pallet_no") <= _key("pallet")
+    assert len(_observed("panel", "pallet_no")) < LOW_DISTINCT_BOUND
+
+
+def _placements(entry_property: str) -> set[tuple[str, str]]:
+    """Every (table, column) a stated property lands on by the normalized-name rule."""
+    (entry,) = (e for e in DICTIONARY_ENTRIES if entry_property in e.domains)
+    named = named_table(entry)
+    tables = [named] if named else list(CODED_TABLES)
+    wanted = normalized_name(entry_property)
+    return {(t.name, c) for t in tables for c in t.column_names if normalized_name(c) == wanted}
+
+
+def test_stated_domains_are_spelled_as_a_document_spells_them() -> None:
+    placed = {prop: _placements(prop) for e in DICTIONARY_ENTRIES for prop in e.domains}
+    assert placed == {
+        "Coat Kind": {("panel", "coat_kind")}, "TRIM": {("panel", "trim")},
+        "Edge Treatment": set(), "coat-kind": {("fitting", "coat_kind")},
+        "Seal / Kind": {("panel", "seal_kind"), ("fitting", "seal_kind")},
+        "Bevel Kind.": {("panel", "bevel_kind")},
+    }
+    assert all(column not in placed for found in placed.values() for _, column in found)
+    assert [e.entity for e in DICTIONARY_ENTRIES if named_table(e) is None] == [
+        None, "Wall Fitting",
+    ]
+    assert normalized_name(UNPLACED_PROPERTY) not in {
+        normalized_name(c) for t in CODED_TABLES for c in t.column_names
+    }
+
+
 def test_stated_domains_cover_the_floor_from_both_sides() -> None:
-    coats = set(CODE_LISTS["coat_kinds"])
+    coats, trims = set(CODE_LISTS["coat_kinds"]), set(CODE_LISTS["trim_kinds"])
     assert _value_share("panel", "coat_kind", coats) == 5 / 6
     assert _value_share("fitting", "coat_kind", coats) == 6 / 10
-    assert _value_share("panel", "trim", set(CODE_LISTS["trim_kinds"])) == 1 / 6
-    assert column_values("panel", "coat_kind").count(None) == 100
-    assert UNPLACED_PROPERTY.replace(" ", "_") not in TABLES["panel"].column_names
-    for entity, domains in STATED_DOMAINS.items():
-        placed = set(domains) - {UNPLACED_PROPERTY}
-        assert placed <= set(TABLES[entity].column_names)
+    assert _value_share("panel", "trim", trims) == 1 / 7
+    assert _value_share("fitting", "trim", trims) == 1.0
+    assert column_values("panel", "coat_kind").count(None) == 96
+    for column in (("panel", "seal_kind"), ("fitting", "seal_kind")):
+        assert _value_share(*column, set(CODE_LISTS["seal_kinds"])) == 1.0
+    assert _value_share("panel", "bevel_kind", set(CODE_LISTS["bevel_kinds"])) == 1.0
 
 
 def test_the_dictionary_imports_its_code_lists(tmp_path: Path) -> None:
@@ -141,3 +216,9 @@ def test_the_dictionary_imports_its_code_lists(tmp_path: Path) -> None:
         (vocabulary, code, label)
         for vocabulary, codes in CODE_LISTS.items() for code, label in codes.items()
     }
+    stated = {
+        domain["property_name"]: domain["domain_id"]
+        for entity in imported.manifest["entities"] for domain in entity.get("domains", [])
+    }
+    assert stated == {prop: vocabulary for e in DICTIONARY_ENTRIES
+                      for prop, vocabulary in e.domains.items()}

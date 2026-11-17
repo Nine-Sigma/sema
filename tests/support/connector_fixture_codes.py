@@ -3,11 +3,17 @@
 One relation per label location and per evidence type, and one column per decoy. Every row
 is spelled out in Python, so a test derives its expected numbers from these rows, never
 from a run of SEMA. The dictionary is an intake-style concept spec over a staging file:
-its code lists are the only place some labels exist.
+its code lists are the only place some labels exist, and it spells properties the way a
+document does, not the way a column is named.
+
+Each column of a fact relation cycles with its own period, and no period divides another,
+so no text column is a function of a coded column unless a case means it (the sibling
+labels). Wide columns run in consecutive blocks for the same reason.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,11 +22,13 @@ from typing import Any
 import yaml
 
 from sema.ingest.duckdb_staging import Staging
+from sema.models.config import ProfilingConfig
 from tests.support.connector_fixture import DeclaredKey, FixtureTable, write_fixture_database
 
 CODES_CATALOG = "fixcodes"
 CODES_SCHEMA = "works"
 DICTIONARY_SCHEMA = "land"
+LOW_DISTINCT_BOUND: int = ProfilingConfig.model_fields["categorical_threshold"].default
 
 Row = tuple[Any, ...]
 
@@ -28,6 +36,10 @@ FINISH = {"MAT": "Matte", "GLS": "Gloss", "SAT": "Satin", "TXR": "Textured", "BR
           "POL": "Polished"}
 TONE_NAMES = {"T-RD": "Crimson", "T-BL": "Cobalt", "T-GN": "Jade", "T-YL": "Saffron",
               "T-BK": "Onyx"}
+SHEEN = {"SH-1": ("Flat sheen", "least light"), "SH-2": ("Eggshell sheen", "some light"),
+         "SH-3": ("Pearl sheen", "most light")}
+GLAZE = {"GZ-1": "Clear glaze", "GZ-2": "Amber glaze", "GZ-3": "Smoke glaze",
+         "GZ-4": "Frost glaze"}
 GRIT = {"G040": ("coarse stock removal", "forty"), "G080": ("shaping", "eighty"),
         "G120": ("smoothing", "one twenty"), "G240": ("pre-finish", "two forty")}
 SHIFT_SLOT = {"EARLY": "Dawn rota", "LATE": "Dusk rota", "NIGHT": "Owl rota",
@@ -35,27 +47,59 @@ SHIFT_SLOT = {"EARLY": "Dawn rota", "LATE": "Dusk rota", "NIGHT": "Owl rota",
 RACK = {101: "north rack", 102: "south rack", 103: "east rack", 104: "west rack", 105: "top rack"}
 RACK_SPARE = {**{n: f"spare {n}" for n in RACK}, 106: "spare overflow"}
 BAY = {n: f"bay {n}" for n in range(1, 9)}
-CREW = {n: f"crew member {n}" for n in range(2001, 3201)}
+CREW = {n: f"crew member {n}" for n in range(2001, 2001 + LOW_DISTINCT_BOUND)}
+PALLET = {n: f"pallet {n}" for n in range(1, LOW_DISTINCT_BOUND + 2)}
 
 # Dictionary code lists: vocabulary id -> code -> label. No warehouse relation holds these.
 COAT_KINDS = {"CK-A": "Primer", "CK-B": "Enamel", "CK-C": "Lacquer", "CK-D": "Varnish",
               "CK-E": "Powder", "CK-F": "Anodised"}
 TRIM_KINDS = {"TR-1": "Bead", "TR-2": "Flat", "TR-3": "Round"}
 EDGE_KINDS = {"EK-1": "Sharp", "EK-2": "Eased"}
-CODE_LISTS = {"coat_kinds": COAT_KINDS, "trim_kinds": TRIM_KINDS, "edge_kinds": EDGE_KINDS}
-STATED_DOMAINS = {
-    "panel": {"coat_kind": "coat_kinds", "trim": "trim_kinds", "edge treatment": "edge_kinds"},
-    "fitting": {"coat_kind": "coat_kinds"},
-}
-UNPLACED_PROPERTY = "edge treatment"
+SEAL_KINDS = {"SL-1": "Wax", "SL-2": "Oil", "SL-3": "Resin"}
+BEVEL_KINDS = {"BV-1": "Chamfer", "BV-2": "Ogee"}
+CODE_LISTS = {"coat_kinds": COAT_KINDS, "trim_kinds": TRIM_KINDS, "edge_kinds": EDGE_KINDS,
+              "seal_kinds": SEAL_KINDS, "bevel_kinds": BEVEL_KINDS}
+
+
+@dataclass(frozen=True)
+class DictionaryEntry:
+    """One dictionary file: the entity it names, if any, and its stated property domains."""
+
+    stem: str
+    entity: str | None
+    domains: dict[str, str]
+
+
+DICTIONARY_ENTRIES = (
+    DictionaryEntry("panel", "Panel", {"Coat Kind": "coat_kinds", "TRIM": "trim_kinds",
+                                       "Edge Treatment": "edge_kinds"}),
+    DictionaryEntry("fitting", "fitting", {"coat-kind": "coat_kinds"}),
+    DictionaryEntry("shared", None, {"Seal / Kind": "seal_kinds"}),
+    DictionaryEntry("wall_fitting", "Wall Fitting", {"Bevel Kind.": "bevel_kinds"}),
+)
+UNPLACED_PROPERTY = "Edge Treatment"
+
+
+def normalized_name(name: str) -> str:
+    """Lowercase, each run of other characters one `_`, no `_` at either end."""
+    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
 
 PANEL_ROWS = 1500
 FITTING_ROWS = 240
-_COAT_PATTERN = (("CK-A",) * 6 + ("CK-B",) * 6 + ("CK-C",) * 6 + ("CK-D",) * 5 + ("CK-E",) * 4
-                 + ("CK-Z", None, None))
 _FINISH_PATTERN = ("MAT", "GLS", "SAT", "TXR", "BRU", None)
-_TRIM_PATTERN = ("TR-1", "BEAD", "FLAT", "ROUND", "NONE", "SQ")
+_COAT_PATTERN = (("CK-A", "CK-B", "CK-C", "CK-D", "CK-E") * 5
+                 + ("CK-A", None, "CK-B", "CK-Z", "CK-C", None))
+_TRIM_PATTERN = ("TR-1", "BEAD", "FLAT", "ROUND", "NONE", "SQ", "OVAL")
+_FINISH_CD_PATTERN = ("F1", "F2", "F3", "F4", "F5")
+_SHIFT_PATTERN = ("EARLY", "LATE", "NIGHT") * 3 + ("EARLY", "LATE")
+_PANEL_SEALS = ("SL-1", "SL-2", "SL-3") * 4 + ("SL-1",)
+_BEVELS = ("BV-1", "BV-2") * 8 + ("BV-1",)
+_TONES = (*TONE_NAMES, "T-RD", "T-BL")
+_SHEENS = (*SHEEN, *SHEEN, *SHEEN, "SH-1", "SH-2")
 _FITTING_COATS = ("CK-A", "CK-B", "CK-C", "CK-D", "CK-E", "CK-F", "CK-P", "CK-Q", "CK-R", "CK-S")
+_FITTING_SEALS = ("SL-1", "SL-2", "SL-3") * 5 + ("SL-1", "SL-2")
+_FITTING_TRIMS = ("TR-1", "TR-2", "TR-3") * 6 + ("TR-1",)
 
 
 def _cycle(pattern: Sequence[Any], i: int) -> Any:
@@ -68,30 +112,38 @@ def _panel_row(i: int) -> Row:
         _cycle(_FINISH_PATTERN, i),
         _cycle(_COAT_PATTERN, i),
         _cycle(_TRIM_PATTERN, i),
-        _cycle(("F1", "F2", "F3", "F4"), i),
-        _cycle(("EARLY", "LATE", "NIGHT"), i),
-        1 + i % 4,
+        _cycle(_FINISH_CD_PATTERN, i),
+        _cycle(_SHIFT_PATTERN, i),
+        1 + i % 3,
         _cycle(tuple(GRIT), i),
         _cycle((101, 102, 103), i),
-        2001 + i % 1100,
+        2001 + i * (LOW_DISTINCT_BOUND + 1) // PANEL_ROWS,
+        2001 + i * LOW_DISTINCT_BOUND // PANEL_ROWS,
+        201 + i * 4 // PANEL_ROWS,
+        _cycle(_PANEL_SEALS, i),
+        _cycle(_BEVELS, i),
     )
 
 
 def _fitting_row(i: int) -> Row:
-    tone = _cycle(tuple(TONE_NAMES), i)
+    tone, sheen = _cycle(_TONES, i), _cycle(_SHEENS, i)
     return (20001 + i, tone, TONE_NAMES[tone], _cycle(("Z1", "Z2", "Z3"), i),
-            _cycle(_FITTING_COATS, i))
+            _cycle(_FITTING_COATS, i), sheen, *SHEEN[sheen], _cycle(tuple(GLAZE), i),
+            _cycle(_FITTING_SEALS, i), _cycle(_FITTING_TRIMS, i))
 
 
 ROWS: dict[str, list[Row]] = {
     "finish": list(FINISH.items()),
     "tone": [(code,) for code in TONE_NAMES],
+    "sheen": [(code,) for code in SHEEN],
+    "glaze": list(GLAZE.items()),
     "grit": [(code, note, alias) for code, (note, alias) in GRIT.items()],
     "shift_slot": list(SHIFT_SLOT.items()),
     "rack": list(RACK.items()),
     "rack_spare": list(RACK_SPARE.items()),
     "bay": list(BAY.items()),
     "crew": list(CREW.items()),
+    "pallet": list(PALLET.items()),
     "panel": [_panel_row(i) for i in range(PANEL_ROWS)],
     "fitting": [_fitting_row(i) for i in range(FITTING_ROWS)],
 }
@@ -117,32 +169,42 @@ def _table(
     return FixtureTable(name, columns, (columns[0][0],), _values_sql(ROWS[name]), keys)
 
 
+def _key(column: str, table: str) -> DeclaredKey:
+    return DeclaredKey((column,), table, (column,))
+
+
 _TEXT = "VARCHAR"
+_INT = "INTEGER"
 CODED_TABLES: tuple[FixtureTable, ...] = (
     _table("finish", (("finish_code", _TEXT), ("finish_label", _TEXT))),
     _table("tone", (("tone_code", _TEXT),)),
+    _table("sheen", (("sheen_code", _TEXT),)),
+    _table("glaze", (("glaze_code", _TEXT), ("glaze_title", _TEXT))),
     _table("grit", (("grit_code", _TEXT), ("grit_note", _TEXT), ("grit_alias", _TEXT))),
     _table("shift_slot", (("slot_key", _TEXT), ("slot_title", _TEXT))),
-    _table("rack", (("rack_no", "INTEGER"), ("rack_title", _TEXT))),
-    _table("rack_spare", (("rack_no", "INTEGER"), ("spare_title", _TEXT))),
-    _table("bay", (("bay_no", "INTEGER"), ("bay_title", _TEXT))),
-    _table("crew", (("crew_ref", "INTEGER"), ("crew_name", _TEXT))),
+    _table("rack", (("rack_no", _INT), ("rack_title", _TEXT))),
+    _table("rack_spare", (("rack_no", _INT), ("spare_title", _TEXT))),
+    _table("bay", (("bay_no", _INT), ("bay_title", _TEXT))),
+    _table("crew", (("crew_ref", _INT), ("crew_name", _TEXT))),
+    _table("pallet", (("pallet_no", _INT), ("pallet_title", _TEXT))),
     _table(
         "panel",
-        (("panel_no", "INTEGER"), ("finish_code", _TEXT), ("coat_kind", _TEXT), ("trim", _TEXT),
-         ("finish_cd", _TEXT), ("shift", _TEXT), ("crew_size", "INTEGER"),
-         ("grit_code", _TEXT), ("rack_no", "INTEGER"), ("assigned_crew", "INTEGER")),
-        (DeclaredKey(("finish_code",), "finish", ("finish_code",)),
-         DeclaredKey(("grit_code",), "grit", ("grit_code",))),
+        (("panel_no", _INT), ("finish_code", _TEXT), ("coat_kind", _TEXT), ("trim", _TEXT),
+         ("finish_cd", _TEXT), ("shift", _TEXT), ("crew_size", _INT), ("grit_code", _TEXT),
+         ("rack_no", _INT), ("assigned_crew", _INT), ("crew_ref", _INT), ("pallet_no", _INT),
+         ("seal_kind", _TEXT), ("bevel_kind", _TEXT)),
+        (_key("finish_code", "finish"), _key("grit_code", "grit"), _key("pallet_no", "pallet")),
     ),
     _table(
         "fitting",
-        (("fitting_no", "INTEGER"), ("tone_code", _TEXT), ("tone_name", _TEXT),
-         ("grit_code", _TEXT), ("coat_kind", _TEXT)),
-        (DeclaredKey(("tone_code",), "tone", ("tone_code",)),),
+        (("fitting_no", _INT), ("tone_code", _TEXT), ("tone_name", _TEXT), ("grit_code", _TEXT),
+         ("coat_kind", _TEXT), ("sheen_code", _TEXT), ("sheen_name", _TEXT),
+         ("sheen_hint", _TEXT), ("glaze_code", _TEXT), ("seal_kind", _TEXT), ("trim", _TEXT)),
+        (_key("tone_code", "tone"), _key("sheen_code", "sheen")),
     ),
 )
 CODED_SCHEMA_TABLES = {CODES_SCHEMA: CODED_TABLES}
+FACT_TABLES = ("panel", "fitting")
 
 
 def column_values(table: str, column: str) -> list[Any]:
@@ -163,11 +225,26 @@ class DictionaryFiles:
     staging: Path
 
 
-def _field_rows(entity: str) -> list[tuple[str, str]]:
-    (table,) = (t for t in CODED_TABLES if t.name == entity)
-    names = list(table.column_names)
-    names += [prop for prop in STATED_DOMAINS[entity] if prop not in names]
-    return [(name, f"the {name.replace('_', ' ')} of a {entity}") for name in names]
+def named_table(entry: DictionaryEntry) -> FixtureTable | None:
+    """The warehouse relation whose normalized name equals the entry's entity, if any."""
+    if entry.entity is None:
+        return None
+    wanted = normalized_name(entry.entity)
+    return next((t for t in CODED_TABLES if normalized_name(t.name) == wanted), None)
+
+
+def _field_rows(entry: DictionaryEntry) -> list[tuple[str, str]]:
+    table = named_table(entry)
+    stated = {normalized_name(prop) for prop in entry.domains}
+    columns = [c for c in table.column_names if c not in stated] if table else []
+    subject = entry.entity or entry.stem
+    return [(name, f"the {name} of a {subject}") for name in [*columns, *entry.domains]]
+
+
+def _entity_entry(entry: DictionaryEntry) -> dict[str, Any]:
+    named = {"entity": entry.entity} if entry.entity else {}
+    return {"relation": f"{DICTIONARY_SCHEMA}.{entry.stem}_fields", **named,
+            "domains": entry.domains}
 
 
 def _spec() -> dict[str, Any]:
@@ -180,11 +257,7 @@ def _spec() -> dict[str, Any]:
         "entity_model": {
             "layout": "per_file",
             "roles": {"property": "field_name", "description": "field_note"},
-            "entities": [
-                {"relation": f"{DICTIONARY_SCHEMA}.{entity}_fields", "entity": entity,
-                 "domains": domains}
-                for entity, domains in STATED_DOMAINS.items()
-            ],
+            "entities": [_entity_entry(entry) for entry in DICTIONARY_ENTRIES],
         },
         "code_lists": [
             {"vocabulary_id": vocabulary, "relation": f"{DICTIONARY_SCHEMA}.{vocabulary}",
@@ -199,10 +272,10 @@ def write_dictionary(directory: Path) -> DictionaryFiles:
     staging_path = directory / "dictionary.duckdb"
     with Staging(str(staging_path), schemas=()) as staging:
         staging.execute(f"CREATE SCHEMA {DICTIONARY_SCHEMA}")
-        for entity in STATED_DOMAINS:
-            relation = f"{DICTIONARY_SCHEMA}.{entity}_fields"
+        for entry in DICTIONARY_ENTRIES:
+            relation = f"{DICTIONARY_SCHEMA}.{entry.stem}_fields"
             staging.execute(f"CREATE TABLE {relation} (field_name VARCHAR, field_note VARCHAR)")
-            staging.execute(f"INSERT INTO {relation} {_values_sql(list(_field_rows(entity)))}")
+            staging.execute(f"INSERT INTO {relation} {_values_sql(list(_field_rows(entry)))}")
         for vocabulary, codes in CODE_LISTS.items():
             relation = f"{DICTIONARY_SCHEMA}.{vocabulary}"
             staging.execute(f"CREATE TABLE {relation} (kind_code VARCHAR, kind_text VARCHAR)")
