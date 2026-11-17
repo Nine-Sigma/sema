@@ -8,7 +8,12 @@ import duckdb
 import pytest
 import yaml
 
-from tests.support.connector_fixture import CATALOG, MAIN_SCHEMA, MAIN_TABLES, write_fixture_database
+from tests.support.connector_fixture import (
+    CATALOG,
+    MAIN_SCHEMA,
+    MAIN_TABLES,
+    write_fixture_database,
+)
 from tests.unit.ontology_query_benchmark.sealed_set_env import materialize, run_arms
 
 pytestmark = pytest.mark.unit
