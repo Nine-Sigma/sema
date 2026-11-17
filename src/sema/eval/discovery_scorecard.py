@@ -2,7 +2,7 @@
 
 `produced` and an oracle are `Cells` per fact kind, keyed as the contract's oracle file format
 keys them, and scored by the intake scorecard's verdict arithmetic. A kind absent from
-`produced` prints `not produced`; a kind absent from the oracle prints `no oracle`.
+`produced` prints `not produced`; a kind the oracle holds no claim for prints `no oracle`.
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ def score_discovery(
 
 
 def _row(made: Cells | None, claims: Cells | None, rechecked: int) -> KindRow:
-    score = None if claims is None else kind_score(verdicts(claims, _resolved(made or {}, claims)))
+    score = kind_score(verdicts(claims, _resolved(made or {}, claims))) if claims else None
     return KindRow(produced=None if made is None else len(made), score=score,
                    rechecked=rechecked)
 
