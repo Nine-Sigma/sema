@@ -12,3 +12,6 @@
 {"id": "N12", "sql": "SELECT count(*) AS accounts FROM shop.account"}
 {"id": "N13", "sql": "SELECT product_id, count(*) AS order_lines, sum(qty) AS total_qty FROM shop.order_line WHERE product_id < 9 GROUP BY product_id ORDER BY product_id"}
 {"id": "N14", "sql": "SELECT count(DISTINCT customer_id) AS customers FROM shop.order_header"}
+{"id": "N15", "sql": "SELECT avg(product_id) AS mean_product_id FROM shop.order_line"}
+{"id": "N16", "sql": "SELECT sum(CAST(amount / 7 AS DECIMAL(18,5))) AS total_sevenths FROM shop.transfer"}
+{"id": "N17", "sql": "SELECT min(CAST(order_date AS TIMESTAMP)) AS first_order_at FROM shop.order_header"}

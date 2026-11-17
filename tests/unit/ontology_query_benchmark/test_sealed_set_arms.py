@@ -32,11 +32,15 @@ executes through the connector's `Connector.execute_query_with_columns(query) ->
 tuple[list[str], list[tuple[Any, ...]]]` (column names, rows), once per statement.
 """
 
+import datetime
 import importlib
 import json
+import re
 import socket
+import tempfile
 from collections import Counter
 from collections.abc import Callable
+from decimal import Decimal
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -52,6 +56,11 @@ from tests.unit.ontology_query_benchmark.sealed_set_env import (
     ARM_REPLIES,
     AUTHOR_SPLIT,
     CONNECTOR_READ,
+    LEAK_MARKED,
+    LEAK_REPLY,
+    LEAK_ROW,
+    LEAK_SQL,
+    LEAK_TEXT,
     MARKERS,
     NEAR_MISS,
     ROW_MARKER,
@@ -60,8 +69,12 @@ from tests.unit.ontology_query_benchmark.sealed_set_env import (
     SQL_MARKERS,
     TEXT_MARKER,
     WIDE,
+    WRITER_RULE,
     SealedRun,
+    captured_logs,
     expected_cells,
+    files_holding,
+    mark_questions,
     materialize,
     question_texts,
     read_jsonl,
@@ -108,9 +121,10 @@ def sealed_run(
 
 
 def _cell(value: Any) -> Any:
-    # shortcut: the writer's normalization for the cell types this fixture returns (int,
-    # integral float, text, NULL); extend it if a question returns another type.
-    return int(value) if isinstance(value, float) and value.is_integer() else value
+    """The expected-answer writer's normalization (M5), as the sealed-set path applies it."""
+    from showcase.ontology_query_benchmark.sealed_set_utils import normalize
+
+    return normalize(value)
 
 
 def test_the_neutral_set_follows_the_sealed_file_contract(tmp_path: Path) -> None:
@@ -348,3 +362,135 @@ def test_renamed_question_ids_give_the_same_per_rule_results(
     assert all(any(qid in line and flag in line for line in lines)
                for qid, flagged in flags.items() for flag in flagged if flagged[flag] is True)
     assert not any(old in decoy.report for old in renamed)
+
+
+def test_markers_in_a_wrong_a_flagged_and_a_refused_question_reach_no_unsealed_surface(
+    frozen: Path, harness: SimpleNamespace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "sealed_set"
+    profile_path = materialize(root, frozen)
+    mark_questions(root / "neutral", LEAK_MARKED, LEAK_TEXT)
+    truncate_expected(root / "neutral", WIDE, keep=5)
+    monkeypatch.setitem(ARM_REPLIES["N02"], "S", LEAK_REPLY)
+
+    run = _run(harness, root, profile_path)
+
+    assert run.receipt("S:N02:1")["outcome"] == "wrong"
+    assert LEAK_ROW in json.dumps(run.receipt("S:N02:1")["answer"])
+    assert LEAK_TEXT in json.dumps(run.model.calls) and SINK_CANARY in run.logs
+    markers = (LEAK_TEXT, LEAK_SQL, LEAK_ROW)
+    surfaces = {"stdout and stderr": run.output, "log": run.logs, "report": run.report}
+    assert [(name, m) for name, text in surfaces.items() for m in markers if m in text] == []
+    assert files_holding((root,), run.set_dir / "sealed", markers) == []
+
+
+def test_a_dry_run_prints_only_slot_and_spend_lines_ids_counts_and_status_words(
+    frozen: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = tmp_path / "sealed_set"
+    profile_path = materialize(root, frozen)
+    truncate_expected(root / "neutral", WIDE, keep=5)
+    texts = question_texts(root / "neutral")
+
+    with captured_logs() as logs:
+        code = _sealed_set().main(["--profile", str(profile_path), "--arms", "A,S",
+                                   "--repetitions", "1", "--dry-run"])  # fmt: skip
+
+    out, err = capsys.readouterr()
+    lines = out.splitlines()
+    assert code == 0 and {"spend 0.00", f"slots {(len(texts) - 1) * 2}"} <= set(lines)
+    word = re.compile(r"[a-z_]+|\d+(\.\d\d)?")
+    assert all(t in texts or word.fullmatch(t) for line in lines for t in line.split()), lines
+    leaked = [t for t in (*texts.values(), *MARKERS) for s in (out, err, *logs) if t in s]
+    assert leaked == []
+
+
+def test_a_run_writes_no_question_sql_or_row_outside_the_sealed_folder(
+    frozen: Path, harness: SimpleNamespace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, work, temp = tmp_path / "sealed_set", tmp_path / "cwd", tmp_path / "tmp"
+    profile_path = materialize(root, frozen)
+    work.mkdir()
+    temp.mkdir()
+    monkeypatch.chdir(work)
+    monkeypatch.setenv("TMPDIR", str(temp))
+    monkeypatch.setattr(tempfile, "tempdir", str(temp))
+
+    run = _run(harness, root, profile_path)
+
+    texts = tuple(question_texts(run.set_dir).values())
+    needles = (*texts, *run.model.replies, *MARKERS)
+    assert run.receipts and run.model.replies
+    assert files_holding((root, work, temp), run.set_dir / "sealed", needles) == []
+
+
+def test_main_gives_arm_s_the_core_path_provider(
+    frozen: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from showcase.ontology_query_benchmark.core_s_provider import CoreSContextProvider
+    from showcase.ontology_query_benchmark.sema_context import SContextProvider
+
+    profile_path = materialize(tmp_path / "sealed_set", frozen)
+    module, seen = _sealed_set(), {}
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "")
+    monkeypatch.setattr(module, "require_clean_process", lambda *_, **__: None)
+    monkeypatch.setattr(module, "model_client", lambda *_, **__: "mocked-model")
+    monkeypatch.setattr(module, "run_sealed_set", lambda *_, **kwargs: seen.update(kwargs))
+
+    code = module.main(["--profile", str(profile_path), "--arms", "A,S", "--repetitions", "1",
+                        "--report", str(tmp_path / "report.md")])  # fmt: skip
+
+    provider = seen["s_provider"]
+    assert code == 0 and seen["model"] == "mocked-model"
+    assert isinstance(provider, CoreSContextProvider)
+    assert not isinstance(provider, SContextProvider)
+
+
+def test_found_values_are_normalized_by_the_writers_rule_before_scoring(
+    sealed_run: Callable[[], SealedRun],
+) -> None:
+    run = sealed_run()
+    scored = {r["slot_id"]: (r["outcome"], r["strict"]) for r in run.receipts
+              if r["question_id"] in WRITER_RULE}  # fmt: skip
+    assert scored == {f"{arm}:{qid}:1": ("correct", True) for qid in WRITER_RULE for arm in ARMS}
+
+
+@pytest.mark.parametrize(("value", "normal"), [
+    (None, None), (True, True), ("001", "001"), (7, 7),
+    (float("nan"), "nan"), (float("inf"), "inf"), (Decimal("-Infinity"), "-inf"),
+    (5.0, 5), (Decimal("5.00"), 5), (1 / 3, 0.3333333333),
+    (Decimal("428785.71429"), 428785.7143),
+    (datetime.datetime(2024, 1, 1), "2024-01-01"),
+    (datetime.datetime(2024, 1, 1, 5), "2024-01-01T05:00:00"),
+    (datetime.datetime(2024, 1, 1, tzinfo=datetime.UTC), "2024-01-01T00:00:00+00:00"),
+    (datetime.date(2024, 1, 2), "2024-01-02"), (datetime.time(1, 2), "01:02:00"),
+    (datetime.timedelta(seconds=90), 90), (datetime.timedelta(milliseconds=1500), 1.5),
+    (b"\x01\xff", "01ff"), ([1.0, {"k": Decimal("2.50")}], [1, {"k": 2.5}]),
+    ((2.0, "a"), [2, "a"]),
+])  # fmt: skip
+def test_the_normalizer_follows_the_writers_rule(value: Any, normal: Any) -> None:
+    assert _cell(value) == normal and type(_cell(value)) is type(normal)
+
+
+def test_the_openrouter_client_speaks_the_harness_model_protocol(harness: SimpleNamespace) -> None:
+    from showcase.ontology_query_benchmark import runner_live_utils as live
+
+    sent: list[tuple[str, dict[str, Any], dict[str, str], float]] = []
+
+    def post(url: str, body: dict[str, Any], headers: dict[str, str], timeout: float) -> Any:
+        sent.append((url, body, headers, timeout))
+        return {"choices": [{"message": {"content": "```sql\nSELECT 1\n```"}}],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 3}}  # fmt: skip
+
+    client = live.OpenRouterClient(harness, "vendor/model-x", "key-1", max_tokens=99,
+                                   timeout=5.0, post=post)  # fmt: skip
+    generation = client.complete([{"role": "user", "content": "q"}])
+
+    ((url, body, headers, timeout),) = sent
+    assert url == "https://openrouter.ai/api/v1/chat/completions"
+    assert body == {"model": "vendor/model-x", "max_tokens": 99,
+                    "messages": [{"role": "user", "content": "q"}]}  # fmt: skip
+    assert headers["Authorization"] == "Bearer key-1" and timeout == 5.0
+    assert isinstance(generation, harness.models.Generation)
+    assert (generation.text, generation.prompt_tokens, generation.completion_tokens) == (
+        "```sql\nSELECT 1\n```", 12, 3)

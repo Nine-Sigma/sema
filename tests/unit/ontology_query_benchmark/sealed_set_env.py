@@ -10,7 +10,8 @@ import io
 import json
 import shutil
 from collections import defaultdict
-from contextlib import redirect_stderr, redirect_stdout
+from collections.abc import Iterator
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -103,7 +104,21 @@ ARM_REPLIES: dict[str, dict[str, Reply]] = {
     AUTHOR_SPLIT: {"A": _right("SELECT count(DISTINCT customer_id) AS customers "
                                "FROM shop.order_header"),
                    "S": _wrong("SELECT count(customer_id) AS n FROM shop.order_header")},
+    # M5: answers the expected-answer writer normalizes (a non-terminating average, an
+    # 11-significant-digit decimal sum, a midnight timestamp); both arms write author A's.
+    "N15": {arm: _right("SELECT avg(product_id) AS mean_product_id FROM shop.order_line")
+            for arm in "AS"},
+    "N16": {arm: _right("SELECT sum(CAST(amount / 7 AS DECIMAL(18,5))) AS total_sevenths "
+                        "FROM shop.transfer") for arm in "AS"},
+    "N17": {arm: _right("SELECT min(CAST(order_date AS TIMESTAMP)) AS first_order_at "
+                        "FROM shop.order_header") for arm in "AS"},
 }
+WRITER_RULE = ("N15", "N16", "N17")
+# M1: planted in a question one arm answers wrong (N02), a flagged one (N07), a refused one
+# (WIDE), and in the wrong reply's statement and the row it returns.
+LEAK_TEXT, LEAK_SQL, LEAK_ROW = "ZQXLEAKTEXT", "zqxleaksql", "ZQXLEAKROW"
+LEAK_MARKED = ("N02", "N07", WIDE)
+LEAK_REPLY = Reply(f"SELECT '{LEAK_ROW}' AS {LEAK_SQL}", False, False, 0)
 
 
 class ScriptedModel:
@@ -183,6 +198,31 @@ def truncate_expected(set_dir: Path, qid: str, keep: int) -> None:
     write_jsonl(path, [{**r, "rows": r["rows"][:keep], "rows_truncated": True}
                        if (r["id"], r["author"]) == (qid, "A") else r
                        for r in read_jsonl(path)])  # fmt: skip
+
+
+def mark_questions(set_dir: Path, ids: tuple[str, ...], marker: str) -> None:
+    """Append `marker` to each named question's text."""
+    path = set_dir / "sealed" / "questions.jsonl"
+    write_jsonl(path, [{**q, "text": f"{q['text']} {marker}"} if q["id"] in ids else q
+                       for q in read_jsonl(path)])  # fmt: skip
+
+
+@contextmanager
+def captured_logs() -> Iterator[list[str]]:
+    """Every log message from TRACE up while the block runs."""
+    logs: list[str] = []
+    sink = logger.add(lambda message: logs.append(str(message)), level="TRACE")
+    try:
+        yield logs
+    finally:
+        logger.remove(sink)
+
+
+def files_holding(dirs: tuple[Path, ...], sealed: Path, needles: tuple[str, ...]) -> list[tuple]:
+    """(file, needle) for every file under `dirs`, outside `sealed`, that holds a needle."""
+    files = {p for d in dirs for p in d.rglob("*") if p.is_file() and not p.is_relative_to(sealed)}
+    texts = {p: p.read_bytes().decode("utf-8", "replace").lower() for p in files}
+    return sorted((str(p), n) for p, text in texts.items() for n in needles if n.lower() in text)
 
 
 def question_texts(set_dir: Path) -> dict[str, str]:
