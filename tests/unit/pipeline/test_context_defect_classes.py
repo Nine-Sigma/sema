@@ -25,6 +25,9 @@ from tests.support.connector_fixture import CATALOG, MAIN_SCHEMA, MAIN_TABLES
 from tests.support.connector_fixture_context import (
     ASKED_HIERARCHY_QUESTION,
     DEFINED_COLUMN,
+    ENTITY_INDEX,
+    ENTITY_SCORE,
+    PROPERTY_INDEX,
     DEFINITION_ONLY_QUESTION,
     GOODS_COLUMN,
     GOODS_TERMS,
@@ -42,9 +45,11 @@ from tests.support.connector_fixture_context import (
     CaseEmbedder,
     CaseGraph,
     case_engine,
+    entity_node,
     hierarchy_edge_lines,
     hierarchy_graph,
     lines_naming,
+    property_node,
     ranking_graph,
     ranks_before_alternative,
 )
@@ -310,3 +315,29 @@ def test_d4_the_consumer_records_the_statement_column_list() -> None:
 
     assert plan.valid, plan.errors
     assert plan.columns == list(RESULT_COLUMNS)
+
+
+def _relation(table: str) -> str:
+    return f"{CATALOG}.{MAIN_SCHEMA}.{table}:"
+
+
+def test_d3_a_property_whose_definition_states_no_question_word_adds_no_table() -> None:
+    unrelated = property_node(NAMED_COLUMN.table, NAMED_COLUMN.column)
+    graph = CaseGraph({ENTITY_INDEX: [(entity_node("customer"), ENTITY_SCORE)],
+                       PROPERTY_INDEX: [(unrelated, 0.2)]})
+    text = _context(graph, "How many customers are there?")
+
+    assert _relation("customer") in text, text
+    assert _relation(NAMED_COLUMN.table) not in text, text
+
+
+def test_d3_a_definition_stating_a_question_word_reaches_its_table_at_any_rank() -> None:
+    graph = CaseGraph({PROPERTY_INDEX: [
+        (property_node("product", "product_name"), 0.90),
+        (property_node(DEFINED_COLUMN.table, DEFINED_COLUMN.column), 0.88),
+    ]})
+    text = _context(graph, DEFINITION_ONLY_QUESTION)
+
+    own = _relation(DEFINED_COLUMN.table)
+    assert [x for x in lines_naming(text, DEFINED_COLUMN.column) if own in x], text
+
