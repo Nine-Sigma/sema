@@ -185,7 +185,7 @@ def _cell(value: object) -> str:
     if isinstance(value, bool):
         return "yes" if value else "no"
     if isinstance(value, float):
-        return f"{value:.4f}"
+        return f"{value:.6f}"
     if isinstance(value, tuple):
         return ", ".join(value)
     return str(value).replace("|", "\\|")
