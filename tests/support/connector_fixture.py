@@ -213,21 +213,28 @@ def _create_table_sql(schema: str, table: FixtureTable) -> str:
     return f"CREATE TABLE {schema}.{table.name} ({', '.join(parts)})"
 
 
-def _create_tables(con: duckdb.DuckDBPyConnection) -> None:
+def _create_tables(
+    con: duckdb.DuckDBPyConnection,
+    schema_tables: dict[str, tuple[FixtureTable, ...]] = SCHEMA_TABLES,
+) -> None:
     """Every schema, table, key and row, in the connection's current catalog."""
-    for schema, tables in SCHEMA_TABLES.items():
+    for schema, tables in schema_tables.items():
         con.execute(f"CREATE SCHEMA {schema}")
         for table in tables:
             con.execute(_create_table_sql(schema, table))
             con.execute(f"INSERT INTO {schema}.{table.name} {table.rows}")
 
 
-def write_fixture_database(directory: Path) -> Path:
-    """The fixture as a DuckDB file whose catalog, its file stem, is `CATALOG`."""
-    path = directory / f"{CATALOG}.duckdb"
+def write_fixture_database(
+    directory: Path,
+    schema_tables: dict[str, tuple[FixtureTable, ...]] = SCHEMA_TABLES,
+    catalog: str = CATALOG,
+) -> Path:
+    """The fixture as a DuckDB file whose catalog, its file stem, is `catalog`."""
+    path = directory / f"{catalog}.duckdb"
     con = duckdb.connect(str(path))
     try:
-        _create_tables(con)
+        _create_tables(con, schema_tables)
     finally:
         con.close()
     return path
