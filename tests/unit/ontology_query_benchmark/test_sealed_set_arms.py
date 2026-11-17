@@ -60,6 +60,7 @@ from tests.unit.ontology_query_benchmark.sealed_set_env import (
     SQL_MARKERS,
     TEXT_MARKER,
     WIDE,
+    ScriptedModel,
     SealedRun,
     expected_cells,
     materialize,
@@ -342,3 +343,19 @@ def test_the_openrouter_client_speaks_the_harness_model_protocol(harness: Simple
     assert isinstance(generation, harness.models.Generation)
     assert (generation.text, generation.prompt_tokens, generation.completion_tokens) == (
         "```sql\nSELECT 1\n```", 12, 3)
+
+
+def test_a_runner_error_receipt_records_order_free_false(
+    frozen: Path, harness: SimpleNamespace, tmp_path: Path,
+) -> None:
+    def failing(question: str, is_denied: Any) -> Any:
+        raise RuntimeError("provider down")
+
+    root = tmp_path / "sealed_set"
+    profile_path = materialize(root, frozen)
+    _sealed_set().run_sealed_set(profile_path, ("S",), 1, model=ScriptedModel(harness, {}),
+                                 s_provider=failing, report=tmp_path / "report.md")  # fmt: skip
+
+    receipts = read_jsonl(next((root / "neutral" / "sealed").rglob("receipts.jsonl")))
+    assert receipts and {(r["outcome"], r.get("order_free", "absent")) for r in receipts} == {
+        ("runner_error", False)}
