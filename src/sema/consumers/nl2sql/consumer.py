@@ -163,9 +163,16 @@ class NL2SQLConsumer:
 
 
 def _output_columns(sql: str, dialect: str) -> list[str]:
-    """The statement's output column names, in order."""
+    """One entry per output column, in order: the alias, else a bare column's
+    name, else the expression's SQL text. A set operation's are its first branch's."""
     parsed = sqlglot.parse_one(sql, dialect=dialect)
-    return list(parsed.named_selects) if isinstance(parsed, exp.Query) else []
+    if not isinstance(parsed, exp.Query):
+        return []
+    return [
+        s.alias or (s.name if isinstance(s, exp.Column) and not s.is_star
+                    else s.sql(dialect=dialect))
+        for s in parsed.selects
+    ]
 
 
 def _extract_sql(response: Any) -> str:
