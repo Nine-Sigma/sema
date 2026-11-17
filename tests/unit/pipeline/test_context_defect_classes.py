@@ -97,6 +97,15 @@ def test_d1_decoy_a_question_naming_a_hierarchy_concept_gets_the_section() -> No
     assert hierarchy_edge_lines(text, GOODS_TERMS), text
 
 
+SINGULAR_CONCEPT_QUESTION = "How many products are in the tool category?"
+
+
+def test_d1_a_question_naming_a_plural_concept_in_the_singular_gets_the_section() -> None:
+    text = _context(hierarchy_graph(), SINGULAR_CONCEPT_QUESTION)
+
+    assert hierarchy_edge_lines(text, GOODS_TERMS), text
+
+
 def test_d2_every_rendered_governed_value_carries_its_label() -> None:
     text = build_sql_prompt(_values_sco(), VALUES_QUESTION)
 
