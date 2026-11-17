@@ -32,6 +32,7 @@ from tests.support.connector_fixture_codes import (
     CODES_CATALOG,
     CODES_SCHEMA,
     CROSS_SCHEMA_TABLES,
+    GRIT,
     LATCH,
     NOTCH,
     NULL_LABEL_TABLES,
@@ -211,6 +212,25 @@ def test_a_verified_binding_beside_decoded_values_holds_each_code_once(coded: Bu
     labels = coded.graph.labels(coded.refs[works("fitting", "tone_code")])
     assert Counter(code for code, _ in labels) == Counter(set(TONE_NAMES))
     assert dict(labels) == TONE_NAMES
+
+
+DECODED_CONFIDENCE = 0.75
+
+
+def _grit_decoded(graph: Graph, refs: dict[Column, str]) -> None:
+    """Decoded labels on a column whose code relation has several text columns, so no label."""
+    ref = refs[works("panel", "grit_code")]
+    for code in GRIT:
+        graph.term(L2_VOCABULARY, code, f"decoded {code}", DECODED_CONFIDENCE)
+        graph.members.setdefault(ref, set()).add((L2_VOCABULARY, code))
+
+
+def test_a_verified_binding_with_no_label_keeps_the_decoded_labels(tmp_path: Path) -> None:
+    built = build(tmp_path, {CODES_SCHEMA: CODED_TABLES}, [CODES_SCHEMA], seeded=_grit_decoded)
+    grit = built.refs[works("panel", "grit_code")]
+    assert built.graph.edges[grit]["verification"] == "verified"
+    assert built.graph.labeled_by.get(grit, []) == []
+    assert dict(built.graph.labels(grit)) == {code: f"decoded {code}" for code in GRIT}
 
 
 # Defect 2: a declared key resolves by its schema-qualified reference.
