@@ -41,6 +41,9 @@ pytestmark = pytest.mark.unit
 
 ACRIS_SQL = "SELECT doc_type AS site_S1 FROM wh.acris.master"
 CRAFTED = "x' OR TRUE) --"
+# Names a concept of the neutral slice that shares no word with an anchor below, so the
+# hierarchy is asked for and the anchors rank as for a question naming none.
+ASKED = "Which events sit under a fracture?"
 
 
 def _text(
@@ -83,14 +86,12 @@ def test_the_anchor_whose_label_the_question_covers_ranks_first(tmp_path: Path) 
     assert members(con, ACRIS_SQL, _filled(text)[0]) == expected and len(expected) == 23
 
 
-def test_a_question_naming_no_concept_keeps_the_instruction_and_the_template(
-    tmp_path: Path,
-) -> None:
+def test_a_question_naming_no_concept_gets_no_hierarchy_section(tmp_path: Path) -> None:
     _, text = _acris_text(tmp_path, "How many records were filed?")
 
-    assert _anchors(text) == [acris.CLASS, "OTHER DOCUMENTS"]
-    assert "Replace {column} with a value column below, {anchor_name} with the anchor" in text
-    assert any("{anchor_name}" in x for x in text.splitlines() if x.strip().startswith("WHERE "))
+    assert "HIERARCHY" not in text
+    assert _anchors(text) == []
+    assert "{anchor_name}" not in text
 
 
 def test_at_most_the_cap_of_filled_anchors_render_and_the_rest_are_counted(
@@ -98,7 +99,7 @@ def test_at_most_the_cap_of_filled_anchors_render_and_the_rest_are_counted(
 ) -> None:
     codes = ["C1", "C2", "C3", "C5", "C7"]
     found = [anchor(code, f"Concept {code}", "std", 1) for code in codes]
-    text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found, "Which events?")
+    text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found, ASKED)
 
     assert ANCHORS_PER_COLUMN == 3
     assert _anchors(text) == [f"Concept {code}" for code in codes[:3]]
@@ -107,7 +108,7 @@ def test_at_most_the_cap_of_filled_anchors_render_and_the_rest_are_counted(
 
 def test_a_crafted_anchor_code_selects_only_true_members_in_duckdb(tmp_path: Path) -> None:
     text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS,
-                 [anchor("C1", CRAFTED, "std", 0)], "Which events are crafted?")  # fmt: skip
+                 [anchor("C1", CRAFTED, "std", 0)], ASKED)  # fmt: skip
 
     [fragment] = _filled(text)
     assert members(warehouse(), EVENTS_SQL, fragment) == set()
@@ -115,7 +116,7 @@ def test_a_crafted_anchor_code_selects_only_true_members_in_duckdb(tmp_path: Pat
 
 def test_a_databricks_warehouse_gets_its_own_string_quoting(tmp_path: Path) -> None:
     text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS,
-                 [anchor("C1", CRAFTED, "std", 0)], "Which events are crafted?",
+                 [anchor("C1", CRAFTED, "std", 0)], ASKED,
                  dialect="databricks")  # fmt: skip
 
     [fragment] = _filled(text)
@@ -125,14 +126,14 @@ def test_a_databricks_warehouse_gets_its_own_string_quoting(tmp_path: Path) -> N
 def test_equal_coverage_ranks_by_match_score_then_code(tmp_path: Path) -> None:
     found = [{**anchor(code, f"Concept {code}", "std", 1), "score": score}
              for code, score in (("C5", 0.4), ("C3", 0.9), ("C2", 0.4))]  # fmt: skip
-    text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found, "Which events?")
+    text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found, ASKED)
 
     assert _anchors(text) == ["Concept C3", "Concept C2", "Concept C5"]
 
 
 def test_the_member_count_reads_as_strict_descendants_only(tmp_path: Path) -> None:
     text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS,
-                 [anchor("C1", "Neoplasm", "std", 2)], "Which events?")  # fmt: skip
+                 [anchor("C1", "Neoplasm", "std", 2)], ASKED)  # fmt: skip
 
     assert ("An anchor's member count is the column's values strictly below it; a value "
             "mapped to the anchor itself is not counted.") in text  # fmt: skip
@@ -143,7 +144,7 @@ def test_the_section_states_the_join_once_however_many_anchors_are_retrieved(
     tmp_path: Path,
 ) -> None:
     found = [anchor(code, f"Concept {code}", "std", 1) for code in ("C1", "C2", "C3", "C5")]
-    text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found, "Which events?")
+    text = _text(tmp_path, _facts(tmp_path, hierarchy()), RELATIONS, found, ASKED)
 
     section = text[text.index("CONCEPT HIERARCHY"):]
     predicates = [x for x in section.splitlines() if x.strip().startswith("WHERE ")]
