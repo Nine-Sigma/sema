@@ -66,18 +66,32 @@ def tokenize_query(query: str) -> list[str]:
 def states_name(question: str, name: str) -> bool:
     """The question holds ``name`` as a phrase, its words in order; a plural on
     either side's word does not matter."""
-    words, asked = _word_stems(name), _word_stems(question)
+    words, asked = _words(name), _words(question)
     span = len(words)
     return span > 0 and any(
-        asked[i:i + span] == words for i in range(len(asked) - span + 1)
+        all(map(_same_word, asked[i:i + span], words))
+        for i in range(len(asked) - span + 1)
     )
 
 
-def _word_stems(text: str) -> list[str]:
-    return [
-        w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w
-        for w in _TOKEN_SPLIT_RE.split(text.lower()) if w
-    ]
+def _words(text: str) -> list[str]:
+    return [w for w in _TOKEN_SPLIT_RE.split(text.lower()) if w]
+
+
+def _same_word(a: str, b: str) -> bool:
+    return a == b or a in _plurals(b) or b in _plurals(a)
+
+
+def _plurals(word: str) -> set[str]:
+    """English plural forms of a singular of three letters or more."""
+    if len(word) < 3:
+        return set()
+    forms = {word + "s"}
+    if word.endswith(("s", "x", "z", "ch", "sh")):
+        forms.add(word + "es")
+    if word.endswith("y") and word[-2] not in "aeiou":
+        forms.add(word[:-1] + "ies")
+    return forms
 
 
 def normalize_vector_hit(
