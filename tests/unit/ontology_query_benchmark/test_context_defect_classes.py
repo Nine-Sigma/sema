@@ -13,7 +13,9 @@ from typing import Any
 
 import pytest
 
+from sema.graph.queries import CypherQueries
 from sema.models.context import PhysicalAsset, SemanticContextObject
+from sema.pipeline.retrieval import RetrievalEngine
 from showcase.ontology_query_benchmark.sema_bindings import (
     Sidecar,
     load_products,
@@ -31,6 +33,7 @@ from tests.support.connector_fixture_context import (
     NAMED_TERM_QUESTION,
     RESULT_COLUMNS,
     SHAPE_QUESTION,
+    CaseEmbedder,
     case_engine,
     lines_naming,
     ranking_graph,
@@ -56,10 +59,12 @@ from tests.unit.ontology_query_benchmark.sema_hierarchy_anchor_env import READAB
 from tests.unit.pipeline.test_context_defect_classes import (
     BOTH_NAMED_QUESTION,
     SHARED_WORD_QUESTION,
+    WithReads,
     alternatives_in,
     banded_engine,
     definition_only_breaches,
     label_breaches,
+    unlabelled_term_graph,
 )
 from tests.unit.ontology_query_benchmark.sema_hierarchy_env import _facts
 
@@ -240,3 +245,34 @@ def test_d4_decoy_a_context_with_no_shape_fields_renders_no_block(tmp_path: Path
     text = _rendered(tmp_path, SemanticContextObject(physical_assets=[_customer()]))
 
     assert RESULT_SHAPE_MARK not in text
+
+
+def _people_term_graph(unlabelled: dict[str, Any], members: list[dict[str, Any]]) -> WithReads:
+    entity = PEOPLE_ENTITY
+    physical = {"table_name": entity["table"], "schema_name": entity["schema"],
+                "catalog": entity["catalog"], "columns": entity["columns"]}
+    value_set = {key: physical[key] for key in ("table_name", "schema_name", "catalog")}
+    graph = unlabelled_term_graph({"name": entity["name"], "confidence": 0.9},
+                                  unlabelled["code"], {**value_set,
+                                                       "column_name": unlabelled["column"]})
+    graph.reads.update({
+        CypherQueries.resolve_physical_mapping(): lambda p: [physical],
+        CypherQueries.find_value_set_members_by_column(): lambda p: [
+            {"code": v["code"], "label": v["label"]} for v in members
+            if v["column"] == p["column_name"]],
+    })
+    return graph
+
+
+def test_d2_a_value_reached_through_a_term_with_no_label_renders_no_label(
+    tmp_path: Path,
+) -> None:
+    *labelled, unlabelled = PEOPLE_VALUES
+    values = [*labelled, _value(unlabelled, "")]
+    engine = RetrievalEngine(driver=_people_term_graph(unlabelled, values),
+                             embedder=CaseEmbedder())
+    text = _s_text(tmp_path, engine, QUESTION)
+
+    rendered = lines_naming(text, unlabelled["code"])
+    assert rendered and all("no label" in line.lower() for line in rendered), text
+    assert label_breaches(text, {v["code"]: v["label"] for v in values}) == [], text

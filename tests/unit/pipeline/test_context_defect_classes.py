@@ -19,15 +19,18 @@ from sema.consumers.base import ConsumerDeps, ConsumerRequest
 from sema.consumers.nl2sql.consumer import NL2SQLConsumer
 from sema.consumers.nl2sql.prompting import build_sql_prompt
 from sema.models.context import GovernedValue, PhysicalAsset, SemanticContextObject
+from sema.graph.queries import CypherQueries
 from sema.pipeline.context import prune_to_sco
 from sema.pipeline.retrieval import RetrievalEngine
 from tests.support.connector_fixture import CATALOG, MAIN_SCHEMA, MAIN_TABLES
 from tests.support.connector_fixture_context import (
     ASKED_HIERARCHY_QUESTION,
+    CLOSEST_SCORE,
     DEFINED_COLUMN,
     ENTITY_INDEX,
     ENTITY_SCORE,
     PROPERTY_INDEX,
+    TERM_INDEX,
     DEFINITION_ONLY_QUESTION,
     GOODS_COLUMN,
     GOODS_TERMS,
@@ -340,4 +343,43 @@ def test_d3_a_definition_stating_a_question_word_reaches_its_table_at_any_rank()
 
     own = _relation(DEFINED_COLUMN.table)
     assert [x for x in lines_naming(text, DEFINED_COLUMN.column) if own in x], text
+
+
+class WithReads(CaseGraph):
+    """The stand-in graph answering some reads from the test's own rows."""
+
+    def __init__(self, vector_hits: dict[str, list[tuple[dict[str, Any], float]]],
+                 reads: dict[str, Any]) -> None:
+        super().__init__(vector_hits)
+        self.reads = reads
+
+    def run(self, query: str, **params: Any) -> Iterator[Any]:
+        answer = self.reads.get(query)
+        if answer is None:
+            return super().run(query, **params)
+        return iter(_Row(row) for row in answer(params))
+
+
+def unlabelled_term_graph(entity: dict[str, Any], code: str,
+                          value_set: dict[str, str]) -> WithReads:
+    """A term with no label is the nearest hit; its value set is also reached by its entity."""
+    term = {"code": code, "confidence": 0.9, "status": "auto"}
+    return WithReads(
+        {TERM_INDEX: [(term, CLOSEST_SCORE)], ENTITY_INDEX: [(entity, ENTITY_SCORE)]},
+        {CypherQueries.find_value_sets_for_term():
+            lambda p: [value_set] if p["code"] == code else []},
+    )
+
+
+def test_d2_a_value_reached_through_a_term_with_no_label_renders_no_label() -> None:
+    table, column = REGION_COLUMN
+    value_set = {"column_name": column, "table_name": table, "schema_name": MAIN_SCHEMA,
+                 "catalog": CATALOG}
+    text = _context(unlabelled_term_graph(entity_node(table), UNLABELLED_REGION, value_set),
+                    VALUES_QUESTION)
+
+    rendered = lines_naming(text, UNLABELLED_REGION)
+    assert rendered and all("no label" in line.lower() for line in rendered), text
+    members = {**dict(LABELLED_REGIONS), UNLABELLED_REGION: ""}
+    assert label_breaches(text, members) == [], text
 
