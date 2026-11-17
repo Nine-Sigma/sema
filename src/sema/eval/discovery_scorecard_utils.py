@@ -10,15 +10,97 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from sema.connectors.base import Connector
 from sema.connectors.databricks_utils import METADATA_SOURCE, sql_string_literal
+from sema.engine.coded_column_utils import CONTAINMENT, label_reading
+from sema.engine.warehouse_lookup import WarehouseValues
 from sema.intake.run.scorecard import Cells, Key
 from sema.log import logger
 from sema.models.extraction import ExtractedForeignKey
+from sema.models.physical_key import CanonicalRef, PhysicalKey
 
 COLUMN_SEPARATOR = "+"
+# One row per has_value_set assertion on a column of the scope; a nominating evidence's row is
+# dropped by `binding_read`. Members are read from the verified value set only.
+CODED_BINDINGS = (
+    "MATCH (a:Assertion {predicate: $predicate}) "
+    "WHERE a.status <> 'superseded' AND ($schemas IS NULL OR a.source_schema IN $schemas) "
+    "MATCH (c:Column {ref: a.subject_ref}) WHERE $catalog IS NULL OR c.catalog = $catalog "
+    "OPTIONAL MATCH (c)-[:LABELED_BY {verification: $verified}]->(l:Column) "
+    "RETURN a.payload AS payload, c.schema_name AS schema, c.table_name AS relation, "
+    "c.name AS column, [l.schema_name, l.table_name, l.name] AS label, "
+    "[(c)-[:HAS_VALUE_SET {verification: $verified}]->(:ValueSet)<-[m:MEMBER_OF]-(t:Term) "
+    "| [t.code, t.vocabulary_name, t.label, m.rows]] AS members"
+)
+
+
+class BindingRead(NamedTuple):
+    """A coded column's binding as the build graph holds it: the code source and verification
+    its containment assertion states, its verified label column (schema, relation, column),
+    whether its members carry its dictionary vocabulary's labels, and each member's rows."""
+
+    schema: str
+    relation: str
+    column: str
+    code_source: str
+    verification: str
+    label: tuple[str, str, str] | None
+    dictionary_label: bool
+    listed_row_share: float | None
+    member_rows: dict[str, int]
+
+
+def binding_read(record: Mapping[str, Any]) -> BindingRead | None:
+    """A `CODED_BINDINGS` row as a binding; None for a nominating evidence's assertion."""
+    payload = json.loads(record["payload"])
+    if payload.get("evidence") != CONTAINMENT:
+        return None
+    source, members, label = str(payload["value_set"]), record["members"], record["label"]
+    return BindingRead(
+        schema=record["schema"], relation=record["relation"], column=record["column"],
+        code_source=source, verification=str(payload.get("verification")),
+        label=(label[0], label[1], label[2]) if label[0] is not None else None,
+        dictionary_label=any(vocabulary == source and text is not None
+                             for _, vocabulary, text, _ in members),
+        listed_row_share=payload.get("listed_row_share"),
+        member_rows={str(code): rows for code, _, _, rows in members if rows is not None},
+    )
+
+
+def code_relation(code_source: str) -> PhysicalKey | None:
+    """The key column a code source refers to, or None for a dictionary vocabulary."""
+    try:
+        return CanonicalRef.parse(code_source)
+    except ValueError:
+        return None
+
+
+def listed_codes(
+    values: WarehouseValues, code_lists: Mapping[str, Mapping[str, Any]], code_source: str,
+) -> set[str] | None:
+    """A code source's codes: its key column's values, or its dictionary vocabulary's codes."""
+    key = code_relation(code_source)
+    if key is None:
+        return set(code_lists.get(code_source, {}))
+    counts = values.counts((key.schema or "", key.table, key.column or ""))
+    return None if counts is None else {code for code in counts if code is not None}
+
+
+def label_holds(values: WarehouseValues, read: BindingRead) -> bool:
+    """Whether the code determines the label column: beside it, or beside the code source's
+    key column in the code relation."""
+    if read.label is None:
+        return False
+    schema, relation, column = read.label
+    code = read.column
+    if (schema, relation) != (read.schema, read.relation):
+        key = code_relation(read.code_source)
+        if key is None or (key.schema, key.table) != (schema, relation):
+            return False
+        code = key.column or ""
+    return label_reading(values.pairs(schema, relation, code, column)) is not None
 # Only the build's join writer (`batch_upsert_join_paths`) sets `status`; the target loader's
 # does not. Map access, so a graph where no join has a cardinality raises no unknown-key warning.
 GRAPH_JOINS = (

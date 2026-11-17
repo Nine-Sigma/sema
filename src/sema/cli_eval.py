@@ -145,28 +145,39 @@ def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> N
     from sema.cli_factories import _get_neo4j_driver
     from sema.eval.discovery_scorecard import (
         FACT_KINDS,
+        coded_facts,
         declared_constraints,
         facts_from_graph,
+        read_coded_bindings,
         recheck,
+        recheck_coded,
         render,
         score_discovery,
     )
     from sema.eval.discovery_scorecard_utils import read_oracle
     from sema.models.config import BuildConfig
     from sema.pipeline.build import resolve_connector_factory
+    from sema.pipeline.coded_columns import read_dictionary
 
     config = BuildConfig.from_file(config_path)
     connector = resolve_connector_factory(config).create()
     driver = _get_neo4j_driver(config.neo4j)
     try:
-        produced = facts_from_graph(driver, config.catalog, config.schemas)
+        joins = facts_from_graph(driver, config.catalog, config.schemas)
+        coded = read_coded_bindings(driver, config.catalog, config.schemas)
     finally:
         driver.close()
+    produced = {**joins, **coded_facts(coded)}
     oracle = (
         read_oracle(Path(oracle_path), FACT_KINDS) if oracle_path
         else declared_constraints(connector, config.catalog, config.schemas)
     )
-    rechecked = recheck(connector, config.catalog, config.schemas, produced)
+    dictionary = read_dictionary(config.concept_spec, config.concept_staging)
+    rechecked = {
+        **recheck(connector, config.catalog, config.schemas, produced),
+        **recheck_coded(connector, config.catalog, coded,
+                        dictionary.code_lists if dictionary else {}),
+    }
     Path(out_path).write_text(render(score_discovery(produced, oracle, rechecked)))
     click.echo(out_path)
 

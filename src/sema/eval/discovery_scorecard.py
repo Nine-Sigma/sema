@@ -7,21 +7,32 @@ keys them, and scored by the intake scorecard's verdict arithmetic. A kind absen
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 from sema.connectors.base import Connector
+from sema.engine.coded_column_utils import VERIFIED
+from sema.engine.join_detector_utils import containment
+from sema.engine.warehouse_lookup import WarehouseValues
 from sema.eval.discovery_scorecard_utils import (
+    CODED_BINDINGS,
     GRAPH_JOINS,
+    BindingRead,
+    binding_read,
+    code_relation,
     declared_join_key,
     graph_join_key,
     join_holds,
+    label_holds,
+    listed_codes,
     unique_keys,
     unique_keys_query,
 )
-from sema.intake.run.scorecard import VERDICTS, Cells, KindScore, kind_score, verdicts
+from sema.intake.run.scorecard import VERDICTS, Cells, Key, KindScore, kind_score, verdicts
+from sema.models.assertions import AssertionPredicate
 
 FACT_KINDS = (
     "candidate_key", "entity_coarser_than_row", "entity_shared_across_relations",
@@ -32,6 +43,12 @@ FACT_KINDS = (
 )
 JOIN = "join"
 CANDIDATE_KEY = "candidate_key"
+BINDING = "column_to_concept_binding"
+LABEL_SOURCE = "label_source"
+MAPPING_COVERAGE = "mapping_coverage"
+OBSERVED_VALUES = "observed_values"
+CODED_KINDS = (BINDING, LABEL_SOURCE, MAPPING_COVERAGE, OBSERVED_VALUES)
+DICTIONARY_ONLY = "dictionary_only"
 KEY_ONLY = "key_only"
 UNIQUE = "unique"
 MANY_TO_ONE = "many_to_one"
@@ -99,7 +116,7 @@ def _cells(row: KindRow) -> tuple[str, ...]:
 def facts_from_graph(
     driver: Any, catalog: str | None = None, schemas: list[str] | None = None,
 ) -> dict[str, Cells]:
-    """The build's facts for the catalog and schemas, in oracle keys; no schemas means every
+    """The build's joins for the catalog and schemas, in oracle keys; no schemas means every
     schema of the catalog. A join with no recorded cardinality is key-only."""
     with driver.session() as session:
         records = list(session.run(GRAPH_JOINS, catalog=catalog, schemas=schemas or None))
@@ -140,3 +157,72 @@ def recheck(
     }
     joins = produced.get(JOIN, {})
     return {JOIN: sum(join_holds(connector, catalog, tables, key) for key in joins)}
+
+
+def read_coded_bindings(
+    driver: Any, catalog: str | None = None, schemas: list[str] | None = None,
+) -> list[BindingRead]:
+    """Every coded column's binding the build wrote for the catalog and schemas."""
+    with driver.session() as session:
+        records = list(session.run(
+            CODED_BINDINGS, predicate=AssertionPredicate.HAS_VALUE_SET.value,
+            verified=VERIFIED, catalog=catalog, schemas=schemas or None,
+        ))
+    return [read for record in records if (read := binding_read(record)) is not None]
+
+
+def coded_facts(reads: Iterable[BindingRead]) -> dict[str, Cells]:
+    """The verified bindings' facts in oracle keys; an unverified binding states none."""
+    verified = [read for read in reads if read.verification == VERIFIED]
+    return {
+        BINDING: {_column(read): _code_list(read.code_source) for read in verified},
+        LABEL_SOURCE: {
+            _column(read): label for read in verified if (label := _label(read)) is not None
+        },
+        MAPPING_COVERAGE: {_column(read): read.listed_row_share for read in verified},
+        OBSERVED_VALUES: {
+            (*_column(read), code): rows
+            for read in verified for code, rows in read.member_rows.items() if rows
+        },
+    }
+
+
+def _column(read: BindingRead) -> Key:
+    return (read.relation.lower(), read.column.lower())
+
+
+def _code_list(code_source: str) -> str:
+    """A code relation's name, or the dictionary vocabulary's."""
+    key = code_relation(code_source)
+    return (key.table if key else code_source).lower()
+
+
+def _label(read: BindingRead) -> list[str] | str | None:
+    if read.label is not None:
+        return [read.label[1].lower(), read.label[2].lower()]
+    return DICTIONARY_ONLY if read.dictionary_label else None
+
+
+def recheck_coded(
+    connector: Connector, catalog: str, reads: Iterable[BindingRead],
+    code_lists: Mapping[str, Mapping[str, Any]],
+) -> dict[str, int]:
+    """Verified coded facts whose evidence recomputes on the data: the containment holds at
+    the floor, the listed row share and each observed value's rows recount, the code
+    determines its label column. A dictionary-only label names no column to recheck."""
+    values = WarehouseValues(connector.execute_query, catalog)
+    counts: Counter[str] = Counter()
+    for read in reads:
+        if read.verification != VERIFIED:
+            continue
+        observed = values.counts((read.schema, read.relation, read.column)) or {}
+        listed = listed_codes(values, code_lists, read.code_source)
+        if observed and listed is not None:
+            measured = containment(observed, listed)
+            counts[BINDING] += measured.holds
+            counts[MAPPING_COVERAGE] += measured.listed_row_share == read.listed_row_share
+        counts[OBSERVED_VALUES] += sum(
+            observed.get(code) == rows for code, rows in read.member_rows.items() if rows
+        )
+        counts[LABEL_SOURCE] += label_holds(values, read)
+    return {kind: counts[kind] for kind in CODED_KINDS}
