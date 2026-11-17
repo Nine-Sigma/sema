@@ -57,6 +57,7 @@ from tests.unit.pipeline.test_context_defect_classes import (
     BOTH_NAMED_QUESTION,
     SHARED_WORD_QUESTION,
     alternatives_in,
+    banded_engine,
     definition_only_breaches,
     label_breaches,
 )
@@ -196,6 +197,13 @@ def test_k2_a_definition_only_match_reaches_its_own_relation_and_no_unrelated_on
     tmp_path: Path,
 ) -> None:
     engine = case_engine(ranking_graph(DEFINITION_ONLY_QUESTION))
+    text = _s_text(tmp_path, engine, DEFINITION_ONLY_QUESTION)
+
+    assert definition_only_breaches(text) == [], text
+
+
+def test_k2_holds_when_every_vector_score_moves_into_a_high_band(tmp_path: Path) -> None:
+    engine = banded_engine(ranking_graph(DEFINITION_ONLY_QUESTION))
     text = _s_text(tmp_path, engine, DEFINITION_ONLY_QUESTION)
 
     assert definition_only_breaches(text) == [], text

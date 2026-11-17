@@ -9,6 +9,8 @@ is a mock. Graph cases and their questions live in `tests/support/connector_fixt
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,6 +20,7 @@ from sema.consumers.nl2sql.consumer import NL2SQLConsumer
 from sema.consumers.nl2sql.prompting import build_sql_prompt
 from sema.models.context import GovernedValue, PhysicalAsset, SemanticContextObject
 from sema.pipeline.context import prune_to_sco
+from sema.pipeline.retrieval import RetrievalEngine
 from tests.support.connector_fixture import CATALOG, MAIN_SCHEMA, MAIN_TABLES
 from tests.support.connector_fixture_context import (
     ASKED_HIERARCHY_QUESTION,
@@ -36,6 +39,7 @@ from tests.support.connector_fixture_context import (
     UNASKED_HIERARCHY_QUESTION,
     UNLABELLED_REGION,
     VALUES_QUESTION,
+    CaseEmbedder,
     CaseGraph,
     case_engine,
     hierarchy_edge_lines,
@@ -202,6 +206,63 @@ def definition_only_breaches(text: str) -> list[str]:
 
 def test_k2_a_definition_only_match_reaches_its_own_relation_and_no_unrelated_one() -> None:
     text = _context(ranking_graph(DEFINITION_ONLY_QUESTION), DEFINITION_ONLY_QUESTION)
+
+    assert definition_only_breaches(text) == [], text
+
+
+class _Row:
+    def __init__(self, data: dict[str, Any]) -> None:
+        self._data = data
+
+    def data(self) -> dict[str, Any]:
+        return self._data
+
+
+class BandedScores:
+    """The stand-in graph with every vector score moved into 0.75 to 0.95, order kept: an
+    embedder whose similarities sit in another band ranks the same nodes the same way."""
+
+    def __init__(self, graph: CaseGraph) -> None:
+        self._graph = graph
+
+    def session(self, **_: Any) -> BandedScores:
+        return self
+
+    def __enter__(self) -> BandedScores:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        return None
+
+    def run(self, query: str, **params: Any) -> Iterator[_Row]:
+        rows = (r.data() for r in self._graph.run(query, **params))
+        return iter(_Row({**d, "score": 0.75 + 0.2 * d["score"]} if "score" in d else d)
+                    for d in rows)
+
+
+def banded_engine(graph: CaseGraph) -> RetrievalEngine:
+    return RetrievalEngine(driver=BandedScores(graph), embedder=CaseEmbedder())
+
+
+def _banded_context(graph: CaseGraph, question: str) -> str:
+    return build_sql_prompt(prune_to_sco(banded_engine(graph).retrieve(question)), question)
+
+
+def test_d3_ranking_and_reach_hold_when_every_vector_score_moves_into_a_high_band() -> None:
+    text = _banded_context(ranking_graph(NAMED_TERM_QUESTION), NAMED_TERM_QUESTION)
+    assert [x for x in text.splitlines()
+            if ranks_before_alternative(x, NAMED_COLUMN.column, DEFINED_COLUMN.column)], text
+    assert not [x for x in text.splitlines()
+                if ranks_before_alternative(x, DEFINED_COLUMN.column, NAMED_COLUMN.column)]
+
+    text = _banded_context(ranking_graph(DEFINITION_ONLY_QUESTION), DEFINITION_ONLY_QUESTION)
+    assert lines_naming(text, DEFINED_COLUMN.column), text
+    assert not [x for x in text.splitlines()
+                if ranks_before_alternative(x, NAMED_COLUMN.column, DEFINED_COLUMN.column)]
+
+
+def test_k2_holds_when_every_vector_score_moves_into_a_high_band() -> None:
+    text = _banded_context(ranking_graph(DEFINITION_ONLY_QUESTION), DEFINITION_ONLY_QUESTION)
 
     assert definition_only_breaches(text) == [], text
 
