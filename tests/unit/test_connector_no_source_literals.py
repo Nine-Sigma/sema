@@ -80,6 +80,9 @@ PREDATING_HITS = {
     ("discovery_scorecard.py", "hierarchy"): (
         "fact kind id fixed in the unit 6 contract; intake fixture specs use it as a section word"
     ),
+    ("discovery_scorecard.py", "many_to_one"): (
+        "join cardinality word fixed in the unit 6 contract (ruling I); the scorecard fixture's oracle uses it"
+    ),
     ("config.py", "databricks-bge-large-en"): (
         "d395b094 embedding model default; predates unit 3, see unit-3 STATE.md Waiting on Dean"
     ),
