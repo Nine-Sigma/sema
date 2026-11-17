@@ -28,6 +28,7 @@ WAREHOUSE = (
     " (4, 'x', NULL, 's'), (5, NULL, 2, 'm')",
 )
 SPEC = {
+    "spec_version": 2,
     "id": "neutral",
     "identity_system": "neutral",
     "release": "1",
@@ -80,10 +81,8 @@ def by_column(rows: list[Row]) -> dict[str | None, Row]:
 
 
 def ref(target: BuildTarget, table: str, column: str) -> str:
-    (item,) = [
-        t for t in report_module.warehouse_tables(target) if t.table_name == table
-    ]
-    return f"{item.fqn}/{column}"
+    (item,) = [t for t in report_module.warehouse_tables(target) if t.name == table]
+    return f"{item.ref}/{column}"
 
 
 def test_stated_domain_without_a_graph_link_is_not_linked_and_carries_data_coverage(
@@ -143,7 +142,7 @@ def test_main_writes_one_markdown_row_per_proposed_binding(
     build = {"database": str(target.database), "catalog": CATALOG, "schema": SCHEMA}
     profile.write_text(yaml.safe_dump({"build": build}), encoding="utf-8")
     spec_path = tmp_path / "spec.yaml"
-    spec_path.write_text(yaml.safe_dump(SPEC), encoding="utf-8")
+    spec_path.write_text(yaml.safe_dump({"concept_source": SPEC}), encoding="utf-8")
     out = tmp_path / "report.md"
     monkeypatch.setattr(report_module, "read_links", lambda *_: [])
     argv = ["--profile", str(profile), "--spec", str(spec_path), "--out", str(out)]
