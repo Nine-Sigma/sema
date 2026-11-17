@@ -158,6 +158,37 @@ def test_d3_decoy_a_term_matching_only_a_definition_still_reaches_that_column() 
     assert demoted == []
 
 
+BOTH_NAMED_QUESTION = "What is the total amount and unit price of each transfer?"
+SHARED_WORD_QUESTION = "What is the total amount of each transfer?"
+
+
+def alternatives_in(text: str) -> set[str]:
+    """Every fixture column named after the word `alternative` on some line."""
+    columns = {c for t in MAIN_TABLES for c in t.column_names}
+    found: set[str] = set()
+    for line in text.splitlines():
+        at = line.lower().find("alternative")
+        if at >= 0:
+            found |= {c for c in columns if lines_naming(line[at:], c)}
+    return found
+
+
+def test_d3_a_column_the_question_names_is_never_listed_as_an_alternative() -> None:
+    text = _context(ranking_graph(NAMED_TERM_QUESTION), BOTH_NAMED_QUESTION)
+
+    for column in (NAMED_COLUMN, DEFINED_COLUMN):
+        assert lines_naming(text, column.column), f"{column.column} is not in the context"
+    assert alternatives_in(text) == set(), text
+
+
+def test_d3_a_column_sharing_only_a_word_with_the_question_is_never_an_alternative() -> None:
+    text = _context(ranking_graph(NAMED_TERM_QUESTION), SHARED_WORD_QUESTION)
+
+    assert [x for x in text.splitlines()
+            if ranks_before_alternative(x, NAMED_COLUMN.column, DEFINED_COLUMN.column)], text
+    assert alternatives_in(text) == {DEFINED_COLUMN.column}, text
+
+
 def definition_only_breaches(text: str) -> list[str]:
     """Ruling K2: the definition-only target is listed under its own relation, and the
     relation only the unrelated low-score hit reaches stays out of the context."""

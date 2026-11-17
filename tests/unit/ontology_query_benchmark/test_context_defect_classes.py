@@ -54,6 +54,9 @@ from tests.unit.ontology_query_benchmark.sema_context_env import (
 )
 from tests.unit.ontology_query_benchmark.sema_hierarchy_anchor_env import READABLE, anchor
 from tests.unit.pipeline.test_context_defect_classes import (
+    BOTH_NAMED_QUESTION,
+    SHARED_WORD_QUESTION,
+    alternatives_in,
     definition_only_breaches,
     label_breaches,
 )
@@ -167,6 +170,26 @@ def test_d3_decoy_a_term_matching_only_a_definition_still_reaches_that_column(
     demoted = [x for x in text.splitlines()
                if ranks_before_alternative(x, NAMED_COLUMN.column, DEFINED_COLUMN.column)]
     assert demoted == []
+
+
+def test_d3_a_column_the_question_names_is_never_listed_as_an_alternative(
+    tmp_path: Path,
+) -> None:
+    engine = case_engine(ranking_graph(NAMED_TERM_QUESTION))
+    text = _s_text(tmp_path, engine, BOTH_NAMED_QUESTION)
+
+    for column in (NAMED_COLUMN, DEFINED_COLUMN):
+        assert lines_naming(text, column.column), f"{column.column} is not in the context"
+    assert alternatives_in(text) == set(), text
+
+
+def test_d3_a_column_sharing_only_a_word_with_the_question_is_never_an_alternative(
+    tmp_path: Path,
+) -> None:
+    engine = case_engine(ranking_graph(NAMED_TERM_QUESTION))
+    text = _s_text(tmp_path, engine, SHARED_WORD_QUESTION)
+
+    assert alternatives_in(text) == {DEFINED_COLUMN.column}, text
 
 
 def test_k2_a_definition_only_match_reaches_its_own_relation_and_no_unrelated_one(
