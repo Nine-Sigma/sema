@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable
 from types import MappingProxyType
 from typing import Any
 
@@ -65,17 +64,20 @@ def tokenize_query(query: str) -> list[str]:
 
 
 def states_name(question: str, name: str) -> bool:
-    """The question holds ``name`` as a phrase, its words in order, plural allowed."""
-    words = [re.escape(w) for w in re.split(r"[\s_]+", name.lower()) if w]
-    if not words:
-        return False
-    return re.search(rf"\b{r'[\s_]+'.join(words)}s?\b", question.lower()) is not None
+    """The question holds ``name`` as a phrase, its words in order; a plural on
+    either side's word does not matter."""
+    words, asked = _word_stems(name), _word_stems(question)
+    span = len(words)
+    return span > 0 and any(
+        asked[i:i + span] == words for i in range(len(asked) - span + 1)
+    )
 
 
-def names_any(question: str, labels: Iterable[str]) -> bool:
-    """The question holds a whole word of one of ``labels``."""
-    asked = set(tokenize_query(question))
-    return any(asked.intersection(tokenize_query(label)) for label in labels)
+def _word_stems(text: str) -> list[str]:
+    return [
+        w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w
+        for w in re.findall(r"[a-z0-9]+", text.lower())
+    ]
 
 
 def normalize_vector_hit(

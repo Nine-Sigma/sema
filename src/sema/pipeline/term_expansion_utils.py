@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 from sema.graph.queries import CypherQueries
 from sema.graph.term_identity_utils import UNSCOPED_VOCAB
 from sema.log import logger
-from sema.pipeline.dedup_utils import names_any
+from sema.pipeline.dedup_utils import states_name
 
 if TYPE_CHECKING:
     from sema.pipeline.retrieval import RetrievalEngine
@@ -70,7 +70,10 @@ def keep_asked_ancestry(
             chains.setdefault(c.get("code", ""), []).append(c.get("label", ""))
         elif c.get("type") == "ancestry":
             chains.setdefault(c.get("parent_code", ""), []).append(c.get("label", ""))
-    asked = {code for code, labels in chains.items() if names_any(question, labels)}
+    asked = {
+        code for code, labels in chains.items()
+        if any(states_name(question, label) for label in labels)
+    }
     return [
         c for c in candidates
         if c.get("type") != "ancestry" or c.get("parent_code") in asked
