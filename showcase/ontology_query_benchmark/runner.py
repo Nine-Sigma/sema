@@ -136,7 +136,8 @@ def _excerpt(reply: str | None) -> str | None:
 
 
 def _runner_error(slot: Slot, meter: Meter, message: str) -> dict[str, Any]:
-    return {**_slot_fields(slot), "outcome": "runner_error", "strict": False, "tolerant": False,
+    return {**_slot_fields(slot), "outcome": "runner_error", "strict": False, "order_free": False,
+            "tolerant": False,
             "error_message": message, "earliest_failure_stage": meter.failed_stage or "runner",
             "context_identity": meter.context_identity, "findings": _messages(meter.findings),
             "generation_calls": meter.generation_calls, "sql_executions": meter.sql_executions,
