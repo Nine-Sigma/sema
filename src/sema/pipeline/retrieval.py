@@ -212,8 +212,8 @@ class RetrievalEngine:
                         })
                 except Exception as e:
                     logger.debug(
-                        "Lexical search {} for '{}': {}",
-                        node_type, token, e,
+                        "Lexical search {} failed: {}",
+                        node_type, type(e).__name__,
                     )
         return hits
 

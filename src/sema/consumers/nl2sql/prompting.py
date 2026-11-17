@@ -53,7 +53,15 @@ def _build_prompt_parts(
         "Generate a SQL query using ONLY the tables, columns, "
         "and values provided below. "
         "Do not use any table or column not listed.\n",
+        *render_sections(sco, dialect),
     ]
+    _add_rules_and_question(parts, question)
+    return parts
+
+
+def render_sections(sco: SemanticContextObject, dialect: str) -> list[str]:
+    """The context lines between the prompt's frame and its rules, untruncated."""
+    parts: list[str] = []
     _add_entity_context_section(parts, sco)
     _add_tables_and_columns(parts, sco)
     _add_join_section(parts, sco)
@@ -62,7 +70,6 @@ def _build_prompt_parts(
     _add_ancestry_section(parts, sco)
     _add_result_shape(parts, sco)
     _add_dialect_notes(parts, dialect)
-    _add_rules_and_question(parts, question)
     return parts
 
 

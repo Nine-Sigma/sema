@@ -101,11 +101,13 @@ def run_slot(slot: Slot, question: Any, runtime: Any, model: Any, contract: scor
         logger.warning("{} runner_error: {}", slot.slot_id, type(exc).__name__)
         return _runner_error(slot, meter, harness.workflow.sanitize_message(str(exc)))
     applied = ru.applied_findings(meter.findings, record["sql"])
-    outcome, verdict = _classify(record, meter, applied, contract, settings.limits.row_limit)
+    outcome, verdict, order_free = _classify(record, meter, applied, contract,
+                                             settings.limits.row_limit)  # fmt: skip
     attempts = record["attempts"]
     return {
         **_slot_fields(slot), "outcome": outcome,
         "strict": bool(verdict and verdict.strict and outcome == "correct"),
+        "order_free": order_free and not applied,
         "tolerant": bool(verdict and verdict.tolerant and not applied),
         "raw_match": verdict.strict if verdict else None,
         "score_reason": verdict.reason if verdict else None,
@@ -134,7 +136,8 @@ def _excerpt(reply: str | None) -> str | None:
 
 
 def _runner_error(slot: Slot, meter: Meter, message: str) -> dict[str, Any]:
-    return {**_slot_fields(slot), "outcome": "runner_error", "strict": False, "tolerant": False,
+    return {**_slot_fields(slot), "outcome": "runner_error", "strict": False, "order_free": False,
+            "tolerant": False,
             "error_message": message, "earliest_failure_stage": meter.failed_stage or "runner",
             "context_identity": meter.context_identity, "findings": _messages(meter.findings),
             "generation_calls": meter.generation_calls, "sql_executions": meter.sql_executions,
@@ -155,18 +158,20 @@ def _classify(
     applied: tuple[ru.FindingLike, ...],
     contract: scorer.Contract,
     row_limit: int,
-) -> tuple[str, scorer.Verdict | None]:
+) -> tuple[str, scorer.Verdict | None, bool]:
+    """The outcome, the strict verdict, and the order-free verdict's strict flag."""
     if meter.overflow or record["outcome"] == "context_overflow":
-        return "overflow", None
+        return "overflow", None, False
     executed = record["outcome"] in ("correct", "wrong") and record["error_class"] is None
     if not executed or meter.last_execution is None:
-        return record["outcome"], None
+        return record["outcome"], None, False
     rows = meter.last_execution.rows
     complete = bool(record["complete"]) and len(rows) < row_limit
     verdict = scorer.score(contract, rows, complete=complete)
+    order_free = scorer.score(contract, rows, complete=complete, order_free=True).strict
     if verdict.strict and applied:
-        return "context_incomplete", verdict
-    return ("correct" if verdict.strict else "wrong"), verdict
+        return "context_incomplete", verdict, order_free
+    return ("correct" if verdict.strict else "wrong"), verdict, order_free
 
 
 def _earliest_stage(

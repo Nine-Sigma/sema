@@ -87,7 +87,41 @@ def test_settings_that_route_elsewhere_are_refused(profile: Profile, name: str, 
         routing.require_clean_process({name: value}, (), profile.routing)
 
 
-@pytest.mark.parametrize("entry", ["runner", "sema_trace", "fit", "sema_build"])
+OTHER_PROVIDER = "openrouter"
+
+
+def test_the_provider_a_profile_names_passes_with_its_own_settings() -> None:
+    environ = {"HOME": "/x", "OPENROUTER_API_KEY": "sk-or-x", "LLM_PROVIDER": OTHER_PROVIDER,
+               "EMBEDDING_PROVIDER": OTHER_PROVIDER, "EMBEDDING_API_KEY": "sk-or-x",
+               "DATABRICKS_CONFIG_FILE": os.devnull}  # fmt: skip
+    routing.require_clean_process(environ, ("json",), None, OTHER_PROVIDER)
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("DATABRICKS_HOST", "https://personal.example.test"),
+        ("DATABRICKS_TOKEN", "dapi-x"),
+        ("DATABRICKS_CONFIG_PROFILE", "DEFAULT"),
+        ("DATABRICKS_CONFIG_FILE", "/home/x/.databrickscfg"),
+        ("LLM_PROVIDER", "databricks"),
+        ("EMBEDDING_PROVIDER", "databricks"),
+        ("OPENAI_API_KEY", "sk-x"),
+        ("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        ("LLM_BASE_URL", "https://gateway.example.com"),
+    ],
+)
+def test_another_provider_still_refuses_databricks_and_other_routes(name: str, value: str) -> None:
+    with pytest.raises(RoutingError, match=name):
+        routing.require_clean_process({name: value}, (), None, OTHER_PROVIDER)
+
+
+def test_another_provider_refuses_a_loaded_dotenv() -> None:
+    with pytest.raises(RoutingError, match="dotenv"):
+        routing.require_clean_process({}, ("dotenv",), None, OTHER_PROVIDER)
+
+
+@pytest.mark.parametrize("entry", ["runner", "sema_trace", "fit", "sema_build", "sealed_set"])
 def test_live_entry_modules_import_without_dotenv(entry: str) -> None:
     probe = (
         f"import sys, showcase.ontology_query_benchmark.{entry}; "

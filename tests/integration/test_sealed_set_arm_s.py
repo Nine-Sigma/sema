@@ -44,6 +44,7 @@ from tests.unit.ontology_query_benchmark.sealed_set_env import (
     ARM_REPLIES,
     TOY_PROFILE,
     ScriptedModel,
+    dialects_named,
     freeze_toy_harness,
     materialize,
     question_texts,
@@ -70,12 +71,13 @@ def _neo4j_config() -> Neo4jConfig:
     )
 
 
-@pytest.fixture
-def frozen(tmp_path: Path) -> Path:
-    return freeze_toy_harness(tmp_path / "frozen")
+@pytest.fixture(scope="module")
+def frozen(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """One frozen copy per module: the harness loads from a single path per process."""
+    return freeze_toy_harness(tmp_path_factory.mktemp("toy") / "frozen")
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def harness(frozen: Path) -> SimpleNamespace:
     return runner_utils.load_harness(frozen, load_profile(TOY_PROFILE).harness)
 
@@ -159,3 +161,18 @@ def test_arm_s_executes_the_mocked_statement_through_the_connector_and_is_scored
     assert len(supplied) == len(prompts) == len(receipts) and any(c.text for c in supplied)
     assert all(context.text in prompt for context, prompt in zip(supplied, prompts, strict=True))
     assert sorted(r["context_identity"] for r in receipts) == sorted(c.identity for c in supplied)
+
+
+def test_arm_s_prompts_on_the_core_path_name_only_the_executors_dialect(
+    built: Any, harness: SimpleNamespace, profile_path: Path, tmp_path: Path,
+) -> None:
+    provider = _module("core_s_provider").CoreSContextProvider(built, embedder=None)
+    model = ScriptedModel(harness, question_texts(profile_path.parent / "neutral"), arm="S")
+
+    _module("sealed_set").run_sealed_set(profile_path, ("S",), 1, model=model,
+                                         s_provider=provider, report=tmp_path / "report.md")
+
+    prompts = ["\n".join(str(m.get("content") or "") for m in call) for call in model.calls]
+    assert prompts and any(CUSTOMER_TABLE in prompt for prompt in prompts)
+    assert {frozenset(dialects_named(prompt)) for prompt in prompts} == {
+        frozenset({DuckDBConnector.sql_dialect})}

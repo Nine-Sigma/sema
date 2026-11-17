@@ -20,6 +20,7 @@ from sema.connectors.databricks_utils import declared_keys_from_rows, declared_k
 from sema.connectors.duckdb_utils import (
     DUCKDB_PLATFORM,
     assemble_table_assertions,
+    bounded_read,
     duckdb_workspace,
     open_read_only,
     qualified_table,
@@ -62,6 +63,12 @@ class DuckDBConnector(Connector):
     def execute_query(self, query: str) -> list[tuple[Any, ...]]:
         """Run a Databricks-dialect read, translated to DuckDB."""
         return self._execute(sqlglot.transpile(query, read="databricks", write="duckdb")[0])
+
+    def execute_query_with_columns(
+        self, query: str, *, max_rows: int | None = None, timeout_s: float | None = None,
+    ) -> tuple[list[str], list[tuple[Any, ...]]]:
+        """Run a DuckDB-dialect read as written, untranslated, within the given bounds."""
+        return bounded_read(self._cursor(), query, max_rows, timeout_s)
 
     def close(self) -> None:
         if self._connection is not None:

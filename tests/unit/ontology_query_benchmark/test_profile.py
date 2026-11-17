@@ -102,3 +102,23 @@ def test_an_unpinned_or_unqualified_source_is_refused(
 def test_a_version_query_must_template_exactly_the_relation(tmp_path: Path, version_sql: str) -> None:
     with pytest.raises(ValidationError, match=r"sources\.version_sql"):
         load_profile(_variant(tmp_path, {"sources.version_sql": version_sql}))
+
+
+def test_a_sealed_set_profile_expands_home_and_resolves_relative_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from showcase.ontology_query_benchmark.profile import load_sealed_profile
+
+    sealed_profile = Path(__file__).parents[2] / "fixtures" / "sealed_set" / "profile.yaml"
+    raw = yaml.safe_load(sealed_profile.read_text())
+    raw["duckdb"] = "~/data/source.duckdb"
+    path = tmp_path / "profile.yaml"
+    path.write_text(yaml.safe_dump(raw))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+    profile = load_sealed_profile(path)
+
+    assert profile.duckdb == tmp_path / "home" / "data" / "source.duckdb"
+    assert profile.set_dir == tmp_path / "neutral"
+    assert profile.harness.frozen == tmp_path / "frozen"
+    assert (profile.model.provider, profile.knobs.budget_tokens) == ("openrouter", 12000)

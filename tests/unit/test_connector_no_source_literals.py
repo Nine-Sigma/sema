@@ -68,6 +68,7 @@ UNIT_FILES = tuple(
         "models/context.py",
         "consumers/nl2sql/consumer.py",
         "consumers/nl2sql/prompting.py",
+        "connectors/base.py",
     )
 )
 LITERAL_ROOTS = (

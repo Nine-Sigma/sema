@@ -1,16 +1,25 @@
 """Live clients for the runner: the serving model and one executor per arm.
 
-Every host, endpoint, URL and tool is checked against the profile's pinned routing;
-nothing here is exercised by unit tests because each path opens a network client.
+Every host, endpoint, URL and tool is checked against the profile's pinned routing. The
+Databricks and Timbr paths are not exercised by unit tests because each opens a network
+client; the OpenRouter client takes its HTTP call as an argument, and the connector
+executor reads through a `sema` Connector.
 """
 
 import argparse
+import json
+import time
+import urllib.error
+import urllib.request
+from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from showcase.ontology_query_benchmark.profile import Limits, Profile
+from sema.cli_factories_utils import OPENROUTER_BASE_URL
+from sema.connectors.base import Connector, RowCapExceeded, StatementTimeout
+from showcase.ontology_query_benchmark.profile import Limits, ModelRoute, Profile
 from showcase.ontology_query_benchmark.routing import (
     RoutingError,
     require_chat_endpoint,
@@ -18,10 +27,88 @@ from showcase.ontology_query_benchmark.routing import (
     require_timbr_mcp_url,
 )
 from showcase.ontology_query_benchmark.runner_utils import guard_mcp_tools, read_env_keys
+from showcase.ontology_query_benchmark.sealed_set_utils import normalize
 from showcase.ontology_query_benchmark.sema_context import SContextProvider
 from showcase.ontology_query_benchmark.sema_trace import open_live_provider
 
 S_INPUTS = ("neo4j_uri", "s_manifest", "s_projection", "s_projection_receipt")
+OPENROUTER = "openrouter"
+OPENROUTER_KEY_ENV = "OPENROUTER_API_KEY"
+MODEL_TIMEOUT_S = 300.0
+Post = Callable[[str, dict[str, Any], dict[str, str], float], dict[str, Any]]
+
+
+def post_json(url: str, body: dict[str, Any], headers: dict[str, str],
+              timeout: float) -> dict[str, Any]:  # fmt: skip
+    request = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                     headers={**headers, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+            return dict(json.loads(response.read()))
+    except urllib.error.HTTPError as exc:
+        # The body may echo the prompt, so only the status leaves this function.
+        raise RuntimeError(f"model HTTP {exc.code}") from None
+
+
+class OpenRouterClient:
+    """The harness model protocol, `complete(messages) -> Generation`, on OpenRouter."""
+
+    def __init__(self, harness: SimpleNamespace, model: str, api_key: str, *, max_tokens: int,
+                 timeout: float, post: Post = post_json) -> None:  # fmt: skip
+        self.generation, self.model, self.api_key = harness.models.Generation, model, api_key
+        self.max_tokens, self.timeout, self.post = max_tokens, timeout, post
+
+    def complete(self, messages: list[dict[str, Any]]) -> Any:
+        body = {"model": self.model, "messages": messages, "max_tokens": self.max_tokens}
+        start = time.perf_counter()
+        payload = self.post(f"{OPENROUTER_BASE_URL}/chat/completions", body,
+                            {"Authorization": f"Bearer {self.api_key}"}, self.timeout)
+        usage = payload.get("usage") or {}
+        content = payload["choices"][0]["message"].get("content")
+        return self.generation(content if isinstance(content, str) else "",
+                               usage.get("prompt_tokens"), usage.get("completion_tokens"),
+                               time.perf_counter() - start)  # fmt: skip
+
+
+def model_client(harness: SimpleNamespace, route: ModelRoute, limits: Limits,
+                 environ: Mapping[str, str]) -> OpenRouterClient:  # fmt: skip
+    """The profile's model client; only OpenRouter has one outside Databricks."""
+    if route.provider != OPENROUTER:
+        raise RoutingError(f"no harness model client for provider {route.provider!r}")
+    key = environ.get(OPENROUTER_KEY_ENV, "")
+    if not key:
+        raise RoutingError(f"{OPENROUTER_KEY_ENV} is not set")
+    return OpenRouterClient(harness, route.name, key, max_tokens=limits.output_ceiling,
+                            timeout=MODEL_TIMEOUT_S)  # fmt: skip
+
+
+class ConnectorExecutor:
+    """The harness executor protocol on a `sema` Connector, one bounded read per statement.
+
+    Rows leave in the expected-answer writer's normal form, so the scorer compares like with
+    like. A result past `row_limit` rows or a statement past the timeout fails with the
+    status word `row_cap` or `timeout`, which the harness does not repair.
+    """
+
+    def __init__(self, harness: SimpleNamespace, connector: Connector,
+                 statement_timeout_s: float) -> None:  # fmt: skip
+        self.harness, self.connector = harness, connector
+        self.statement_timeout_s = statement_timeout_s
+
+    def execute(self, sql: str, row_limit: int) -> Any:
+        start = time.perf_counter()
+        try:
+            columns, rows = self.connector.execute_query_with_columns(
+                sql, max_rows=row_limit, timeout_s=self.statement_timeout_s)
+        except (RowCapExceeded, StatementTimeout) as exc:
+            word = "row_cap" if isinstance(exc, RowCapExceeded) else "timeout"
+            return self.harness.models.Execution(False, (), (), time.perf_counter() - start,
+                                                 word, str(exc))  # fmt: skip
+        except Exception as exc:  # noqa: BLE001 - every failure becomes a classified outcome
+            return self.harness.clients.failed_execution(exc, time.perf_counter() - start)
+        normal = tuple(tuple(normalize(cell) for cell in row) for row in rows)
+        return self.harness.models.Execution(True, tuple(columns), normal,
+                                             time.perf_counter() - start)  # fmt: skip
 
 
 def add_s_args(parser: argparse.ArgumentParser) -> None:

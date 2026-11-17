@@ -32,13 +32,13 @@ executes through the connector's `Connector.execute_query_with_columns(query) ->
 tuple[list[str], list[tuple[Any, ...]]]` (column names, rows), once per statement.
 """
 
-import importlib
 import json
 import socket
+import time
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 from typing import Any
 
 import duckdb
@@ -49,7 +49,9 @@ from sema.connectors.duckdb import DuckDBConnector
 from sema.models.config import DuckDBConfig
 from tests.support.connector_fixture import write_fixture_database
 from tests.unit.ontology_query_benchmark.sealed_set_env import (
+    ACRIS_PROFILE,
     ARM_REPLIES,
+    ARMS,
     AUTHOR_SPLIT,
     CONNECTOR_READ,
     MARKERS,
@@ -60,57 +62,29 @@ from tests.unit.ontology_query_benchmark.sealed_set_env import (
     SQL_MARKERS,
     TEXT_MARKER,
     WIDE,
+    ScriptedModel,
     SealedRun,
+    dialects_named,
     expected_cells,
     materialize,
     question_texts,
     read_jsonl,
     rename_question_ids,
     report_cells,
-    run_sealed,
+    sealed_run,  # noqa: F401 - a fixture
     truncate_expected,
 )
+from tests.unit.ontology_query_benchmark.sealed_set_env import run_arms as _run
+from tests.unit.ontology_query_benchmark.sealed_set_env import sealed_set_module as _sealed_set
+from tests.unit.ontology_query_benchmark.sealed_set_env import writer_cell as _cell
 
 pytestmark = pytest.mark.unit
 
-ARMS = ("A", "S")
 REPORT_CELLS = ("class", "hop_class", "hops", "joins", "join", "excluded")
 SCORED = ("correct", "wrong", "context_incomplete")
 QUESTION_FIELDS = {"id": str, "text": str, "question_class": str, "hop_class": int,
                    "hops": int, "answer_columns": list, "difficulty": int,
                    "underspecified": bool}  # fmt: skip
-
-
-def _sealed_set() -> ModuleType:
-    return importlib.import_module("showcase.ontology_query_benchmark.sealed_set")
-
-
-def _run(harness: SimpleNamespace, root: Path, profile_path: Path,
-         arms: tuple[str, ...] = ARMS) -> SealedRun:  # fmt: skip
-    return run_sealed(_sealed_set(), harness, root, profile_path, arms)
-
-
-@pytest.fixture(scope="module")
-def sealed_run(
-    frozen: Path, harness: SimpleNamespace, tmp_path_factory: pytest.TempPathFactory
-) -> Callable[[], SealedRun]:
-    """One run of both arms over the neutral set, made by the first test that asks."""
-    root = tmp_path_factory.mktemp("sealed") / "sealed_set"
-    profile_path = materialize(root, frozen)
-    done: list[SealedRun] = []
-
-    def get() -> SealedRun:
-        if not done:
-            done.append(_run(harness, root, profile_path))
-        return done[0]
-
-    return get
-
-
-def _cell(value: Any) -> Any:
-    # shortcut: the writer's normalization for the cell types this fixture returns (int,
-    # integral float, text, NULL); extend it if a question returns another type.
-    return int(value) if isinstance(value, float) and value.is_integer() else value
 
 
 def test_the_neutral_set_follows_the_sealed_file_contract(tmp_path: Path) -> None:
@@ -348,3 +322,79 @@ def test_renamed_question_ids_give_the_same_per_rule_results(
     assert all(any(qid in line and flag in line for line in lines)
                for qid, flagged in flags.items() for flag in flagged if flagged[flag] is True)
     assert not any(old in decoy.report for old in renamed)
+
+
+def test_the_openrouter_client_speaks_the_harness_model_protocol(harness: SimpleNamespace) -> None:
+    from showcase.ontology_query_benchmark import runner_live_utils as live
+
+    sent: list[tuple[str, dict[str, Any], dict[str, str], float]] = []
+
+    def post(url: str, body: dict[str, Any], headers: dict[str, str], timeout: float) -> Any:
+        sent.append((url, body, headers, timeout))
+        return {"choices": [{"message": {"content": "```sql\nSELECT 1\n```"}}],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 3}}  # fmt: skip
+
+    client = live.OpenRouterClient(harness, "vendor/model-x", "key-1", max_tokens=99,
+                                   timeout=5.0, post=post)  # fmt: skip
+    generation = client.complete([{"role": "user", "content": "q"}])
+
+    ((url, body, headers, timeout),) = sent
+    assert url == "https://openrouter.ai/api/v1/chat/completions"
+    assert body == {"model": "vendor/model-x", "max_tokens": 99,
+                    "messages": [{"role": "user", "content": "q"}]}  # fmt: skip
+    assert headers["Authorization"] == "Bearer key-1" and timeout == 5.0
+    assert isinstance(generation, harness.models.Generation)
+    assert (generation.text, generation.prompt_tokens, generation.completion_tokens) == (
+        "```sql\nSELECT 1\n```", 12, 3)
+
+
+def test_a_runner_error_receipt_records_order_free_false(
+    frozen: Path, harness: SimpleNamespace, tmp_path: Path,
+) -> None:
+    def failing(question: str, is_denied: Any) -> Any:
+        raise RuntimeError("provider down")
+
+    root = tmp_path / "sealed_set"
+    profile_path = materialize(root, frozen)
+    _sealed_set().run_sealed_set(profile_path, ("S",), 1, model=ScriptedModel(harness, {}),
+                                 s_provider=failing, report=tmp_path / "report.md")  # fmt: skip
+
+    receipts = read_jsonl(next((root / "neutral" / "sealed").rglob("receipts.jsonl")))
+    assert receipts and {(r["outcome"], r.get("order_free", "absent")) for r in receipts} == {
+        ("runner_error", False)}
+
+
+def test_a_statement_past_the_row_cap_or_the_timeout_returns_promptly_with_its_status_word(
+    harness: SimpleNamespace, tmp_path: Path,
+) -> None:
+    from showcase.ontology_query_benchmark.profile import load_sealed_profile
+    from showcase.ontology_query_benchmark.runner_live_utils import ConnectorExecutor
+
+    profiles = (SEALED_SET_FIXTURE / "profile.yaml", ACRIS_PROFILE)
+    assert all(load_sealed_profile(p).limits.statement_timeout_s > 0 for p in profiles)
+    connector = DuckDBConnector(DuckDBConfig(path=str(write_fixture_database(tmp_path))))
+    executor, started = ConnectorExecutor(harness, connector, 1.0), time.monotonic()
+    try:
+        done = [executor.execute(sql, 10) for sql in (
+            "SELECT i FROM range(1000000000) r(i)",
+            "SELECT sum(i * i) AS n FROM range(20000000000) r(i)",
+            "SELECT count(*) AS n FROM shop.customer")]  # fmt: skip
+    finally:
+        connector.close()
+    assert time.monotonic() - started < 15
+    assert [(e.ok, e.error_class) for e in done] == [
+        (False, "row_cap"), (False, "timeout"), (True, None)]
+    assert done[2].rows == ((200,),)
+
+
+def test_both_arms_prompts_name_the_executors_dialect_and_no_other(
+    frozen: Path, harness: SimpleNamespace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    framed, build = [], harness.workflow.build_messages
+    monkeypatch.setattr(harness.workflow, "build_messages", lambda context, *rest: (
+        framed.append(context.dialect) or build(context, *rest)))  # fmt: skip
+    run = _run(harness, tmp_path / "sealed_set", materialize(tmp_path / "sealed_set", frozen))
+    prompts = ["\n".join(str(m["content"]) for m in call) for call in run.model.calls]
+    assert len(framed) == len(prompts) == len(run.receipts) > 0
+    assert {frozenset(dialects_named(text)) for text in (*framed, *prompts)} == {
+        frozenset({DuckDBConnector.sql_dialect})}

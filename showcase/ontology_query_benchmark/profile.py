@@ -37,6 +37,7 @@ class _Frozen(BaseModel):
 
 def _resolved(value: Path, info: ValidationInfo) -> Path:
     base = (info.context or {}).get("base")
+    value = value.expanduser()
     return value if value.is_absolute() or base is None else Path(base) / value
 
 
@@ -104,6 +105,12 @@ class Limits(_Frozen):
     @property
     def first_prompt_ceiling(self) -> int:
         return self.input_ceiling - self.repair_reserve
+
+
+class SealedLimits(Limits):
+    """A sealed-set run's limits: `row_limit` caps each statement's rows, this its seconds."""
+
+    statement_timeout_s: float = Field(gt=0)
 
 
 class Knobs(_Frozen):
@@ -284,3 +291,49 @@ class Profile(_Frozen):
 def load_profile(path: Path) -> Profile:
     raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     return Profile.model_validate(raw, context={"base": Path(path).resolve().parent})
+
+
+class FrozenHarness(_Frozen):
+    """A frozen harness closure reused unchanged: its directory and its package name."""
+
+    frozen: Path
+    package: str
+
+    _frozen = field_validator("frozen")(_resolved)
+
+
+class ModelRoute(_Frozen):
+    provider: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+
+
+class PriceSettings(_Frozen):
+    input_usd_per_1m: float = Field(ge=0)
+    output_usd_per_1m: float = Field(ge=0)
+
+
+class RunCeilings(_Frozen):
+    prices: PriceSettings
+    max_cost_usd: float = Field(ge=0)
+    max_wall_s: float = Field(gt=0)
+
+
+class SealedSetProfile(_Frozen):
+    """A source with loaded data and a sealed question set, measured by the same runner."""
+
+    profile_version: Literal[1]
+    name: str
+    set_dir: Path
+    duckdb: Path
+    harness: FrozenHarness
+    model: ModelRoute
+    limits: SealedLimits
+    knobs: Knobs
+    settings: RunCeilings
+
+    _paths = field_validator("set_dir", "duckdb")(_resolved)
+
+
+def load_sealed_profile(path: Path) -> SealedSetProfile:
+    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    return SealedSetProfile.model_validate(raw, context={"base": Path(path).resolve().parent})
