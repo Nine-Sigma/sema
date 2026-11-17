@@ -3,8 +3,9 @@
 The step runs over the neutral fixture in DuckDB, through the real connector; only the graph
 is a stand-in. It answers the step's reads (the run's columns, the declared keys, a value
 set's current members) and keeps its writes the way the loader's Cypher merges them: a
-`Term` per vocabulary and code whose label a write replaces only with a higher confidence,
-`MEMBER_OF` per term and value set, `HAS_VALUE_SET` per column, and `LABELED_BY` per pair.
+`Term` per vocabulary and code whose label a write replaces only with a higher confidence and a
+label of its own, `MEMBER_OF` per term and value set, `HAS_VALUE_SET` per column, and
+`LABELED_BY` per pair.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from tests.support.connector_fixture_codes import (
     CODES_CATALOG,
     CODES_SCHEMA,
     CROSS_SCHEMA_TABLES,
+    GRIT,
     LATCH,
     NOTCH,
     NULL_LABEL_TABLES,
@@ -83,6 +85,7 @@ class Graph:
                 (params["label_ref"], dict(params["edge"])))
             return
         if "rows" in params and "Term" in cypher:
+            assert "r.label IS NOT NULL" in cypher, "the stand-in's label rule left the term write"
             for r in params["rows"]:
                 self.term(r["vocabulary_name"], r["code"], r["label"], r["confidence"])
             return
@@ -90,7 +93,7 @@ class Graph:
 
     def term(self, vocabulary: str, code: str, label: str | None, confidence: float) -> None:
         held = self.terms.get((vocabulary, code))
-        if held is None or confidence > held[1]:
+        if held is None or (confidence > held[1] and (label is not None or held[0] is None)):
             self.terms[(vocabulary, code)] = (label, confidence)
 
     def store_assertion(self, assertion: Assertion, source_schema: str | None = None) -> None:
@@ -211,6 +214,25 @@ def test_a_verified_binding_beside_decoded_values_holds_each_code_once(coded: Bu
     labels = coded.graph.labels(coded.refs[works("fitting", "tone_code")])
     assert Counter(code for code, _ in labels) == Counter(set(TONE_NAMES))
     assert dict(labels) == TONE_NAMES
+
+
+DECODED_CONFIDENCE = 0.75
+
+
+def _grit_decoded(graph: Graph, refs: dict[Column, str]) -> None:
+    """Decoded labels on a column whose code relation has several text columns, so no label."""
+    ref = refs[works("panel", "grit_code")]
+    for code in GRIT:
+        graph.term(L2_VOCABULARY, code, f"decoded {code}", DECODED_CONFIDENCE)
+        graph.members.setdefault(ref, set()).add((L2_VOCABULARY, code))
+
+
+def test_a_verified_binding_with_no_label_keeps_the_decoded_labels(tmp_path: Path) -> None:
+    built = build(tmp_path, {CODES_SCHEMA: CODED_TABLES}, [CODES_SCHEMA], seeded=_grit_decoded)
+    grit = built.refs[works("panel", "grit_code")]
+    assert built.graph.edges[grit]["verification"] == "verified"
+    assert built.graph.labeled_by.get(grit, []) == []
+    assert dict(built.graph.labels(grit)) == {code: f"decoded {code}" for code in GRIT}
 
 
 # Defect 2: a declared key resolves by its schema-qualified reference.
