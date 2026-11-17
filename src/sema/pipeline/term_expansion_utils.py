@@ -350,7 +350,7 @@ def _expand_term_governed_values(
             "column": col,
             "table": table,
             "code": code,
-            "label": label or code,
+            "label": label,
             "source": "retrieval_term_expansion",
             "status": status,
             "confidence": confidence,
