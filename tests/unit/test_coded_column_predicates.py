@@ -18,13 +18,7 @@ from sema.engine import join_detector_utils as detector
 from sema.models.config import ProfilingConfig
 from sema.models.extraction import ExtractedColumn
 
-pytestmark = [
-    pytest.mark.unit,
-    pytest.mark.xfail(
-        strict=True,
-        reason="unit 5 N3 (mechanism) blocked; see unit-5/STATE.md Waiting on Dean 2",
-    ),
-]
+pytestmark = pytest.mark.unit
 
 SCHEMA = "s"
 Profiles = dict[tuple[str, str, str], tuple[int, int]]

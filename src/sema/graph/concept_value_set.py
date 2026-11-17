@@ -14,14 +14,30 @@ the caller.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from typing import Any, NamedTuple
 
 from sema.graph.concept_source import ConceptSource
 from sema.graph.loader import GraphLoader
+from sema.graph.loader_utils import batch_upsert_terms
 
 _SOURCE = "target-load"
 _CONFIDENCE = 1.0
+_CODED_SOURCE = "coded_columns"
+_HELD_MEMBERS = (
+    "MATCH (t:Term)-[:MEMBER_OF]->(:ValueSet {column_ref: $column_ref}) "
+    "RETURN t.code AS code, t.vocabulary_name AS vocabulary_name ORDER BY vocabulary_name"
+)
+
+
+class CodedMember(NamedTuple):
+    """A code of a coded column's value set: its label, observed rows, and whether it is listed."""
+
+    code: str
+    label: str | None
+    rows: int
+    listed: bool
 
 
 @dataclass(frozen=True)
@@ -66,6 +82,57 @@ def materialize_concept_value_set(
             _upsert_ancestors(
                 loader, code, concept_vocabulary, concepts, source_schema
             )
+
+
+def materialize_coded_value_set(
+    loader: GraphLoader,
+    *,
+    column: ValueSetColumn,
+    vocabulary: str,
+    members: Sequence[CodedMember],
+    edge: dict[str, Any],
+    source_schema: str,
+    confidence: float,
+) -> None:
+    """A coded column's value set: `HAS_VALUE_SET` with ``edge`` and `MEMBER_OF {rows, listed}`.
+
+    A code the value set already holds keeps its Term, whatever its vocabulary, so the value
+    set holds each code once. ``confidence`` guards term labels, so a weaker binding never
+    overwrites a stronger one's.
+    """
+    vs_name = f"{column.table}_{column.column}_values"
+    loader.upsert_value_set(
+        vs_name, column.column, column.table, column.schema, column.catalog,
+        source_schema=source_schema, column_ref=column.ref, edge=edge,
+    )
+    if not members:
+        return
+    held: dict[str, str] = {}
+    for row in loader._run_read(_HELD_MEMBERS, column_ref=column.ref):
+        held.setdefault(str(row["code"]), row["vocabulary_name"])
+    vocabularies = {m.code: held.get(m.code, vocabulary) for m in members}
+    batch_upsert_terms(loader, [
+        dict(code=m.code, label=m.label, vocabulary_name=vocabularies[m.code],
+             source=_CODED_SOURCE, confidence=confidence)
+        for m in members
+    ], source_schema=source_schema)
+    for m in members:
+        loader.add_term_to_value_set(
+            m.code, vs_name, source_schema=source_schema, vocabulary_name=vocabularies[m.code],
+            value_set_ref=column.ref, rows=m.rows, listed=m.listed,
+        )
+
+
+def link_label_column(
+    loader: GraphLoader, *, column_ref: str, label_ref: str, edge: dict[str, Any],
+    source_schema: str,
+) -> None:
+    """`(Column)-[:LABELED_BY {verification, violation_rate, via}]->(Column)`."""
+    loader._run(
+        "MATCH (c:Column {ref: $column_ref}) MATCH (l:Column {ref: $label_ref}) "
+        "MERGE (c)-[e:LABELED_BY {source_schema: $source_schema}]->(l) SET e += $edge",
+        column_ref=column_ref, label_ref=label_ref, edge=edge, source_schema=source_schema,
+    )
 
 
 def _upsert_concept(
@@ -117,4 +184,10 @@ def _set_term_synonyms(
     )
 
 
-__all__ = ["ValueSetColumn", "materialize_concept_value_set"]
+__all__ = [
+    "CodedMember",
+    "ValueSetColumn",
+    "link_label_column",
+    "materialize_coded_value_set",
+    "materialize_concept_value_set",
+]
