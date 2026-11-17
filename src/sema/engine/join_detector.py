@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from sema.engine.join_detector_utils import (
+    COVERAGE_THRESHOLD as COVERAGE_THRESHOLD,
     FKCandidate,
     enumerate_candidates_from_metadata,
     verify_cardinality,
@@ -35,7 +36,6 @@ SamplerFn = Callable[[ColumnKey], set[str] | None]
 ContainmentFn = Callable[[ColumnKey, frozenset[str]], int | None]
 DEFAULT_SAMPLE_CAP = 500
 DEFAULT_MATERIALIZE_THRESHOLD = 0.80
-COVERAGE_THRESHOLD = 0.80
 TIER_1 = 0.95
 TIER_2 = 0.80
 TIER_3 = 0.70

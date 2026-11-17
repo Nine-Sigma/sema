@@ -198,7 +198,9 @@ def batch_upsert_terms(
         "UNWIND $rows AS r "
         "MERGE (t:Term {vocabulary_name: r.vocabulary_name, code: r.code}) "
         "ON CREATE SET t.id = r.id "
-        f"WITH t, r, {_confidence_guard('t')} AS win "
+        # A row with no label claims nothing, so it never replaces a stored label.
+        f"WITH t, r, {_confidence_guard('t')} "
+        "AND (r.label IS NOT NULL OR t.label IS NULL) AS win "
         f"SET {guarded}, "
         "t.status = 'ACTIVE', "
         "t.model_role = coalesce(t.model_role, 'SOURCE'), "

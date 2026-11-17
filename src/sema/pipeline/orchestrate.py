@@ -148,13 +148,19 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     )
 
     from sema.graph.join_materializer import materialize_schema_joins
+    from sema.pipeline.coded_columns import run_coded_columns
     schemas = sorted({wi.schema for wi in work_items})
     detected = run_fk_detection(
         loader, discovery_connector, config, schemas, run_id=run_id,
     )
+    coded = run_coded_columns(
+        loader, discovery_connector, config, schemas, run_id=run_id,
+    )
     # Joins wait for every table of the run: either end may be built last.
     for schema in schemas:
-        materialize_schema_joins(loader, schema, detected.get(schema, []))
+        materialize_schema_joins(
+            loader, schema, [*detected.get(schema, []), *coded.get(schema, [])],
+        )
 
     _compute_embeddings(config, loader, skip_embeddings=config.skip_embeddings)
 

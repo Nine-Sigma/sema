@@ -1,4 +1,5 @@
-"""Generality gate: the source files the DuckDB connector unit changes name no source.
+"""Generality gate: the source files the DuckDB connector unit and the coded-column unit
+change name no source.
 
 The literals are read at test time from every source fixture and profile, so a source
 added later is covered without editing this test.
@@ -44,10 +45,19 @@ UNIT_FILES = tuple(
         "intake/run/scorecard.py",
         "connectors/duckdb.py",
         "connectors/duckdb_utils.py",
+        "consumers/nl2sql/prompting_utils.py",
+        "engine/coded_column_utils.py",
+        "engine/join_detector.py",
+        "engine/join_detector_utils.py",
+        "engine/warehouse_lookup.py",
+        "graph/concept_value_set.py",
+        "graph/loader.py",
+        "models/assertions.py",
         "models/config.py",
         "models/extraction.py",
         "models/physical_key.py",
         "pipeline/build.py",
+        "pipeline/coded_columns.py",
         "pipeline/orchestrate.py",
         "pipeline/dedup_utils.py",
         "pipeline/retrieval.py",
@@ -58,7 +68,6 @@ UNIT_FILES = tuple(
         "models/context.py",
         "consumers/nl2sql/consumer.py",
         "consumers/nl2sql/prompting.py",
-        "consumers/nl2sql/prompting_utils.py",
     )
 )
 LITERAL_ROOTS = (
@@ -83,6 +92,11 @@ PREDATING_HITS = {
     ("discovery_scorecard.py", "many_to_one"): (
         "join cardinality word fixed in the unit 6 contract (ruling I); the scorecard fixture's oracle uses it"
     ),
+    **dict.fromkeys(
+        [("discovery_scorecard.py", "kind"), ("discovery_scorecard_utils.py", "kind"),
+         ("scorecard.py", "kind")],
+        "the oracle file format's field name (unit 6 contract); unit 5's code fixture uses it as a word",
+    ),
     ("config.py", "databricks-bge-large-en"): (
         "d395b094 embedding model default; predates unit 3, see unit-3 STATE.md Waiting on Dean"
     ),
@@ -95,6 +109,9 @@ PREDATING_HITS = {
          ("term_expansion_utils.py", "source")],
         "a generic candidate key a profile also uses as a word; predates unit 6 (f792d5c)",
     ),
+    ("loader.py", "column name"): "Column node keys in Cypher; predates unit 5",
+    ("loader.py", "predicate"): "Assertion field name; predates unit 5",
+    ("loader.py", "source"): "Assertion field name; predates unit 5",
 }
 # Source fixture modules: their public constants name the connector fixture's source.
 CONNECTOR_FIXTURES = tuple(sorted((REPO_ROOT / "tests" / "support").glob("connector_fixture*.py")))
