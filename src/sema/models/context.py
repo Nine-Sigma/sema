@@ -105,13 +105,13 @@ class HierarchyAnchor(BaseModel):
 
 
 class ColumnMatch(BaseModel):
-    """A listed column a question term reached; ``named`` when the question states
-    the column's name, so it outranks a column reached by definition alone."""
+    """A column the question names, and another listed column whose definition states
+    that same name: the named column ranks first, the other is its alternative."""
 
     table: str
     column: str
-    named: bool = False
-    score: float = 0.0
+    alternative_table: str
+    alternative_column: str
 
 
 class ResultShape(BaseModel):

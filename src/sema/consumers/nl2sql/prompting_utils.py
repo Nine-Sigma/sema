@@ -66,14 +66,16 @@ def _add_tables_and_columns(
 def _add_column_choice(
     parts: list[str], sco: SemanticContextObject,
 ) -> None:
-    """One line: the column the question names, then the others it reached."""
-    if len(sco.column_matches) < 2 or not sco.column_matches[0].named:
-        return
-    named, *others = sco.column_matches
-    listed = ", ".join(f"{m.table}.{m.column}" for m in others)
-    parts.append(
-        f"  Column the question names: {named.table}.{named.column}; "
-        f"alternative: {listed}"
+    """One line per column the question names that another column's definition
+    competes for: the named column, then its alternatives."""
+    alternatives: dict[str, list[str]] = {}
+    for m in sco.column_matches:
+        alternatives.setdefault(f"{m.table}.{m.column}", []).append(
+            f"{m.alternative_table}.{m.alternative_column}"
+        )
+    parts.extend(
+        f"  Column the question names: {named}; alternative: {', '.join(others)}"
+        for named, others in alternatives.items()
     )
 
 

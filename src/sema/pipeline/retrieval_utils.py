@@ -157,6 +157,7 @@ def _expand_property_hit(
         "type": "property",
         "name": name,
         "entity_name": hit.get("entity_name", ""),
+        "description": hit.get("description"),
         "score": hit.get("final_score", 0.0),
         "source": "retrieval",
         "status": hit.get("status", "auto"),

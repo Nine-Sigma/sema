@@ -94,23 +94,31 @@ def _build_column_matches(
     candidate_set: SemanticCandidateSet,
     physical_assets: list[PhysicalAsset],
 ) -> list[ColumnMatch]:
-    """Listed columns a property hit reached: a column the question names first,
-    then by hit score, so a closer definition never outranks a named column."""
+    """Each listed column the question names, paired with every other listed column a
+    property hit reached whose definition states that same name. A column the question
+    names is never another's alternative."""
     listed = {(a.table, c) for a in physical_assets for c in a.columns}
-    found: dict[tuple[str, str], ColumnMatch] = {}
-    for c in candidate_set.candidates:
-        place = (c.get("physical_table", ""), c.get("physical_column", ""))
-        if c.get("type") != "property" or place not in listed:
-            continue
-        named = any(
-            states_name(candidate_set.query, n) for n in (c.get("name", ""), place[1])
-        )
-        match = ColumnMatch(table=place[0], column=place[1], named=named,
-                            score=c.get("score", 0.0))
-        kept = found.get(place)
-        if kept is None or (match.named, match.score) > (kept.named, kept.score):
-            found[place] = match
-    return sorted(found.values(), key=lambda m: (not m.named, -m.score))
+    hits = {
+        place: c for c in candidate_set.candidates
+        if c.get("type") == "property"
+        and (place := (c.get("physical_table", ""), c.get("physical_column", ""))) in listed
+    }
+    named = {
+        place: term for place, c in hits.items()
+        if (term := _named_term(candidate_set.query, c.get("name", ""), place[1]))
+    }
+    return [
+        ColumnMatch(table=table, column=column,
+                    alternative_table=other[0], alternative_column=other[1])
+        for (table, column), term in named.items()
+        for other, c in hits.items()
+        if other not in named and states_name(c.get("description") or "", term)
+    ]
+
+
+def _named_term(question: str, *names: str) -> str:
+    """The first of ``names`` the question states, or ''."""
+    return next((n for n in names if states_name(question, n)), "")
 
 
 def _parse_join_predicates(
