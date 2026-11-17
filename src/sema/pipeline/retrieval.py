@@ -21,7 +21,7 @@ from sema.pipeline.retrieval_utils import (
     _expand_term_hit,
     _expand_values,
     _normalize_vector_hit,
-    mark_nearest_property,
+    mark_properties_defining_question,
     merge_and_rank_candidates,
     tokenize_query,
 )
@@ -308,7 +308,7 @@ class RetrievalEngine:
         all_seeds = vector_candidates + lexical_candidates
         ranked = merge_and_rank_candidates(all_seeds)
         deduped_seeds = _dedup_seeds(ranked)
-        mark_nearest_property(vector_candidates, deduped_seeds)
+        mark_properties_defining_question(question, deduped_seeds)
 
         # Phase 3: Type-aware expansion
         all_candidates: list[dict[str, Any]] = []

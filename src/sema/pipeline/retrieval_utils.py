@@ -15,8 +15,8 @@ from sema.pipeline.dedup_utils import (
     dedup_artifacts as _dedup_artifacts,
     dedup_seeds as _dedup_seeds,
     merge_and_rank_candidates,
-    _seed_identity_key as seed_identity_key,
     normalize_vector_hit as _normalize_vector_hit,
+    states_name,
     tokenize_query,
 )
 from sema.pipeline.term_expansion_utils import (
@@ -194,7 +194,7 @@ def _property_vocabulary(
 def _property_owners(
     engine: RetrievalEngine, hit: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """The owning entity's tables. The property the vector index ranks nearest
+    """The owning entity's tables. A property whose definition states a word of
     the question brings its table at the property's own confidence; any other
     property hit's table keeps the expansion confidence, below the semantic
     threshold, so it does not enter alone."""
@@ -203,7 +203,7 @@ def _property_owners(
         return []
     confidence = (
         hit.get("confidence", 0.5)
-        if hit.get("nearest_property")
+        if hit.get("definition_states_question")
         else _PROPERTY_OWNER_CONFIDENCE
     )
     return [
@@ -224,18 +224,19 @@ def _property_owners(
     ]
 
 
-def mark_nearest_property(
-    vector_hits: list[dict[str, Any]], seeds: list[dict[str, Any]],
+def mark_properties_defining_question(
+    question: str, seeds: list[dict[str, Any]],
 ) -> None:
-    """Flag the seed of the property hit the vector index ranks nearest the
-    question. An index returns its nearest nodes for any question, and only
-    their order, never the level of their similarity, holds across embedders."""
-    properties = [h for h in vector_hits if h.get("node_type") == "property"]
-    top = max((h.get("score", 0.0) for h in properties), default=None)
-    nearest = {seed_identity_key(h) for h in properties if h.get("score", 0.0) == top}
+    """Flag each property seed whose definition states a word of the question.
+    An index returns its nearest nodes for any question, so neither a hit's
+    rank nor its score level says the question asks for it; the text does."""
+    words = tokenize_query(question)
     for seed in seeds:
-        if seed.get("node_type") == "property" and seed_identity_key(seed) in nearest:
-            seed["nearest_property"] = True
+        definition = seed.get("description") or ""
+        if seed.get("node_type") == "property" and any(
+            states_name(definition, word) for word in words
+        ):
+            seed["definition_states_question"] = True
 
 
 def _physical_column(
