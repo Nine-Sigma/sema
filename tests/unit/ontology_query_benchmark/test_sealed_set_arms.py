@@ -34,6 +34,7 @@ tuple[list[str], list[tuple[Any, ...]]]` (column names, rows), once per statemen
 
 import json
 import socket
+import time
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -77,6 +78,8 @@ from tests.unit.ontology_query_benchmark.sealed_set_env import writer_cell as _c
 
 pytestmark = pytest.mark.unit
 
+ACRIS_PROFILE = (Path(__file__).parents[3] / "showcase" / "ontology_query_benchmark"
+                 / "profiles" / "acris_sealed.yaml")  # fmt: skip
 REPORT_CELLS = ("class", "hop_class", "hops", "joins", "join", "excluded")
 SCORED = ("correct", "wrong", "context_incomplete")
 QUESTION_FIELDS = {"id": str, "text": str, "question_class": str, "hop_class": int,
@@ -359,3 +362,26 @@ def test_a_runner_error_receipt_records_order_free_false(
     receipts = read_jsonl(next((root / "neutral" / "sealed").rglob("receipts.jsonl")))
     assert receipts and {(r["outcome"], r.get("order_free", "absent")) for r in receipts} == {
         ("runner_error", False)}
+
+
+def test_a_statement_past_the_row_cap_or_the_timeout_returns_promptly_with_its_status_word(
+    harness: SimpleNamespace, tmp_path: Path,
+) -> None:
+    from showcase.ontology_query_benchmark.profile import load_sealed_profile
+    from showcase.ontology_query_benchmark.runner_live_utils import ConnectorExecutor
+
+    profiles = (SEALED_SET_FIXTURE / "profile.yaml", ACRIS_PROFILE)
+    assert all(load_sealed_profile(p).limits.statement_timeout_s > 0 for p in profiles)
+    connector = DuckDBConnector(DuckDBConfig(path=str(write_fixture_database(tmp_path))))
+    executor, started = ConnectorExecutor(harness, connector, 1.0), time.monotonic()
+    try:
+        done = [executor.execute(sql, 10) for sql in (
+            "SELECT i FROM range(1000000000) r(i)",
+            "SELECT sum(i * i) AS n FROM range(20000000000) r(i)",
+            "SELECT count(*) AS n FROM shop.customer")]  # fmt: skip
+    finally:
+        connector.close()
+    assert time.monotonic() - started < 15
+    assert [(e.ok, e.error_class) for e in done] == [
+        (False, "row_cap"), (False, "timeout"), (True, None)]
+    assert done[2].rows == ((200,),)
