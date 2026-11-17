@@ -19,6 +19,10 @@ from sema.connectors.base import Connector
 from sema.engine.coded_column_utils import (
     DECLARED_KEY,
     NAME_MATCH,
+    NO_PROFILE,
+    NO_VALUES,
+    OWN_KEY,
+    PAST_BOUND,
     STATED_DOMAIN,
     VERIFIED,
     Binding,
@@ -129,23 +133,57 @@ def run_coded_columns(
     profile_lookup = WarehouseProfileLookup(connector.execute_query, config.catalog)
     values = WarehouseValues(connector.execute_query, config.catalog)
     bound = config.profiling.categorical_threshold
+    by_schema = {schema: fetch_columns_by_schema(loader, schema) for schema in schemas}
+    placed = _place(loader, dictionary, by_schema, run_id)
     joins: dict[str, list[Assertion]] = {}
-    for schema in schemas:
-        columns = fetch_columns_by_schema(loader, schema)
+    for schema, columns in by_schema.items():
         profiles = {
             column_key(c): stats for c in columns
             if (stats := profile_lookup(column_key(c))) is not None
         }
         run = _Run(loader, values, dictionary, columns, run_id, schema)
-        for column, candidates in _candidates(run, profiles, bound).items():
+        stated = [(domain, c) for domain, c in placed if c.schema == schema]
+        for column, candidates in _candidates(run, profiles, bound, stated).items():
             _bind(run, column, candidates)
         joins[schema] = run.joins
     return joins
 
 
-def _within(profiles: Profiles, column: ExtractedColumn, bound: int) -> bool:
+def _place(
+    loader: GraphLoader, dictionary: Dictionary | None,
+    by_schema: dict[str, list[ExtractedColumn]], run_id: str,
+) -> list[tuple[StatedDomain, ExtractedColumn]]:
+    """Each stated domain on the run's columns; one placed nowhere is recorded in each schema."""
+    if dictionary is None:
+        return []
+    every = [c for columns in by_schema.values() for c in columns]
+    placed = []
+    for domain in dictionary.domains:
+        named = place(domain, every)
+        placed += [(domain, column) for column in named]
+        if named:
+            continue
+        for schema in by_schema:
+            loader.store_assertion(
+                unplaced_assertion(dictionary.spec_id, domain, run_id, schema),
+                source_schema=schema,
+            )
+    return placed
+
+
+def _uncoded(run: _Run, profiles: Profiles, column: ExtractedColumn, bound: int) -> str | None:
+    """Why a column is no coded column, or None when it is one; codes repeat within the bound."""
     stats = profiles.get(column_key(column))
-    return stats is not None and 0 < stats[0] <= bound
+    if stats is None:
+        return NO_PROFILE
+    if stats[0] == 0:
+        return NO_VALUES
+    if stats[0] > bound:
+        return PAST_BOUND
+    counts = run.values.counts(column_key(column))
+    if counts and all(rows == 1 for value, rows in counts.items() if value is not None):
+        return OWN_KEY
+    return None
 
 
 def _relation(key: ExtractedColumn) -> CodeSource:
@@ -154,12 +192,15 @@ def _relation(key: ExtractedColumn) -> CodeSource:
 
 def _candidates(
     run: _Run, profiles: Profiles, bound: int,
+    stated: list[tuple[StatedDomain, ExtractedColumn]],
 ) -> dict[str, list[Candidate]]:
-    """Each coded column's candidates, keyed by column ref; unplaced domains are recorded."""
+    """Each coded column's candidates, keyed by column ref; a domain no column takes is recorded."""
     by_ref = {c.ref: c for c in run.columns if c.ref}
     found: dict[tuple[str, str], Candidate] = {}
 
     def add(column: ExtractedColumn, source: CodeSource, kind: str | None, **detail: Any) -> None:
+        if _uncoded(run, profiles, column, bound) is not None:
+            return
         candidate = found.setdefault((column.ref or "", source.ref), Candidate(column, source))
         if kind is not None:
             candidate.evidence[kind] = detail
@@ -170,17 +211,16 @@ def _candidates(
         add(by_ref[fk.fk_ref], _relation(by_ref[fk.pk_ref]), NAME_MATCH)
     for column, key, constraint in _declared(run, profiles, bound):
         add(column, _relation(key), DECLARED_KEY, constraint=constraint)
-    dictionary = run.dictionary
-    for domain in dictionary.domains if dictionary else ():
-        named = place(domain, run.columns)
-        if dictionary and not named:
+    for domain, column in stated:
+        reason = _uncoded(run, profiles, column, bound)
+        if reason is not None:
             run.loader.store_assertion(
-                unplaced_assertion(dictionary.spec_id, domain, run.run_id, run.schema),
+                unplaced_assertion(column.ref or "", domain, run.run_id, run.schema, reason),
                 source_schema=run.schema,
             )
-        for column in (c for c in named if _within(profiles, c, bound)):
-            source = CodeSource(domain.vocabulary, domain.vocabulary)
-            add(column, source, STATED_DOMAIN, property=domain.property, entity=domain.entity)
+            continue
+        source = CodeSource(domain.vocabulary, domain.vocabulary)
+        add(column, source, STATED_DOMAIN, property=domain.property, entity=domain.entity)
     by_column: dict[str, list[Candidate]] = {}
     for (column_ref, _), candidate in sorted(found.items()):
         by_column.setdefault(column_ref, []).append(candidate)
@@ -202,7 +242,7 @@ def _declared(
         column = by_name.get((p["right_table"], p["right_column"]))
         if key is None or column is None or key.table_name == column.table_name:
             continue
-        if is_code_key(profiles.get(column_key(key)), bound) and _within(profiles, column, bound):
+        if is_code_key(profiles.get(column_key(key)), bound):
             yield column, key, str(constraint)
 
 

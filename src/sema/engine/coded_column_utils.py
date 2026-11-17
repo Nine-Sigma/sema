@@ -35,6 +35,10 @@ NAME_MATCH = "name_match"
 CONTAINMENT = "containment"
 VERIFIED = "verified"
 UNVERIFIED = "unverified"
+PAST_BOUND = "past the low-cardinality bound"
+OWN_KEY = "every non-null value is distinct: its relation's key, not a code"
+NO_VALUES = "the column holds no non-null value"
+NO_PROFILE = "the column could not be profiled"
 _SOURCE = "coded_columns"
 _VERIFIED_CONFIDENCE = 0.95
 _UNVERIFIED_CONFIDENCE = 0.5
@@ -74,13 +78,16 @@ class StatedDomain:
 
 
 def place(domain: StatedDomain, columns: Sequence[ExtractedColumn]) -> list[ExtractedColumn]:
-    """Columns whose normalized name equals the property's, in the entity's table if one is named."""
+    """Columns whose normalized name equals the property's, in the entity's table if one is named.
+
+    `columns` are every column of the run, so an entity's table in one schema limits all.
+    """
     wanted = normalized_name(domain.property)
     entity = normalized_name(domain.entity) if domain.entity else None
-    named = {c.table_name for c in columns if normalized_name(c.table_name) == entity}
+    named = {(c.schema, c.table_name) for c in columns if normalized_name(c.table_name) == entity}
     return [
         c for c in columns
-        if normalized_name(c.name) == wanted and (not named or c.table_name in named)
+        if normalized_name(c.name) == wanted and (not named or (c.schema, c.table_name) in named)
     ]
 
 
@@ -107,7 +114,7 @@ def decide(scored: Sequence[tuple[Candidate, Containment]]) -> list[Binding]:
 def _reason(measured: Containment, linked: bool, verified: bool, *, tied: bool) -> str:
     if not measured.holds:
         if not measured.observed_distinct:
-            return "the column holds no non-null value"
+            return NO_VALUES
         return "containment below the floor"
     if linked:
         return "" if verified else "containment alone: no nominating evidence"
@@ -174,11 +181,12 @@ def binding_assertions(binding: Binding, run_id: str, schema: str) -> list[Asser
 
 
 def unplaced_assertion(
-    subject: str, domain: StatedDomain, run_id: str, schema: str,
+    subject: str, domain: StatedDomain, run_id: str, schema: str, reason: str | None = None,
 ) -> Assertion:
+    """A stated domain no column takes: none is named for it, or `reason` says why not."""
     payload = {
         "evidence": STATED_DOMAIN, "value_set": domain.vocabulary, "property": domain.property,
         "entity": domain.entity, "linked": False, "verification": UNVERIFIED,
-        "reason": f"no column's normalized name equals property {domain.property!r}",
+        "reason": reason or f"no column's normalized name equals property {domain.property!r}",
     }
     return _assertion(subject, payload, domain.vocabulary, _UNVERIFIED_CONFIDENCE, run_id, schema)
