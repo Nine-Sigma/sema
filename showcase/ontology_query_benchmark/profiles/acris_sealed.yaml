@@ -1,0 +1,34 @@
+# ACRIS sealed-set profile for showcase.ontology_query_benchmark.sealed_set: the sealed
+# question set (gitignored, in the main checkout only) over the loaded ACRIS DuckDB file,
+# run on the pinned harness closure reused unchanged. Paths accept ~.
+profile_version: 1
+name: acris_sealed
+
+set_dir: ~/dev/ai/graphrag-semantic-ontology/docs/poc/query-accuracy-eval/acris
+duckdb: ~/.sema/acris.duckdb
+
+harness:
+  frozen: ~/dev/ai/graphrag-semantic-ontology/docs/poc/partner-timbr-benchmark/runs/partner-bench-20261109-r1/frozen/8b4cfdc02f8d13c6af00bc2c84c08bb94818c7bbef8b0900198a84a790b69a04
+  package: timbr_demographics_poc
+
+model:
+  provider: openrouter
+  name: openai/gpt-6-luna          # the intake model Dean chose 2026-10-21
+
+limits:
+  input_ceiling: 36000
+  repair_reserve: 2066
+  output_ceiling: 8192
+  guard_chars_per_token: 2.334
+  conservative_chars_per_token: 2.08
+  row_limit: 1000
+  max_repairs: 2
+
+knobs: {budget_tokens: 16000, values_top_k: 25}
+
+settings:
+  # Upper-bound prices, not read from OpenRouter (no network call here): an overestimate
+  # stops a run early instead of overspending. LS2 confirms them before its first call.
+  prices: {input_usd_per_1m: 2.5, output_usd_per_1m: 10.0}
+  max_cost_usd: 15.0               # LS2 ceiling, approved 2026-11-17
+  max_wall_s: 10800

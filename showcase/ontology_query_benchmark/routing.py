@@ -3,6 +3,7 @@
 Every check raises RoutingError instead of falling back to another host, provider or tool.
 """
 
+import os
 from collections.abc import Collection, Mapping
 
 from showcase.ontology_query_benchmark.profile import Routing, Timbr
@@ -14,7 +15,11 @@ FORBIDDEN_ENV = (
 )  # fmt: skip
 FORBIDDEN_ENV_PREFIXES = ("OPENROUTER_",)
 PROVIDER_ENV = ("LLM_PROVIDER", "INTAKE_MODEL_PROVIDER", "EMBEDDING_PROVIDER")
-ALLOWED_PROVIDERS = frozenset({"", "databricks"})
+DATABRICKS = "databricks"
+ALLOWED_PROVIDERS = frozenset({"", DATABRICKS})
+PROVIDER_KEY_ENV = ("LLM_API_KEY", "INTAKE_MODEL_API_KEY", "EMBEDDING_API_KEY")
+# The run rules' provider-free setting: it points the Databricks SDK at no config at all.
+INERT_DATABRICKS_ENV = ("DATABRICKS_CONFIG_FILE", os.devnull)
 
 
 class RoutingError(RuntimeError):
@@ -54,11 +59,18 @@ def require_timbr_mcp_url(url: str, timbr: Timbr) -> str:
 
 
 def require_clean_process(
-    environ: Mapping[str, str], modules: Collection[str], routing: Routing
+    environ: Mapping[str, str], modules: Collection[str], routing: Routing | None,
+    provider: str = DATABRICKS,
 ) -> None:
-    """Refuse a loaded dotenv module or any setting that would route a call elsewhere."""
+    """Refuse a loaded dotenv module or any setting that would route a call away from the
+    profile's provider; Databricks settings are checked against the pinned routing."""
     if "dotenv" in modules:
         raise RoutingError("python-dotenv is loaded; the benchmark never reads a .env file")
+    if provider != DATABRICKS:
+        _require_provider_only(environ, provider)
+        return
+    if routing is None:
+        raise RoutingError("a Databricks run needs the profile's pinned routing")
     for name, value in environ.items():
         if name in FORBIDDEN_ENV or name.startswith(FORBIDDEN_ENV_PREFIXES):
             raise RoutingError(f"{name} is set; only the pinned serving host is allowed")
@@ -75,6 +87,17 @@ def require_clean_process(
         raise RoutingError(
             f"DATABRICKS_CONFIG_PROFILE={profile!r} is not {routing.databricks_profile}"
         )
+
+
+def _require_provider_only(environ: Mapping[str, str], provider: str) -> None:
+    for name, value in environ.items():
+        # The pinned provider's own key is allowed; a base URL or another vendor's key is not.
+        foreign = name in FORBIDDEN_ENV and name not in PROVIDER_KEY_ENV
+        databricks = name.startswith("DATABRICKS_") and (name, value) != INERT_DATABRICKS_ENV
+        if foreign or databricks:
+            raise RoutingError(f"{name} is set; only provider {provider} is allowed")
+        if name in PROVIDER_ENV and value.strip().lower() not in {"", provider}:
+            raise RoutingError(f"{name}={value!r} is not the profile's provider {provider}")
 
 
 def intake_env(environ: Mapping[str, str], routing: Routing) -> dict[str, str]:
