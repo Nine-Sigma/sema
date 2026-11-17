@@ -27,7 +27,13 @@ from tests.support.connector_fixture_codes import (
     TONE_NAMES,
 )
 
-pytestmark = pytest.mark.unit
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.xfail(
+        strict=True,
+        reason="unit 5 N3 (mechanism) blocked; see unit-5/STATE.md Waiting on Dean 2",
+    ),
+]
 
 
 @dataclass(frozen=True)

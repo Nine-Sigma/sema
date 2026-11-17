@@ -40,7 +40,13 @@ from tests.support.connector_fixture_codes import (
     write_dictionary,
 )
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.xfail(
+        strict=True,
+        reason="unit 5 N3 (mechanism) blocked; see unit-5/STATE.md Waiting on Dean 2",
+    ),
+]
 
 Column = tuple[str, str]
 DICTIONARY_FIELDS = {"concept_spec", "concept_staging"}
