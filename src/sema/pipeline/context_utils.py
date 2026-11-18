@@ -292,7 +292,7 @@ def _build_governed_values(
         c for c in candidate_set.candidates if c.get("type") == "value"
     ]
     GroupKey = tuple[str, str, str, str, bool]
-    value_groups: dict[GroupKey, list[dict[str, str]]] = {}
+    value_groups: dict[GroupKey, list[dict[str, str | None]]] = {}
     for vc in value_candidates:
         key = (
             vc.get("property_name", ""),

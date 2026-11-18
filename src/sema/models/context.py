@@ -60,7 +60,7 @@ class GovernedValue(BaseModel):
     property_name: str
     column: str
     table: str
-    values: list[dict[str, str]] = Field(default_factory=list)
+    values: list[dict[str, str | None]] = Field(default_factory=list)
     vocabulary: str | None = None
     ambiguous: bool = False
 
