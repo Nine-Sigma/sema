@@ -238,6 +238,7 @@ def run_query(config: QueryConfig) -> dict[str, Any]:
     response: dict[str, Any] = {
         "operation": config.operation,
         "sql": result.artifact,
+        "columns": result.columns,
         "validation": {
             "valid": result.valid,
             "errors": result.errors,
