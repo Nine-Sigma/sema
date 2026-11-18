@@ -70,6 +70,7 @@ class NL2SQLConsumer:
             valid=sql_plan.valid,
             errors=sql_plan.errors,
             attempts=sql_plan.attempts,
+            columns=sql_plan.columns,
         )
 
         if request.operation == "plan":

@@ -47,6 +47,7 @@ class ConsumerResult:
     attempts: int = 1
     data: dict[str, Any] = field(default_factory=dict)
     summary: str | None = None
+    columns: list[str] = field(default_factory=list)
 
 
 @runtime_checkable
