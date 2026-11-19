@@ -56,7 +56,8 @@ def key_reads(grade: str = "proven") -> list[Any]:
     read = _scorecard().KeyRead
     reads = [read(relation=t, columns=k, verification=grade, null_rows=0)
              for t, k in KEYED.items()]
-    return reads + [read(relation=t, columns=k, verification="open",
+    nullable = "open" if grade == "proven" else grade
+    return reads + [read(relation=t, columns=k, verification=nullable,
                          null_rows=null_row_count(t, k)) for t, k in NULL_PART_KEYS.items()]
 
 
