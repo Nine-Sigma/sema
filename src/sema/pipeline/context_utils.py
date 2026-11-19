@@ -12,7 +12,7 @@ import json
 from pydantic import ValidationError
 
 from sema.log import logger
-from sema.models.assertions import VERIFIED
+from sema.models.assertions import STATED_GRADES, VERIFIED
 from sema.models.context import (
     AncestryTerm,
     ColumnMatch,
@@ -31,9 +31,6 @@ from sema.models.context import (
 )
 from sema.models.target.identity import EntityIdentity
 from sema.pipeline.dedup_utils import states_name
-
-_RENDERED_GRADES = frozenset({"proven", "supported"})
-
 
 def _filter_entity_candidates(
     candidate_set: SemanticCandidateSet,
@@ -104,7 +101,7 @@ def _build_entities_and_assets(
 def _entity_identity(ec: dict[str, Any]) -> dict[str, Any]:
     """The entity's key, its identity when coarser than a row, and its NULL-key row count,
     when the edge's grade is one the context states."""
-    if ec.get("verification") not in _RENDERED_GRADES:
+    if ec.get("verification") not in STATED_GRADES:
         return {}
     return {
         "key_columns": list(ec.get("key_columns") or []),
@@ -127,7 +124,7 @@ def _parse_identity(raw: Any) -> EntityIdentity | None:
 
 def _asset_identity(ec: dict[str, Any]) -> dict[str, Any]:
     """The relation's key when its grade is stated, and the entities it shares."""
-    graded = ec.get("table_key_verification") in _RENDERED_GRADES
+    graded = ec.get("table_key_verification") in STATED_GRADES
     return {
         "key_columns": list(ec.get("table_key_columns") or []) if graded else [],
         "shared_entities": [
@@ -138,7 +135,7 @@ def _asset_identity(ec: dict[str, Any]) -> dict[str, Any]:
                 identity=_parse_identity(s.get("identity")),
             )
             for s in ec.get("shared_entities") or []
-            if s.get("verification") in _RENDERED_GRADES and (o := s.get("owner"))
+            if s.get("verification") in STATED_GRADES and (o := s.get("owner"))
         ],
     }
 

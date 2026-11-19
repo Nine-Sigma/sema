@@ -16,6 +16,7 @@ from sema.engine.join_detector_utils import COVERAGE_THRESHOLD, normalized_name
 from sema.engine.normalize_utils import normalize_name
 from sema.engine.warehouse_lookup import RelationEvidence
 from sema.llm_client import IdentityProposal
+from sema.models.assertions import OPEN, PROVEN, REJECTED, STATED_GRADES, SUPPORTED
 from sema.models.extraction import ExtractedColumn
 from sema.models.target.identity import EntityIdentity, ResolutionRule, ResolvedAttribute
 
@@ -66,8 +67,6 @@ def conflict_shares(groups: int, conflicting: Mapping[str, int]) -> dict[str, fl
 DECLARED_KEY, SPEC_LIST, CONTAINED = "declared_key", "spec_list", "contained"
 # F2's signal order: a lower rank outranks a higher one; no signal ranks last.
 _SIGNAL_RANK = {DECLARED_KEY: 0, SPEC_LIST: 1, CONTAINED: 2}
-PROVEN, SUPPORTED, OPEN, REJECTED = "proven", "supported", "open", "rejected"
-ACCEPTED = (PROVEN, SUPPORTED)
 
 
 @dataclass
@@ -309,7 +308,7 @@ def _spelled(columns: Columns) -> frozenset[str]:
 
 
 def _rank(fact: EntityFact) -> tuple[bool, bool]:
-    return fact.identity is not None, fact.verification in ACCEPTED
+    return fact.identity is not None, fact.verification in STATED_GRADES
 
 
 def _coarser(
@@ -325,7 +324,7 @@ def _coarser(
         for other, theirs in same_named(relation, named, scope.names))
     fact = EntityFact(relation, normalize_name(proposal.entity), named, relation,
                       grade(holds, corroborated), rows, groups, counts.null_rows(relation, named))
-    if fact.verification in ACCEPTED:
+    if fact.verification in STATED_GRADES:
         _resolve(scope, fact, proposal.latest_by)
     return fact
 

@@ -19,7 +19,6 @@ import uuid
 from sema.connectors.base import Connector
 from sema.engine.identity_prompt import ColumnProfile, identity_prompt, propose
 from sema.engine.identity_utils import (
-    ACCEPTED,
     CONTAINED,
     DECLARED_KEY,
     SPEC_LIST,
@@ -50,7 +49,12 @@ from sema.graph.loader import GraphLoader
 from sema.graph.loader_utils import fetch_columns_by_schema
 from sema.llm_client import IdentityProposal
 from sema.log import logger
-from sema.models.assertions import Assertion, AssertionPredicate, AssertionStatus
+from sema.models.assertions import (
+    STATED_GRADES,
+    Assertion,
+    AssertionPredicate,
+    AssertionStatus,
+)
 from sema.models.config import BuildConfig
 from sema.models.extraction import ExtractedColumn
 from sema.models.physical_key import CanonicalRef
@@ -324,7 +328,7 @@ def _write_entities(
             subject, AssertionPredicate.HAS_IDENTITY, identity_payload(fact, owner),
             fact.relation, run_id,
         ), source_schema=fact.relation[0])
-        if fact.verification in ACCEPTED:
+        if fact.verification in STATED_GRADES:
             edges.append({
                 "catalog": relations[fact.relation][0].catalog, "schema": fact.relation[0],
                 "table": fact.relation[1], "entity": fact.entity,
