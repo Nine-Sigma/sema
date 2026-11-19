@@ -22,6 +22,7 @@ _PHYSICAL_MAPPING_TAIL = (
     "[(o:Entity)-[s:ENTITY_ON_TABLE]->(t) "
     "WHERE s.key_columns IS NOT NULL AND coalesce(s.owner, false) = false | "
     "{entity: o.name, key_columns: s.key_columns, verification: s.verification, "
+    "identity: s.identity, "
     "owner: head([(o)-[w:ENTITY_ON_TABLE]->(ot:Table) WHERE w.owner = true | "
     "{catalog: ot.catalog, schema: ot.schema_name, table: ot.name}])}] "
     "AS shared_entities"
