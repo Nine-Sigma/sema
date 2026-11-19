@@ -1,8 +1,10 @@
-"""Done-when 3 (N5), contract F6: one entity fact per relation and entity name.
+"""Done-when 3 (N5), contracts F4 and F6: one entity fact per relation and entity name, and a
+share always spells its owner's key.
 
 A versioned relation owns a coarser entity under its L2 name, and a second relation names the
 versioned relation's row key as its entity key, so the row-owned entity takes the same name.
-The relation keeps one fact under that name: the coarser one, which carries its identity.
+The relation keeps one fact under that name: the coarser one, which carries its identity. The
+second relation's rows hold the row key, not the coarser key, so it shares nothing under it.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ import duckdb
 import pytest
 
 from sema.connectors.duckdb import DuckDBConnector
-from sema.engine.identity_utils import Counts, EntityScope, KeyFact, entity_facts
+from sema.engine.identity_utils import Counts, EntityScope, KeyFact, entity_facts, entity_holds
 from sema.engine.warehouse_lookup import RelationEvidence
 from sema.llm_client import IdentityProposal
 from sema.models.config import DuckDBConfig
@@ -57,7 +59,7 @@ def _scope(directory: Path) -> EntityScope:
     return EntityScope(relations, keys, counts, lambda _relation, _columns: False)
 
 
-def test_a_relation_keeps_its_versioned_entity_when_its_row_entity_takes_the_same_name(
+def test_a_relation_keeps_its_versioned_entity_and_shares_none_under_another_key(
     tmp_path: Path,
 ) -> None:
     facts = entity_facts(_scope(tmp_path), PROPOSALS, {VERSIONED: "item", CHILD: None})
@@ -65,9 +67,8 @@ def test_a_relation_keeps_its_versioned_entity_when_its_row_entity_takes_the_sam
     on_versioned = [(f.entity, f.key_columns) for f in facts if f.relation == VERSIONED]
     assert on_versioned == [("item", ("item_no",))]
     [kept] = [f for f in facts if f.relation == VERSIONED]
-    [child] = [f for f in facts if f.relation == CHILD]
     assert kept.identity is not None and kept.identity.key_columns == ("item_no",)
-    assert (child.entity, child.owner, child.key_columns) == ("item", VERSIONED, ("rev_id",))
+    assert [f for f in facts if f.relation == CHILD] == []
 
 
 def test_a_row_entity_under_its_own_name_stays_beside_the_versioned_entity(
@@ -78,3 +79,8 @@ def test_a_row_entity_under_its_own_name_stays_beside_the_versioned_entity(
     on_versioned = {f.entity: f.key_columns for f in facts if f.relation == VERSIONED}
     assert on_versioned == {"item": ("item_no",), "item revision": ("rev_id",)}
     assert max(Counter((f.entity, f.relation) for f in facts).values()) == 1
+
+
+@pytest.mark.parametrize(("distinct", "holds"), [(1, False), (2, True)])
+def test_a_one_column_entity_key_needs_more_than_one_group(distinct: int, holds: bool) -> None:
+    assert entity_holds(3, distinct, []) is holds
