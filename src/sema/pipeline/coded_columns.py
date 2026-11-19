@@ -31,7 +31,9 @@ from sema.engine.coded_column_utils import (
     StatedDomain,
     binding_assertions,
     decide,
+    label_column,
     label_reading,
+    loaded_relation,
     place,
     unplaced_assertion,
     unread_key_assertion,
@@ -75,11 +77,14 @@ _VERIFIED_TERM_CONFIDENCE = 0.95
 
 @dataclass(frozen=True)
 class Dictionary:
-    """What intake's concept spec states: its domains, and each code list's codes and labels."""
+    """What intake's concept spec states: its domains, each code list's codes and labels, its
+    code and display role columns, and each foreign key's reference columns."""
 
     spec_id: str
     domains: tuple[StatedDomain, ...]
     code_lists: dict[str, dict[str, str | None]]
+    roles: dict[str, tuple[str, str | None]]
+    reference_keys: list[tuple[str, ...]]
 
 
 @dataclass(frozen=True)
@@ -120,7 +125,14 @@ def read_dictionary(spec_path: str | None, staging_path: str | None) -> Dictiona
         StatedDomain(entry.entity, prop, vocabulary)
         for entry in entries for prop, vocabulary in entry.domains.items()
     )
-    return Dictionary(spec.id, domains, code_lists)
+    roles: dict[str, tuple[str, str | None]] = {
+        entry.vocabulary_id: (entry.roles.code, entry.roles.display)
+        for entry in spec.code_lists or []
+    }
+    reference_keys = [
+        tuple(key.reference_columns) for entry in entries for key in entry.foreign_keys
+    ]
+    return Dictionary(spec.id, domains, code_lists, roles, reference_keys)
 
 
 def run_coded_columns(
@@ -278,19 +290,25 @@ def _bind(run: _Run, column_ref: str, candidates: list[Candidate]) -> None:
         (c, containment(counts, codes)) for c in candidates
         if (codes := listed[c.source.ref]) is not None
     ]
+    relations = [
+        (c.source.key, codes) for c, measured in scored
+        if c.source.key is not None and measured.holds and (codes := listed[c.source.ref])
+    ]
     for binding in decide(scored):
         for assertion in binding_assertions(binding, run.run_id, run.schema):
             run.loader.store_assertion(assertion, source_schema=run.schema)
         if binding.linked:
-            _link(run, binding, counts, listed[binding.candidate.source.ref] or {})
+            codes = listed[binding.candidate.source.ref] or {}
+            _link(run, binding, counts, codes, loaded_relation(codes, relations))
 
 
 def _link(
     run: _Run, binding: Binding, counts: dict[str | None, int], listed: dict[str, str | None],
+    loaded: ExtractedColumn | None,
 ) -> None:
     column, source = binding.candidate.column, binding.candidate.source
     verified = binding.verification == VERIFIED
-    labels, label_edge = _labels(run, binding, listed) if verified else ({}, None)
+    labels, label_edge = _labels(run, binding, listed, loaded) if verified else ({}, None)
     observed = sorted(code for code in counts if code is not None and code not in listed)
     # An unverified binding is no governed value set: its numbers only, never its codes.
     members = [
@@ -320,33 +338,33 @@ def _link(
 
 
 def _labels(
-    run: _Run, binding: Binding, listed: dict[str, str | None],
+    run: _Run, binding: Binding, listed: dict[str, str | None], loaded: ExtractedColumn | None,
 ) -> tuple[dict[str, str | None], LabelEdge | None]:
-    """A dictionary's labels, else the code relation's one text column, else one sibling."""
-    column, key = binding.candidate.column, binding.candidate.source.key
-    if key is None and any(listed.values()):
-        return listed, None
+    """A code relation's label column, a dictionary list's `loaded` relation's, the list's own
+    labels, else one sibling; a loaded relation wins, as the column a query can join to."""
+    column, source = binding.candidate.column, binding.candidate.source
+    key, display = source.key, None
+    if key is None and loaded is not None:
+        roles = run.dictionary.roles if run.dictionary else {}
+        key, display = loaded, roles.get(source.vocabulary, ("", None))[1]
     if key is not None:
         join = to_fk_assertion(FKAssertion(fk_candidate(key, column), TIER_1, 1, run.schema),
                                run.run_id)
-        run.joins.append(join)
-        texts = _texts(run, key)
-        if len(texts) > 1:
+        chosen = label_column(_readings(run, key), display)
+        if source.key is not None or chosen is not None:
+            run.joins.append(join)
+        if chosen is not None:
+            text, (rate, labels) = chosen
+            return labels, LabelEdge(text, rate, (_join_name(join),))
+        if source.key is not None and _texts(run, key):
             return {}, None
-        if texts:
-            reading = label_reading(_pairs(run, key, texts[0]))
-            if reading is None:
-                return {}, None
-            rate, labels = reading
-            return labels, LabelEdge(texts[0], rate, (_join_name(join),))
-    determined = [
-        (text, reading) for text in _texts(run, column)
-        if (reading := label_reading(_pairs(run, column, text))) is not None
-    ]
+    if source.key is None and any(listed.values()):
+        return listed, None
+    determined = _readings(run, column)
     if len(determined) != 1:
         return {}, None
-    ((text, (rate, labels)),) = determined
-    return labels, LabelEdge(text, rate, ())
+    ((sibling, (rate, labels)),) = determined
+    return labels, LabelEdge(sibling, rate, ())
 
 
 def _texts(run: _Run, beside: ExtractedColumn) -> list[ExtractedColumn]:
@@ -357,10 +375,15 @@ def _texts(run: _Run, beside: ExtractedColumn) -> list[ExtractedColumn]:
     ]
 
 
-def _pairs(
-    run: _Run, code: ExtractedColumn, text: ExtractedColumn,
-) -> dict[tuple[str | None, str | None], int] | None:
-    return run.values.pairs(code.schema, code.table_name, code.name, text.name)
+def _readings(
+    run: _Run, code: ExtractedColumn,
+) -> list[tuple[ExtractedColumn, tuple[float, dict[str, str | None]]]]:
+    """Each text column beside `code` that `code` determines, with its label reading."""
+    return [
+        (text, reading) for text in _texts(run, code)
+        if (reading := label_reading(run.values.pairs(
+            code.schema, code.table_name, code.name, text.name))) is not None
+    ]
 
 
 def _join_name(join: Assertion) -> str:
