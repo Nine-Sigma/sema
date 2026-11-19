@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from sema.connectors.base import Connector
-from sema.connectors.databricks_utils import METADATA_SOURCE, sql_string_literal
 from sema.engine.coded_column_utils import CONTAINMENT, label_reading
 from sema.engine.warehouse_lookup import ColumnKey, WarehouseProfileLookup, WarehouseValues
 from sema.intake.run.scorecard import Cells, Key
@@ -152,30 +151,6 @@ def graph_join_key(predicates_json: str) -> Key:
 def declared_join_key(key: ExtractedForeignKey) -> Key:
     referencing, referenced = zip(*key.column_pairs, strict=True)
     return join_key(key.referencing_table, referencing, key.referenced_table, referenced)
-
-
-def unique_keys_query(catalog: str, schema: str) -> str:
-    """Each column of every primary key and unique constraint declared in one schema."""
-    same_constraint = " AND ".join(
-        f"kcu.constraint_{part} = tc.constraint_{part}" for part in ("catalog", "schema", "name")
-    )
-    return (
-        "SELECT tc.table_name, tc.constraint_name, kcu.column_name "
-        f"FROM {METADATA_SOURCE}.`table_constraints` tc "
-        f"JOIN {METADATA_SOURCE}.`key_column_usage` kcu ON {same_constraint} "
-        "AND kcu.table_name = tc.table_name "
-        "WHERE tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE') "
-        f"AND tc.table_catalog = {sql_string_literal(catalog)} "
-        f"AND tc.table_schema = {sql_string_literal(schema)}"
-    )
-
-
-def unique_keys(rows: Iterable[tuple[Any, ...]]) -> set[Key]:
-    """(relation, columns) per declared unique constraint, from `unique_keys_query` rows."""
-    columns: dict[tuple[str, str], list[str]] = {}
-    for table, constraint, column in rows:
-        columns.setdefault((str(table), str(constraint)), []).append(str(column))
-    return {(table.lower(), columns_key(names)) for (table, _), names in columns.items()}
 
 
 def duplicate_count_query(catalog: str, column: tuple[str, str, str]) -> str:

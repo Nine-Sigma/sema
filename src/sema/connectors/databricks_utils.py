@@ -280,3 +280,25 @@ def declared_keys_from_rows(
         )
         for (name, ref_catalog, ref_schema, ref_table), columns in pairs.items()
     ]
+
+
+def unique_keys_query(catalog: str, schema: str) -> str:
+    """Each column of every primary key and unique constraint declared in one schema."""
+    return (
+        "SELECT tc.table_name, tc.constraint_name, kcu.column_name "
+        f"FROM {METADATA_SOURCE}.`table_constraints` tc "
+        f"JOIN {METADATA_SOURCE}.`key_column_usage` kcu ON {_same_constraint('kcu', 'tc')} "
+        "AND kcu.table_name = tc.table_name "
+        "WHERE tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE') "
+        f"AND tc.table_catalog = {sql_string_literal(catalog)} "
+        f"AND tc.table_schema = {sql_string_literal(schema)} "
+        "ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position"
+    )
+
+
+def unique_keys_from_rows(rows: Sequence[Row]) -> list[tuple[str, tuple[str, ...]]]:
+    """(relation, ordered columns) per declared unique constraint, from `unique_keys_query` rows."""
+    columns: dict[tuple[str, str], list[str]] = {}
+    for table, constraint, column in rows:
+        columns.setdefault((str(table), str(constraint)), []).append(str(column))
+    return [(table, tuple(names)) for (table, _), names in columns.items()]
