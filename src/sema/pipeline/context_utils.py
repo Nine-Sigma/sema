@@ -50,8 +50,7 @@ def _build_entities_and_assets(
     entity_candidates: list[dict[str, Any]],
 ) -> tuple[list[ResolvedEntity], list[PhysicalAsset]]:
     entities: list[ResolvedEntity] = []
-    physical_assets: list[PhysicalAsset] = []
-    seen_tables: set[str] = set()
+    assets: dict[str, PhysicalAsset] = {}
 
     for ec in entity_candidates:
         properties = []
@@ -85,21 +84,21 @@ def _build_entities_and_assets(
         ))
 
         table_key = f"{ec.get('catalog')}.{ec.get('schema')}.{ec.get('table')}"
-        if table_key not in seen_tables:
-            seen_tables.add(table_key)
-            physical_assets.append(PhysicalAsset(
+        columns = [col.get("column") or "" for col in ec.get("columns", []) if col.get("column")]
+        asset = assets.get(table_key)
+        if asset is None:
+            assets[table_key] = PhysicalAsset(
                 catalog=ec.get("catalog", ""),
                 schema=ec.get("schema", ""),
                 table=ec.get("table", ""),
-                columns=[
-                    col.get("column") or ""
-                    for col in ec.get("columns", [])
-                    if col.get("column")
-                ],
+                columns=columns,
                 **_asset_identity(ec),
-            ))
+            )
+        elif not asset.columns:
+            # An entity the identity step created has no properties; another on its table has.
+            asset.columns = columns
 
-    return entities, physical_assets
+    return entities, list(assets.values())
 
 
 def _entity_identity(ec: dict[str, Any]) -> dict[str, Any]:
