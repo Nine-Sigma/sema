@@ -70,7 +70,6 @@ class SynonymExpansion(BaseModel):
 class IdentityProposal(BaseModel):
     """What one relation's rows describe (contract F4): the entity, the columns that identify
     it, the column whose greatest value marks its newest version, and the row key."""
-    model_config = ConfigDict(populate_by_name=True)
 
     entity: str
     entity_key: list[str]

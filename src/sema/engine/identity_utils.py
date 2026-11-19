@@ -48,10 +48,12 @@ def key_holds(
 def entity_holds(
     rows: int | None, distinct: int | None, smaller_distincts: Sequence[int | None],
 ) -> bool | None:
-    """Coarser than the row, and dropping any one key column lowers the distinct count."""
+    """Coarser than the row, and dropping any one key column lowers the distinct count; dropping
+    the only column leaves one group, so one column needs more than one."""
     if rows is None or distinct is None:
         return None
-    if distinct >= rows or any(n is not None and n >= distinct for n in smaller_distincts):
+    if distinct >= rows or distinct <= 1 or any(
+            n is not None and n >= distinct for n in smaller_distincts):
         return False
     return None if None in smaller_distincts else True
 
@@ -290,13 +292,20 @@ def entity_facts(
 
 def _one_per_relation(facts: Sequence[EntityFact]) -> list[EntityFact]:
     """F6 holds one edge per entity and relation: a fact with an identity outranks an accepted
-    one, which outranks the rest; the first of equals stays."""
+    one, which outranks the rest; the first of equals stays. A share stays only when it spells
+    the key its owner kept under that name: its containment was counted on that key alone."""
     kept: dict[tuple[str, Relation], EntityFact] = {}
     for fact in facts:
         held = kept.setdefault((fact.entity, fact.relation), fact)
         if _rank(fact) > _rank(held):
             kept[(fact.entity, fact.relation)] = fact
-    return list(kept.values())
+    owned = {held: _spelled(f.key_columns) for held, f in kept.items() if held[1] == f.owner}
+    return [f for (name, relation), f in kept.items()
+            if relation == f.owner or owned.get((name, f.owner)) == _spelled(f.key_columns)]
+
+
+def _spelled(columns: Columns) -> frozenset[str]:
+    return frozenset(normalized_name(c) for c in columns)
 
 
 def _rank(fact: EntityFact) -> tuple[bool, bool]:
