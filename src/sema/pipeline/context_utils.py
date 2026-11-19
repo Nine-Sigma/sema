@@ -36,11 +36,22 @@ def _filter_entity_candidates(
     candidate_set: SemanticCandidateSet,
     max_entities: int,
 ) -> list[dict[str, Any]]:
-    return sorted(
+    """Every entity candidate of the `max_entities` most confident tables, so a table that
+    carries two entities spends one slot."""
+    ranked = sorted(
         [c for c in candidate_set.candidates if c.get("type") == "entity"],
         key=lambda c: c.get("confidence", 0),
         reverse=True,
-    )[:max_entities]
+    )
+    admitted: set[str] = set()
+    kept: list[dict[str, Any]] = []
+    for c in ranked:
+        table = f"{c.get('catalog')}.{c.get('schema')}.{c.get('table')}"
+        if table not in admitted and len(admitted) < max_entities:
+            admitted.add(table)
+        if table in admitted:
+            kept.append(c)
+    return kept
 
 
 def _build_entities_and_assets(
