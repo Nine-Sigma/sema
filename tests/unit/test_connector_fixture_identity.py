@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from sema.binding.spec import load_concept_source_spec
 from sema.connectors.duckdb import DuckDBConnector
 from sema.engine.join_detector import COVERAGE_THRESHOLD
-from sema.eval.discovery_scorecard_utils import unique_keys, unique_keys_query
 from sema.models.config import DuckDBConfig
 from sema.models.stages import StageAResult
 from tests.support.connector_fixture_identity import (
@@ -77,12 +76,12 @@ def test_the_file_holds_every_row_the_python_spells(warehouse: duckdb.DuckDBPyCo
 def test_the_declared_keys_are_the_ones_the_source_reads(database: Path) -> None:
     connector = DuckDBConnector(DuckDBConfig(path=str(database)))
     try:
-        rows = connector.execute_query(unique_keys_query(IDENTITY_CATALOG, IDENTITY_SCHEMA))
+        read = connector.extract_unique_keys(IDENTITY_CATALOG, IDENTITY_SCHEMA)
     finally:
         connector.close()
     declared = {(t.name, "+".join(sorted(k))) for t in IDENTITY_TABLES
                 for k in (t.primary_key, *t.unique) if k}
-    assert unique_keys(rows) == declared
+    assert {(str(table).lower(), "+".join(sorted(columns))) for table, columns in read} == declared
     assert ("valve", "unit_no+valve_tag") in declared and ("mooring", "pier_code+slot_no") in declared
 
 
