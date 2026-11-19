@@ -14,7 +14,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from sema.connectors.base import Connector
-from sema.engine.coded_column_utils import VERIFIED
 from sema.engine.join_detector_utils import containment
 from sema.engine.warehouse_lookup import RelationEvidence, WarehouseValues
 from sema.eval.discovery_scorecard_identity_utils import (
@@ -22,14 +21,10 @@ from sema.eval.discovery_scorecard_identity_utils import (
     CANDIDATE_KEY,
     ENTITY_COARSER,
     ENTITY_SHARED,
-    HAS_IDENTITY,
-    HAS_KEY,
     IDENTITY_ASSERTIONS,
     KEYED_ENTITY_EDGES,
     NULL_KEY_POLICY,
-    REJECTED,
     SINGLE,
-    STATED_GRADES,
     UNIQUE,
     EntityRead,
     KeyRead,
@@ -53,7 +48,7 @@ from sema.eval.discovery_scorecard_utils import (
     listed_codes,
 )
 from sema.intake.run.scorecard import VERDICTS, Cells, Key, KindScore, kind_score, verdicts
-from sema.models.assertions import AssertionPredicate
+from sema.models.assertions import REJECTED, STATED_GRADES, VERIFIED, AssertionPredicate
 
 FACT_KINDS = (
     "candidate_key", "entity_coarser_than_row", "entity_shared_across_relations",
@@ -187,7 +182,8 @@ def read_identity(
     with driver.session() as session:
         keys, entities = (
             list(session.run(IDENTITY_ASSERTIONS, predicate=predicate, **scope))
-            for predicate in (HAS_KEY, HAS_IDENTITY)
+            for predicate in (AssertionPredicate.HAS_KEY.value,
+                              AssertionPredicate.HAS_IDENTITY.value)
         )
         edges = list(session.run(KEYED_ENTITY_EDGES, **scope))
     return [key_read(record) for record in keys], entity_reads(entities, edges)

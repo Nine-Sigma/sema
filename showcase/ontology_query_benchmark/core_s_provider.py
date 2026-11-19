@@ -19,6 +19,7 @@ from sema.models.context import (
     ResolvedProperty,
     SemanticContextObject,
 )
+from sema.models.target.identity import EntityIdentity
 from sema.pipeline.context import prune_to_sco
 from sema.pipeline.retrieval import RetrievalEngine
 
@@ -71,7 +72,8 @@ def _asset_kept(asset: PhysicalAsset, keep: Keep) -> PhysicalAsset:
     return asset.model_copy(update={
         "columns": [c for c in asset.columns if keep(c)],
         "key_columns": asset.key_columns if keep(*asset.key_columns) else [],
-        "shared_entities": [s for s in asset.shared_entities if keep(*s.key_columns)],
+        "shared_entities": [s.model_copy(update={"identity": _rules_kept(s.identity, keep)})
+                            for s in asset.shared_entities if keep(*s.key_columns)],
     })
 
 
@@ -83,10 +85,16 @@ def _entity_kept(entity: ResolvedEntity, keep: Keep) -> ResolvedEntity:
     if not keep(*entity.key_columns, *(identity.key_columns if identity else ())):
         return entity.model_copy(update={
             "properties": properties, "key_columns": [], "identity": None, "null_key_rows": None})
-    if identity is not None:
-        identity = identity.model_copy(update={
-            "attributes": tuple(a for a in identity.attributes if keep(*a.columns))})
-    return entity.model_copy(update={"properties": properties, "identity": identity})
+    return entity.model_copy(update={"properties": properties,
+                                     "identity": _rules_kept(identity, keep)})
+
+
+def _rules_kept(identity: EntityIdentity | None, keep: Keep) -> EntityIdentity | None:
+    """An ordering rule goes when a column it reads is denied."""
+    if identity is None:
+        return None
+    return identity.model_copy(update={
+        "attributes": tuple(a for a in identity.attributes if keep(*a.columns))})
 
 
 def _property_kept(prop: ResolvedProperty, keep: Keep) -> ResolvedProperty:

@@ -183,12 +183,9 @@ def _artifact_identity_key(
     art_type = art.get("type", "")
 
     if art_type == "entity":
-        return (
-            art_type,
-            art.get("catalog", ""),
-            art.get("schema", ""),
-            art.get("table", ""),
-        )
+        on_table = (art_type, art.get("catalog", ""), art.get("schema", ""), art.get("table", ""))
+        # An entity the identity step placed is a fact of its own beside L2's on the table.
+        return (*on_table, art.get("name", "")) if art.get("key_columns") else on_table
     if art_type == "property":
         return (
             art_type,

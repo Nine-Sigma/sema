@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 import duckdb
 import pytest
@@ -41,18 +42,18 @@ def _key(column: str) -> KeyFact:
     return KeyFact((column,), True, 3, 3, 0, verification="supported")
 
 
-def _scope(directory: Path) -> EntityScope:
+def _scope(directory: Path, tables: dict[tuple[str, str], Any] = TABLES) -> EntityScope:
     path = directory / f"{CATALOG}.duckdb"
     with duckdb.connect(str(path)) as con:
         con.execute(f"CREATE SCHEMA {SCHEMA}")
-        for (_, table), (columns, rows) in TABLES.items():
+        for (_, table), (columns, rows) in tables.items():
             listed = ", ".join(f"{c} {'VARCHAR' if c == 'colour' else 'INTEGER'}" for c in columns)
             con.execute(f"CREATE TABLE {SCHEMA}.{table} ({listed})")
             con.executemany(f"INSERT INTO {SCHEMA}.{table} VALUES "
                             f"({', '.join('?' for _ in columns)})", rows)
     relations = {
         relation: [ExtractedColumn(c, relation[1], CATALOG, SCHEMA, "INTEGER") for c in columns]
-        for relation, (columns, _) in TABLES.items()
+        for relation, (columns, _) in tables.items()
     }
     counts = Counts(RelationEvidence(DuckDBConnector(DuckDBConfig(path=str(path))), CATALOG))
     keys = {VERSIONED: _key("rev_id"), CHILD: _key("use_id")}
@@ -84,3 +85,19 @@ def test_a_row_entity_under_its_own_name_stays_beside_the_versioned_entity(
 @pytest.mark.parametrize(("distinct", "holds"), [(1, False), (2, True)])
 def test_a_one_column_entity_key_needs_more_than_one_group(distinct: int, holds: bool) -> None:
     assert entity_holds(3, distinct, []) is holds
+
+
+@pytest.mark.parametrize(("second_rev", "ordered_by"), [(2, {"rev_no"}), (None, set())])
+def test_an_ordering_column_with_a_null_picks_no_row(
+    tmp_path: Path, second_rev: int | None, ordered_by: set[str],
+) -> None:
+    columns, _ = TABLES[VERSIONED]
+    rows = [(1, 10, 1, "red"), (2, 10, second_rev, "blue"), (3, 11, 1, "green")]
+
+    facts = entity_facts(_scope(tmp_path, {**TABLES, VERSIONED: (columns, rows)}), PROPOSALS,
+                         {VERSIONED: "item", CHILD: None})
+
+    [kept] = [f for f in facts if f.relation == VERSIONED]
+    assert kept.identity is not None
+    assert "colour" in kept.conflict_share
+    assert {a.by for a in kept.identity.attributes} == ordered_by

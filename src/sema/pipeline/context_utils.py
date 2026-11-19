@@ -11,8 +11,8 @@ import json
 
 from pydantic import ValidationError
 
-from sema.engine.coded_column_utils import VERIFIED
 from sema.log import logger
+from sema.models.assertions import STATED_GRADES, VERIFIED
 from sema.models.context import (
     AncestryTerm,
     ColumnMatch,
@@ -32,9 +32,6 @@ from sema.models.context import (
 from sema.models.target.identity import EntityIdentity
 from sema.pipeline.dedup_utils import states_name
 
-_RENDERED_GRADES = frozenset({"proven", "supported"})
-
-
 def _filter_entity_candidates(
     candidate_set: SemanticCandidateSet,
     max_entities: int,
@@ -50,8 +47,7 @@ def _build_entities_and_assets(
     entity_candidates: list[dict[str, Any]],
 ) -> tuple[list[ResolvedEntity], list[PhysicalAsset]]:
     entities: list[ResolvedEntity] = []
-    physical_assets: list[PhysicalAsset] = []
-    seen_tables: set[str] = set()
+    assets: dict[str, PhysicalAsset] = {}
 
     for ec in entity_candidates:
         properties = []
@@ -85,27 +81,27 @@ def _build_entities_and_assets(
         ))
 
         table_key = f"{ec.get('catalog')}.{ec.get('schema')}.{ec.get('table')}"
-        if table_key not in seen_tables:
-            seen_tables.add(table_key)
-            physical_assets.append(PhysicalAsset(
+        columns = [col.get("column") or "" for col in ec.get("columns", []) if col.get("column")]
+        asset = assets.get(table_key)
+        if asset is None:
+            assets[table_key] = PhysicalAsset(
                 catalog=ec.get("catalog", ""),
                 schema=ec.get("schema", ""),
                 table=ec.get("table", ""),
-                columns=[
-                    col.get("column") or ""
-                    for col in ec.get("columns", [])
-                    if col.get("column")
-                ],
+                columns=columns,
                 **_asset_identity(ec),
-            ))
+            )
+        elif not asset.columns:
+            # An entity the identity step created has no properties; another on its table has.
+            asset.columns = columns
 
-    return entities, physical_assets
+    return entities, list(assets.values())
 
 
 def _entity_identity(ec: dict[str, Any]) -> dict[str, Any]:
     """The entity's key, its identity when coarser than a row, and its NULL-key row count,
     when the edge's grade is one the context states."""
-    if ec.get("verification") not in _RENDERED_GRADES:
+    if ec.get("verification") not in STATED_GRADES:
         return {}
     return {
         "key_columns": list(ec.get("key_columns") or []),
@@ -128,7 +124,7 @@ def _parse_identity(raw: Any) -> EntityIdentity | None:
 
 def _asset_identity(ec: dict[str, Any]) -> dict[str, Any]:
     """The relation's key when its grade is stated, and the entities it shares."""
-    graded = ec.get("table_key_verification") in _RENDERED_GRADES
+    graded = ec.get("table_key_verification") in STATED_GRADES
     return {
         "key_columns": list(ec.get("table_key_columns") or []) if graded else [],
         "shared_entities": [
@@ -136,9 +132,10 @@ def _asset_identity(ec: dict[str, Any]) -> dict[str, Any]:
                 entity=s["entity"],
                 owner_table=f"{o.get('catalog') or ''}.{o.get('schema') or ''}.{o['table']}",
                 key_columns=list(s["key_columns"]),
+                identity=_parse_identity(s.get("identity")),
             )
             for s in ec.get("shared_entities") or []
-            if s.get("verification") in _RENDERED_GRADES and (o := s.get("owner"))
+            if s.get("verification") in STATED_GRADES and (o := s.get("owner"))
         ],
     }
 

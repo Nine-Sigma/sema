@@ -17,6 +17,7 @@ from sema.engine.join_detector_utils import COVERAGE_THRESHOLD
 from sema.engine.warehouse_lookup import RelationEvidence, TableKey
 from sema.eval.discovery_scorecard_utils import COLUMN_SEPARATOR
 from sema.intake.run.scorecard import Cells, Key
+from sema.models.assertions import STATED_GRADES
 from sema.models.target.identity import EntityIdentity, ResolutionRule, ResolvedAttribute
 
 CANDIDATE_KEY = "candidate_key"
@@ -28,11 +29,6 @@ IDENTITY_KINDS = (CANDIDATE_KEY, ENTITY_COARSER, ENTITY_SHARED, NULL_KEY_POLICY,
 UNIQUE = "unique"
 SINGLE = "single"
 LATEST = "latest:"
-STATED_GRADES = frozenset({"proven", "supported"})
-REJECTED = "rejected"
-# shortcut: the predicate words N4 and N5 add to `AssertionPredicate`; use the enum once merged.
-HAS_KEY = "has_key"
-HAS_IDENTITY = "has_identity"
 IN_SCOPE = (
     "($catalog IS NULL OR t.catalog = $catalog) AND ($schemas IS NULL OR t.schema_name IN $schemas)"
 )

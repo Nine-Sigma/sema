@@ -45,6 +45,14 @@ class AssertionPredicate(str, Enum):
     HAS_IDENTITY = "has_identity"
 
 
+# The `verification` words a coded column's `has_value_set` payload states.
+VERIFIED, UNVERIFIED = "verified", "unverified"
+# The grades a `has_key` or `has_identity` payload states (contract F2); a reader states a
+# fact only under one of STATED_GRADES.
+PROVEN, SUPPORTED, OPEN, REJECTED = "proven", "supported", "open", "rejected"
+STATED_GRADES = frozenset({PROVEN, SUPPORTED})
+
+
 # Predicates whose payload "value" is a name/alias that becomes a graph MERGE
 # key; normalized at construction so cosmetic variants cannot fragment nodes.
 _NAME_PREDICATES = frozenset(
