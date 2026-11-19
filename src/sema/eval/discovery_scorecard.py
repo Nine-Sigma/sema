@@ -217,14 +217,16 @@ def identity_facts(keys: Iterable[KeyRead], entities: Iterable[EntityRead]) -> d
 
 def _shared_entities(stated: list[EntityRead], entities: list[EntityRead]) -> Cells:
     """Each stated owner edge's entity, keyed by its relation and key, to the other relations
-    whose edge on that entity carries key columns and is not rejected; an L2 edge carries none."""
+    whose edge on that entity carries key columns and is proven, supported or ungraded (a
+    pre-existing edge the step only gave key columns); an L2 edge carries none."""
     shared: Cells = {}
     for owner in stated:
         if owner.owner is not True or not owner.key_columns:
             continue
         others = sorted({read.relation.lower() for read in entities
                          if read.entity == owner.entity and read.key_columns
-                         and read.owner is not True and read.verification != REJECTED
+                         and read.owner is not True
+                         and (read.verification is None or read.verification in STATED_GRADES)
                          and read.relation != owner.relation})
         if others:
             shared[(owner.relation.lower(), columns_key(owner.key_columns))] = others
