@@ -41,6 +41,7 @@ class AssertionPredicate(str, Enum):
     PROPERTY_ON_COLUMN = "property_on_column"
     FK_TO = "fk_to"
     HAS_VALUE_SET = "has_value_set"
+    HAS_KEY = "has_key"
 
 
 # Predicates whose payload "value" is a name/alias that becomes a graph MERGE

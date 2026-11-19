@@ -149,6 +149,7 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
 
     from sema.graph.join_materializer import materialize_schema_joins
     from sema.pipeline.coded_columns import run_coded_columns
+    from sema.pipeline.identity import run_identity
     schemas = sorted({wi.schema for wi in work_items})
     detected = run_fk_detection(
         loader, discovery_connector, config, schemas, run_id=run_id,
@@ -161,6 +162,8 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         materialize_schema_joins(
             loader, schema, [*detected.get(schema, []), *coded.get(schema, [])],
         )
+    # After the joins, so join-path entity links never see an edge this step writes.
+    run_identity(loader, discovery_connector, config, schemas, run_id=run_id)
 
     _compute_embeddings(config, loader, skip_embeddings=config.skip_embeddings)
 
