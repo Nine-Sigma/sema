@@ -24,7 +24,6 @@ from sema.engine.coded_column_utils import (
     OWN_KEY,
     PAST_BOUND,
     STATED_DOMAIN,
-    VERIFIED,
     Binding,
     Candidate,
     CodeSource,
@@ -67,7 +66,7 @@ from sema.graph.loader_utils import fetch_columns_by_schema
 from sema.ingest.duckdb_staging import Staging
 from sema.intake.land.relations import RelationProvider
 from sema.log import logger
-from sema.models.assertions import Assertion, AssertionPredicate
+from sema.models.assertions import VERIFIED, Assertion, AssertionPredicate
 from sema.models.config import BuildConfig
 from sema.models.extraction import ExtractedColumn
 from sema.models.physical_key import CanonicalRef

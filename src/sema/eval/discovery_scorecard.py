@@ -14,7 +14,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from sema.connectors.base import Connector
-from sema.engine.coded_column_utils import VERIFIED
 from sema.engine.join_detector_utils import containment
 from sema.engine.warehouse_lookup import RelationEvidence, WarehouseValues
 from sema.eval.discovery_scorecard_identity_utils import (
@@ -53,7 +52,7 @@ from sema.eval.discovery_scorecard_utils import (
     listed_codes,
 )
 from sema.intake.run.scorecard import VERDICTS, Cells, Key, KindScore, kind_score, verdicts
-from sema.models.assertions import AssertionPredicate
+from sema.models.assertions import VERIFIED, AssertionPredicate
 
 FACT_KINDS = (
     "candidate_key", "entity_coarser_than_row", "entity_shared_across_relations",

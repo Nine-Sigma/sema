@@ -11,8 +11,8 @@ import json
 
 from pydantic import ValidationError
 
-from sema.engine.coded_column_utils import VERIFIED
 from sema.log import logger
+from sema.models.assertions import VERIFIED
 from sema.models.context import (
     AncestryTerm,
     ColumnMatch,

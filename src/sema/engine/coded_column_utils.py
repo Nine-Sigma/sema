@@ -29,15 +29,19 @@ from sema.engine.join_detector_utils import (
     containment,
     normalized_name,
 )
-from sema.models.assertions import Assertion, AssertionPredicate, AssertionStatus
+from sema.models.assertions import (
+    UNVERIFIED,
+    VERIFIED,
+    Assertion,
+    AssertionPredicate,
+    AssertionStatus,
+)
 from sema.models.extraction import ExtractedColumn
 
 DECLARED_KEY = "declared_key"
 STATED_DOMAIN = "stated_domain"
 NAME_MATCH = "name_match"
 CONTAINMENT = "containment"
-VERIFIED = "verified"
-UNVERIFIED = "unverified"
 PAST_BOUND = "past the low-cardinality bound"
 OWN_KEY = "every non-null value is distinct: its relation's key, not a code"
 NO_VALUES = "the column holds no non-null value"
