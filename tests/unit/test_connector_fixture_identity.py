@@ -134,6 +134,15 @@ def test_the_key_cases_and_their_decoys() -> None:
     assert distinct_count("slip_use", SLIP_REFERENCE) < rows["slip_use"]
 
 
+def test_no_other_relation_corroborates_the_spec_list_by_containment() -> None:
+    holders = [t.name for t in IDENTITY_TABLES if set(SLIP_REFERENCE) <= set(t.column_names)]
+    for owner in ("slip_a", "slip_b"):
+        for other in holders:
+            if other != owner:
+                held, inside = contained_counts(other, SLIP_REFERENCE, owner, SLIP_REFERENCE)
+                assert held > 0 and inside == 0, (other, owner)
+
+
 def test_the_entity_cases_and_their_decoys() -> None:
     rows = {t.name: len(t.rows) for t in IDENTITY_TABLES}
     for table, key, by in (("hull_rev", "hull_no", "rev_no"), ("crane_rev", "crane_no", "rev_no"),

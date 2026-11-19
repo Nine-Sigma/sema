@@ -152,17 +152,18 @@ VALVE = IdentityTable(
     unique=(("unit_no", "valve_tag"),),
 )
 # The dictionary's foreign key names `slip_ref`: unique on two relations, repeated on a third.
+# The three hold disjoint refs, so no containment corroborates the list on either.
 SLIP_A = IdentityTable(
     "slip_a", (("slip_id", _INT), ("slip_ref", _TEXT), ("slip_len", _INT)),
     ((1, "S-1", 10), (2, "S-2", 10), (3, "S-3", 12), (4, "S-4", 12)), ("slip_id",),
 )
 SLIP_B = IdentityTable(
     "slip_b", (("slip_ref", _TEXT), ("slip_width", _INT)),
-    (("S-1", 3), ("S-2", 3), ("S-3", 4)),
+    (("S-5", 3), ("S-6", 3), ("S-7", 4)),
 )
 SLIP_USE = IdentityTable(
     "slip_use", (("use_no", _INT), ("slip_ref", _TEXT)),
-    ((1, "S-1"), (2, "S-1"), (3, "S-2"), (4, "S-3")), ("use_no",),
+    ((1, "S-8"), (2, "S-8"), (3, "S-9"), (4, "S-9")), ("use_no",),
 )
 # A member relation: several calls per vessel, each with its own day; one call has no vessel.
 BERTH_CALL = IdentityTable(
