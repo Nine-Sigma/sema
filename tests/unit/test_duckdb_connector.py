@@ -195,3 +195,23 @@ class TestExtractTable:
         }
         assert profiled == {"a", "b"}
         assert _of(assertions, AssertionPredicate.HAS_SAMPLE_ROWS)
+
+
+def test_a_connector_without_external_access_reads_its_tables_and_no_local_file(
+    db_path: Path, tmp_path: Path,
+) -> None:
+    outside = tmp_path / "outside.txt"
+    outside.write_text("outside")
+    connector = DuckDBConnector(DuckDBConfig(path=str(db_path), external_access=False))
+    try:
+        assert connector.execute_query_with_columns("SELECT count(*) AS n FROM s1.parent")[1] == [(2,)]
+        for statement in (
+            f"SELECT content FROM read_text('{outside}')",
+            f"COPY (SELECT 1) TO '{tmp_path / 'written.csv'}'",
+            "SET enable_external_access = true",
+        ):
+            with pytest.raises(duckdb.Error):
+                connector.execute_query_with_columns(statement)
+    finally:
+        connector.close()
+    assert not (tmp_path / "written.csv").exists()

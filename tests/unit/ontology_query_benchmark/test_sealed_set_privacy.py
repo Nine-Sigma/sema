@@ -30,6 +30,7 @@ from tests.unit.ontology_query_benchmark.sealed_set_env import (
     SINK_CANARY,
     WIDE,
     WRITER_RULE,
+    Reply,
     SealedRun,
     captured_logs,
     files_holding,
@@ -120,6 +121,21 @@ def test_a_run_writes_no_question_sql_or_row_outside_the_sealed_folder(
     needles = (*texts, *run.model.replies, *MARKERS)
     assert run.receipts and run.model.replies
     assert files_holding((root, work, temp), run.set_dir / "sealed", needles) == []
+
+
+def test_model_sql_cannot_read_a_sealed_file(
+    frozen: Path, harness: SimpleNamespace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "sealed_set"
+    profile_path = materialize(root, frozen)
+    questions = root / "neutral" / "sealed" / "questions.jsonl"
+    reply = Reply(f"SELECT content FROM read_text('{questions}')", False, False, 0)
+    monkeypatch.setitem(ARM_REPLIES["N02"], "A", reply)
+
+    run = _run(harness, root, profile_path)
+
+    answer = json.dumps(run.receipt("A:N02:1").get("answer"))
+    assert [t for t in question_texts(run.set_dir).values() if t in answer] == []
 
 
 def test_main_gives_arm_s_the_core_path_provider(
