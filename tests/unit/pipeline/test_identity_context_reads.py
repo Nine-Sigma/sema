@@ -134,7 +134,8 @@ def test_two_l2_entities_on_one_table_still_resolve_to_one(hits: list[str]) -> N
 
 CARGO_ORDER = (ResolvedAttribute(column="cargo_tons", rule=ResolutionRule.MAX_BY, by="cargo_no"),)
 SHARED_LINE = f"{fqn('hull_cargo')}: rows belong to Hull of {fqn('hull_rev')} through hull_no"
-ORDER_CLAUSE = "; each Hull has exactly one row per cargo_no, so the greatest cargo_no picks one row of each"
+ORDER_CLAUSE = ("; each Hull has exactly one row per cargo_no, so the greatest cargo_no picks one "
+                "row of each")
 
 
 def shared_with(identity: EntityIdentity) -> dict[str, list[dict[str, Any]]]:
