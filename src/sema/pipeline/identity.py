@@ -1,33 +1,54 @@
-"""Build step: each loaded relation's key, nominated and graded on the data, zero model calls.
+"""Build step: each loaded relation's key and the entity its rows describe, graded on the data.
 
-Runs once every table of the run is built and its joins are materialized. Nominations are the
-source's declared keys, the column lists intake's spec states (each code list's code column,
-each foreign key's reference columns) placed by column name, and each single column whose
-distinct count equals the row count. A count on the data accepts or rejects each one (contract
-F2, F4); the relation's `has_key` assertion and its `Table` read form record the result.
+Runs once every table of the run is built and its joins are materialized. Key nominations are
+the source's declared keys, the column lists intake's spec states (each code list's code column,
+each foreign key's reference columns) placed by column name, each single column whose distinct
+count equals the row count, and the row key the proposer names. With a model, one proposal per
+relation names the entity its rows describe; a count on the data accepts or rejects every
+nomination (contract F2, F4). The `has_key` and `has_identity` assertions and their read
+forms record the result.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime, timezone
+from typing import Any
 import uuid
 
 from sema.connectors.base import Connector
+from sema.engine.identity_prompt import ColumnProfile, identity_prompt, propose
 from sema.engine.identity_utils import (
+    ACCEPTED,
     CONTAINED,
     DECLARED_KEY,
     SPEC_LIST,
+    Columns,
+    Counts,
+    EntityFact,
+    EntityScope,
     KeyFact,
+    Relation,
+    by_name,
+    entity_facts,
     grade_keys,
+    identity_payload,
     key_holds,
     key_payload,
+    named_columns,
     one_smaller,
+    same_named,
 )
-from sema.engine.join_detector_utils import COVERAGE_THRESHOLD, normalized_name
+from sema.engine.join_detector_utils import normalized_name
 from sema.engine.warehouse_lookup import RelationEvidence
-from sema.graph.identity_read_forms import write_table_keys
+from sema.graph.identity_read_forms import (
+    read_entity_names,
+    write_entity_edges,
+    write_table_keys,
+)
 from sema.graph.loader import GraphLoader
 from sema.graph.loader_utils import fetch_columns_by_schema
+from sema.llm_client import IdentityProposal
 from sema.log import logger
 from sema.models.assertions import Assertion, AssertionPredicate, AssertionStatus
 from sema.models.config import BuildConfig
@@ -41,44 +62,14 @@ MAX_KEY_SETS = 8
 _SOURCE = "identity"
 _CONFIDENCE = 0.95
 
-Relation = tuple[str, str]
-Columns = tuple[str, ...]
-
-
-@dataclass
-class _Counts:
-    """Each count once per build: a single column's distinct count is both its profile and a
-    smaller set of a two-column nomination."""
-
-    evidence: RelationEvidence
-    _held: dict[tuple[str, Relation, Columns], int | None] = field(default_factory=dict)
-
-    def rows(self, relation: Relation) -> int | None:
-        return self._count("rows", relation, ())
-
-    def distinct(self, relation: Relation, columns: Columns) -> int | None:
-        return self._count("distinct", relation, tuple(sorted(columns)))
-
-    def null_rows(self, relation: Relation, columns: Columns) -> int | None:
-        return self._count("null_rows", relation, tuple(sorted(columns)))
-
-    def _count(self, measure: str, relation: Relation, columns: Columns) -> int | None:
-        held = (measure, relation, columns)
-        if held not in self._held:
-            if measure == "rows":
-                self._held[held] = self.evidence.rows(relation)
-            elif measure == "distinct":
-                self._held[held] = self.evidence.distinct(relation, columns)
-            else:
-                self._held[held] = self.evidence.null_rows(relation, columns)
-        return self._held[held]
 
 
 def run_identity(
     loader: GraphLoader, connector: Connector, config: BuildConfig, schemas: list[str],
-    run_id: str,
+    run_id: str, client: Any | None = None,
 ) -> None:
-    """Grade each relation's nominated keys and write its `has_key` assertion and key."""
+    """Grade each relation's nominated keys and, with a model, the entity its rows describe;
+    write the `has_key` and `has_identity` assertions and their read forms."""
     if not config.enable_fk_detection:
         return
     dictionary = read_dictionary(config.concept_spec, config.concept_staging)
@@ -86,7 +77,7 @@ def run_identity(
     for schema in schemas:
         for column in fetch_columns_by_schema(loader, schema):
             relations.setdefault((column.schema, column.table_name), []).append(column)
-    counts = _Counts(RelationEvidence(connector, config.catalog))
+    counts = Counts(RelationEvidence(connector, config.catalog))
     declared = _declared(connector, config.catalog, schemas)
     stated = _stated(dictionary, relations)
     facts = {
@@ -98,7 +89,19 @@ def run_identity(
     }
     _corroborate_stated(facts, stated)
     _corroborate_contained(facts, relations, counts)
-    _write(loader, relations, facts, run_id)
+    if client is None:
+        _write(loader, relations, facts, run_id)
+        return
+    named = read_entity_names(loader, [r for cs in relations.values() if (r := _table_ref(cs))])
+    l2 = {relation: named.get(_table_ref(columns) or "", (None, None))
+          for relation, columns in relations.items()}
+    proposals = _proposals(client, relations, facts, l2, counts)
+    _nominate_row_keys(facts, proposals, relations, counts)
+    keys = _write(loader, relations, facts, run_id)
+    scope = EntityScope(relations, keys, counts,
+                        _reference_lists(connector, config.catalog, dictionary))
+    entities = entity_facts(scope, proposals, {r: names[0] for r, names in l2.items()})
+    _write_entities(loader, relations, entities, run_id)
 
 
 def _declared(
@@ -137,7 +140,7 @@ def _stated(
 
 def _nominated(
     relation: Relation, columns: list[ExtractedColumn], declared: list[Columns],
-    stated: list[Columns], counts: _Counts,
+    stated: list[Columns], counts: Counts,
 ) -> dict[frozenset[str], KeyFact]:
     """Declared keys, then stated lists, then single columns unique with no NULL (a profile's
     distinct count leaves NULL out), up to `MAX_KEY_SETS`."""
@@ -168,7 +171,7 @@ def _nominated(
 
 
 def _measured(
-    relation: Relation, nominated: dict[frozenset[str], KeyFact], counts: _Counts,
+    relation: Relation, nominated: dict[frozenset[str], KeyFact], counts: Counts,
 ) -> dict[frozenset[str], KeyFact]:
     for fact in nominated.values():
         fact.rows = counts.rows(relation)
@@ -198,43 +201,139 @@ def _corroborate_stated(
 
 def _corroborate_contained(
     facts: dict[Relation, dict[frozenset[str], KeyFact]],
-    relations: dict[Relation, list[ExtractedColumn]], counts: _Counts,
+    relations: dict[Relation, list[ExtractedColumn]], counts: Counts,
 ) -> None:
     """A second relation whose same-named columns are contained in a passing set corroborates it."""
-    names = {r: {normalized_name(c.name): c.name for c in cs} for r, cs in relations.items()}
+    names = by_name(relations)
     for relation, nominated in facts.items():
         for fact in (f for f in nominated.values() if f.holds):
-            for other, by_name in names.items():
-                theirs = tuple(by_name.get(normalized_name(c), "") for c in fact.columns)
-                if other == relation or not all(theirs):
-                    continue
-                held = counts.evidence.contained(other, theirs, relation, fact.columns)
-                if held and held[0] and held[1] / held[0] >= COVERAGE_THRESHOLD:
+            for other, theirs in same_named(relation, fact.columns, names):
+                if counts.within(other, theirs, relation, fact.columns):
                     fact.signals.append(f"{CONTAINED}:{other[1]}")
 
 
 def _write(
     loader: GraphLoader, relations: dict[Relation, list[ExtractedColumn]],
     facts: dict[Relation, dict[frozenset[str], KeyFact]], run_id: str,
-) -> None:
+) -> dict[Relation, KeyFact | None]:
     keys: dict[Relation, KeyFact | None] = {}
     for relation, nominated in facts.items():
         graded = list(nominated.values())
         keys[relation] = key = grade_keys(graded)
         subject = _table_ref(relations[relation])
-        if not graded or subject is None:
-            continue
-        loader.store_assertion(Assertion(
-            id=str(uuid.uuid4()), subject_ref=subject,
-            predicate=AssertionPredicate.HAS_KEY, payload=key_payload(graded, key),
-            source=_SOURCE, confidence=_CONFIDENCE, status=AssertionStatus.AUTO,
-            run_id=run_id, observed_at=datetime.now(timezone.utc), source_schema=relation[0],
-        ), source_schema=relation[0])
+        if graded and subject is not None:
+            loader.store_assertion(_assertion(
+                subject, AssertionPredicate.HAS_KEY, key_payload(graded, key), relation, run_id,
+            ), source_schema=relation[0])
     write_table_keys(loader, [
         (relations[relation][0].catalog, *relation,
          (list(key.columns), key.verification) if key else None)
         for relation, key in keys.items()
     ])
+    return keys
+
+
+def _assertion(
+    subject: str, predicate: AssertionPredicate, payload: dict[str, Any], relation: Relation,
+    run_id: str,
+) -> Assertion:
+    return Assertion(
+        id=str(uuid.uuid4()), subject_ref=subject, predicate=predicate, payload=payload,
+        source=_SOURCE, confidence=_CONFIDENCE, status=AssertionStatus.AUTO, run_id=run_id,
+        observed_at=datetime.now(timezone.utc), source_schema=relation[0],
+    )
+
+
+def _proposals(
+    client: Any, relations: dict[Relation, list[ExtractedColumn]],
+    facts: dict[Relation, dict[frozenset[str], KeyFact]],
+    l2: dict[Relation, tuple[str | None, str | None]], counts: Counts,
+) -> dict[Relation, IdentityProposal]:
+    """One proposer call per relation, a relation with no key or a single-column key too: a
+    surrogate key says nothing about the entity."""
+    proposals: dict[Relation, IdentityProposal] = {}
+    for relation, columns in relations.items():
+        key = grade_keys(list(facts[relation].values()))
+        profiles = [ColumnProfile(c.name, c.data_type, c.comment,
+                                  counts.distinct(relation, (c.name,)),
+                                  counts.null_rows(relation, (c.name,))) for c in columns]
+        prompt = identity_prompt(relation[1], counts.rows(relation), profiles,
+                                 key.columns if key else None, *l2[relation])
+        proposal = propose(client, prompt, _table_ref(columns) or relation[1])
+        if proposal is not None:
+            proposals[relation] = proposal
+    return proposals
+
+
+def _nominate_row_keys(
+    facts: dict[Relation, dict[frozenset[str], KeyFact]],
+    proposals: dict[Relation, IdentityProposal],
+    relations: dict[Relation, list[ExtractedColumn]], counts: Counts,
+) -> None:
+    """A proposed row key is one more nomination, under the same cap and the key predicate."""
+    for relation, proposal in proposals.items():
+        names = named_columns(relations[relation], proposal.row_key)
+        nominated = facts[relation]
+        if names is None or frozenset(names) in nominated or len(nominated) >= MAX_KEY_SETS:
+            continue
+        added = {frozenset(names): KeyFact(names, None, None, None, None)}
+        nominated.update(_measured(relation, added, counts))
+        _corroborate_contained({relation: added}, relations, counts)
+
+
+def _reference_lists(
+    connector: Connector, catalog: str, dictionary: Dictionary | None,
+) -> Callable[[Relation, Columns], bool]:
+    """Whether a declared foreign key of the relation, or a spec reference list, names exactly
+    these columns; a relation's declared keys are read once, when first asked."""
+    spec = {frozenset(map(normalized_name, ref))
+            for ref in (dictionary.reference_keys if dictionary else [])}
+    declared: dict[Relation, set[frozenset[str]]] = {}
+
+    def referenced(relation: Relation, columns: Columns) -> bool:
+        names = frozenset(map(normalized_name, columns))
+        if relation not in declared:
+            declared[relation] = _declared_references(connector, catalog, relation)
+        return names in spec or names in declared[relation]
+
+    return referenced
+
+
+def _declared_references(
+    connector: Connector, catalog: str, relation: Relation,
+) -> set[frozenset[str]]:
+    try:
+        keys = connector.extract_foreign_keys_dto(catalog, *relation)
+    except Exception as exc:  # each connector raises its own driver's errors
+        logger.warning(f"Declared foreign keys of {relation[1]} not read: {exc}")
+        return set()
+    return {frozenset(normalized_name(a) for a, _ in key.column_pairs) for key in keys}
+
+
+def _write_entities(
+    loader: GraphLoader, relations: dict[Relation, list[ExtractedColumn]],
+    entities: list[EntityFact], run_id: str,
+) -> None:
+    """One `has_identity` per relation and entity; an edge for each accepted one."""
+    edges = []
+    for fact in entities:
+        subject, owner = _table_ref(relations[fact.relation]), _table_ref(relations[fact.owner])
+        if subject is None or owner is None:
+            continue
+        loader.store_assertion(_assertion(
+            subject, AssertionPredicate.HAS_IDENTITY, identity_payload(fact, owner),
+            fact.relation, run_id,
+        ), source_schema=fact.relation[0])
+        if fact.verification in ACCEPTED:
+            edges.append({
+                "catalog": relations[fact.relation][0].catalog, "schema": fact.relation[0],
+                "table": fact.relation[1], "entity": fact.entity,
+                "owner": fact.owner == fact.relation, "key_columns": list(fact.key_columns),
+                "verification": fact.verification,
+                "identity": fact.identity.model_dump_json() if fact.identity else None,
+                "null_key_rows": fact.null_rows or None,
+            })
+    write_entity_edges(loader, edges, _SOURCE)
 
 
 def _table_ref(columns: list[ExtractedColumn]) -> str | None:
