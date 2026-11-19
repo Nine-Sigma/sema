@@ -53,7 +53,8 @@ def run_sealed_set(profile_path: Path, arms: Sequence[str], repetitions: int, *,
     settings = run_settings(profile)
     runner._write_manifest(run_dir, profile.harness.frozen, profile.knobs, settings, {})
     harness = ru.load_harness(profile.harness.frozen, profile.harness)  # type: ignore[arg-type]
-    connector = DuckDBConnector(DuckDBConfig(path=str(profile.duckdb)))
+    # Model SQL runs as written; it must not read sealed files or write anywhere.
+    connector = DuckDBConnector(DuckDBConfig(path=str(profile.duckdb), external_access=False))
     try:
         layout = su.source_layout(connector, run_dir, profile.harness.package, profile.knobs)
         executors = {arm: ConnectorExecutor(harness, connector, profile.limits.statement_timeout_s)

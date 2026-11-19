@@ -27,6 +27,8 @@ class DuckDBConfig(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="DUCKDB_")
 
     path: str = ""
+    # False refuses file and network reads and writes from SQL; the database file stays readable.
+    external_access: bool = True
 
 
 class Neo4jConfig(BaseSettings):

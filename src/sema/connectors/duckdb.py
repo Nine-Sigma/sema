@@ -48,7 +48,9 @@ class DuckDBConnector(Connector):
         self._run_id = str(uuid.uuid4())
         self._workspace = duckdb_workspace(config.path)
         # Opened eagerly so a mistyped path fails at construction, as Databricks does.
-        self._connection: duckdb.DuckDBPyConnection | None = open_read_only(config.path)
+        self._connection: duckdb.DuckDBPyConnection | None = open_read_only(
+            config.path, config.external_access,
+        )
 
     # --- Connection ---
 

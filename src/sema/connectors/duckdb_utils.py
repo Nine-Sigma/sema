@@ -55,7 +55,7 @@ def duckdb_workspace(path: str) -> str:
     return f"{safe_stem}-{digest}"
 
 
-def open_read_only(path: str) -> duckdb.DuckDBPyConnection:
+def open_read_only(path: str, external_access: bool = True) -> duckdb.DuckDBPyConnection:
     """Open an existing database read-only; a missing file is a caller error.
 
     ``read_only=True`` never creates a file, but its ``IOException`` is generic;
@@ -64,7 +64,10 @@ def open_read_only(path: str) -> duckdb.DuckDBPyConnection:
     resolved = resolve_database_path(path)
     if not resolved.is_file():
         raise FileNotFoundError(f"DuckDB database not found: {resolved}")
-    return duckdb.connect(str(resolved), read_only=True)
+    if external_access:
+        return duckdb.connect(str(resolved), read_only=True)
+    config: dict[str, Any] = {"enable_external_access": False, "lock_configuration": True}
+    return duckdb.connect(str(resolved), read_only=True, config=config)
 
 
 def bounded_read(
