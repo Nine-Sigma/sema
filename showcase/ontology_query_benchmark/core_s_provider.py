@@ -12,7 +12,13 @@ from typing import Any
 
 from sema.connectors.duckdb import DuckDBConnector
 from sema.consumers.nl2sql.prompting import render_sections
-from sema.models.context import SemanticContextObject
+from sema.models.context import (
+    JoinPredicate,
+    PhysicalAsset,
+    ResolvedEntity,
+    ResolvedProperty,
+    SemanticContextObject,
+)
 from sema.pipeline.context import prune_to_sco
 from sema.pipeline.retrieval import RetrievalEngine
 
@@ -44,10 +50,8 @@ def without_denied(sco: SemanticContextObject,
         return not any(is_denied(c) for c in columns)
 
     return sco.model_copy(update={
-        "physical_assets": [a.model_copy(update={"columns": [c for c in a.columns if keep(c)]})
-                            for a in sco.physical_assets],
-        "entities": [e.model_copy(update={"properties": [
-            p for p in e.properties if keep(p.physical_column)]}) for e in sco.entities],
+        "physical_assets": [_asset_kept(a, keep) for a in sco.physical_assets],
+        "entities": [_entity_kept(e, keep) for e in sco.entities],
         "governed_values": [g for g in sco.governed_values if keep(g.column)],
         "join_paths": [j for j in sco.join_paths if all(
             keep(p.left_column, p.right_column) for p in j.join_predicates)],
@@ -57,3 +61,38 @@ def without_denied(sco: SemanticContextObject,
         "result_shape": sco.result_shape and sco.result_shape.model_copy(update={
             "columns": [c for c in sco.result_shape.columns if keep(c)]}),
     })  # fmt: skip
+
+
+Keep = Callable[..., bool]
+
+
+def _asset_kept(asset: PhysicalAsset, keep: Keep) -> PhysicalAsset:
+    """A key or a shared entity that names a denied column is dropped whole."""
+    return asset.model_copy(update={
+        "columns": [c for c in asset.columns if keep(c)],
+        "key_columns": asset.key_columns if keep(*asset.key_columns) else [],
+        "shared_entities": [s for s in asset.shared_entities if keep(*s.key_columns)],
+    })
+
+
+def _entity_kept(entity: ResolvedEntity, keep: Keep) -> ResolvedEntity:
+    """The entity's identity goes when a key column is denied, and an ordering rule goes when
+    a column it reads is denied."""
+    properties = [_property_kept(p, keep) for p in entity.properties if keep(p.physical_column)]
+    identity = entity.identity
+    if not keep(*entity.key_columns, *(identity.key_columns if identity else ())):
+        return entity.model_copy(update={
+            "properties": properties, "key_columns": [], "identity": None, "null_key_rows": None})
+    if identity is not None:
+        identity = identity.model_copy(update={
+            "attributes": tuple(a for a in identity.attributes if keep(*a.columns))})
+    return entity.model_copy(update={"properties": properties, "identity": identity})
+
+
+def _property_kept(prop: ResolvedProperty, keep: Keep) -> ResolvedProperty:
+    return prop.model_copy(update={"labels": [
+        label for label in prop.labels if keep(label.column, *_columns(label.via))]})
+
+
+def _columns(predicates: list[JoinPredicate]) -> list[str]:
+    return [c for p in predicates for c in (p.left_column, p.right_column)]

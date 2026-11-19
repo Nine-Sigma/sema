@@ -6,12 +6,17 @@ build_sql_prompt entry point and its truncation budget.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 from sema.models.context import (
+    JoinPredicate,
+    LabelSource,
+    ResolvedEntity,
     ResolvedProperty,
     SemanticContextObject,
 )
+from sema.models.target.identity import EntityIdentity, ResolutionRule
 
 
 def _dialect_label(dialect: str) -> str:
@@ -43,22 +48,18 @@ def _add_tables_and_columns(
     annotate: bool = True,
 ) -> None:
     parts.append("\nAVAILABLE TABLES AND COLUMNS:")
-    prop_map = _build_property_map(sco) if annotate else {}
+    prop_map = _build_property_map(sco)
     for asset in sco.physical_assets:
         fqn = f"{asset.catalog}.{asset.schema}.{asset.table}"
         cols = asset.columns
         if max_cols is not None and len(cols) > max_cols:
             cols = cols[:max_cols]
-            annotated = _annotate_columns(
-                cols, fqn, prop_map,
-            ) if annotate else cols
+            annotated = _annotate_columns(cols, fqn, prop_map, semantic=annotate)
             parts.append(
                 f"  {fqn}: {', '.join(annotated)} [truncated]"
             )
         else:
-            annotated = _annotate_columns(
-                cols, fqn, prop_map,
-            ) if annotate else cols
+            annotated = _annotate_columns(cols, fqn, prop_map, semantic=annotate)
             parts.append(f"  {fqn}: {', '.join(annotated)}")
     _add_column_choice(parts, sco)
 
@@ -95,16 +96,25 @@ def _annotate_columns(
     columns: list[str],
     fqn: str,
     prop_map: dict[tuple[str, str], ResolvedProperty],
+    semantic: bool = True,
 ) -> list[str]:
-    """Annotate columns with semantic type where available."""
+    """Annotate columns with semantic type where available, and with each label source."""
     result: list[str] = []
     for col in columns:
         prop = prop_map.get((fqn, col))
-        if prop and prop.semantic_type != "free_text":
-            result.append(f"{col} ({prop.semantic_type})")
-        else:
-            result.append(col)
+        notes = _column_notes(prop, semantic) if prop else []
+        result.append(f"{col} ({'; '.join(notes)})" if notes else col)
     return result
+
+
+def _column_notes(prop: ResolvedProperty, semantic: bool) -> list[str]:
+    typed = semantic and prop.semantic_type != "free_text"
+    return [*([prop.semantic_type] if typed else []), *map(_label_note, prop.labels)]
+
+
+def _label_note(label: LabelSource) -> str:
+    joined = " AND ".join(map(_format_predicate, label.via))
+    return f"label: {label.table}.{label.column}" + (f" on {joined}" if joined else "")
 
 
 def _add_join_section(
@@ -126,12 +136,54 @@ def _format_join_predicates(jp: Any) -> str:
     if jp.sql_snippet:
         return str(jp.sql_snippet)
     if jp.join_predicates:
-        return " AND ".join(
-            f"{p.left_table}.{p.left_column} {p.operator} "
-            f"{p.right_table}.{p.right_column}"
-            for p in jp.join_predicates
-        )
+        return " AND ".join(map(_format_predicate, jp.join_predicates))
     return "(unknown join condition)"
+
+
+def _format_predicate(p: JoinPredicate) -> str:
+    return f"{p.left_table}.{p.left_column} {p.operator} {p.right_table}.{p.right_column}"
+
+
+def _add_keys_and_entities_section(
+    parts: list[str], sco: SemanticContextObject,
+) -> None:
+    """Each stated key, entity and shared entity, in words that hold in any SQL dialect."""
+    lines = [*_key_lines(sco), *_entity_lines(sco)]
+    if not lines:
+        return
+    parts.append("\nKEYS AND ENTITIES:")
+    parts.extend(f"  {line}" for line in lines)
+
+
+def _key_lines(sco: SemanticContextObject) -> Iterator[str]:
+    for asset in sco.physical_assets:
+        fqn = f"{asset.catalog}.{asset.schema}.{asset.table}"
+        if asset.key_columns:
+            yield f"{fqn}: one row per {', '.join(asset.key_columns)}"
+        for shared in asset.shared_entities:
+            yield (f"{fqn}: rows belong to {shared.entity} of {shared.owner_table} "
+                   f"through {', '.join(shared.key_columns)}")
+
+
+def _entity_lines(sco: SemanticContextObject) -> Iterator[str]:
+    for entity in sco.entities:
+        if entity.identity is not None:
+            yield f"{entity.physical_table}: {_entity_sentence(entity, entity.identity)}"
+
+
+def _entity_sentence(entity: ResolvedEntity, identity: EntityIdentity) -> str:
+    name, key = entity.name, ", ".join(entity.key_columns or identity.key_columns)
+    clauses = [f"several rows can hold one {name}", f"one {name} per distinct {key}"]
+    if entity.null_key_rows:
+        clauses.append(f"{entity.null_key_rows} rows have a NULL in {key}")
+    ordering = dict.fromkeys(
+        a.by for a in identity.attributes if a.rule == ResolutionRule.MAX_BY and a.by
+    )
+    clauses.extend(
+        f"each {name} has exactly one row per {by}, so the greatest {by} picks one row of each"
+        for by in ordering
+    )
+    return "; ".join(clauses)
 
 
 def _format_value(value: dict[str, str | None]) -> str:

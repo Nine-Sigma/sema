@@ -4,11 +4,29 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from sema.models.target.identity import EntityIdentity
+
 
 class Provenance(BaseModel):
     source: str
     confidence: float = Field(ge=0.0, le=1.0)
     assertion_ids: list[str] = Field(default_factory=list)
+
+
+class JoinPredicate(BaseModel):
+    left_table: str
+    left_column: str
+    right_table: str
+    right_column: str
+    operator: str = "="
+
+
+class LabelSource(BaseModel):
+    """Where a coded column's label lives; `via` joins the label's relation when it differs."""
+
+    table: str
+    column: str
+    via: list[JoinPredicate] = Field(default_factory=list)
 
 
 class ResolvedProperty(BaseModel):
@@ -19,6 +37,7 @@ class ResolvedProperty(BaseModel):
     description: str | None = None
     vocabulary: str | None = None
     provenance: Provenance
+    labels: list[LabelSource] = Field(default_factory=list, exclude_if=lambda v: not v)
 
 
 class ResolvedEntity(BaseModel):
@@ -27,6 +46,17 @@ class ResolvedEntity(BaseModel):
     physical_table: str
     properties: list[ResolvedProperty] = Field(default_factory=list)
     provenance: Provenance
+    key_columns: list[str] = Field(default_factory=list, exclude_if=lambda v: not v)
+    identity: EntityIdentity | None = Field(default=None, exclude_if=lambda v: v is None)
+    null_key_rows: int | None = Field(default=None, exclude_if=lambda v: v is None)
+
+
+class SharedEntity(BaseModel):
+    """An entity owned by another relation that this relation's rows belong to."""
+
+    entity: str
+    owner_table: str
+    key_columns: list[str]
 
 
 class PhysicalAsset(BaseModel):
@@ -36,14 +66,10 @@ class PhysicalAsset(BaseModel):
     schema: str  # type: ignore[assignment]
     table: str
     columns: list[str] = Field(default_factory=list)
-
-
-class JoinPredicate(BaseModel):
-    left_table: str
-    left_column: str
-    right_table: str
-    right_column: str
-    operator: str = "="
+    key_columns: list[str] = Field(default_factory=list, exclude_if=lambda v: not v)
+    shared_entities: list[SharedEntity] = Field(
+        default_factory=list, exclude_if=lambda v: not v,
+    )
 
 
 class JoinPath(BaseModel):
