@@ -70,6 +70,8 @@ UNIT_FILES = tuple(
         "consumers/nl2sql/prompting.py",
         "connectors/base.py",
         "consumers/base.py",
+        "engine/identity_utils.py",
+        "connectors/databricks_utils.py",
     )
 )
 LITERAL_ROOTS = (
@@ -114,6 +116,10 @@ PREDATING_HITS = {
     ("loader.py", "column name"): "Column node keys in Cypher; predates unit 5",
     ("loader.py", "predicate"): "Assertion field name; predates unit 5",
     ("loader.py", "source"): "Assertion field name; predates unit 5",
+    ("databricks_utils.py", "values"): (
+        "HAS_TOP_VALUES payload field name, a generic word a profile also uses; predates unit 7, "
+        "baselined 2026-11-19 when N3 added the file"
+    ),
 }
 # Source fixture modules: their public constants name the connector fixture's source.
 CONNECTOR_FIXTURES = tuple(sorted((REPO_ROOT / "tests" / "support").glob("connector_fixture*.py")))
