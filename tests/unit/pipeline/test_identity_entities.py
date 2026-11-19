@@ -117,7 +117,7 @@ def test_every_relation_gets_one_model_call(proposed: StepRun, client: MagicMock
     called = Counter(relation_named(str(c.args[0] if c.args else c.kwargs.get("prompt", "")),
                                     str(c.kwargs.get("table_ref", "")))
                      for c in client.invoke.call_args_list)
-    assert called == Counter(TABLES)
+    assert called == Counter(TABLES.keys())
     assert called["gate_tally"] == 1, "a relation with no key is asked too"
 
 

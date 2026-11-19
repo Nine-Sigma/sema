@@ -67,6 +67,16 @@ class SynonymExpansion(BaseModel):
     synonyms: list[dict[str, Any]] = []
 
 
+class IdentityProposal(BaseModel):
+    """What one relation's rows describe (contract F4): the entity, the columns that identify
+    it, the column whose greatest value marks its newest version, and the row key."""
+
+    entity: str
+    entity_key: list[str]
+    latest_by: str | None = None
+    row_key: list[str] | None = None
+
+
 class LLMStageError(Exception):
     """Raised when all LLM fallback steps are exhausted for a call.
 

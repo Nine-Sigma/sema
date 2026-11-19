@@ -10,6 +10,7 @@ from sema.cli_factories import (
     _get_llm,
     _get_neo4j_driver,
 )
+from sema.log import logger
 from sema.models.config import (
     BuildConfig,
     QueryConfig,
@@ -163,12 +164,23 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
             loader, schema, [*detected.get(schema, []), *coded.get(schema, [])],
         )
     # After the joins, so join-path entity links never see an edge this step writes.
-    run_identity(loader, discovery_connector, config, schemas, run_id=run_id)
+    run_identity(loader, discovery_connector, config, schemas, run_id=run_id,
+                 client=_identity_client(llm_factory))
 
     _compute_embeddings(config, loader, skip_embeddings=config.skip_embeddings)
 
     driver.close()
     return report
+
+
+def _identity_client(llm_factory: Any) -> Any:
+    """The build's model client for the identity proposer, or None when no model can be made:
+    the step then states keys only and the build goes on."""
+    try:
+        return llm_factory.create()
+    except Exception as exc:  # each provider raises its own configuration errors
+        logger.warning(f"Identity proposer has no model client: {type(exc).__name__}: {exc}")
+        return None
 
 
 def run_context(config: QueryConfig) -> dict[str, Any]:

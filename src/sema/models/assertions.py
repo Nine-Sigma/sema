@@ -42,6 +42,7 @@ class AssertionPredicate(str, Enum):
     FK_TO = "fk_to"
     HAS_VALUE_SET = "has_value_set"
     HAS_KEY = "has_key"
+    HAS_IDENTITY = "has_identity"
 
 
 # Predicates whose payload "value" is a name/alias that becomes a graph MERGE
