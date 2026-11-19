@@ -32,9 +32,9 @@ from sema.eval.discovery_scorecard_identity_utils import (
     STATED_GRADES,
     UNIQUE,
     EntityRead,
-    IdentityRecheck,
     KeyRead,
     entity_reads,
+    identity_counts,
     key_read,
     rule_word,
 )
@@ -175,7 +175,7 @@ def recheck(
         for table in connector.discover_tables(catalog, schemas or None)
     }
     joins = produced.get(JOIN, {})
-    identity = IdentityRecheck(RelationEvidence(connector, catalog), tables).counts(produced)
+    identity = identity_counts(RelationEvidence(connector, catalog), tables, produced)
     return {JOIN: sum(join_holds(connector, catalog, tables, key) for key in joins), **identity}
 
 

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
 from typing import Any, NamedTuple
 
 from sema.engine.identity_utils import entity_holds, key_holds, one_smaller
@@ -132,71 +131,83 @@ def rule_word(attribute: ResolvedAttribute) -> str | None:
     return None if attribute.rule is ResolutionRule.MIN_BY else attribute.rule.value
 
 
-@dataclass
-class IdentityRecheck:
+def identity_counts(
+    evidence: RelationEvidence, tables: Mapping[str, TableKey], produced: Mapping[str, Cells],
+) -> dict[str, int]:
     """Per identity kind, the produced facts whose counts the data re-proves; `tables` maps a
     lowercased relation name to its (schema, table)."""
+    entities = produced.get(ENTITY_COARSER, {})
+    entity_keys = {key[0]: str(value) for key, value in entities.items()}
+    checks: dict[str, Callable[[Key, Any], bool]] = {
+        CANDIDATE_KEY: lambda key, _: _key(evidence, tables[key[0]], columns_of(key[1])),
+        ENTITY_COARSER: lambda key, value: _entity(evidence, tables[key[0]],
+                                                   columns_of(str(value))),
+        ENTITY_SHARED: lambda key, others: _shared(evidence, tables, key, others),
+        NULL_KEY_POLICY: lambda key, value: evidence.null_rows(
+            tables[key[0]], columns_of(key[1])) == value,
+        ATTRIBUTE_RULE: lambda key, value: _rule(evidence, tables[key[0]], key[1], value,
+                                                 entity_keys.get(key[0])),
+    }
+    return {
+        kind: sum(key[0] in tables and check(key, value)
+                  for key, value in produced.get(kind, {}).items())
+        for kind, check in checks.items()
+    }
 
-    evidence: RelationEvidence
-    tables: Mapping[str, TableKey]
 
-    def counts(self, produced: Mapping[str, Cells]) -> dict[str, int]:
-        entities = produced.get(ENTITY_COARSER, {})
-        entity_keys = {key[0]: str(value) for key, value in entities.items()}
-        checks: dict[str, Callable[[Key, Any], bool]] = {
-            CANDIDATE_KEY: lambda key, _: self._key(self.tables[key[0]], columns_of(key[1])),
-            ENTITY_COARSER: lambda key, value: self._entity(self.tables[key[0]],
-                                                            columns_of(str(value))),
-            ENTITY_SHARED: self._shared,
-            NULL_KEY_POLICY: lambda key, value: self.evidence.null_rows(
-                self.tables[key[0]], columns_of(key[1])) == value,
-            ATTRIBUTE_RULE: lambda key, value: self._rule(key, value, entity_keys.get(key[0])),
-        }
-        return {
-            kind: sum(key[0] in self.tables and check(key, value)
-                      for key, value in produced.get(kind, {}).items())
-            for kind, check in checks.items()
-        }
+def _smaller(
+    evidence: RelationEvidence, relation: TableKey, columns: Sequence[str],
+) -> list[int | None]:
+    return [evidence.distinct(relation, subset) for subset in one_smaller(columns)]
 
-    def _smaller(self, relation: TableKey, columns: Sequence[str]) -> list[int | None]:
-        return [self.evidence.distinct(relation, subset) for subset in one_smaller(columns)]
 
-    def _key(self, relation: TableKey, columns: Sequence[str]) -> bool:
-        return key_holds(
-            self.evidence.rows(relation), self.evidence.distinct(relation, columns),
-            self.evidence.null_rows(relation, columns), self._smaller(relation, columns),
-        ) is True
+def _key(evidence: RelationEvidence, relation: TableKey, columns: Sequence[str]) -> bool:
+    return key_holds(
+        evidence.rows(relation), evidence.distinct(relation, columns),
+        evidence.null_rows(relation, columns), _smaller(evidence, relation, columns),
+    ) is True
 
-    def _entity(self, relation: TableKey, columns: Sequence[str]) -> bool:
-        return entity_holds(
-            self.evidence.rows(relation), self.evidence.distinct(relation, columns),
-            self._smaller(relation, columns),
-        ) is True
 
-    def _shared(self, key: Key, others: Any) -> bool:
-        """Every other relation's non-NULL key tuples are contained in the owner's at the floor."""
-        owner, columns = self.tables[key[0]], columns_of(key[1])
-        return bool(others) and all(
-            other in self.tables and self._contained(self.tables[other], owner, columns)
-            for other in others
-        )
+def _entity(evidence: RelationEvidence, relation: TableKey, columns: Sequence[str]) -> bool:
+    return entity_holds(
+        evidence.rows(relation), evidence.distinct(relation, columns),
+        _smaller(evidence, relation, columns),
+    ) is True
 
-    def _contained(self, relation: TableKey, owner: TableKey, columns: Sequence[str]) -> bool:
-        counted = self.evidence.contained(relation, columns, owner, columns)
-        return counted is not None and counted[0] > 0 and (
-            counted[1] / counted[0] >= COVERAGE_THRESHOLD)
 
-    def _rule(self, key: Key, value: Any, entity_key: str | None) -> bool:
-        """`single`: no entity group holds two values; `latest:<by>`: the ordering column picks
-        exactly one row of each entity. No count accepts `min` or `max`."""
-        if entity_key is None:
-            return False
-        relation, columns = self.tables[key[0]], columns_of(entity_key)
-        if value == SINGLE:
-            counted = self.evidence.conflicts(relation, columns, [key[1]])
-            return counted is not None and counted[1][key[1]] == 0
-        if not str(value).startswith(LATEST):
-            return False
-        ordered = [*columns, str(value).removeprefix(LATEST)]
-        rows = self.evidence.rows(relation)
-        return rows is not None and self.evidence.distinct(relation, ordered) == rows
+def _shared(
+    evidence: RelationEvidence, tables: Mapping[str, TableKey], key: Key, others: Any,
+) -> bool:
+    """Every other relation's non-NULL key tuples are contained in the owner's at the floor."""
+    owner, columns = tables[key[0]], columns_of(key[1])
+    return bool(others) and all(
+        other in tables and _contained(evidence, tables[other], owner, columns)
+        for other in others
+    )
+
+
+def _contained(
+    evidence: RelationEvidence, relation: TableKey, owner: TableKey, columns: Sequence[str],
+) -> bool:
+    counted = evidence.contained(relation, columns, owner, columns)
+    return counted is not None and counted[0] > 0 and (
+        counted[1] / counted[0] >= COVERAGE_THRESHOLD)
+
+
+def _rule(
+    evidence: RelationEvidence, relation: TableKey, column: str, value: Any,
+    entity_key: str | None,
+) -> bool:
+    """`single`: no entity group holds two values; `latest:<by>`: the ordering column picks
+    exactly one row of each entity. No count accepts `min` or `max`."""
+    if entity_key is None:
+        return False
+    columns = columns_of(entity_key)
+    if value == SINGLE:
+        counted = evidence.conflicts(relation, columns, [column])
+        return counted is not None and counted[1][column] == 0
+    if not str(value).startswith(LATEST):
+        return False
+    ordered = [*columns, str(value).removeprefix(LATEST)]
+    rows = evidence.rows(relation)
+    return rows is not None and evidence.distinct(relation, ordered) == rows
