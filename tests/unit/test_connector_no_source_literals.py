@@ -42,6 +42,7 @@ UNIT_FILES = tuple(
         "cli_eval.py",
         "eval/discovery_scorecard.py",
         "eval/discovery_scorecard_utils.py",
+        "eval/discovery_scorecard_identity_utils.py",
         "intake/run/scorecard.py",
         "connectors/duckdb.py",
         "connectors/duckdb_utils.py",
