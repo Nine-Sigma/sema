@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from sema.connectors.databricks_utils import unique_keys_from_rows, unique_keys_query
 from sema.models.assertions import Assertion
 from sema.models.extraction import (
     ExtractedColumn,
@@ -79,6 +80,10 @@ class Connector(ABC):
         cursor/connection handling.
         """
         ...
+
+    def extract_unique_keys(self, catalog: str, schema: str) -> list[tuple[str, tuple[str, ...]]]:
+        """Each primary key and unique constraint one schema declares: (relation, columns)."""
+        return unique_keys_from_rows(self.execute_query(unique_keys_query(catalog, schema)))
 
     def execute_query_with_columns(
         self, query: str, *, max_rows: int | None = None, timeout_s: float | None = None,

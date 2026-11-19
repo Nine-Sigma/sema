@@ -24,13 +24,12 @@ from sema.eval.discovery_scorecard_utils import (
     binding_read,
     code_relation,
     columns_by_row_count,
+    columns_key,
     declared_join_key,
     graph_join_key,
     join_holds,
     label_holds,
     listed_codes,
-    unique_keys,
-    unique_keys_query,
 )
 from sema.intake.run.scorecard import VERDICTS, Cells, Key, KindScore, kind_score, verdicts
 from sema.models.assertions import AssertionPredicate
@@ -132,10 +131,10 @@ def declared_constraints(
 ) -> dict[str, Cells]:
     """Declared unique keys and foreign keys; a foreign key on unique columns is one to one."""
     tables = connector.discover_tables(catalog, schemas or None)
-    candidate_keys = {
-        key: UNIQUE
+    candidate_keys: Cells = {
+        (relation.lower(), columns_key(columns)): UNIQUE
         for schema in sorted({table.schema for table in tables})
-        for key in unique_keys(connector.execute_query(unique_keys_query(catalog, schema)))
+        for relation, columns in connector.extract_unique_keys(catalog, schema)
     }
     joins = {
         key: ONE_TO_ONE if key[:2] in candidate_keys else MANY_TO_ONE

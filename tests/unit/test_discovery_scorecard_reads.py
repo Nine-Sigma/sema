@@ -14,9 +14,10 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from sema.connectors.databricks_utils import unique_keys_from_rows
 from sema.connectors.duckdb import DuckDBConnector
 from sema.eval.discovery_scorecard import declared_constraints, recheck, render, score_discovery
-from sema.eval.discovery_scorecard_utils import read_oracle, unique_keys
+from sema.eval.discovery_scorecard_utils import read_oracle
 from sema.models.config import DuckDBConfig
 from tests.support.connector_fixture import (
     CATALOG,
@@ -115,7 +116,7 @@ def test_a_join_whose_values_are_not_contained_does_not_recheck(
 def test_unique_keys_groups_each_constraints_columns() -> None:
     rows = [("T", "pk_t", "b"), ("T", "pk_t", "a"), ("T", "uq_t", "c")]
 
-    assert unique_keys(rows) == {("t", "a+b"), ("t", "c")}
+    assert unique_keys_from_rows(rows) == [("T", ("b", "a")), ("T", ("c",))]
 
 
 def test_a_foreign_key_on_declared_unique_columns_is_one_to_one(
