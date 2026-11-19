@@ -109,6 +109,17 @@ def test_a_sharing_edge_on_a_relation_with_no_assertion_is_read() -> None:
     assert shared == {("lot_rev", "lot_no"): ["lot_note", "lot_tag"]}
 
 
+def test_an_open_sharing_edge_is_not_counted() -> None:
+    driver = _Driver({"has_key": [], "has_identity": [_identity("proven")], EDGES: [
+        *_edges("proven"),
+        _edge("Lot_Wait", "Lot", key_columns=["lot_no"], owner=False, verification="open"),
+    ]})
+
+    facts = identity_facts(*read_identity(driver, "cat", ["s"]))
+
+    assert facts["entity_shared_across_relations"] == {("lot_rev", "lot_no"): ["lot_note", "lot_tag"]}
+
+
 def test_an_accepted_set_the_table_does_not_hold_as_its_key_is_no_candidate_key() -> None:
     assert ("lot", "tag") not in _facts("supported")["candidate_key"]
 
