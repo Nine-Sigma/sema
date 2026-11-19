@@ -25,6 +25,7 @@ from sema.eval.discovery_scorecard_identity_utils import (
     HAS_IDENTITY,
     HAS_KEY,
     IDENTITY_ASSERTIONS,
+    KEYED_ENTITY_EDGES,
     NULL_KEY_POLICY,
     REJECTED,
     SINGLE,
@@ -33,7 +34,7 @@ from sema.eval.discovery_scorecard_identity_utils import (
     EntityRead,
     IdentityRecheck,
     KeyRead,
-    entity_read,
+    entity_reads,
     key_read,
     rule_word,
 )
@@ -182,13 +183,14 @@ def read_identity(
     driver: Any, catalog: str | None = None, schemas: list[str] | None = None,
 ) -> tuple[list[KeyRead], list[EntityRead]]:
     """Every key and entity fact the build wrote for the catalog and schemas."""
+    scope = {"catalog": catalog, "schemas": schemas or None}
     with driver.session() as session:
         keys, entities = (
-            list(session.run(IDENTITY_ASSERTIONS, predicate=predicate, catalog=catalog,
-                             schemas=schemas or None))
+            list(session.run(IDENTITY_ASSERTIONS, predicate=predicate, **scope))
             for predicate in (HAS_KEY, HAS_IDENTITY)
         )
-    return [key_read(record) for record in keys], [entity_read(record) for record in entities]
+        edges = list(session.run(KEYED_ENTITY_EDGES, **scope))
+    return [key_read(record) for record in keys], entity_reads(entities, edges)
 
 
 def identity_facts(keys: Iterable[KeyRead], entities: Iterable[EntityRead]) -> dict[str, Cells]:
@@ -204,7 +206,7 @@ def identity_facts(keys: Iterable[KeyRead], entities: Iterable[EntityRead]) -> d
                         for read in keys if read.verification in STATED_GRADES},
         ENTITY_COARSER: {(read.relation.lower(),): columns_key(identity.key_columns)
                          for read in stated if (identity := read.identity) is not None},
-        ENTITY_SHARED: _shared_entities(stated),
+        ENTITY_SHARED: _shared_entities(stated, entities),
         NULL_KEY_POLICY: {(relation.lower(), columns_key(columns)): rows
                           for relation, columns, rows, grade in measured
                           if columns and rows is not None and grade != REJECTED},
@@ -213,16 +215,17 @@ def identity_facts(keys: Iterable[KeyRead], entities: Iterable[EntityRead]) -> d
     }
 
 
-def _shared_entities(stated: list[EntityRead]) -> Cells:
-    """Each owner edge's entity, keyed by its relation and key, to the other relations whose
-    edge on that entity carries key columns; an L2 edge carries none."""
+def _shared_entities(stated: list[EntityRead], entities: list[EntityRead]) -> Cells:
+    """Each stated owner edge's entity, keyed by its relation and key, to the other relations
+    whose edge on that entity carries key columns and is not rejected; an L2 edge carries none."""
     shared: Cells = {}
     for owner in stated:
         if owner.owner is not True or not owner.key_columns:
             continue
-        others = sorted({read.relation.lower() for read in stated
+        others = sorted({read.relation.lower() for read in entities
                          if read.entity == owner.entity and read.key_columns
-                         and read.owner is not True and read.relation != owner.relation})
+                         and read.owner is not True and read.verification != REJECTED
+                         and read.relation != owner.relation})
         if others:
             shared[(owner.relation.lower(), columns_key(owner.key_columns))] = others
     return shared

@@ -1,15 +1,15 @@
 """The identity facts behind the discovery scorecard: their graph reads and their rechecks.
 
 A key or entity fact is read as the build graph holds it (contract F6): a `has_key` or
-`has_identity` assertion, its relation's `key_columns`, and the relation's `ENTITY_ON_TABLE`
-edges. A recheck recounts a fact through `RelationEvidence` and decides it with the build's own
-predicates in `engine.identity_utils`.
+`has_identity` assertion, its relation's `key_columns`, and the scope's
+`ENTITY_ON_TABLE` edges that carry `key_columns`. A recheck recounts a fact through
+`RelationEvidence` and decides it with the build's own predicates in `engine.identity_utils`.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
@@ -34,13 +34,18 @@ REJECTED = "rejected"
 # shortcut: the predicate words N4 and N5 add to `AssertionPredicate`; use the enum once merged.
 HAS_KEY = "has_key"
 HAS_IDENTITY = "has_identity"
+IN_SCOPE = (
+    "($catalog IS NULL OR t.catalog = $catalog) AND ($schemas IS NULL OR t.schema_name IN $schemas)"
+)
 IDENTITY_ASSERTIONS = (
     "MATCH (a:Assertion {predicate: $predicate}) WHERE a.status <> 'superseded' "
-    "MATCH (t:Table {ref: a.subject_ref}) "
-    "WHERE ($catalog IS NULL OR t.catalog = $catalog) "
-    "AND ($schemas IS NULL OR t.schema_name IN $schemas) "
-    "RETURN t.name AS relation, a.payload AS payload, properties(t).key_columns AS table_key, "
-    "[(e:Entity)-[r:ENTITY_ON_TABLE]->(t) | [e.name, properties(r)]] AS edges"
+    f"MATCH (t:Table {{ref: a.subject_ref}}) WHERE {IN_SCOPE} "
+    "RETURN t.name AS relation, a.payload AS payload, properties(t).key_columns AS table_key"
+)
+KEYED_ENTITY_EDGES = (
+    "MATCH (e:Entity)-[r:ENTITY_ON_TABLE]->(t:Table) "
+    f"WHERE r.key_columns IS NOT NULL AND {IN_SCOPE} "
+    "RETURN t.name AS relation, e.name AS entity, properties(r) AS properties"
 )
 
 
@@ -82,16 +87,32 @@ def key_read(record: Mapping[str, Any]) -> KeyRead:
     return KeyRead(record["relation"], columns, grade, _evidence(payload).get("null_rows"))
 
 
-def entity_read(record: Mapping[str, Any]) -> EntityRead:
-    """A `has_identity` assertion: its entity's edge on the relation states the fact, and the
-    assertion's evidence its counts."""
-    payload = json.loads(record["payload"])
-    entity, evidence = str(payload.get("entity")), _evidence(payload)
-    edge: dict[str, Any] = next(
-        (properties for name, properties in record["edges"] if name == entity), {})
+def entity_reads(
+    assertions: Iterable[Mapping[str, Any]], edges: Iterable[Mapping[str, Any]],
+) -> list[EntityRead]:
+    """Each `has_identity` assertion with its entity's keyed edge on the relation, then each
+    keyed edge no assertion covers, such as a relation sharing an owner's entity."""
+    keyed = {(record["relation"], record["entity"]): dict(record["properties"])
+             for record in edges}
+    reads = []
+    for record in assertions:
+        payload = json.loads(record["payload"])
+        entity = str(payload.get("entity"))
+        edge = keyed.pop((record["relation"], entity), {})
+        reads.append(entity_read(record["relation"], entity, edge, payload))
+    return reads + [entity_read(relation, entity, edge, {})
+                    for (relation, entity), edge in keyed.items()]
+
+
+def entity_read(
+    relation: str, entity: str, edge: Mapping[str, Any], payload: Mapping[str, Any],
+) -> EntityRead:
+    """The entity's edge on the relation states the fact; its assertion's evidence, when there
+    is one, the counts."""
+    evidence = _evidence(payload)
     key, identity = edge.get("key_columns") or payload.get("key_columns"), edge.get("identity")
     return EntityRead(
-        relation=record["relation"], entity=entity, key_columns=tuple(key) if key else None,
+        relation=relation, entity=entity, key_columns=tuple(key) if key else None,
         owner=edge.get("owner"),
         identity=EntityIdentity.model_validate_json(identity) if identity else None,
         verification=edge.get("verification", payload.get("verification")),
