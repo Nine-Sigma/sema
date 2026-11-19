@@ -26,6 +26,7 @@ from typing import Any
 from sema.engine.join_detector_utils import (
     COVERAGE_THRESHOLD,
     Containment,
+    containment,
     normalized_name,
 )
 from sema.models.assertions import Assertion, AssertionPredicate, AssertionStatus
@@ -152,6 +153,36 @@ def label_reading(
         return None
     labels: dict[str, str | None] = {code: text for code, (text, _) in majority.items()}
     return violation_rate, labels
+
+
+def label_column(
+    readings: Sequence[tuple[ExtractedColumn, tuple[float, dict[str, str | None]]]],
+    display: str | None,
+) -> tuple[ExtractedColumn, tuple[float, dict[str, str | None]]] | None:
+    """The one text column a code key labels with: a constant text never labels, and among
+    several the one the display role names, under its normalized name, wins."""
+    varying = [
+        (text, reading) for text, reading in readings
+        if len(reading[1]) < 2 or len(set(reading[1].values())) > 1
+    ]
+    if len(varying) > 1 and display is not None:
+        varying = [
+            (text, reading) for text, reading in varying
+            if normalized_name(text.name) == normalized_name(display)
+        ]
+    return varying[0] if len(varying) == 1 else None
+
+
+def loaded_relation(
+    listed: Mapping[str, str | None],
+    relations: Sequence[tuple[ExtractedColumn, Mapping[str, str | None]]],
+) -> ExtractedColumn | None:
+    """The one code key the column holds on that also lists a dictionary list's codes."""
+    if not listed:
+        return None
+    codes = dict.fromkeys(listed, 1)
+    keys = [key for key, keyed in relations if containment(codes, keyed).holds]
+    return keys[0] if len(keys) == 1 else None
 
 
 def _assertion(
