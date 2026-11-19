@@ -285,7 +285,22 @@ def entity_facts(
         facts.extend(shares)
     for fact in coarse_owned:
         facts.extend(_shares(scope, fact, facts))
-    return facts
+    return _one_per_relation(facts)
+
+
+def _one_per_relation(facts: Sequence[EntityFact]) -> list[EntityFact]:
+    """F6 holds one edge per entity and relation: a fact with an identity outranks an accepted
+    one, which outranks the rest; the first of equals stays."""
+    kept: dict[tuple[str, Relation], EntityFact] = {}
+    for fact in facts:
+        held = kept.setdefault((fact.entity, fact.relation), fact)
+        if _rank(fact) > _rank(held):
+            kept[(fact.entity, fact.relation)] = fact
+    return list(kept.values())
+
+
+def _rank(fact: EntityFact) -> tuple[bool, bool]:
+    return fact.identity is not None, fact.verification in ACCEPTED
 
 
 def _coarser(
