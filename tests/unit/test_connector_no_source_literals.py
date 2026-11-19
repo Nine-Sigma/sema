@@ -76,6 +76,8 @@ UNIT_FILES = tuple(
         "graph/queries.py",
         "pipeline/identity.py",
         "graph/identity_read_forms.py",
+        "engine/identity_prompt.py",
+        "llm_client.py",
     )
 )
 LITERAL_ROOTS = (
