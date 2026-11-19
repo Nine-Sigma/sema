@@ -287,7 +287,9 @@ def test_the_discovery_command_scores_the_graph_against_the_declared_constraints
         cell: str(count) for cell, count in JOIN_SHAPE.items()
     }
     assert rows["join"]["rechecked"] == str(len(SINGLE_COLUMN_GRAPH_JOIN_KEYS))
-    assert rows["candidate_key"]["missing"] == str(len(MAIN_TABLES))
+    assert {cell: rows["candidate_key"][cell] for cell in ("equal", "missing", "wrong")} == {
+        "equal": str(len(MAIN_TABLES)), "missing": "0", "wrong": "0",
+    }
 
 
 def test_the_discovery_command_scores_the_graph_against_an_oracle_file(
