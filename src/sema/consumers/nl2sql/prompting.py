@@ -9,6 +9,7 @@ from sema.consumers.nl2sql.prompting_utils import (
     _add_entity_context_section,
     _add_governed_values_section,
     _add_join_section,
+    _add_keys_and_entities_section,
     _add_metrics_section,
     _add_result_shape,
     _add_rules_and_question,
@@ -65,6 +66,7 @@ def render_sections(sco: SemanticContextObject, dialect: str) -> list[str]:
     _add_entity_context_section(parts, sco)
     _add_tables_and_columns(parts, sco)
     _add_join_section(parts, sco)
+    _add_keys_and_entities_section(parts, sco)
     _add_governed_values_section(parts, sco)
     _add_metrics_section(parts, sco)
     _add_ancestry_section(parts, sco)
@@ -171,6 +173,7 @@ def _build_with_cuts(
         parts, sco, max_cols=max_cols, annotate=annotate,
     )
     _add_join_section(parts, sco)
+    _add_keys_and_entities_section(parts, sco)
     if not skip_values:
         _add_governed_values_section(
             parts, sco, max_values=max_values,

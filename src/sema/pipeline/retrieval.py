@@ -23,6 +23,7 @@ from sema.pipeline.retrieval_utils import (
     _normalize_vector_hit,
     mark_properties_defining_question,
     merge_and_rank_candidates,
+    read_forms,
     tokenize_query,
 )
 
@@ -228,9 +229,7 @@ class RetrievalEngine:
         for r in expansion.get("physical", []):
             candidates.append({
                 "type": "entity",
-                "name": next(
-                    (n for n in entity_names), r["table_name"]
-                ),
+                "name": r.get("entity_name", entity_names[0]),
                 "table": r["table_name"],
                 "schema": r.get("schema_name", ""),
                 "catalog": r.get("catalog", ""),
@@ -240,6 +239,7 @@ class RetrievalEngine:
                 "columns": r.get("columns", []),
                 "status": "auto",
                 "confidence_policy": "semantic",
+                **read_forms(r),
             })
 
         for j in expansion.get("joins", []):

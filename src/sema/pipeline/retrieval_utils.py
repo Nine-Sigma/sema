@@ -29,6 +29,10 @@ if TYPE_CHECKING:
     from sema.pipeline.retrieval import RetrievalEngine
 
 _PROPERTY_OWNER_CONFIDENCE = 0.6
+_READ_FORMS = (
+    "table_key_columns", "table_key_verification", "key_columns", "verification",
+    "identity", "null_key_rows", "shared_entities",
+)
 
 __all__ = [
     "_dedup_artifacts",
@@ -45,14 +49,25 @@ __all__ = [
 def _expand_physical(
     engine: RetrievalEngine, entity_names: list[str]
 ) -> list[dict[str, Any]]:
+    """Each entity's relations, named by their entity. An edge with `owner = false` belongs
+    to an entity another relation owns, so it brings no relation."""
     scope = getattr(engine, "_scope", None)
     physical: list[dict[str, Any]] = []
     for name in entity_names:
         try:
-            physical.extend(_resolve_physical_for(engine, name, scope))
+            physical.extend(
+                {**row, "entity_name": name}
+                for row in _resolve_physical_for(engine, name, scope)
+                if row.get("owner") is not False
+            )
         except Exception:
             pass
     return physical
+
+
+def read_forms(row: dict[str, Any]) -> dict[str, Any]:
+    """The identity facts a physical mapping row carries, for its entity candidate."""
+    return {k: row[k] for k in _READ_FORMS if row.get(k) is not None}
 
 
 def _resolve_physical_for(
@@ -219,6 +234,7 @@ def _property_owners(
             "columns": r.get("columns", []),
             "status": hit.get("status", "auto"),
             "confidence_policy": "semantic",
+            **read_forms(r),
         }
         for r in _expand_physical(engine, [entity_name])
     ]
@@ -313,6 +329,7 @@ def _expand_alias_hit(
                 "columns": r.get("columns", []),
                 "status": hit_status,
                 "confidence_policy": "semantic",
+                **read_forms(r),
             })
     elif "Property" in target_labels:
         prop_hit = {
@@ -352,6 +369,7 @@ def _expand_alias_hit(
                 "columns": r.get("columns", []),
                 "status": hit_status,
                 "confidence_policy": "semantic",
+                **read_forms(r),
             })
 
     return results
