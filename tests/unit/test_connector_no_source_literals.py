@@ -73,6 +73,8 @@ UNIT_FILES = tuple(
         "engine/identity_utils.py",
         "connectors/databricks_utils.py",
         "graph/queries.py",
+        "pipeline/identity.py",
+        "graph/identity_read_forms.py",
     )
 )
 LITERAL_ROOTS = (
