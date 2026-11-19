@@ -39,7 +39,7 @@ def _identity(grade: str) -> dict[str, Any]:
                "identity": LATEST.model_dump(mode="json"), "verification": grade,
                "alternatives": [], "evidence": {"rows": 9, "groups": 4, "null_rows": 1,
                                                 "conflict_share": {"note": 0.0, "size": 0.5}}}
-    edges = [{"entity": "Lot", "edge": _owner_edge(grade)}, {"entity": "Other", "edge": {}}]
+    edges = [["Lot", _owner_edge(grade)], ["Other", {}]]
     return {"relation": "Lot_Rev", "payload": json.dumps(payload), "table_key": ["rev_id"],
             "edges": edges}
 

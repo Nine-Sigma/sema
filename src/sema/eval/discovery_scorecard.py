@@ -16,7 +16,27 @@ from pydantic import BaseModel, ConfigDict
 from sema.connectors.base import Connector
 from sema.engine.coded_column_utils import VERIFIED
 from sema.engine.join_detector_utils import containment
-from sema.engine.warehouse_lookup import WarehouseValues
+from sema.engine.warehouse_lookup import RelationEvidence, WarehouseValues
+from sema.eval.discovery_scorecard_identity_utils import (
+    ATTRIBUTE_RULE,
+    CANDIDATE_KEY,
+    ENTITY_COARSER,
+    ENTITY_SHARED,
+    HAS_IDENTITY,
+    HAS_KEY,
+    IDENTITY_ASSERTIONS,
+    NULL_KEY_POLICY,
+    REJECTED,
+    SINGLE,
+    STATED_GRADES,
+    UNIQUE,
+    EntityRead,
+    IdentityRecheck,
+    KeyRead,
+    entity_read,
+    key_read,
+    rule_word,
+)
 from sema.eval.discovery_scorecard_utils import (
     CODED_BINDINGS,
     GRAPH_JOINS,
@@ -42,7 +62,6 @@ FACT_KINDS = (
     "universe_and_special_values", "term_default",
 )
 JOIN = "join"
-CANDIDATE_KEY = "candidate_key"
 BINDING = "column_to_concept_binding"
 LABEL_SOURCE = "label_source"
 MAPPING_COVERAGE = "mapping_coverage"
@@ -50,7 +69,6 @@ OBSERVED_VALUES = "observed_values"
 CODED_KINDS = (BINDING, LABEL_SOURCE, MAPPING_COVERAGE, OBSERVED_VALUES)
 DICTIONARY_ONLY = "dictionary_only"
 KEY_ONLY = "key_only"
-UNIQUE = "unique"
 MANY_TO_ONE = "many_to_one"
 ONE_TO_ONE = "one_to_one"
 NOT_PRODUCED = "not produced"
@@ -150,13 +168,78 @@ def recheck(
     connector: Connector, catalog: str, schemas: list[str] | None,
     produced: Mapping[str, Cells],
 ) -> dict[str, int]:
-    """Produced facts whose evidence recomputes on the data; only joins have a recheck."""
+    """Produced joins and identity facts whose evidence recomputes on the data."""
     tables = {
         table.table_name.lower(): (table.schema, table.table_name)
         for table in connector.discover_tables(catalog, schemas or None)
     }
     joins = produced.get(JOIN, {})
-    return {JOIN: sum(join_holds(connector, catalog, tables, key) for key in joins)}
+    identity = IdentityRecheck(RelationEvidence(connector, catalog), tables).counts(produced)
+    return {JOIN: sum(join_holds(connector, catalog, tables, key) for key in joins), **identity}
+
+
+def read_identity(
+    driver: Any, catalog: str | None = None, schemas: list[str] | None = None,
+) -> tuple[list[KeyRead], list[EntityRead]]:
+    """Every key and entity fact the build wrote for the catalog and schemas."""
+    with driver.session() as session:
+        keys, entities = (
+            list(session.run(IDENTITY_ASSERTIONS, predicate=predicate, catalog=catalog,
+                             schemas=schemas or None))
+            for predicate in (HAS_KEY, HAS_IDENTITY)
+        )
+    return [key_read(record) for record in keys], [entity_read(record) for record in entities]
+
+
+def identity_facts(keys: Iterable[KeyRead], entities: Iterable[EntityRead]) -> dict[str, Cells]:
+    """Key and entity facts in oracle keys: a fact graded `proven` or `supported`, and every
+    NULL-key count whose fact is not rejected, since a count is a measurement."""
+    keys, entities = list(keys), list(entities)
+    stated = [read for read in entities if read.verification in STATED_GRADES]
+    measured = [(read.relation, read.key_columns, read.null_rows, read.verification)
+                for read in entities]
+    measured += [(read.relation, read.columns, read.null_rows, read.verification) for read in keys]
+    return {
+        CANDIDATE_KEY: {(read.relation.lower(), columns_key(read.columns)): UNIQUE
+                        for read in keys if read.verification in STATED_GRADES},
+        ENTITY_COARSER: {(read.relation.lower(),): columns_key(identity.key_columns)
+                         for read in stated if (identity := read.identity) is not None},
+        ENTITY_SHARED: _shared_entities(stated),
+        NULL_KEY_POLICY: {(relation.lower(), columns_key(columns)): rows
+                          for relation, columns, rows, grade in measured
+                          if columns and rows is not None and grade != REJECTED},
+        ATTRIBUTE_RULE: {fact: rule for read in stated
+                         for fact, rule in _attribute_rules(read).items()},
+    }
+
+
+def _shared_entities(stated: list[EntityRead]) -> Cells:
+    """Each owner edge's entity, keyed by its relation and key, to the other relations whose
+    edge on that entity carries key columns; an L2 edge carries none."""
+    shared: Cells = {}
+    for owner in stated:
+        if owner.owner is not True or not owner.key_columns:
+            continue
+        others = sorted({read.relation.lower() for read in stated
+                         if read.entity == owner.entity and read.key_columns
+                         and read.owner is not True and read.relation != owner.relation})
+        if others:
+            shared[(owner.relation.lower(), columns_key(owner.key_columns))] = others
+    return shared
+
+
+def _attribute_rules(read: EntityRead) -> Cells:
+    """An entity coarser than its row: `single` for each column no entity group holds two values
+    of, then the rule `identity.attributes` names for each resolved column."""
+    if read.identity is None:
+        return {}
+    relation = read.relation.lower()
+    rules: Cells = {(relation, column.lower()): SINGLE
+                    for column, share in read.conflict_share.items() if share == 0}
+    rules.update({(relation, attribute.column.lower()): word
+                  for attribute in read.identity.attributes
+                  if (word := rule_word(attribute)) is not None})
+    return rules
 
 
 def read_coded_bindings(
