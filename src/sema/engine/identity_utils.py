@@ -337,8 +337,10 @@ def _resolve(scope: EntityScope, fact: EntityFact, latest_by: str | None) -> Non
     held = scope.counts.evidence.conflicts(fact.relation, fact.key_columns, attributes)
     groups, conflicting = held if held is not None else (0, {})
     by = (named_columns(columns, [latest_by]) or (None,))[0] if latest_by else None
+    # A NULL ordering value is no greatest value, so it picks no row of its entity.
     ordered = by is not None and by not in fact.key_columns and (
-        scope.counts.distinct(fact.relation, (*fact.key_columns, by)) == fact.rows)
+        scope.counts.distinct(fact.relation, (*fact.key_columns, by)) == fact.rows
+        and scope.counts.null_rows(fact.relation, (by,)) == 0)
     fact.conflict_share = conflict_shares(groups, conflicting)
     fact.identity = entity_identity(fact.key_columns, conflicting, by if ordered else None)
 
