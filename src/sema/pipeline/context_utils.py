@@ -135,6 +135,7 @@ def _asset_identity(ec: dict[str, Any]) -> dict[str, Any]:
                 entity=s["entity"],
                 owner_table=f"{o.get('catalog') or ''}.{o.get('schema') or ''}.{o['table']}",
                 key_columns=list(s["key_columns"]),
+                identity=_parse_identity(s.get("identity")),
             )
             for s in ec.get("shared_entities") or []
             if s.get("verification") in _RENDERED_GRADES and (o := s.get("owner"))

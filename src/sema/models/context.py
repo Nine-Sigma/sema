@@ -57,6 +57,7 @@ class SharedEntity(BaseModel):
     entity: str
     owner_table: str
     key_columns: list[str]
+    identity: EntityIdentity | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class PhysicalAsset(BaseModel):

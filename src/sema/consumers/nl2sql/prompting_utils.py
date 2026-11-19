@@ -161,8 +161,10 @@ def _key_lines(sco: SemanticContextObject) -> Iterator[str]:
         if asset.key_columns:
             yield f"{fqn}: one row per {', '.join(asset.key_columns)}"
         for shared in asset.shared_entities:
-            yield (f"{fqn}: rows belong to {shared.entity} of {shared.owner_table} "
-                   f"through {', '.join(shared.key_columns)}")
+            clauses = [f"rows belong to {shared.entity} of {shared.owner_table} "
+                       f"through {', '.join(shared.key_columns)}",
+                       *_ordering_clauses(shared.entity, shared.identity)]
+            yield f"{fqn}: {'; '.join(clauses)}"
 
 
 def _entity_lines(sco: SemanticContextObject) -> Iterator[str]:
@@ -176,14 +178,18 @@ def _entity_sentence(entity: ResolvedEntity, identity: EntityIdentity) -> str:
     clauses = [f"several rows can hold one {name}", f"one {name} per distinct {key}"]
     if entity.null_key_rows:
         clauses.append(f"{entity.null_key_rows} rows have a NULL in {key}")
+    return "; ".join([*clauses, *_ordering_clauses(name, identity)])
+
+
+def _ordering_clauses(name: str, identity: EntityIdentity | None) -> list[str]:
     ordering = dict.fromkeys(
-        a.by for a in identity.attributes if a.rule == ResolutionRule.MAX_BY and a.by
+        a.by for a in (identity.attributes if identity else ())
+        if a.rule == ResolutionRule.MAX_BY and a.by
     )
-    clauses.extend(
+    return [
         f"each {name} has exactly one row per {by}, so the greatest {by} picks one row of each"
         for by in ordering
-    )
-    return "; ".join(clauses)
+    ]
 
 
 def _format_value(value: dict[str, str | None]) -> str:
