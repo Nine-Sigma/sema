@@ -11,6 +11,7 @@ import dataclasses
 import importlib
 import json
 import sqlite3
+import subprocess
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import closing
 from pathlib import Path
@@ -107,9 +108,6 @@ PREDATING_HITS = {
          ("scorecard.py", "kind")],
         "the oracle file format's field name (unit 6 contract); unit 5's code fixture uses it as a word",
     ),
-    ("config.py", "databricks-bge-large-en"): (
-        "d395b094 embedding model default; predates unit 3, see unit-3 STATE.md Waiting on Dean"
-    ),
     ("config.py", "5.4"): (
         "aed40d37 cdm_version default; predates unit 3, see unit-3 STATE.md Waiting on Dean"
     ),
@@ -129,20 +127,31 @@ PREDATING_HITS = {
     ("queries.py", "column name"): (
         "Column node keys in Cypher; predates unit 7, scanned from 2026-11-19 (N7)"
     ),
-    ("queries.py", "maps to"): "a comment's words; predates unit 7, scanned from 2026-11-19 (N7)",
 }
 # Source fixture modules: their public constants name the connector fixture's source.
 CONNECTOR_FIXTURES = tuple(sorted((REPO_ROOT / "tests" / "support").glob("connector_fixture*.py")))
 
 
 def literal_files(roots: Iterable[Path] = LITERAL_ROOTS) -> list[Path]:
-    """Source files only: bytecode that importing a fixture builder leaves is skipped."""
+    """Source files only: bytecode and files git ignores, such as local profiles, are skipped."""
+    ignored = _ignored_files()
     return sorted(
         path
         for root in roots
         for path in root.rglob("*")
-        if path.is_file() and "__pycache__" not in path.relative_to(root).parts
+        if path.is_file()
+        and "__pycache__" not in path.relative_to(root).parts
+        and path not in ignored
     )
+
+
+def _ignored_files() -> set[Path]:
+    roots = [str(root.relative_to(REPO_ROOT)) for root in LITERAL_ROOTS]
+    listed = subprocess.run(
+        ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--", *roots],
+        cwd=REPO_ROOT, capture_output=True, check=True,
+    ).stdout.decode()
+    return {REPO_ROOT / name for name in listed.split("\0") if name}
 
 
 def _catalog_names(path: Path) -> set[str]:
