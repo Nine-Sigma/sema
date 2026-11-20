@@ -86,11 +86,11 @@ def test_the_guard_scans_every_package_file_type_outside_the_profiles(tmp_path: 
     package = tmp_path / "package"
     for relative in ("notes.sql", "profiles/source.yaml", "__pycache__/m.cpython-312.pyc"):
         (package / relative).parent.mkdir(parents=True, exist_ok=True)
-    (package / "notes.sql").write_text("SELECT 1\nFROM partner_dev.s.t\n")
-    (package / "profiles/source.yaml").write_text("relation: partner_dev.s.t\n")
-    (package / "__pycache__/m.cpython-312.pyc").write_bytes(b"\x00\xffpartner_dev")
+    (package / "notes.sql").write_text("SELECT 1\nFROM cancer_registry.s.t\n")
+    (package / "profiles/source.yaml").write_text("relation: cancer_registry.s.t\n")
+    (package / "__pycache__/m.cpython-312.pyc").write_bytes(b"\x00\xffcancer_registry")
     hits = [h for h in literal_hits(scanned_files(package)) if h.startswith(str(package))]
-    assert hits == [f"{package / 'notes.sql'}:2: partner_dev"]
+    assert hits == [f"{package / 'notes.sql'}:2: cancer_registry"]
 
 
 def test_generic_code_and_tests_name_no_source() -> None:
