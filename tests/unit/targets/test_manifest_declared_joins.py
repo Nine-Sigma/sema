@@ -52,7 +52,7 @@ GOLDEN_HASHES: dict[str, str | None] = {
         "3a5c3a1f37ea879a71cd5107382d023915c6ab7144c6c7a74487229a99986212"
     ),
     "tests/unit/targets/fixtures/concept_manifest.yaml": (
-        "593bc64124d748c3533d172a1d8d5ae2e00f5cbc6af53925b08ffd411586be7d"
+        "caa3e2208cdad45eb88533a98dece807940d0729b6442e4032c15dbe94fbdaee"
     ),
     "tests/unit/targets/fixtures/golden_manifest.yaml": (
         "e8c9bfdc1026f1593686d197047c0d49acbd97db343badb73d0bba847241644b"
