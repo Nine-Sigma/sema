@@ -1,34 +1,5 @@
 from __future__ import annotations
 
-# Every edge is returned, one with `owner = false` too: the retrieval reader drops it.
-_PHYSICAL_MAPPING_TAIL = (
-    "OPTIONAL MATCH (e)-[:HAS_PROPERTY]->(p:Property)"
-    "-[:PROPERTY_ON_COLUMN]->(c:Column)-[:IN_TABLE]->(t) "
-    "WITH t, r.owner AS owner, r.key_columns AS key_columns, "
-    "r.verification AS verification, r.identity AS identity, "
-    "r.null_key_rows AS null_key_rows, "
-    "collect({property: p.name, column: c.name, "
-    "data_type: c.data_type, semantic_type: p.semantic_type, "
-    "labels: CASE WHEN c IS NULL THEN [] ELSE "
-    "[(c)-[l:LABELED_BY]->(lc:Column)-[:IN_TABLE]->(lt:Table) | "
-    "{table: lt.name, column: lc.name, verification: l.verification, "
-    "via: [(jp:JoinPath)-[:USES]->(lt) WHERE jp.name IN coalesce(l.via, []) "
-    "| jp.join_predicates]}] END}) AS columns "
-    "RETURN t.name AS table_name, t.schema_name AS schema_name, "
-    "t.catalog AS catalog, columns, "
-    "t.key_columns AS table_key_columns, "
-    "t.key_verification AS table_key_verification, "
-    "owner, key_columns, verification, identity, null_key_rows, "
-    "[(o:Entity)-[s:ENTITY_ON_TABLE]->(t) "
-    "WHERE s.key_columns IS NOT NULL AND coalesce(s.owner, false) = false | "
-    "{entity: o.name, key_columns: s.key_columns, verification: s.verification, "
-    "identity: s.identity, "
-    "owner: head([(o)-[w:ENTITY_ON_TABLE]->(ot:Table) WHERE w.owner = true | "
-    "{catalog: ot.catalog, schema: ot.schema_name, table: ot.name}])}] "
-    "AS shared_entities"
-)
-
-
 class CypherQueries:
     """Parameterized Cypher query templates for the semantic graph."""
 
@@ -92,10 +63,41 @@ class CypherQueries:
         )
 
     @staticmethod
+    def _physical_mapping_tail() -> str:
+        # Every edge is returned, one with `owner = false` too:
+        # the retrieval reader drops it.
+        return (
+            "OPTIONAL MATCH (e)-[:HAS_PROPERTY]->(p:Property)"
+            "-[:PROPERTY_ON_COLUMN]->(c:Column)-[:IN_TABLE]->(t) "
+            "WITH t, r.owner AS owner, r.key_columns AS key_columns, "
+            "r.verification AS verification, r.identity AS identity, "
+            "r.null_key_rows AS null_key_rows, "
+            "collect({property: p.name, column: c.name, "
+            "data_type: c.data_type, semantic_type: p.semantic_type, "
+            "labels: CASE WHEN c IS NULL THEN [] ELSE "
+            "[(c)-[l:LABELED_BY]->(lc:Column)-[:IN_TABLE]->(lt:Table) | "
+            "{table: lt.name, column: lc.name, verification: l.verification, "
+            "via: [(jp:JoinPath)-[:USES]->(lt) WHERE jp.name IN coalesce(l.via, []) "
+            "| jp.join_predicates]}] END}) AS columns "
+            "RETURN t.name AS table_name, t.schema_name AS schema_name, "
+            "t.catalog AS catalog, columns, "
+            "t.key_columns AS table_key_columns, "
+            "t.key_verification AS table_key_verification, "
+            "owner, key_columns, verification, identity, null_key_rows, "
+            "[(o:Entity)-[s:ENTITY_ON_TABLE]->(t) "
+            "WHERE s.key_columns IS NOT NULL AND coalesce(s.owner, false) = false | "
+            "{entity: o.name, key_columns: s.key_columns, verification: s.verification, "
+            "identity: s.identity, "
+            "owner: head([(o)-[w:ENTITY_ON_TABLE]->(ot:Table) WHERE w.owner = true | "
+            "{catalog: ot.catalog, schema: ot.schema_name, table: ot.name}])}] "
+            "AS shared_entities"
+        )
+
+    @staticmethod
     def resolve_physical_mapping() -> str:
         return (
             "MATCH (e:Entity {name: $entity_name})-[r:ENTITY_ON_TABLE]->(t:Table) "
-            f"{_PHYSICAL_MAPPING_TAIL}"
+            + CypherQueries._physical_mapping_tail()
         )
 
     @staticmethod
@@ -108,7 +110,7 @@ class CypherQueries:
             "MATCH (e:Entity {name: $entity_name})-[r:ENTITY_ON_TABLE]->(t:Table) "
             "WHERE (e.model_role = $model_role OR $model_role IS NULL) "
             "AND (e.schema_name = $schema_name OR $schema_name IS NULL) "
-            f"{_PHYSICAL_MAPPING_TAIL}"
+            + CypherQueries._physical_mapping_tail()
         )
 
     @staticmethod
