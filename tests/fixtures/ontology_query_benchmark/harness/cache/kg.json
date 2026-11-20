@@ -1,0 +1,24 @@
+{
+ "concepts": [
+  {
+   "name": "person",
+   "description": "A person record in the toy registry. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. "
+  },
+  {
+   "name": "visit",
+   "description": "A visit record in the toy registry. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. "
+  },
+  {
+   "name": "region",
+   "description": "A region record in the toy registry. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. "
+  },
+  {
+   "name": "status",
+   "description": "A status record in the toy registry. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. "
+  },
+  {
+   "name": "kind",
+   "description": "A kind record in the toy registry. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. It carries an identifier, a status and a region code. "
+  }
+ ]
+}

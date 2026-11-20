@@ -1,0 +1,27 @@
+# heldout4: correct oracle as far as spec_version 2 can state it, written 2026-10-23 at Dean's direction (S5 plan decision 13, task 0.4). The classification codes are the concepts: `Code` (widths 1, 2, 4, 7 at `Level` 1 to 4; 5,473 rows, unique, non-null) and `Class title`. The parent of a code is its prefix at the next shorter width (no separator); spec_version 2 has no prefix hierarchy form (parent column, level columns, separator path codes only), so this oracle carries no hierarchy section and the hierarchy is unscoreable until S6 adds a prefix parent rule. `Level` and `Hierarchical structure` are each code's depth and depth name, not concepts; no role reads them. The French file is the same classification in French; no translation template exists, so it is ignored (S6).
+# review_status: reviewed_correct
+# reviewed_by: Dean
+# reviewed_on: 2026-10-23
+concept_source:
+  spec_version: 2
+  id: heldout4
+  identity_system: heldout4
+  release: '2026-10-22'
+  default_provider: staging
+  shape:
+  - section: concepts
+    template: concept_list
+  scheme:
+    qualified_name: heldout4.heldout4
+    description: Standard Geographical Classification (SGC) 2021, Statistics Canada,
+      classification structure, English
+  concepts:
+    relation:
+      provider: staging
+      name: land_heldout4.sgc_cgt_2021_structure_eng
+    group_by: Code
+    roles:
+      concept_id: Code
+      name: Class title
+  term_storage:
+    inline_cap: 5000

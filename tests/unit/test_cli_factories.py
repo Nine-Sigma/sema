@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -219,3 +220,161 @@ class TestGetEmbedder:
     def test_unknown_embedding_provider_raises(self):
         with pytest.raises(ValueError, match="Unknown embedding provider"):
             self._call(provider="unknown")
+
+
+class TestGetEmbedderGateway:
+    """S0-07: OpenAI-compatible gateways get strings, not tiktoken id arrays."""
+
+    def _call(self, **overrides):
+        from sema.cli_factories import _get_embedder
+        config = EmbeddingConfig(api_key="test-key", **overrides)
+        return _get_embedder(config)
+
+    @patch("openai.resources.embeddings.Embeddings.create")
+    def test_openrouter_request_carries_input_as_strings(self, mock_create):
+        mock_create.return_value = {
+            "data": [{"embedding": [0.1, 0.2, 0.3], "index": 0}],
+        }
+        embedder = self._call(
+            provider="openrouter", model="baai/bge-large-en-v1.5",
+        )
+        vector = embedder.embed_query("hello world")
+        kwargs = mock_create.call_args.kwargs
+        assert kwargs["input"] == ["hello world"]
+        assert kwargs["model"] == "baai/bge-large-en-v1.5"
+        assert kwargs["encoding_format"] == "float"
+        assert vector == [0.1, 0.2, 0.3]
+
+    @patch("langchain_openai.OpenAIEmbeddings")
+    def test_openrouter_disables_ctx_length_check(self, mock_cls):
+        mock_cls.return_value = MagicMock()
+        self._call(provider="openrouter", model="baai/bge-large-en-v1.5")
+        kwargs = mock_cls.call_args.kwargs
+        assert kwargs["check_embedding_ctx_length"] is False
+        assert kwargs["model_kwargs"] == {"encoding_format": "float"}
+        assert kwargs["base_url"] == "https://openrouter.ai/api/v1"
+
+    @patch("langchain_openai.OpenAIEmbeddings")
+    def test_custom_disables_ctx_length_check(self, mock_cls):
+        mock_cls.return_value = MagicMock()
+        self._call(
+            provider="custom", model="local-embed",
+            base_url="http://localhost:8000/v1",
+        )
+        kwargs = mock_cls.call_args.kwargs
+        assert kwargs["check_embedding_ctx_length"] is False
+        assert kwargs["model_kwargs"] == {"encoding_format": "float"}
+        assert kwargs["base_url"] == "http://localhost:8000/v1"
+
+    @patch("langchain_openai.OpenAIEmbeddings")
+    def test_openai_kwargs_unchanged(self, mock_cls):
+        mock_cls.return_value = MagicMock()
+        self._call(provider="openai", model="text-embedding-3-small")
+        kwargs = mock_cls.call_args.kwargs
+        assert kwargs == {
+            "model": "text-embedding-3-small",
+            "api_key": "test-key",
+            "base_url": None,
+        }
+
+    @patch("langchain_openai.OpenAIEmbeddings")
+    def test_openrouter_and_custom_are_wrapped_for_truncation(self, mock_cls):
+        from sema.cli_factories_utils import TruncatingEmbedder
+        mock_cls.return_value = MagicMock()
+        openrouter = self._call(
+            provider="openrouter", model="baai/bge-large-en-v1.5",
+        )
+        custom = self._call(
+            provider="custom", model="x", base_url="http://localhost:8000/v1",
+        )
+        assert isinstance(openrouter, TruncatingEmbedder)
+        assert isinstance(custom, TruncatingEmbedder)
+        assert openrouter.context_tokens == 512
+
+    @patch("langchain_openai.OpenAIEmbeddings")
+    def test_openai_is_not_wrapped(self, mock_cls):
+        inner = MagicMock()
+        mock_cls.return_value = inner
+        assert self._call(provider="openai", model="text-embedding-3-small") is inner
+
+
+class TestGetEmbedderSentenceTransformers:
+    """S0-03: offline provider resolves with no Databricks import."""
+
+    def _call(self, **overrides):
+        from sema.cli_factories import _get_embedder
+        config = EmbeddingConfig(api_key="test-key", **overrides)
+        return _get_embedder(config)
+
+    @patch("sentence_transformers.SentenceTransformer")
+    def test_resolves_without_databricks(self, mock_cls, monkeypatch, tmp_path):
+        monkeypatch.delenv("DATABRICKS_HOST", raising=False)
+        monkeypatch.delenv("DATABRICKS_TOKEN", raising=False)
+        mock_cls.return_value = MagicMock()
+        blocked = {
+            "databricks": None, "databricks.sdk": None,
+            "databricks_langchain": None,
+        }
+        with patch.dict(sys.modules, blocked):
+            self._call(
+                provider="sentence-transformers", model="all-MiniLM-L6-v2",
+                cache_dir=str(tmp_path),
+            )
+        args, kwargs = mock_cls.call_args
+        assert args == ("all-MiniLM-L6-v2",)
+        assert kwargs == {"cache_folder": str(tmp_path), "local_files_only": True}
+
+    @patch("sentence_transformers.SentenceTransformer")
+    def test_env_var_route_reaches_factory(self, mock_cls, monkeypatch, tmp_path):
+        from sema.cli_factories import _get_embedder
+        monkeypatch.setenv("EMBEDDING_PROVIDER", "sentence-transformers")
+        monkeypatch.setenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+        monkeypatch.setenv("EMBEDDING_CACHE_DIR", str(tmp_path))
+        mock_cls.return_value = MagicMock()
+        _get_embedder(EmbeddingConfig())
+        assert mock_cls.call_args.kwargs["cache_folder"] == str(tmp_path)
+
+    @patch("sentence_transformers.SentenceTransformer")
+    def test_cache_dir_tilde_is_expanded(self, mock_cls):
+        mock_cls.return_value = MagicMock()
+        self._call(
+            provider="sentence-transformers", model="all-MiniLM-L6-v2",
+            cache_dir="~/hf-cache",
+        )
+        folder = mock_cls.call_args.kwargs["cache_folder"]
+        assert "~" not in folder and folder.endswith("/hf-cache")
+
+    @patch("sentence_transformers.SentenceTransformer")
+    def test_no_cache_dir_keeps_default_call(self, mock_cls, monkeypatch):
+        monkeypatch.delenv("EMBEDDING_CACHE_DIR", raising=False)
+        mock_cls.return_value = MagicMock()
+        self._call(provider="sentence-transformers", model="all-MiniLM-L6-v2")
+        mock_cls.assert_called_once_with("all-MiniLM-L6-v2")
+
+    @patch("sentence_transformers.SentenceTransformer")
+    def test_empty_cache_dir_means_none(self, mock_cls):
+        mock_cls.return_value = MagicMock()
+        self._call(
+            provider="sentence-transformers", model="all-MiniLM-L6-v2",
+            cache_dir="",
+        )
+        mock_cls.assert_called_once_with("all-MiniLM-L6-v2")
+
+    @patch("sentence_transformers.SentenceTransformer")
+    def test_cache_miss_names_prefetch_command(self, mock_cls, tmp_path):
+        from sema.cli_factories_utils import EmbeddingCacheMissError
+        mock_cls.side_effect = OSError(
+            "Cannot find the requested files in the disk cache",
+        )
+        with pytest.raises(EmbeddingCacheMissError) as exc_info:
+            self._call(
+                provider="sentence-transformers", model="all-MiniLM-L6-v2",
+                cache_dir=str(tmp_path),
+            )
+        msg = str(exc_info.value)
+        expected = (
+            "hf download sentence-transformers/all-MiniLM-L6-v2 "
+            f"--cache-dir {tmp_path}"
+        )
+        assert expected in msg
+        assert "Cannot find the requested files" in msg

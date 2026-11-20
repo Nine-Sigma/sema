@@ -43,6 +43,11 @@ class PropertyOp(_Op):
     endpoint_cardinality: str | None = None
     endpoint_nullable: bool | None = None
     materialized_as_edge_property: bool = True
+    concept_ref_system: str | None = None
+    concept_ref_id: str | None = None
+    concept_ref_version: str | None = None
+    definition: str | None = None
+    external_refs: list[str] = Field(default_factory=list)
     is_current: bool = True
 
 
@@ -54,6 +59,9 @@ class TermOp(_Op):
     vocabulary_name: str
     code: str
     display: str
+    definition: str | None = None
+    synonyms: list[str] = Field(default_factory=list)
+    external_refs: list[str] = Field(default_factory=list)
 
 
 class ConstraintOp(_Op):

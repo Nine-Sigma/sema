@@ -104,6 +104,25 @@ class TestStagingWriteTable:
         assert info.columns["x"].comment == "O'Brien's column"
         assert info.table_comment == "study with 'quotes' inside"
 
+    def test_column_name_with_a_double_quote_lands(self, staging: Staging) -> None:
+        name = 'Measure in "Most Recent" file'
+        rows = pa.table({name: ["a", "b"]})
+        staging.write_table(
+            schema="cbioportal",
+            table="embedded_quote",
+            rows=rows,
+            column_types={name: "VARCHAR"},
+            column_comments={},
+            table_comment=None,
+        )
+
+        info = staging.describe("cbioportal", "embedded_quote")
+        assert list(info.columns.keys()) == [name]
+        landed = staging.execute(
+            'SELECT * FROM cbioportal.embedded_quote ORDER BY 1'
+        ).fetchall()
+        assert landed == [("a",), ("b",)]
+
 
 @pytest.mark.unit
 class TestStagingDescribe:

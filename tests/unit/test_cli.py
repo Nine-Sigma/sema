@@ -8,7 +8,7 @@ pytestmark = pytest.mark.unit
 
 from sema.cli import cli
 from sema.pipeline.orchestrate import run_build
-from sema.models.config import BuildConfig
+from sema.models.config import BuildConfig, DatabricksConfig
 
 
 @pytest.fixture
@@ -299,8 +299,8 @@ class TestRunBuildCharacterization:
         mock_get_embedder.side_effect = Exception("no embedder configured")
 
         work_items = [
-            TableWorkItem(catalog="cdm", schema="clinical", table_name="patients", fqn="unity://cdm.clinical.patients"),
-            TableWorkItem(catalog="cdm", schema="clinical", table_name="visits", fqn="unity://cdm.clinical.visits"),
+            TableWorkItem(catalog="cdm", schema="clinical", table_name="patients", fqn="databricks://ws/cdm/clinical/patients"),
+            TableWorkItem(catalog="cdm", schema="clinical", table_name="visits", fqn="databricks://ws/cdm/clinical/visits"),
         ]
 
         with patch(
@@ -312,14 +312,15 @@ class TestRunBuildCharacterization:
             "sema.graph.loader.GraphLoader",
         ):
             mock_process.side_effect = [
-                TableResult.success("unity://cdm.clinical.patients", entities=1, properties=5, terms=3),
-                TableResult.success("unity://cdm.clinical.visits", entities=1, properties=4, terms=2),
+                TableResult.success("databricks://ws/cdm/clinical/patients", entities=1, properties=5, terms=3),
+                TableResult.success("databricks://ws/cdm/clinical/visits", entities=1, properties=4, terms=2),
             ]
 
             config = BuildConfig(
                 source="databricks",
                 catalog="cdm",
                 schemas=["clinical"],
+                databricks=DatabricksConfig(host="https://ws"),
             )
             result = run_build(config)
 

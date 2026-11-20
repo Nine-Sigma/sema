@@ -66,3 +66,10 @@ def test_property_frozen() -> None:
     p = TargetPropertyDecl(name="x", type="int", nullable=False)
     with pytest.raises(ValidationError):
         p.name = "y"  # type: ignore[misc]
+
+
+def test_exposure_is_absent_from_dumps_until_set() -> None:
+    plain = TargetPropertyDecl(name="first_name", type="string", nullable=True)
+    assert "exposure" not in plain.model_dump()
+    denied = plain.model_copy(update={"exposure": "denied"})
+    assert TargetPropertyDecl.model_validate_json(denied.model_dump_json()).exposure == "denied"

@@ -226,3 +226,32 @@ class TestBuildMetrics:
         prop = sco.entities[0].properties[0]
         assert prop.semantic_type == "categorical"
         assert prop.vocabulary == "tnm_staging"
+
+
+def _entity(table: str, confidence: float, name: str = "Thing") -> dict[str, object]:
+    return {"type": "entity", "name": name, "catalog": "c", "schema": "s", "table": table,
+            "confidence": confidence, "status": "pinned", "columns": []}
+
+
+def _tables(candidates: list[dict[str, object]], max_entities: int) -> list[str]:
+    sco = prune_to_sco(SemanticCandidateSet(query="q", candidates=candidates),
+                       max_entities=max_entities)
+    return [a.table for a in sco.physical_assets]
+
+
+class TestEntityCapCountsTables:
+    def test_a_table_with_two_entities_spends_one_slot(self) -> None:
+        candidates = [_entity("a", 0.9), _entity("a", 0.85, "Created"),
+                      _entity("b", 0.8), _entity("c", 0.7)]
+
+        sco = prune_to_sco(SemanticCandidateSet(query="q", candidates=candidates),
+                           max_entities=2)
+
+        assert [a.table for a in sco.physical_assets] == ["a", "b"]
+        assert [(e.name, e.physical_table) for e in sco.entities] == [
+            ("Thing", "c.s.a"), ("Created", "c.s.a"), ("Thing", "c.s.b")]
+
+    def test_one_entity_per_table_selects_the_top_tables_by_confidence(self) -> None:
+        candidates = [_entity("c", 0.7), _entity("a", 0.9), _entity("b", 0.8)]
+
+        assert _tables(candidates, 2) == ["a", "b"]

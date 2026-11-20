@@ -1,0 +1,19 @@
+## concept
+concept_id:VARCHAR,concept_name:VARCHAR,domain_id:VARCHAR,vocabulary_id:VARCHAR,concept_class_id:VARCHAR
+1,Gender,Meas,HL7,Class
+2,Person,Obs,HL7,Class
+## concept_ancestor
+ancestor_concept_id:VARCHAR,descendant_concept_id:VARCHAR,min_levels:VARCHAR,max_levels:VARCHAR
+1,2,1,1
+## concept_relationship
+concept_id_1:VARCHAR,concept_id_2:VARCHAR,relationship_id:VARCHAR
+1,2,maps_to
+## concept_synonym
+concept_id:VARCHAR,concept_synonym_name:VARCHAR,language_concept_id:VARCHAR
+1,Sex,4180186
+## domain
+domain_id:VARCHAR,domain_name:VARCHAR
+Meas,Measurement
+## vocabulary
+vocabulary_id:VARCHAR,vocabulary_name:VARCHAR,vocabulary_version:VARCHAR
+HL7,HL7 V3,2024-01

@@ -1,0 +1,156 @@
+manifest_version: 1
+descriptor:
+  target_model_id: codes-a2
+  target_model_version: 2026-10
+  display_name: codes-a2
+vocabularies:
+- name: VS_COLOR
+  source: INLINE
+- name: VS_SHAPE
+  source: INLINE
+- name: VS_SIZE
+  source: INLINE
+terms:
+- vocabulary: VS_COLOR
+  code: BLUE
+  display: Blue
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_COLOR
+  code: GREEN
+  display: Green
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_COLOR
+  code: RED
+  display: Red
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_SHAPE
+  code: ROUND
+  display: Round
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_SHAPE
+  code: SQUARE
+  display: Square
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_SIZE
+  code: L
+  display: Large
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_SIZE
+  code: M
+  display: Medium
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_SIZE
+  code: S
+  display: Small
+  definition: null
+  synonyms: []
+  external_refs: []
+entities:
+- qualified_name: a2.codes
+  kind: CONCEPT_SCHEME
+  properties:
+  - name: Attribute
+    type: string
+    synonyms: []
+    concept_ref:
+      identity_system: a2
+      id: ATTR
+      version: 2026-10
+    definition: Any attribute of an item
+    external_refs: []
+  - name: Color
+    type: string
+    synonyms: []
+    concept_ref:
+      identity_system: a2
+      id: COLOR
+      version: 2026-10
+    definition: Colour of an item
+    external_refs: []
+    vocabulary_binding:
+      vocabulary: VS_COLOR
+  - name: Dimension
+    type: string
+    synonyms: []
+    concept_ref:
+      identity_system: a2
+      id: DIM
+      version: 2026-10
+    definition: A measurable extent
+    external_refs: []
+  - name: Shape
+    type: string
+    synonyms: []
+    concept_ref:
+      identity_system: a2
+      id: SHAPE
+      version: 2026-10
+    definition: Outline of an item
+    external_refs: []
+    vocabulary_binding:
+      vocabulary: VS_SHAPE
+  - name: Size
+    type: string
+    synonyms: []
+    concept_ref:
+      identity_system: a2
+      id: SIZE
+      version: 2026-10
+    definition: Size of an item
+    external_refs: []
+    vocabulary_binding:
+      vocabulary: VS_SIZE
+  context_card:
+    card_version: 2026-10
+    description: Synthetic code library landed from a workbook
+relationships:
+- from:
+    system: a2
+    id: COLOR
+  to:
+    system: a2
+    id: ATTR
+  type: BROADER
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: a2
+    id: DIM
+  to:
+    system: a2
+    id: ATTR
+  type: BROADER
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: a2
+    id: SHAPE
+  to:
+    system: a2
+    id: DIM
+  type: BROADER
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: a2
+    id: SIZE
+  to:
+    system: a2
+    id: DIM
+  type: BROADER
+  hierarchical: true
+  far_end_loaded: true

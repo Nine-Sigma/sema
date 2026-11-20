@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from sema.graph.queries import CypherQueries
 from sema.graph.term_identity_utils import UNSCOPED_VOCAB
 from sema.log import logger
+from sema.pipeline.dedup_utils import states_name
 
 if TYPE_CHECKING:
     from sema.pipeline.retrieval import RetrievalEngine
@@ -55,6 +56,28 @@ def _expand_ancestry(
         except Exception:
             pass
     return ancestry
+
+
+def keep_asked_ancestry(
+    candidates: list[dict[str, Any]], question: str,
+) -> list[dict[str, Any]]:
+    """A term hit's ancestry stays only when the question names a concept of
+    that chain, the hit term or one of its ancestors: a nearest-neighbour hit
+    alone does not ask for its hierarchy."""
+    chains: dict[str, list[str]] = {}
+    for c in candidates:
+        if c.get("type") == "term":
+            chains.setdefault(c.get("code", ""), []).append(c.get("label", ""))
+        elif c.get("type") == "ancestry":
+            chains.setdefault(c.get("parent_code", ""), []).append(c.get("label", ""))
+    asked = {
+        code for code, labels in chains.items()
+        if any(states_name(question, label) for label in labels)
+    }
+    return [
+        c for c in candidates
+        if c.get("type") != "ancestry" or c.get("parent_code") in asked
+    ]
 
 
 def _expand_term_hit(
@@ -222,7 +245,7 @@ def _expand_term_for_vocab(
     results.extend(
         _expand_term_governed_values(
             engine, code, hit_status, hit_confidence,
-            vocabulary_name=vocab,
+            vocabulary_name=vocab, label=label,
         )
     )
 
@@ -239,7 +262,57 @@ def _expand_term_for_vocab(
             "confidence": hit_confidence,
             "confidence_policy": "semantic",
         })
+    results.extend(_expand_hierarchy_anchor(
+        engine, code, vocab, hit_status, hit_confidence,
+        score=hit.get("final_score", 0.0),
+    ))
     return results
+
+
+def _expand_hierarchy_anchor(
+    engine: RetrievalEngine,
+    code: str,
+    vocabulary_name: str | None,
+    status: str,
+    confidence: float,
+    *,
+    score: float,
+) -> list[dict[str, Any]]:
+    """Walk down PARENT_OF from a matched term to the columns whose
+    value-set members sit under it, directly or through a value bridge.
+    Each anchor carries the score of the hit that found it."""
+    bounds = engine.hierarchy_anchor
+    try:
+        rows = engine._run_query(
+            CypherQueries.expand_hierarchy_anchor(bounds.max_depth),
+            code=code,
+            vocabulary_name=vocabulary_name,
+            member_cap=bounds.member_cap,
+        )
+    except Exception as exc:
+        logger.warning("Hierarchy anchor lookup failed for {!r}: {}", code, exc)
+        return []
+
+    return [
+        {
+            "type": "hierarchy_anchor",
+            "code": r.get("anchor_code", code),
+            "label": r.get("anchor_label") or "",
+            "vocabulary": r.get("anchor_vocabulary") or _display_vocab(vocabulary_name),
+            "table": r["table_name"],
+            "column": r["column_name"],
+            "schema": r.get("schema_name") or "",
+            "member_count": r.get("member_count", 0),
+            "member_codes": r.get("member_codes", []),
+            "score": score,
+            "source": "retrieval_hierarchy_anchor",
+            "status": status,
+            "confidence": confidence,
+            "confidence_policy": "semantic",
+        }
+        for r in rows
+        if r.get("table_name") and r.get("column_name")
+    ]
 
 
 def _expand_term_governed_values(
@@ -248,6 +321,7 @@ def _expand_term_governed_values(
     status: str,
     confidence: float,
     vocabulary_name: str | None = None,
+    label: str = "",
 ) -> list[dict[str, Any]]:
     """Traverse Term→MEMBER_OF→ValueSet←HAS_VALUE_SET←Column.
 
@@ -276,7 +350,7 @@ def _expand_term_governed_values(
             "column": col,
             "table": table,
             "code": code,
-            "label": code,
+            "label": label,
             "source": "retrieval_term_expansion",
             "status": status,
             "confidence": confidence,

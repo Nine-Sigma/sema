@@ -73,16 +73,17 @@ class TestColumnNormalization:
 class TestForeignKeyNormalization:
     def test_joins_to_assertion(self, normalizer: AssertionNormalizer) -> None:
         fk = ExtractedForeignKey(
-            from_table="encounters", from_columns=["patient_id"],
-            to_table="patients", to_columns=["id"],
-            from_catalog="cat", from_schema="sch",
-            to_catalog="cat", to_schema="sch",
+            constraint_name="fk_encounter_patient",
+            referencing_catalog="cat", referencing_schema="sch", referencing_table="encounters",
+            referenced_catalog="cat", referenced_schema="sch", referenced_table="patients",
+            column_pairs=(("patient_id", "id"),),
         )
         assertions = normalizer.normalize_foreign_key(fk)
         assert len(assertions) == 1
         a = assertions[0]
         assert a.predicate == AssertionPredicate.JOINS_TO
-        assert "patient_id" in a.payload["on_column"]
+        [predicate] = a.payload["join_predicates"]
+        assert (predicate["left_column"], predicate["right_column"]) == ("id", "patient_id")
         assert a.object_ref == "databricks://ws.example.com/cat/sch/patients"
 
 
@@ -105,7 +106,7 @@ class TestSampleRowsNormalization:
     def test_sample_rows_assertion(self, normalizer: AssertionNormalizer) -> None:
         sr = ExtractedSampleRows(
             table_name="tbl", catalog="cat", schema="sch",
-            rows=[["1", "John"], ["2", "Jane"]],
+            rows=[{"id": "1", "name": "John"}, {"id": "2", "name": "Jane"}],
             column_names=["id", "name"],
         )
         assertions = normalizer.normalize_sample_rows(sr)

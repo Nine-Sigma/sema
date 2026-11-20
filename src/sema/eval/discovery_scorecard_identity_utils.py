@@ -1,0 +1,209 @@
+"""The identity facts behind the discovery scorecard: their graph reads and their rechecks.
+
+A key or entity fact is read as the build graph holds it (contract F6): a `has_key` or
+`has_identity` assertion, its relation's `key_columns`, and the scope's
+`ENTITY_ON_TABLE` edges that carry `key_columns`. A recheck recounts a fact through
+`RelationEvidence` and decides it with the build's own predicates in `engine.identity_utils`.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from typing import Any, NamedTuple
+
+from sema.engine.identity_utils import entity_holds, key_holds, one_smaller
+from sema.engine.join_detector_utils import COVERAGE_THRESHOLD
+from sema.engine.warehouse_lookup import RelationEvidence, TableKey
+from sema.eval.discovery_scorecard_utils import COLUMN_SEPARATOR
+from sema.intake.run.scorecard import Cells, Key
+from sema.models.assertions import STATED_GRADES
+from sema.models.target.identity import EntityIdentity, ResolutionRule, ResolvedAttribute
+
+CANDIDATE_KEY = "candidate_key"
+ENTITY_COARSER = "entity_coarser_than_row"
+ENTITY_SHARED = "entity_shared_across_relations"
+NULL_KEY_POLICY = "null_key_policy"
+ATTRIBUTE_RULE = "attribute_resolution_rule"
+IDENTITY_KINDS = (CANDIDATE_KEY, ENTITY_COARSER, ENTITY_SHARED, NULL_KEY_POLICY, ATTRIBUTE_RULE)
+UNIQUE = "unique"
+SINGLE = "single"
+LATEST = "latest:"
+IN_SCOPE = (
+    "($catalog IS NULL OR t.catalog = $catalog) AND ($schemas IS NULL OR t.schema_name IN $schemas)"
+)
+IDENTITY_ASSERTIONS = (
+    "MATCH (a:Assertion {predicate: $predicate}) WHERE a.status <> 'superseded' "
+    f"MATCH (t:Table {{ref: a.subject_ref}}) WHERE {IN_SCOPE} "
+    "RETURN t.name AS relation, a.payload AS payload, properties(t).key_columns AS table_key"
+)
+KEYED_ENTITY_EDGES = (
+    "MATCH (e:Entity)-[r:ENTITY_ON_TABLE]->(t:Table) "
+    f"WHERE r.key_columns IS NOT NULL AND {IN_SCOPE} "
+    "RETURN t.name AS relation, e.name AS entity, properties(r) AS properties"
+)
+
+
+class KeyRead(NamedTuple):
+    """A key fact: the relation, its key columns, its grade and its NULL-key row count."""
+
+    relation: str
+    columns: tuple[str, ...]
+    verification: str | None
+    null_rows: int | None
+
+
+class EntityRead(NamedTuple):
+    """An entity on a relation: its edge's key columns, `owner` and `EntityIdentity`, the
+    grade, and the NULL-key rows and conflict share per non-key column its evidence counts.
+    An edge L2 wrote has no key columns and no grade."""
+
+    relation: str
+    entity: str
+    key_columns: tuple[str, ...] | None
+    owner: bool | None
+    identity: EntityIdentity | None
+    verification: str | None
+    null_rows: int | None
+    conflict_share: dict[str, float]
+
+
+def _evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return dict(payload.get("evidence") or {})
+
+
+def key_read(record: Mapping[str, Any]) -> KeyRead:
+    """A `has_key` assertion. The relation's key is its `key_columns`: another accepted set is
+    an alternative, so it states no key and keeps only its NULL count."""
+    payload = json.loads(record["payload"])
+    columns, grade = tuple(payload["columns"]), payload.get("verification")
+    if grade in STATED_GRADES and list(columns) != list(record["table_key"] or []):
+        grade = None
+    return KeyRead(record["relation"], columns, grade, _evidence(payload).get("null_rows"))
+
+
+def entity_reads(
+    assertions: Iterable[Mapping[str, Any]], edges: Iterable[Mapping[str, Any]],
+) -> list[EntityRead]:
+    """Each `has_identity` assertion with its entity's keyed edge on the relation, then each
+    keyed edge no assertion covers, such as a relation sharing an owner's entity."""
+    keyed = {(record["relation"], record["entity"]): dict(record["properties"])
+             for record in edges}
+    reads = []
+    for record in assertions:
+        payload = json.loads(record["payload"])
+        entity = str(payload.get("entity"))
+        edge = keyed.pop((record["relation"], entity), {})
+        reads.append(entity_read(record["relation"], entity, edge, payload))
+    return reads + [entity_read(relation, entity, edge, {})
+                    for (relation, entity), edge in keyed.items()]
+
+
+def entity_read(
+    relation: str, entity: str, edge: Mapping[str, Any], payload: Mapping[str, Any],
+) -> EntityRead:
+    """The entity's edge on the relation states the fact; its assertion's evidence, when there
+    is one, the counts."""
+    evidence = _evidence(payload)
+    key, identity = edge.get("key_columns") or payload.get("key_columns"), edge.get("identity")
+    return EntityRead(
+        relation=relation, entity=entity, key_columns=tuple(key) if key else None,
+        owner=edge.get("owner"),
+        identity=EntityIdentity.model_validate_json(identity) if identity else None,
+        verification=edge.get("verification", payload.get("verification")),
+        null_rows=evidence.get("null_rows"),
+        conflict_share=dict(evidence.get("conflict_share") or {}),
+    )
+
+
+def columns_of(key: str) -> list[str]:
+    return key.split(COLUMN_SEPARATOR)
+
+
+def rule_word(attribute: ResolvedAttribute) -> str | None:
+    """An attribute rule in the F1 form; a `min_by` rule has none."""
+    if attribute.rule is ResolutionRule.MAX_BY:
+        return f"{LATEST}{(attribute.by or '').lower()}"
+    return None if attribute.rule is ResolutionRule.MIN_BY else attribute.rule.value
+
+
+def identity_counts(
+    evidence: RelationEvidence, tables: Mapping[str, TableKey], produced: Mapping[str, Cells],
+) -> dict[str, int]:
+    """Per identity kind, the produced facts whose counts the data re-proves; `tables` maps a
+    lowercased relation name to its (schema, table)."""
+    entities = produced.get(ENTITY_COARSER, {})
+    entity_keys = {key[0]: str(value) for key, value in entities.items()}
+    checks: dict[str, Callable[[Key, Any], bool]] = {
+        CANDIDATE_KEY: lambda key, _: _key(evidence, tables[key[0]], columns_of(key[1])),
+        ENTITY_COARSER: lambda key, value: _entity(evidence, tables[key[0]],
+                                                   columns_of(str(value))),
+        ENTITY_SHARED: lambda key, others: _shared(evidence, tables, key, others),
+        NULL_KEY_POLICY: lambda key, value: evidence.null_rows(
+            tables[key[0]], columns_of(key[1])) == value,
+        ATTRIBUTE_RULE: lambda key, value: _rule(evidence, tables[key[0]], key[1], value,
+                                                 entity_keys.get(key[0])),
+    }
+    return {
+        kind: sum(key[0] in tables and check(key, value)
+                  for key, value in produced.get(kind, {}).items())
+        for kind, check in checks.items()
+    }
+
+
+def _smaller(
+    evidence: RelationEvidence, relation: TableKey, columns: Sequence[str],
+) -> list[int | None]:
+    return [evidence.distinct(relation, subset) for subset in one_smaller(columns)]
+
+
+def _key(evidence: RelationEvidence, relation: TableKey, columns: Sequence[str]) -> bool:
+    return key_holds(
+        evidence.rows(relation), evidence.distinct(relation, columns),
+        evidence.null_rows(relation, columns), _smaller(evidence, relation, columns),
+    ) is True
+
+
+def _entity(evidence: RelationEvidence, relation: TableKey, columns: Sequence[str]) -> bool:
+    return entity_holds(
+        evidence.rows(relation), evidence.distinct(relation, columns),
+        _smaller(evidence, relation, columns),
+    ) is True
+
+
+def _shared(
+    evidence: RelationEvidence, tables: Mapping[str, TableKey], key: Key, others: Any,
+) -> bool:
+    """Every other relation's non-NULL key tuples are contained in the owner's at the floor."""
+    owner, columns = tables[key[0]], columns_of(key[1])
+    return bool(others) and all(
+        other in tables and _contained(evidence, tables[other], owner, columns)
+        for other in others
+    )
+
+
+def _contained(
+    evidence: RelationEvidence, relation: TableKey, owner: TableKey, columns: Sequence[str],
+) -> bool:
+    counted = evidence.contained(relation, columns, owner, columns)
+    return counted is not None and counted[0] > 0 and (
+        counted[1] / counted[0] >= COVERAGE_THRESHOLD)
+
+
+def _rule(
+    evidence: RelationEvidence, relation: TableKey, column: str, value: Any,
+    entity_key: str | None,
+) -> bool:
+    """`single`: no entity group holds two values; `latest:<by>`: the ordering column picks
+    exactly one row of each entity. No count accepts `min` or `max`."""
+    if entity_key is None:
+        return False
+    columns = columns_of(entity_key)
+    if value == SINGLE:
+        counted = evidence.conflicts(relation, columns, [column])
+        return counted is not None and counted[1][column] == 0
+    if not str(value).startswith(LATEST):
+        return False
+    ordered = [*columns, str(value).removeprefix(LATEST)]
+    rows = evidence.rows(relation)
+    return rows is not None and evidence.distinct(relation, ordered) == rows

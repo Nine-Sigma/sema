@@ -1,0 +1,117 @@
+# review_status: reviewed_correct
+# reviewed_by: Dean
+# reviewed_on: 2026-10-22
+# A10: the ACRIS directory (15 dictionary workbooks, 5 code tables) landed by the
+# tabular loader into schema land_acris. Values no predicate derives come from
+# acris.run.yaml; joins and domains are the ones the dictionaries state in prose.
+concept_source:
+  spec_version: 2
+  id: acris
+  identity_system: acris
+  release: "2026-10-20"
+  default_provider: staging
+  term_storage:
+    inline_cap: 5000
+    external_namespace: vocabulary_acris
+  shape:
+    - {section: entity_model, template: entity_model}
+    - {section: code_lists.Country_Codes, template: concept_list}
+    - {section: code_lists.Document_Control_Codes, template: concept_list}
+    - {section: code_lists.Property_Types_Codes, template: concept_list}
+    - {section: code_lists.State_Codes, template: concept_list}
+    - {section: code_lists.UCC_Collateral_Codes, template: concept_list}
+  entity_model:
+    layout: per_file
+    entity_case: preserve
+    roles:
+      property: Column Name
+      description: Column Description
+      notes:
+        - "Term, Acronym, or Code Definitions"
+        - "Additional Notes (where applicable, include the range of possible values, units of measure, how to interpret null/zero values, whether there are specific relationships between columns, and information on column source)"
+    entities:
+      - relation: land_acris.ACRIS___Real_Property_Master_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Real_Property_Master_Data_Dictionary__Dataset_Info
+        domains:
+          Docoument Type: Document_Control_Codes
+      - relation: land_acris.ACRIS___Real_Property_Legals_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Real_Property_Legals_Data_Dictionary__Dataset_Info
+        foreign_keys:
+          - {columns: [Document ID, Good Through Date], entity: 'ACRIS - Real Property Master', reference_columns: [Document ID, Good Through Date]}
+        domains:
+          Property Type: Property_Types_Codes
+      - relation: land_acris.ACRIS___Real_Property_Parties_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Real_Property_Parties_Data_Dictionary__Dataset_Info
+        foreign_keys:
+          - {columns: [Document ID, Good Through Date], entity: 'ACRIS - Real Property Master', reference_columns: [Document ID, Good Through Date]}
+        domains:
+          Country: Country_Codes
+          State: State_Codes
+      - relation: land_acris.ACRIS___Real_Property_References_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Real_Property_References_Data_Dictionary__Dataset_Info
+        foreign_keys:
+          - {columns: [Document ID, Good Through Date], entity: 'ACRIS - Real Property Master', reference_columns: [Document ID, Good Through Date]}
+      - relation: land_acris.ACRIS___Real_Property_Remarks_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Real_Property_Remarks_Data_Dictionary__Dataset_Info
+        foreign_keys:
+          - {columns: [Document ID, Good Through Date], entity: 'ACRIS - Real Property Master', reference_columns: [Document ID, Good Through Date]}
+      - relation: land_acris.ACRIS___Personal_Property_Master_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Personal_Property_Master_Data_Dictionary__Dataset_Info
+        domains:
+          Docoument Type: Document_Control_Codes
+          UCC Collateral: UCC_Collateral_Codes
+      - relation: land_acris.ACRIS___Personal_Property_Legals_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Personal_Property_Legals_Data_Dictionary__Dataset_Info
+        foreign_keys:
+          - {columns: [Document ID, Good Through Date], entity: 'ACRIS - Personal Property Master', reference_columns: [Document ID, Good Through Date]}
+        domains:
+          Property Type: Property_Types_Codes
+      - relation: land_acris.ACRIS___Personal_Property_Parties_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Personal_Property_Parties_Data_Dictionary__Dataset_Info
+        foreign_keys:
+          - {columns: [Document ID, Good Through Date], entity: 'ACRIS - Personal Property Master', reference_columns: [Document ID, Good Through Date]}
+        domains:
+          Country: Country_Codes
+          State: State_Codes
+      - relation: land_acris.ACRIS___Personal_Property_References_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Personal_Property_References_Data_Dictionary__Dataset_Info
+        foreign_keys:
+          - {columns: [Document ID, Good Through Date], entity: 'ACRIS - Personal Property Master', reference_columns: [Document ID, Good Through Date]}
+      - relation: land_acris.ACRIS___Personal_Property_Remarks_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Personal_Property_Remarks_Data_Dictionary__Dataset_Info
+        foreign_keys:
+          - {columns: [Document ID, Good Through Date], entity: 'ACRIS - Personal Property Master', reference_columns: [Document ID, Good Through Date]}
+      - relation: land_acris.ACRIS___Country_Codes_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Country_Codes_Data_Dictionary__Dataset_Info
+        domains:
+          COUNTRY CODE: Country_Codes
+      - relation: land_acris.ACRIS___Document_Control_Codes_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Document_Control_Codes_Data_Dictionary__Dataset_Info
+      - relation: land_acris.ACRIS___Property_Types_Codes_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___Property_Types_Codes_Data_Dictionary__Dataset_Info
+        domains:
+          PROPERTY TYPE: Property_Types_Codes
+      - relation: land_acris.ACRIS___State_Codes_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___State_Codes_Data_Dictionary__Dataset_Info
+        domains:
+          State Code: State_Codes
+      - relation: land_acris.ACRIS___UCC_Collateral_Codes_Data_Dictionary__Column_Info
+        header: land_acris.ACRIS___UCC_Collateral_Codes_Data_Dictionary__Dataset_Info
+        domains:
+          UCC COLLATERAL CODE: UCC_Collateral_Codes
+  code_lists:
+    - vocabulary_id: Country_Codes
+      relation: land_acris.Country_Codes
+      roles: {code: COUNTRY CODE, display: DESCRIPTION}
+    - vocabulary_id: Document_Control_Codes
+      relation: land_acris.Document_Control_Codes
+      roles: {code: DOC. TYPE, display: DOC. TYPE DESCRIPTION}
+    - vocabulary_id: Property_Types_Codes
+      relation: land_acris.Property_Types_Codes
+      roles: {code: PROPERTY TYPE, display: DESCRIPTION}
+    - vocabulary_id: State_Codes
+      relation: land_acris.State_Codes
+      roles: {code: STATE CODE, display: DESCRIPTION}
+    - vocabulary_id: UCC_Collateral_Codes
+      relation: land_acris.UCC_Collateral_Codes
+      roles: {code: UCC COLLATERAL CODE, display: DESCRIPTION}

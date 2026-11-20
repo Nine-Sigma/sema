@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from sema.models.assertions import Assertion, AssertionPredicate
+from sema.models.physical_key import CanonicalRef
 from sema.models.stages import (
     StageAResult,
     StageBCoverage,
@@ -59,11 +60,13 @@ class PromptLayers:
     enable_vocab_hints: bool = True
     enable_few_shot: bool = True
     enable_stage_c: bool = True
+    enable_inline_examples: bool = True
 
 _KEY_PATTERN = re.compile(
     r"(?:_id$|_key$|_pk$|_fk$|^id$|^key$)", re.IGNORECASE,
 )
 
+_FAMILY_EXAMPLES = ' (e.g. "diagnosis coding system", "gene symbol namespace")'
 _RAW_COVERAGE_THRESHOLD = 0.75
 _DEFAULT_PARTIAL_COVERAGE_FLOOR = 0.60
 
@@ -215,6 +218,7 @@ def build_stage_b_prompt(
         type_inv = get_semantic_type_inventory(domain_context)
     else:
         type_inv = get_semantic_type_inventory(None)
+    family_examples = _FAMILY_EXAMPLES if _layers.enable_inline_examples else ""
     parts.append(f"""
 For each column above, return a JSON object with:
 - "columns": array, one per column, each with:
@@ -223,8 +227,7 @@ For each column above, return a JSON object with:
   - "semantic_type": one of [{type_inv}]
   - "confidence": 0.0–1.0 how confident you are in this classification
   - "synonyms": alternative names for this property (empty list if none)
-  - "candidate_vocab_families": list of semantic family labels \
-(e.g. "diagnosis coding system", "gene symbol namespace"). \
+  - "candidate_vocab_families": list of semantic family labels{family_examples}. \
 Do NOT name a specific ontology or coding system unless the column \
 header or values explicitly identify it.
   - "entity_role": role in entity \
@@ -551,7 +554,7 @@ def merge_stage_outputs(
         for col in batch.columns:
             if col.column in unresolved_names:
                 continue
-            col_ref = f"{table_ref}.{col.column}"
+            col_ref = CanonicalRef.with_column(table_ref, col.column)
 
             assertions.append(_make_assertion(
                 table_ref, col_ref,
@@ -580,7 +583,7 @@ def merge_stage_outputs(
     # Decoded values from C only
     if c_results:
         for col_name, c in c_results.items():
-            col_ref = f"{table_ref}.{col_name}"
+            col_ref = CanonicalRef.with_column(table_ref, col_name)
             for dv in c.decoded_categories:
                 assertions.append(_make_assertion(
                     table_ref, col_ref,

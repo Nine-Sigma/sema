@@ -377,3 +377,67 @@ class TestExpandFromEntitiesCharacterization:
             assert "property" in v
             assert "column" in v
             assert "table" in v
+
+
+class TestGovernedValuesReachContext:
+    def _patient_engine(self, mock_driver, mock_embedder):
+        driver, session = mock_driver
+
+        def row(data):
+            r = MagicMock()
+            r.data.return_value = data
+            return r
+
+        def run_side_effect(query, **params):
+            if "db.index.vector.queryNodes" in query:
+                if "entity" in query:
+                    return [row({"node": {"name": "Patient"}, "score": 0.9})]
+                return []
+            if "ENTITY_ON_TABLE" in query:
+                return [row({
+                    "table_name": "patient", "schema_name": "s",
+                    "catalog": "c", "columns": [{
+                        "property": "Sex", "column": "sex_cd",
+                        "data_type": "STRING",
+                        "semantic_type": "categorical",
+                    }],
+                })]
+            if "HAS_VALUE_SET" in query and "MEMBER_OF" in query:
+                return [row({"code": "F", "label": "Female",
+                             "vocabulary_name": None})]
+            return []
+
+        session.run.side_effect = run_side_effect
+        return RetrievalEngine(driver=driver, embedder=mock_embedder)
+
+    def test_entity_value_set_survives_visibility_policy(
+        self, mock_driver, mock_embedder,
+    ):
+        engine = self._patient_engine(mock_driver, mock_embedder)
+        sco = prune_to_sco(engine.retrieve("female patients", top_k=5))
+
+        assert [(g.column, g.values) for g in sco.governed_values] == [
+            ("sex_cd", [{"code": "F", "label": "Female"}]),
+        ]
+
+    def test_expanded_values_carry_their_entity_status_and_confidence(
+        self, mock_driver, mock_embedder,
+    ):
+        engine = self._patient_engine(mock_driver, mock_embedder)
+        candidates = engine.retrieve("female patients", top_k=5).candidates
+        entity = next(c for c in candidates if c["type"] == "entity")
+        values = [c for c in candidates if c["type"] == "value"]
+
+        assert values
+        assert {(v["status"], v["confidence"]) for v in values} == {
+            (entity["status"], entity["confidence"]),
+        }
+        assert entity["confidence"] != 0.5
+
+    def test_rejected_entity_values_stay_hidden(self):
+        candidate_set = SemanticCandidateSet(query="q", candidates=[{
+            "type": "value", "property_name": "Sex", "column": "sex_cd",
+            "table": "patient", "code": "F", "label": "Female",
+            "status": "rejected", "confidence": 1.0,
+        }])
+        assert prune_to_sco(candidate_set).governed_values == []

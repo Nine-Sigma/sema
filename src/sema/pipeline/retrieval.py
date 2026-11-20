@@ -5,8 +5,10 @@ from typing import Any
 
 from sema.graph.queries import CypherQueries
 from sema.log import logger
+from sema.models.hierarchy_anchor import HierarchyAnchorConfig
 from sema.models.constants import MATCH_TYPE_BOOST
 from sema.models.context import SemanticCandidateSet
+from sema.pipeline.term_expansion_utils import keep_asked_ancestry
 from sema.pipeline.retrieval_utils import (
     _dedup_artifacts,
     _dedup_seeds,
@@ -19,7 +21,9 @@ from sema.pipeline.retrieval_utils import (
     _expand_term_hit,
     _expand_values,
     _normalize_vector_hit,
+    mark_properties_defining_question,
     merge_and_rank_candidates,
+    read_forms,
     tokenize_query,
 )
 
@@ -58,10 +62,12 @@ class RetrievalEngine:
         *,
         embedder_model_name: str = "<configured embedder>",
         scope: RetrievalScope | None = None,
+        hierarchy_anchor: HierarchyAnchorConfig | None = None,
     ) -> None:
         self._driver = driver
         self._embedder = embedder
         self._scope = scope or RetrievalScope()
+        self.hierarchy_anchor = hierarchy_anchor or HierarchyAnchorConfig()
         if embedder is not None:
             from sema.graph.vector_index_utils import (
                 assert_retrieval_dim_matches,
@@ -207,8 +213,8 @@ class RetrievalEngine:
                         })
                 except Exception as e:
                     logger.debug(
-                        "Lexical search {} for '{}': {}",
-                        node_type, token, e,
+                        "Lexical search {} failed: {}",
+                        node_type, type(e).__name__,
                     )
         return hits
 
@@ -223,9 +229,7 @@ class RetrievalEngine:
         for r in expansion.get("physical", []):
             candidates.append({
                 "type": "entity",
-                "name": next(
-                    (n for n in entity_names), r["table_name"]
-                ),
+                "name": r.get("entity_name", entity_names[0]),
                 "table": r["table_name"],
                 "schema": r.get("schema_name", ""),
                 "catalog": r.get("catalog", ""),
@@ -235,6 +239,7 @@ class RetrievalEngine:
                 "columns": r.get("columns", []),
                 "status": "auto",
                 "confidence_policy": "semantic",
+                **read_forms(r),
             })
 
         for j in expansion.get("joins", []):
@@ -245,7 +250,9 @@ class RetrievalEngine:
                 "confidence_policy": "structural",
             })
 
+        parents = {c["table"]: c for c in candidates if c["type"] == "entity"}
         for v in expansion.get("values", []):
+            parent = parents.get(v.get("table", ""), {})
             candidates.append({
                 "type": "value",
                 "property_name": v.get("property", ""),
@@ -253,8 +260,8 @@ class RetrievalEngine:
                 "table": v.get("table", ""),
                 "code": v.get("code", ""),
                 "label": v.get("label", ""),
-                "status": "auto",
-                "confidence": 0.5,
+                "status": parent.get("status", "auto"),
+                "confidence": parent.get("confidence", 0.5),
                 "confidence_policy": "semantic",
             })
 
@@ -301,6 +308,7 @@ class RetrievalEngine:
         all_seeds = vector_candidates + lexical_candidates
         ranked = merge_and_rank_candidates(all_seeds)
         deduped_seeds = _dedup_seeds(ranked)
+        mark_properties_defining_question(question, deduped_seeds)
 
         # Phase 3: Type-aware expansion
         all_candidates: list[dict[str, Any]] = []
@@ -320,7 +328,9 @@ class RetrievalEngine:
             )
 
         # Phase 4: Artifact deduplication
-        all_candidates = _dedup_artifacts(all_candidates)
+        all_candidates = keep_asked_ancestry(
+            _dedup_artifacts(all_candidates), question,
+        )
 
         return SemanticCandidateSet(
             query=question,

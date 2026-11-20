@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from sema.graph.loader import GraphLoader
+from sema.models.physical_key import PhysicalKey
 from sema.graph.loader_utils import (
     batch_upsert_aliases,
     batch_upsert_entities,
@@ -302,24 +303,23 @@ class TestMergeKeys:
         ) in cypher
 
 
+_TABLE_KEY = PhysicalKey("ds", "cat", "sch", "tbl")
+
+
 class TestJoinPathEdgeRequiresSourceSchema:
     def test_uses_requires_source_schema(self, loader):
         with pytest.raises(ValueError, match="source_schema"):
-            loader.add_join_path_uses("jp", "tbl_ref")
+            loader.add_join_path_uses("jp", _TABLE_KEY)
 
     def test_entity_links_requires_source_schema(self, loader):
         with pytest.raises(ValueError, match="source_schema"):
-            loader.add_join_path_entity_links(
-                "jp", "from", "to",
-            )
+            loader.add_join_path_entity_links("jp", _TABLE_KEY, _TABLE_KEY)
 
     def test_uses_with_schema_matches_by_name_and_schema(
         self, loader, mock_driver,
     ):
         _, session = mock_driver
-        loader.add_join_path_uses(
-            "jp", "tbl_ref", source_schema=SCHEMA_BRCA,
-        )
+        loader.add_join_path_uses("jp", _TABLE_KEY, source_schema=SCHEMA_BRCA)
         cypher = session.run.call_args[0][0]
         assert (
             "MATCH (jp:JoinPath {name: $jp_name, "

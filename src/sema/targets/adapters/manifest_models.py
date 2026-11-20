@@ -11,7 +11,9 @@ from sema.models.planner._enums import (
     TargetArtifactKind,
 )
 from sema.models.target.completeness import SemanticCompletenessAnnotations
-from sema.models.target.refs import VocabularySource
+from sema.models.target.declared import DeclarationEvidence
+from sema.models.target.identity import EntityIdentity
+from sema.models.target.refs import ConceptRef, ExternalRef, VocabularySource
 
 
 class ManifestVocabulary(BaseModel):
@@ -28,6 +30,9 @@ class ManifestTerm(BaseModel):
     code: str = Field(min_length=1)
     display: str = Field(min_length=1)
     domain: str | None = None
+    definition: str | None = None
+    synonyms: list[str] = Field(default_factory=list)
+    external_refs: list[ExternalRef] = Field(default_factory=list)
 
 
 class ManifestVocabularyBinding(BaseModel):
@@ -51,6 +56,9 @@ class ManifestProperty(BaseModel):
     synonyms: list[str] = Field(default_factory=list)
     decoded_values: dict[str, str] = Field(default_factory=dict)
     vocabulary_binding: ManifestVocabularyBinding | None = None
+    concept_ref: ConceptRef | None = None
+    definition: str | None = None
+    external_refs: list[ExternalRef] = Field(default_factory=list)
 
 
 class ManifestEndpoint(BaseModel):
@@ -81,6 +89,22 @@ class ManifestDomainConstraint(BaseModel):
 
     property_name: str = Field(min_length=1)
     domain_id: str = Field(min_length=1)
+
+
+class ManifestDeclaredJoin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    referenced_entity: str = Field(min_length=1)
+    join_keys: list[tuple[str, str]] = Field(min_length=1)
+    evidence: DeclarationEvidence
+
+
+class ManifestDeclaredDomain(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    property_name: str = Field(min_length=1)
+    domain_id: str = Field(min_length=1)
+    evidence: DeclarationEvidence
 
 
 class ManifestRowClause(BaseModel):
@@ -138,7 +162,10 @@ class ManifestEntity(BaseModel):
     endpoints: ManifestEndpoints | None = None
     properties: list[ManifestProperty] = Field(default_factory=list)
     obligation: ManifestObligation | None = None
+    joins: list[ManifestDeclaredJoin] = Field(default_factory=list)
+    domains: list[ManifestDeclaredDomain] = Field(default_factory=list)
     context_card: ManifestContextCard | None = None
+    identity: EntityIdentity | None = None
 
 
 class ManifestDescriptor(BaseModel):
@@ -152,6 +179,16 @@ class ManifestDescriptor(BaseModel):
     completeness: SemanticCompletenessAnnotations | None = None
 
 
+class ManifestRelationship(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    from_: ExternalRef = Field(alias="from")
+    to: ExternalRef
+    type: str = Field(min_length=1)
+    hierarchical: bool | None = None
+    far_end_loaded: bool
+
+
 class ParsedManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -160,3 +197,4 @@ class ParsedManifest(BaseModel):
     vocabularies: list[ManifestVocabulary] = Field(default_factory=list)
     terms: list[ManifestTerm] = Field(default_factory=list)
     entities: list[ManifestEntity] = Field(default_factory=list)
+    relationships: list[ManifestRelationship] = Field(default_factory=list)

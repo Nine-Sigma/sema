@@ -1,0 +1,28 @@
+{
+ "questions": [
+  {
+   "id": "R01",
+   "class": "single_field",
+   "question": "How many active people are there?",
+   "result_shape": "scalar",
+   "precision": 0,
+   "gold_answer": [
+    "42"
+   ],
+   "gold_sql": "SELECT 1",
+   "needs": []
+  },
+  {
+   "id": "R02",
+   "class": "single_field",
+   "question": "How many visits happened?",
+   "result_shape": "scalar",
+   "precision": 0,
+   "gold_answer": [
+    "7"
+   ],
+   "gold_sql": "SELECT 1",
+   "needs": []
+  }
+ ]
+}

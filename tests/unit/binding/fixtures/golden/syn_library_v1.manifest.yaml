@@ -1,0 +1,189 @@
+manifest_version: 1
+descriptor:
+  target_model_id: syn-library
+  target_model_version: 2026-09
+  display_name: syn-library
+vocabularies:
+- name: VS_SYN_ETHNICITY
+  source: INLINE
+- name: VS_SYN_RACE
+  source: INLINE
+- name: VS_SYN_SEX
+  source: INLINE
+- name: VS_SYN_VITAL_STATUS
+  source: INLINE
+terms:
+- vocabulary: VS_SYN_ETHNICITY
+  code: SYN_ETH_HISPANIC
+  display: Hispanic or Latino
+  definition: null
+  synonyms:
+  - Latino
+  external_refs:
+  - system: SYNVOCAB
+    id: V_SYN_ETH_HISPANIC
+- vocabulary: VS_SYN_ETHNICITY
+  code: SYN_ETH_NOT_HISPANIC
+  display: Not Hispanic or Latino
+  definition: null
+  synonyms: []
+  external_refs:
+  - system: SYNVOCAB
+    id: V_SYN_ETH_NOT_HISPANIC
+- vocabulary: VS_SYN_RACE
+  code: SYN_RACE_ASIAN
+  display: Asian
+  definition: Origins in Asia.
+  synonyms: []
+  external_refs:
+  - system: SYNVOCAB
+    id: V_SYN_RACE_ASIAN
+  - system: omop
+    id: '900103'
+- vocabulary: VS_SYN_RACE
+  code: SYN_RACE_BLACK
+  display: Black or African American
+  definition: Origins in Africa.
+  synonyms:
+  - Black
+  external_refs:
+  - system: SYNVOCAB
+    id: V_SYN_RACE_BLACK
+  - system: omop
+    id: '900102'
+- vocabulary: VS_SYN_RACE
+  code: SYN_RACE_WHITE
+  display: White
+  definition: Origins in Europe.
+  synonyms:
+  - Caucasian
+  external_refs:
+  - system: SYNVOCAB
+    id: V_SYN_RACE_WHITE
+  - system: omop
+    id: '900101'
+- vocabulary: VS_SYN_SEX
+  code: SYN_SEX_FEMALE
+  display: Female
+  definition: null
+  synonyms:
+  - F
+  external_refs:
+  - system: SYNVOCAB
+    id: V_SYN_SEX_FEMALE
+- vocabulary: VS_SYN_SEX
+  code: SYN_SEX_MALE
+  display: Male
+  definition: null
+  synonyms:
+  - M
+  external_refs:
+  - system: SYNVOCAB
+    id: V_SYN_SEX_MALE
+- vocabulary: VS_SYN_VITAL_STATUS
+  code: SYN_VS_ALIVE
+  display: Alive
+  definition: null
+  synonyms:
+  - Living
+  external_refs:
+  - system: SYNVOCAB
+    id: V_SYN_VS_ALIVE
+- vocabulary: VS_SYN_VITAL_STATUS
+  code: SYN_VS_DECEASED
+  display: Deceased
+  definition: null
+  synonyms:
+  - Dead
+  external_refs:
+  - system: SYNVOCAB
+    id: V_SYN_VS_DECEASED
+entities:
+- qualified_name: syn_library.demographics
+  kind: CONCEPT_SCHEME
+  properties:
+  - name: Ethnicity
+    type: string
+    synonyms:
+    - Patient ethnicity
+    concept_ref:
+      identity_system: syn
+      id: SYN_ETHNICITY
+      version: 2026-09
+    definition: Hispanic or Latino origin.
+    external_refs:
+    - system: SYNVOCAB
+      id: C0002
+    - system: omop
+      id: '900002'
+    vocabulary_binding:
+      vocabulary: VS_SYN_ETHNICITY
+  - name: Race
+    type: string
+    synonyms:
+    - Patient race
+    concept_ref:
+      identity_system: syn
+      id: SYN_RACE
+      version: 2026-09
+    definition: Self-identified ancestral grouping.
+    external_refs:
+    - system: SYNVOCAB
+      id: C0001
+    - system: omop
+      id: '900001'
+    vocabulary_binding:
+      vocabulary: VS_SYN_RACE
+  - name: Sex
+    type: string
+    synonyms:
+    - Patient sex
+    concept_ref:
+      identity_system: syn
+      id: SYN_SEX
+      version: 2026-09
+    definition: Biological sex recorded at registration.
+    external_refs:
+    - system: SYNVOCAB
+      id: C0003
+    - system: omop
+      id: '900003'
+    vocabulary_binding:
+      vocabulary: VS_SYN_SEX
+  - name: Vital status
+    type: string
+    synonyms: []
+    concept_ref:
+      identity_system: syn
+      id: SYN_VITAL_STATUS
+      version: 2026-09
+    definition: Whether the patient is alive.
+    external_refs:
+    - system: SYNVOCAB
+      id: C0004
+    - system: omop
+      id: '900004'
+    vocabulary_binding:
+      vocabulary: VS_SYN_VITAL_STATUS
+  context_card:
+    card_version: 2026-09
+    description: Synthetic library data elements for the demographics domain
+relationships:
+- from:
+    system: syn
+    id: SYN_ETHNICITY
+  to:
+    system: syn
+    id: SYN_RACE
+  type: Is a
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: syn
+    id: SYN_RACE
+  to:
+    system: omop
+    id: '900999'
+  type: Maps to
+  hierarchical: false
+  far_end_loaded: false

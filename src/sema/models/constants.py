@@ -5,6 +5,8 @@ from enum import IntEnum
 from typing import Final, NamedTuple
 from types import MappingProxyType
 
+from sema.models.physical_key import CanonicalRef, PhysicalKey
+
 
 class SourcePrecedence(IntEnum):
     HUMAN = 100
@@ -63,10 +65,8 @@ def translate_ref(old_ref: str, workspace: str) -> str:
     m = _UNITY_REF_PATTERN.match(old_ref)
     if not m:
         return old_ref
-    parts = [f"databricks://{workspace}", m.group(1), m.group(2), m.group(3)]
-    if m.group(4):
-        parts.append(m.group(4))
-    return "/".join(parts)
+    key = PhysicalKey(workspace, m.group(1), m.group(2), m.group(3), m.group(4))
+    return CanonicalRef.build("databricks", key)
 
 
 # Deprecated: use parse_ref() with translate_ref() for legacy refs

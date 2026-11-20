@@ -1,0 +1,16 @@
+{
+ "main.s.person": {
+  "columns": [
+   {"name": "rid", "type": "string"},
+   {"name": "status", "type": "string"},
+   {"name": "region", "type": "string"}
+  ]
+ },
+ "main.s.visit": {
+  "columns": [
+   {"name": "visit_id", "type": "string"},
+   {"name": "rid", "type": "string"},
+   {"name": "kind", "type": "string"}
+  ]
+ }
+}

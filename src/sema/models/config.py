@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
 
 import yaml
-from pydantic import Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from sema.models.hierarchy_anchor import HierarchyAnchorConfig
+
+# Defaults differ by caller: build reads values (``full``), intake starts at ``metadata_only``.
+EvidenceTier = Literal["metadata_only", "bounded_values", "full"]
 
 
 class DatabricksConfig(BaseSettings):
@@ -13,6 +19,16 @@ class DatabricksConfig(BaseSettings):
     host: str = ""
     token: SecretStr = SecretStr("")
     http_path: str = ""
+
+
+class DuckDBConfig(BaseSettings):
+    """File path of the DuckDB database."""
+
+    model_config = SettingsConfigDict(env_prefix="DUCKDB_")
+
+    path: str = ""
+    # False refuses file and network reads and writes from SQL; the database file stays readable.
+    external_access: bool = True
 
 
 class Neo4jConfig(BaseSettings):
@@ -49,13 +65,56 @@ class LLMConfig(BaseSettings):
     request_timeout: int = 120
 
 
+class ModelPrice(BaseModel):
+    input_per_1k: float = Field(ge=0)
+    output_per_1k: float = Field(ge=0)
+
+
+class IntakeModelConfig(BaseSettings):
+    """Model calls for intake: its own provider (never the build default), caps, and prices.
+
+    `provider` stays None unless set for intake, so a run fails at start instead of
+    reading `LLM_PROVIDER`. Cost is an estimate from `prices`, keyed by model id.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="INTAKE_MODEL_")
+
+    provider: str | None = None
+    model: str
+    max_calls: int = Field(ge=0)
+    max_cost: float = Field(ge=0)
+    prices: dict[str, ModelPrice] = Field(default_factory=dict)
+    recordings_dir: Path | None = None
+    api_key: SecretStr = SecretStr("")
+    base_url: str | None = None
+    use_structured_output: str = "auto"
+    request_timeout: int = 120
+    agreement: bool = True
+
+
+class TracingConfig(BaseSettings):
+    """Where intake runs send traces; the trace store itself is MLflow's own setting."""
+
+    model_config = SettingsConfigDict(env_prefix="INTAKE_TRACING_")
+
+    backend: Literal["none", "mlflow", "langfuse"] = "none"
+
+    @model_validator(mode="after")
+    def _backend_is_available(self) -> TracingConfig:
+        if self.backend == "langfuse":
+            raise ValueError("tracing backend 'langfuse' is not available until slice S4")
+        return self
+
+
 class EmbeddingConfig(BaseSettings):
     """Embedding provider configuration.
 
     Supported providers:
         openrouter          - OpenRouter API (default)
         openai              - Direct OpenAI API
-        sentence-transformers - Local sentence-transformers model
+        sentence-transformers - Local sentence-transformers model. `cache_dir`
+                              (EMBEDDING_CACHE_DIR) names the warm Hugging Face
+                              cache; when set, loading is local-only.
         databricks          - Mosaic AI / Databricks Model Serving. `model` is
                               a serving-endpoint name (e.g.,
                               databricks-bge-large-en). `api_key` and
@@ -70,6 +129,7 @@ class EmbeddingConfig(BaseSettings):
     model: str = "databricks-bge-large-en"
     api_key: SecretStr = SecretStr("")
     base_url: str | None = None
+    cache_dir: str | None = None
     embeddable_labels: list[str] = [
         "Entity", "Property", "Alias", "Term", "Metric",
     ]
@@ -82,6 +142,7 @@ class ProfilingConfig(BaseSettings):
     max_sample_values: int = 5
     skip_temporal_profiling: bool = True
     skip_numeric_profiling: bool = False
+    enable_distinct_counts: bool = True
 
 
 class BuildConfig(BaseSettings):
@@ -103,6 +164,14 @@ class BuildConfig(BaseSettings):
 
     enable_fk_detection: bool = True
     materialize_structural_fk: bool = False
+    # Intake's concept spec and the staging file its relations live in: stated domains, code lists.
+    concept_spec: str | None = None
+    concept_staging: str | None = None
+
+    evidence_policy: EvidenceTier = "full"
+    max_distinct_values_read: int = 200
+    max_unmatched_reported: int = 20
+    judge_workers: int = 4
 
     eval_dump_dir: str | None = None
     eval_config_label: str = "run"
@@ -125,10 +194,21 @@ class BuildConfig(BaseSettings):
     quality_budget_min_processed: int = 5
 
     databricks: DatabricksConfig = Field(default_factory=DatabricksConfig)
+    duckdb: DuckDBConfig = Field(default_factory=DuckDBConfig)
     neo4j: Neo4jConfig = Field(default_factory=Neo4jConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     profiling: ProfilingConfig = Field(default_factory=ProfilingConfig)
+
+    @model_validator(mode="after")
+    def _apply_evidence_policy(self) -> BuildConfig:
+        if self.evidence_policy != "metadata_only":
+            return self
+        self.profiling = self.profiling.model_copy(update={
+            "sample_rows": 0, "top_k_values": 0, "enable_distinct_counts": False,
+        })
+        self.enable_fk_detection = False
+        return self
 
     @property
     def fk_materialization_threshold(self) -> float:
@@ -187,6 +267,7 @@ class QueryConfig(BaseSettings):
     operation: str = "plan"
     verbose: bool = False
     session_id: str | None = None
+    hierarchy_anchor: HierarchyAnchorConfig = Field(default_factory=HierarchyAnchorConfig)
 
     neo4j: Neo4jConfig = Field(default_factory=Neo4jConfig)
     databricks: DatabricksConfig = Field(default_factory=DatabricksConfig)

@@ -1,0 +1,301 @@
+"""Scoped retrieval-graph build for arm S (Neo4j and embedder mocked)."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock
+
+import pytest
+
+from showcase.ontology_query_benchmark import sema_build
+from showcase.ontology_query_benchmark.profile import Attribution
+from showcase.ontology_query_benchmark.routing import RoutingError
+from showcase.ontology_query_benchmark.sema_bindings import SpecPinError, load_sidecar
+from showcase.ontology_query_benchmark.sema_build import (
+    BuildManifest,
+    build_scoped_graph,
+    read_manifest,
+    write_manifest,
+)
+from showcase.ontology_query_benchmark.sema_build_utils import (
+    FactsConceptSource,
+    LibraryFacts,
+    import_library_facts,
+)
+from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH
+from tests.unit.ontology_query_benchmark.sema_bindings_env import (
+    CONCEPT_SPEC,
+    ELEMENTS,
+    EVENTS,
+    ID_SUFFIX,
+    PEOPLE,
+    RID,
+    catalog_fixture,
+    facts_fixture,
+    write_fixture,
+    write_projection,
+)
+from tests.unit.ontology_query_benchmark.sema_build_env import (
+    ClientBuilt,
+    _catalog,
+    _embedder,
+    clean_process,
+    no_client,
+)
+
+pytestmark = pytest.mark.unit
+
+
+def build_args(tmp_path: Path) -> list[str]:
+    return [
+        "--profile", str(PROFILE_PATH), "--neo4j-uri", "bolt://unused",
+        "--projection", str(tmp_path / "projection.duckdb"),
+        "--projection-receipt", str(tmp_path / "receipt.json"),
+        "--manifest", str(tmp_path / "manifest.json"),
+    ]
+
+
+def _build_with(tmp_path: Path, facts: LibraryFacts) -> tuple[MagicMock, MagicMock, BuildManifest]:
+    loader, embedder = MagicMock(), _embedder()
+    manifest = build_scoped_graph(
+        loader, _catalog(), load_sidecar(write_fixture(tmp_path), tmp_path), facts, embedder,
+        dimensions=4, embedder_model="toy-embed",
+    )
+    return loader, embedder, manifest
+
+
+def _build(tmp_path: Path) -> tuple[MagicMock, MagicMock, BuildManifest]:
+    return _build_with(tmp_path, facts_fixture(tmp_path))
+
+
+def _cypher_params(loader: MagicMock) -> list[dict[str, Any]]:
+    return [c.kwargs for c in loader._run.call_args_list]
+
+
+def _embedded_texts(embedder: MagicMock) -> list[str]:
+    return [t for c in embedder.embed_documents.call_args_list for t in c.args[0]]
+
+
+def test_library_facts_come_from_the_concept_source_import(tmp_path: Path) -> None:
+    projection, receipt = write_projection(tmp_path)
+    before = hashlib.sha256(projection.read_bytes()).hexdigest()
+    facts = import_library_facts(
+        CONCEPT_SPEC, projection, receipt, spec_attribution=Attribution.ASSISTED
+    )
+    gender = facts.elements["G1"]
+    assert (gender.label, gender.definition) == ("Administrative gender", "Gender for billing.")
+    assert set(gender.members) == {("L8532", "Female"), ("L8507", "Male")}
+    assert set(facts.elements) == set(ELEMENTS)
+    assert "toy-library-workload" in facts.release
+    detail = FactsConceptSource(facts).name_synonyms("L8532")
+    assert detail is not None and detail.name == "Female"
+    assert hashlib.sha256(projection.read_bytes()).hexdigest() == before
+
+
+def test_projection_must_match_its_receipt(tmp_path: Path) -> None:
+    projection, receipt = write_projection(tmp_path)
+    receipt.write_text(json.dumps({"complete": True, "duckdb": {"sha256": "0" * 64}}))
+    with pytest.raises(SpecPinError, match="projection"):
+        import_library_facts(CONCEPT_SPEC, projection, receipt,
+                             spec_attribution=Attribution.ASSISTED)
+    receipt.write_text(json.dumps({
+        "complete": False,
+        "duckdb": {"sha256": hashlib.sha256(projection.read_bytes()).hexdigest()},
+    }))
+    with pytest.raises(SpecPinError, match="incomplete"):
+        import_library_facts(CONCEPT_SPEC, projection, receipt,
+                             spec_attribution=Attribution.ASSISTED)
+
+
+def _declared(loader: MagicMock) -> dict[tuple[str, str], str]:
+    return {
+        (p["entity_name"], p["name"]): p["semantic_type"] for p in _cypher_params(loader)
+        if "semantic_type" in p
+    }
+
+
+def test_every_catalog_column_is_declared(tmp_path: Path) -> None:
+    loader, _, _ = _build(tmp_path)
+    declared = _declared(loader)
+    catalog = {(table, column) for table, cols in catalog_fixture().items() for column in cols}
+    assert set(declared) == catalog - {(EVENTS, "subject")}
+
+
+def test_a_reserved_column_name_is_a_finding_not_a_failed_build(tmp_path: Path) -> None:
+    loader, embedder, manifest = _build(tmp_path)
+    assert (EVENTS, "subject") not in _declared(loader)
+    assert "subject" not in _embedded_texts(embedder)
+    reserved = [f for f in manifest.findings if "reserved" in f]
+    assert len(reserved) == 1
+    assert f"cat.sch.{EVENTS}" in reserved[0] and "'subject'" in reserved[0]
+    roles = {p["model_role"] for p in _cypher_params(loader) if "model_role" in p}
+    assert roles == {"BENCH_S"}
+
+
+def test_only_approved_governed_bindings_are_categorical(tmp_path: Path) -> None:
+    loader, _, _ = _build(tmp_path)
+    categorical = {k for k, t in _declared(loader).items() if t == "categorical"}
+    assert categorical == {
+        (PEOPLE, "gender_G1"), (PEOPLE, "vital_V1"), (PEOPLE, "city_C1"),
+        (EVENTS, "site_S1"),
+    }
+
+
+def test_unbound_columns_are_embedded_by_their_name(tmp_path: Path) -> None:
+    loader, embedder, _ = _build(tmp_path)
+    assert "ended on" in _embedded_texts(embedder)
+    matches = {
+        tuple(sorted(c.kwargs["match"].items()))
+        for c in loader.set_node_embedding.call_args_list if c.kwargs["label"] == "Property"
+    }
+    assert (("entity_name", EVENTS), ("name", "ended_on")) in matches
+    assert (("entity_name", PEOPLE), ("name", "first_name")) in matches
+
+
+def test_denied_columns_carry_the_denied_exposure(tmp_path: Path) -> None:
+    loader, _, _ = _build(tmp_path)
+    exposure = {
+        (p["entity_name"], p["name"]): p["exposure"] for p in _cypher_params(loader)
+        if "semantic_type" in p
+    }
+    assert {k for k, v in exposure.items() if v is not None} == {(PEOPLE, "first_name")}
+    assert exposure[(PEOPLE, "first_name")] == "denied"
+
+
+def test_value_sets_hold_every_imported_member(tmp_path: Path) -> None:
+    loader, _, manifest = _build(tmp_path)
+    anchored = {c.args[1] for c in loader.upsert_value_set.call_args_list}
+    assert anchored == {"gender_G1", "vital_V1", "site_S1"}
+    members = {c.args[0] for c in loader.add_term_to_value_set.call_args_list}
+    assert members == {"L8532", "L8507", "L1", "L2", "P1", "P2", "P3"}
+
+
+def test_absent_library_elements_are_build_findings(tmp_path: Path) -> None:
+    _, _, manifest = _build(tmp_path)
+    assert any(f.startswith("library element absent: C1") for f in manifest.findings)
+    assert any(f.startswith("library element absent: N1") for f in manifest.findings)
+
+
+def test_entities_and_properties_are_embedded_with_library_text(
+    tmp_path: Path,
+) -> None:
+    loader, embedder, _ = _build(tmp_path)
+    texts = _embedded_texts(embedder)
+    assert any(t.startswith("Administrative gender") for t in texts)
+    matches = {
+        (c.kwargs["label"], tuple(sorted(c.kwargs["match"].items())))
+        for c in loader.set_node_embedding.call_args_list
+    }
+    assert ("Property", (("entity_name", PEOPLE), ("name", "gender_G1"))) in matches
+    assert ("Entity", (("name", EVENTS),)) in matches
+    loader.create_vector_index.assert_any_call("property_embedding_index", "Property", 4)
+
+
+def test_companions_are_embedded_by_their_declared_role(tmp_path: Path) -> None:
+    _, embedder, _ = _build(tmp_path)
+    texts = _embedded_texts(embedder)
+    assert "Administrative gender label text" in texts
+    assert "Administrative gender mapping type" in texts
+
+
+def test_an_absent_element_is_embedded_by_its_library_id_without_the_suffix(
+    tmp_path: Path,
+) -> None:
+    _, embedder, _ = _build(tmp_path)
+    texts = _embedded_texts(embedder)
+    assert "city" in texts and "city label text" in texts
+    assert not any(ID_SUFFIX in t for t in texts)
+
+
+def test_join_from_spec_relationship_is_materialized(tmp_path: Path) -> None:
+    loader, _, _ = _build(tmp_path)
+    loader.upsert_join_path.assert_called_once()
+    predicates = str(loader.upsert_join_path.call_args)
+    assert "rid_L1" in predicates and PEOPLE in predicates and EVENTS in predicates
+
+
+def test_graph_identity_tracks_inputs(tmp_path: Path) -> None:
+    _, _, first = _build(tmp_path / "a")
+    _, _, again = _build(tmp_path / "a")
+    assert first.graph_identity == again.graph_identity
+    fewer = {**ELEMENTS, "G1": (*ELEMENTS["G1"][:2], ELEMENTS["G1"][2][:1])}
+    changed_facts = import_library_facts(
+        CONCEPT_SPEC, *write_projection(tmp_path / "b", fewer),
+        spec_attribution=Attribution.ASSISTED,
+    )
+    _, _, changed = _build_with(tmp_path / "a", changed_facts)
+    assert changed.graph_identity != first.graph_identity
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_manifest_records_each_input_file_with_its_attribution(tmp_path: Path) -> None:
+    _, _, manifest = _build(tmp_path)
+    recorded = {i.role: (i.attribution, i.sha256) for i in manifest.inputs}
+    assert recorded == {
+        "sidecar": ("supplied", _sha256(tmp_path / "sidecar.json")),
+        "product_spec:people": ("supplied", _sha256(tmp_path / "people.json")),
+        "product_spec:events": ("assisted", _sha256(tmp_path / "events.json")),
+        "concept_spec": ("assisted", _sha256(CONCEPT_SPEC)),
+        "projection": ("supplied", _sha256(tmp_path / "projection.duckdb")),
+    }
+
+
+def test_the_projection_attribution_is_the_receipt_assistance(tmp_path: Path) -> None:
+    _, _, manifest = _build_with(tmp_path, facts_fixture(tmp_path, "automatic"))
+    recorded = {i.role: i.attribution for i in manifest.inputs}
+    assert recorded["projection"] == "automatic"
+
+
+def test_a_receipt_without_assistance_is_refused(tmp_path: Path) -> None:
+    projection, receipt = write_projection(tmp_path)
+    raw = json.loads(receipt.read_text())
+    del raw["assistance"]
+    receipt.write_text(json.dumps(raw))
+    with pytest.raises(SpecPinError, match="assistance"):
+        import_library_facts(CONCEPT_SPEC, projection, receipt,
+                             spec_attribution=Attribution.ASSISTED)
+
+
+def test_manifest_round_trips(tmp_path: Path) -> None:
+    _, _, manifest = _build(tmp_path)
+    path = tmp_path / "manifest.json"
+    write_manifest(manifest, path)
+    assert read_manifest(path) == manifest
+
+
+def test_build_entry_refuses_a_foreign_route_before_any_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clean_process(monkeypatch)
+    no_client(monkeypatch)
+    monkeypatch.setenv("OPENAI_API_KEY", "set")
+    with pytest.raises(RoutingError, match="OPENAI_API_KEY"):
+        sema_build.main(build_args(tmp_path))
+
+
+def test_build_entry_in_a_clean_process_goes_on_to_the_clients(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clean_process(monkeypatch)
+    no_client(monkeypatch)
+    with pytest.raises(ClientBuilt):
+        sema_build.main(build_args(tmp_path))
+
+
+def test_a_spec_entity_identity_reaches_the_entity_node(tmp_path: Path) -> None:
+    identity = {"key_columns": [RID, "site_S1"], "exclude_null_keys": True}
+    loader = MagicMock()
+    build_scoped_graph(
+        loader, _catalog(),
+        load_sidecar(write_fixture(tmp_path, events_identity=identity), tmp_path),
+        facts_fixture(tmp_path), _embedder(), dimensions=4, embedder_model="toy-embed",
+    )
+    projected = {p["name"]: p["identity"] for p in _cypher_params(loader) if "identity" in p}
+    assert projected[PEOPLE] is None
+    assert json.loads(projected[EVENTS])["key_columns"] == [RID, "site_S1"]

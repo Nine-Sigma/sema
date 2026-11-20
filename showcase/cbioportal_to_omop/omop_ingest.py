@@ -8,6 +8,11 @@ from urllib.request import urlopen
 import pyarrow as pa
 
 from sema.ingest.duckdb_staging import Staging
+from sema.intake.land.loaders.athena import (
+    OPTIONAL_VOCAB_FILES,
+    REQUIRED_VOCAB_FILES,
+    land_athena_bundle,
+)
 from showcase.cbioportal_to_omop.omop_ingest_utils import (
     CDM_FIELD_CSV_URL_TEMPLATE,
     CDM_REPO_URL_TEMPLATE,
@@ -20,22 +25,9 @@ from sema.log import logger
 ONTOLOGY_SCHEMA = "ontology_omop"
 VOCABULARY_SCHEMA = "vocabulary_omop"
 
-REQUIRED_VOCAB_FILES: tuple[str, ...] = (
-    "CONCEPT.csv",
-    "CONCEPT_RELATIONSHIP.csv",
-    "CONCEPT_ANCESTOR.csv",
-    "VOCABULARY.csv",
-    "DOMAIN.csv",
-)
-
-OPTIONAL_VOCAB_FILES: tuple[str, ...] = (
-    "CONCEPT_SYNONYM.csv",
-    "CONCEPT_CLASS.csv",
-    "RELATIONSHIP.csv",
-    "DRUG_STRENGTH.csv",
-)
-
 __all__ = [
+    "OPTIONAL_VOCAB_FILES",
+    "REQUIRED_VOCAB_FILES",
     "fetch_cdm_artifacts",
     "ingest_cdm_schema",
     "ingest_vocabulary",
@@ -135,36 +127,4 @@ def ingest_vocabulary(
     if vocab_path is None:
         logger.info("No --vocab-path provided; skipping OMOP vocabulary ingestion.")
         return
-    vocab_dir = Path(vocab_path).expanduser()
-    _assert_required_vocab_files(vocab_dir)
-    for filename in REQUIRED_VOCAB_FILES + OPTIONAL_VOCAB_FILES:
-        path = vocab_dir / filename
-        if not path.exists():
-            continue
-        _load_vocab_csv_into_duckdb(path, staging)
-    logger.info("Vocabulary ingestion complete from {}", vocab_dir)
-
-
-def _assert_required_vocab_files(vocab_dir: Path) -> None:
-    if not vocab_dir.exists():
-        raise FileNotFoundError(f"Vocabulary path does not exist: {vocab_dir}")
-    missing = [f for f in REQUIRED_VOCAB_FILES if not (vocab_dir / f).exists()]
-    if missing:
-        raise FileNotFoundError(
-            f"Missing required OMOP vocabulary file(s) in {vocab_dir}: {', '.join(missing)}"
-        )
-
-
-def _load_vocab_csv_into_duckdb(path: Path, staging: Staging) -> None:
-    table_name = path.stem.lower()
-    logger.info("Loading vocabulary CSV {} into {}.{}", path.name, VOCABULARY_SCHEMA, table_name)
-    staging.drop_table(VOCABULARY_SCHEMA, table_name)
-    sanitized = str(path).replace("'", "''")
-    sql = (
-        f'CREATE TABLE "{VOCABULARY_SCHEMA}"."{table_name}" AS '
-        f"SELECT * FROM read_csv_auto('{sanitized}', "
-        "delim='\\t', header=true, all_varchar=true, strict_mode=false)"
-    )
-    staging.execute(sql)
-
-
+    land_athena_bundle(Path(vocab_path).expanduser(), staging, schema=VOCABULARY_SCHEMA)

@@ -1,0 +1,53 @@
+NAME,TITLE,DEFINITION
+ADDRESS,Branch Address,Street address at which the branch is physically located.
+BKCLASS,Institution Class,"A classification code assigned by the FDIC based on the institution's charter type (commercial bank or savings institution), charter agent (state or federal), Federal Reserve membership status (Fed member, Fed nonmember) and its primary federal regulator (state chartered institutions are subject to both federal and state supervision)."
+,N -,"Commercial bank, national (federal) charter and Fed member, supervised by the Office of the Comptroller of the Currency (OCC)"
+,NM -,"Commercial bank, state charter and Fed nonmember, supervised by the FDIC"
+,OI - ,Insured U.S. branch of a foreign chartered institution (IBA)
+,SA - ,"Savings associations, state or federal charter, supervised by the Office of Thrift Supervision (OTS)"
+,SB - ,"Savings banks, state charter, supervised by the FDIC"
+,SM - ,"Commercial bank, state charter and Fed member, supervised by the Federal Reserve (FRB)"
+CBSA,Core Based Statistical Area Name (Branch),Name of the Core Based Statistical Area (CBSA) as defined by the US Census Bureau Office of Management and Budget.
+CBSA_DIV,Metropolitan Divisions Name (Branch),Name of the Core Based Statistical Division as defined by the US Census Bureau Office of Management and Budget.
+CBSA_DIV_FLG,Metropolitan Divisions Flag (Branch),A flag (1=Yes) indicating member of a Core Based Statistical Division as defined by the US Census Bureau Office of Management and Budget.
+CBSA_DIV_NO,Metropolitan Divisions Number (Branch),Numeric code of the Core Based Statistical Division as defined by the US Census Bureau Office of Management and Budget.
+CBSA_METRO,Metropolitan Division Number (Branch),Numeric code of the Metropolitan Statistical Area as defined by the US Census Bureau Office of Management and Budget
+CBSA_METRO_FLG,Metropolitan Division Flag (Branch),A flag (1=Yes) used to indicate whether an branch is in a Metropolitan Statistical Area as defined by the US Census Bureau Office of Management and Budget
+CBSA_METRO_NAME,Metropolitan Division Name (Branch),Name of the Metropolitan Statistical Area as defined by the US Census Bureau Office of Management and Budget
+CBSA_MICRO_FLG,Micropolitan Division Flag (Branch),A flag (1=Yes) used to indicate whether an branch is in a Micropolitan Statistical Area as defined by the US Census Bureau Office of Management and Budget
+CBSA_NO,Core Based Statistical Areas (Branch),Numeric code of the Core Based Statistical Area (CBSA) as defined by the US Census Bureau Office of Management and Budget.
+CERT,Institution FDIC Certificate #,A unique number assigned by the FDIC used to identify institutions and for the issuance of insurance certificates.
+CITY,Branch City,City in which branch is physically located.
+COUNTY,Branch County,County where the branch is physically located.
+CSA,Combined Statistical Area Name (Branch),Name of the Combined Statistical Area (CSA) as defined by the US Census Bureau Office of Management and Budget
+CSA_FLG,Combined Statistical Area Flag  (Branch),Flag (1=Yes) indicating member of a Combined Statistical Area (CSA) as defined by the US Census Bureau Office of Management and Budget
+CSA_NO,Combined Statistical Area Number  (Branch),Numeric code of the Combined Statistical Area (CSA) as defined by the US Census Bureau Office of Management and Budget
+ESTYMD,Branch Established Date,The date on which the branch began operations.
+FI_UNINUM,FDIC UNINUM of the Owner Institution,This is the FDIC UNINUM of the institution that owns the branch.  A UNINUM is a unique sequentially number added to the FDIC database for both banks and  branches.  There is no pattern imbedded within the number.  The FI_UNINUM is updated with every merger or purchase of branches to reflect the most current owner.  
+MAINOFF,Main Office,The main office for the institution.
+NAME,Institution Name,Legal name of the FDIC-Insured Institution
+OFFNAME,Office Name,Name of the branch.
+OFFNUM,Branch Number,The branch's corresponding office number.
+RUNDATE,Run Date,The day the institution information was updated.
+SERVTYPE,Service Type Code,Define the various types of offices of FDIC-insured institutions.
+,11,Full Service Brick and Mortar Office
+,12,Full Service Retail Office
+,13,Full Service Home Banking
+,14,Full Service Mobile Office
+,15,Full Service Home/Phone Banking
+,16,Full Service Seasonal Office
+,21,Limited Service Administrative Office
+,22,Limited Service Military Facility
+,23,Limited Service Facility Office
+,24,Limited Service Loan Production Office
+,25,Limited Service Consumer Credit Office
+,26,Limited Service Contractual Office
+,27,Limited Service Messenger Office
+,28,Limited Service Retail Office
+,29,Limited Service Mobile Office
+,30,Limited Service Trust Office
+STALP,Branch State Abbreviation,"State abbreviation in which the branch is physically located. The FDIC Act defines state as any State of the United States, the District of Columbia, and any territory of the United States, Puerto Rico, Guam, American Samoa, the Trust Territory of the Pacific Islands, the Virgin Island, and the Northern Mariana Islands."
+STCNTY,State and County Number,A five digit number representing the state and county in which the institution is physically located.  The first two digits represent the FIPS state numeric code and the last three digits represent the FIPS county numeric code.
+STNAME,Branch State   ,"State in which the  branch is physically located. The FDIC Act defines state as any State of the United States, the District of Columbia, and any territory of the United States, Puerto Rico, Guam, American Samoa, the Trust Territory of the Pacific Islands, the Virgin Island, and the Northern Mariana Islands."
+UNINUM,Unique Identification Number for a Branch Office,Unique Identification Number for a Branch Office as assigned by the FDIC
+ZIP,Branch Zip Code,The first five digits of the full postal zip code representing physical location of the branch.

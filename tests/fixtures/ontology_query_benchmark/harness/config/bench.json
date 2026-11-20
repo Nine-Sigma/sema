@@ -1,0 +1,25 @@
+{
+ "sources": [
+  {"relation": "main.s.person"},
+  {"relation": "main.s.visit"}
+ ],
+ "row_concepts": [
+  "person"
+ ],
+ "always_concepts": [
+  "visit"
+ ],
+ "budget_tokens": 3000,
+ "values_top_k": 25,
+ "near_miss_pct": 1.0,
+ "description_cap_chars": 160,
+ "conventions": [
+  "People means distinct rid values."
+ ],
+ "sql_rules": [
+  "Use ANSI SQL."
+ ],
+ "sql_checks": [
+  "empty_result"
+ ]
+}

@@ -14,6 +14,7 @@ class TargetArtifactKind(str, Enum):
     TABLE_ROW = "TABLE_ROW"
     GRAPH_NODE = "GRAPH_NODE"
     GRAPH_EDGE = "GRAPH_EDGE"
+    CONCEPT_SCHEME = "CONCEPT_SCHEME"
 
 
 class PrimaryKeyStrategy(str, Enum):

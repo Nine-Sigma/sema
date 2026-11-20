@@ -10,6 +10,7 @@ from sema.cli_factories import (
     _get_llm,
     _get_neo4j_driver,
 )
+from sema.log import logger
 from sema.models.config import (
     BuildConfig,
     QueryConfig,
@@ -41,9 +42,9 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     from sema.circuit_breaker import CircuitBreaker
     from sema.graph.loader import GraphLoader
     from sema.pipeline.build import (
-        DatabricksConnectorFactory,
         LLMClientFactory,
         aggregate_report,
+        resolve_connector_factory,
     )
     import uuid
 
@@ -51,9 +52,7 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     driver = _get_neo4j_driver(config.neo4j)
     loader = GraphLoader(driver)
 
-    connector_factory = DatabricksConnectorFactory(
-        config=config.databricks, profiling=config.profiling,
-    )
+    connector_factory = resolve_connector_factory(config)
     discovery_connector = connector_factory.create()
     _register_datasource(discovery_connector, loader)
     work_items = _discover_tables(discovery_connector, config)
@@ -149,15 +148,39 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
         full_coverage=not (config.slice_tables or config.table_pattern),
     )
 
+    from sema.graph.join_materializer import materialize_schema_joins
+    from sema.pipeline.coded_columns import run_coded_columns
+    from sema.pipeline.identity import run_identity
     schemas = sorted({wi.schema for wi in work_items})
-    run_fk_detection(
+    detected = run_fk_detection(
         loader, discovery_connector, config, schemas, run_id=run_id,
     )
+    coded = run_coded_columns(
+        loader, discovery_connector, config, schemas, run_id=run_id,
+    )
+    # Joins wait for every table of the run: either end may be built last.
+    for schema in schemas:
+        materialize_schema_joins(
+            loader, schema, [*detected.get(schema, []), *coded.get(schema, [])],
+        )
+    # After the joins, so join-path entity links never see an edge this step writes.
+    run_identity(loader, discovery_connector, config, schemas, run_id=run_id,
+                 client=_identity_client(llm_factory))
 
     _compute_embeddings(config, loader, skip_embeddings=config.skip_embeddings)
 
     driver.close()
     return report
+
+
+def _identity_client(llm_factory: Any) -> Any:
+    """The build's model client for the identity proposer, or None when no model can be made:
+    the step then states keys only and the build goes on."""
+    try:
+        return llm_factory.create()
+    except Exception as exc:  # each provider raises its own configuration errors
+        logger.warning(f"Identity proposer has no model client: {type(exc).__name__}: {exc}")
+        return None
 
 
 def run_context(config: QueryConfig) -> dict[str, Any]:
@@ -177,6 +200,7 @@ def run_context(config: QueryConfig) -> dict[str, Any]:
         driver=driver,
         embedder=embedder,
         embedder_model_name=config.embedding.model,
+        hierarchy_anchor=config.hierarchy_anchor,
     )
     candidate_set = engine.retrieve(config.question)
     sco = prune_to_sco(candidate_set, consumer=config.consumer)
@@ -229,6 +253,7 @@ def run_query(config: QueryConfig) -> dict[str, Any]:
     response: dict[str, Any] = {
         "operation": config.operation,
         "sql": result.artifact,
+        "columns": result.columns,
         "validation": {
             "valid": result.valid,
             "errors": result.errors,

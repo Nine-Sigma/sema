@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -20,6 +19,8 @@ from sema.graph.target_retrieval_loader import (
     PhysicalSchemaBinding,
     project_target_to_retrieval_graph,
 )
+from sema.models.context import JoinPredicate
+from sema.pipeline.context_utils import _parse_join_predicates
 from sema.targets.adapters.manifest import ManifestTargetAdapter
 from sema.targets.normalizer import TargetModelNormalizer
 
@@ -68,9 +69,14 @@ def test_person_join_path_is_retrievable(clean_neo4j) -> None:
             table_names=["condition_occurrence"],
         ))
     assert len(rows) == 1
-    predicates = json.loads(rows[0]["join_predicates"])
-    assert predicates == [{
-        "left": f"{_CATALOG}.{_SCHEMA}.condition_occurrence.person_id",
-        "right": f"{_CATALOG}.{_SCHEMA}.person.person_id",
-        "op": "=",
-    }]
+    assert rows[0]["name"] == "person__condition_occurrence"
+    assert rows[0]["confidence"] == 1.0
+    assert _parse_join_predicates(rows[0]["join_predicates"]) == [
+        JoinPredicate(
+            left_table=f"{_CATALOG}.{_SCHEMA}.condition_occurrence",
+            left_column="person_id",
+            right_table=f"{_CATALOG}.{_SCHEMA}.person",
+            right_column="person_id",
+            operator="=",
+        )
+    ]

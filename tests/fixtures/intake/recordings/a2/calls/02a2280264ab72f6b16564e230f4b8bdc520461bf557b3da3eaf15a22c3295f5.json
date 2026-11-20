@@ -1,0 +1,49 @@
+{
+  "model": "openai/gpt-6-luna",
+  "output": {
+    "confidences": [
+      0.99,
+      0.99,
+      0.99,
+      0.99,
+      0.99,
+      1.0,
+      1.0,
+      0.99,
+      1.0,
+      0.99,
+      0.99,
+      0.99,
+      0.99
+    ],
+    "reasons": [
+      "No column indicates whether a row is in use or withdrawn.",
+      "No column has a date-shaped role for when a row starts to apply.",
+      "No column has a date-shaped role for when a row stops applying.",
+      "No column identifies a replacement for a withdrawn row.",
+      "No column indicates the language of a row's text.",
+      "The claim in force and unique non-null key evidence identify concept_code as the concept identifier.",
+      "The lexicon claim identifies concept_name as the preferred human-readable name.",
+      "No column represents a longer heading alongside the preferred name.",
+      "The lexicon claim identifies definition as the explanatory text.",
+      "The data_type column is the constant-valued field indicating the values' data type.",
+      "No column indicates whether concept values need protection.",
+      "No column has the array shape required for synonyms."
+    ],
+    "role_concept_id": "concept_code",
+    "role_data_type": "data_type",
+    "role_definition": "definition",
+    "role_lang": "none",
+    "role_name": "concept_name",
+    "role_replaced_by": "none",
+    "role_sensitive": "none",
+    "role_status": "none",
+    "role_synonyms": "none",
+    "role_title": "none",
+    "role_valid_from": "none",
+    "role_valid_to": "none"
+  },
+  "prompt": "# prompt: roles v2\n\nYou read what the columns of one relation landed from a source stand for. Code has\nprofiled the relation and lists every column below with its facts. Code checks your answer\nafter you give it.\n\n## How to answer\n\n- Each `role_<name>` field asks one role of `land_a2.codes_a2__Concepts`. Answer it with the exact name of\n  one column of `land_a2.codes_a2__Concepts` listed under Relations, or `none` when no column holds that\n  role. A required role needs a column.\n- Never name one column for two roles in one answer, except `display` and `name`.\n- A claim in force from the lexicon is code's reading of the names: answer the same\n  column to keep it, or another column to contest it. A claim settled by the binding, a\n  decision, or memory stands; answer it as stated.\n- Each `reference_<n>` field asks one entry under Fields: answer it with exactly one member\n  listed there, or `abstain` when the evidence does not separate the members.\n- Fill `confidences` and `reasons` with one item per field, in field order. A list of any\n  other length fails the whole answer.\n- A reason is one short sentence naming the evidence that decided the answer.\n- Use only the evidence given here: names, types, comments, aggregates, lexicon and\n  embedding facts, findings, and the text of relations that describe the schema. Data\n  values are shown only under Values, for the columns a reviewer approved reading, with\n  the first landed rows of those columns after them in landed order.\n- Code sends an answer back once with its failures: a name that is not a column of the\n  relation, two roles on one column, or a column that fails its role's data fact. A\n  finding is a reading, not a failure.\n\n## Claims in force\n\n- `concept_id`: `concept_code` (code)\n- `name`: `concept_name` (lexicon; a claim you may contest)\n- `definition`: `definition` (lexicon; a claim you may contest)\n\n## Failed checks from previous answers\n\nanswer 1:\n- the answer's confidences or reasons do not list one item per entry\n\n## Relations\n\n### land_a2.codes_a2__Concepts\nrows: 5\ncolumns:\n- concept_code: type VARCHAR, distinct 5, distinct ratio 1, null rate 0, mean length 4.2, unique; findings definition_mean_length 4.2\n- concept_name: type VARCHAR, distinct 5, distinct ratio 1, null rate 0, mean length 6.4, unique; lexicon tokens of name; findings definition_mean_length 6.4\n- _empty_3: type VARCHAR, distinct 0, distinct ratio 0, null rate 1; findings display_null_rate 1\n- definition: type VARCHAR, distinct 5, distinct ratio 1, null rate 0, mean length 18.6, unique; lexicon tokens of definition\n- data_type: type VARCHAR, distinct 1, distinct ratio 0.2, null rate 0, mean length 6, constant; findings constant, definition_mean_length 6\n\n### land_a2.codes_a2__Values\nrows: 9\ncolumns:\n- concept_code: type VARCHAR, distinct 3, distinct ratio 0.3333, null rate 0, mean length 4.667\n- code: type VARCHAR, distinct 9, distinct ratio 1, null rate 0, mean length 3.333, unique\n- label: type VARCHAR, distinct 9, distinct ratio 1, null rate 0, mean length 5.444, unique\n- rank: type BIGINT, distinct 4, distinct ratio 0.4444, null rate 0, mean length 1\n- status: type VARCHAR, distinct 2, distinct ratio 0.2222, null rate 0, mean length 6.444\n- successor: type VARCHAR, distinct 1, distinct ratio 1, null rate 0.8889, mean length 4, constant\n\n## Values\n\nnone\n\n## Fields\n\n- `role_status`: whether a row is in use or withdrawn; optional\n- `role_valid_from`: when a row starts to apply; optional; data fact date_shape\n- `role_valid_to`: when a row stops applying; optional; data fact date_shape\n- `role_replaced_by`: the identifier of the row that replaces a withdrawn one; optional\n- `role_lang`: the language a row's text is written in; optional\n- `role_concept_id`: the stable identifier of a concept; required; data fact key_unique_non_null, met by `concept_code`; claim in force: `concept_code` (code)\n- `role_name`: the preferred human readable name; required; claim in force: `concept_name` (lexicon)\n- `role_title`: a longer heading shown alongside the preferred name; optional\n- `role_definition`: a sentence or more explaining what something means; optional; claim in force: `definition` (lexicon)\n- `role_data_type`: the data type of the values a concept takes; optional\n- `role_sensitive`: whether a concept's values need protection; optional\n- `role_synonyms`: other names for the same thing; optional; data fact array_shape\n",
+  "schema_name": "RoleMapConceptRoles_v1",
+  "tokens": 2041
+}

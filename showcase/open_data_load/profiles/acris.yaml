@@ -1,0 +1,95 @@
+# NYC ACRIS on NYC Open Data (Socrata). Dataset ids resolved 2026-11-14 from the public
+# catalog, https://api.us.socrata.com/api/catalog/v1?domains=data.cityofnewyork.us&q=ACRIS,
+# by exact dataset name. The catalog spells one code table "ACRIS - Property Types Codes"
+# (id 94g4-w6xz); schema.json says "Property Type Codes". Code tables load from the local
+# copies under docs/, so that spelling does not change the load.
+#
+# Pages come from the SODA2 resource endpoint in :id order. The one-file export
+# (/api/views/<id>/rows.csv) honors no Range request and the server cut it mid-stream, so a
+# multi-GB file could not finish; a page can be retried alone.
+#
+# `headers` names the published CSV header for a column whose header differs from its
+# dictionary_name (matching ignores case, underscores and repeated spaces). Each pair was
+# aligned from the publisher's column metadata (/api/views/<id>.json) by position and type.
+# `ignore_headers` are published columns the dictionaries do not define; the publisher reports
+# them null in every row, and the load refuses them if any row holds a value.
+date_format: "%Y-%m-%dT%H:%M:%S.%g"
+page_url: "https://data.cityofnewyork.us/resource/{dataset}.csv?$order=:id&$limit={limit}&$offset={offset}"
+page_size: 1000000
+count_url: "https://data.cityofnewyork.us/resource/{dataset}.json?$select=count(*)"
+relations:
+  real_property_master:
+    dataset: bnx9-e6tj
+    headers:
+      doc_type: doc_type
+      document_amount: document_amt
+      recorded_date: recorded_datetime
+      reel_year: reel_yr
+      reel_page: reel_pg
+      percentage_transferred: percent_trans
+  real_property_legals:
+    dataset: 8h5j-fqxa
+  real_property_parties:
+    dataset: 636b-3b5g
+    headers:
+      address_line_1: address_1
+      address_line_2: address_2
+  real_property_references:
+    dataset: pwkr-dpni
+    headers:
+      crfn_reference: reference_by_crfn_
+      document_id_reference: reference_by_doc_id
+      reel_year: reference_by_reel_year
+      reel_borough: reference_by_reel_borough
+      reel_nbr: reference_by_reel_nbr
+      reel_page: reference_by_reel_page
+    ignore_headers: [not_used_1, not_used_2]
+  real_property_remarks:
+    dataset: 9p4w-7npp
+    headers:
+      sequence: sequence_number
+      text: remark_text
+  personal_property_master:
+    dataset: sv7x-dduq
+    headers:
+      doc_type: doc_type
+      document_amount: document_amt
+      recorded_filed_date: recorded_datetime
+      fedtax_serial_slid_nbr: fedtax_serial_nbr
+      rptt_nbr: rpttl_nbr
+      reel_year: reel_yr
+      reel_page: reel_pg
+  personal_property_legals:
+    dataset: uqqa-hym2
+    headers:
+      unit: addr_unit
+  personal_property_parties:
+    dataset: nbbg-wtuz
+    headers:
+      address_line_1: address_1
+      address_line_2: address_2
+  personal_property_references:
+    dataset: 6y3e-jcrc
+    headers:
+      document_id_reference: doc_id_ref
+  personal_property_remarks:
+    dataset: fuzi-5ks9
+    headers:
+      sequence: sequence_number
+      text: remark_text
+  document_control_codes:
+    file: docs/poc/acris/code_tables/Document_Control_Codes.csv
+  property_types_codes:
+    file: docs/poc/acris/code_tables/Property_Types_Codes.csv
+  ucc_collateral_codes:
+    file: docs/poc/acris/code_tables/UCC_Collateral_Codes.csv
+  state_codes:
+    file: docs/poc/acris/code_tables/State_Codes.csv
+  country_codes:
+    file: docs/poc/acris/code_tables/Country_Codes.csv
+# What `python -m showcase.open_data_load.build` builds: the file `load` wrote, its catalog
+# (the file name up to its first dot) and the schema the load wrote into.
+build:
+  database: ~/.sema/acris.duckdb
+  catalog: acris
+  schema: main

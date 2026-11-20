@@ -127,10 +127,7 @@ class SemanticEngine:
         Returns typed intermediate — does NOT produce assertions.
         LLMStageError propagates to caller on failure.
         """
-        table_ref = table_metadata.get(
-            "table_ref",
-            f"unity://{table_metadata.get('table_name', 'unknown')}",
-        )
+        table_ref = table_metadata["table_ref"]
         prompt = build_stage_a_prompt(
             table_metadata, domain_context=self._domain_context,
             layers=self._layers,
@@ -269,10 +266,7 @@ class SemanticEngine:
 
         Returns typed intermediate — does NOT produce assertions.
         """
-        table_ref = table_metadata.get(
-            "table_ref",
-            f"unity://{table_metadata.get('table_name', 'unknown')}",
-        )
+        table_ref = table_metadata["table_ref"]
         columns = table_metadata.get("columns", [])
         all_col_names = [c["name"] for c in columns]
         critical = identify_critical_columns(all_col_names, stage_a)
@@ -385,10 +379,7 @@ class SemanticEngine:
         if not self._layers.enable_stage_c:
             return {}
 
-        table_ref = table_metadata.get(
-            "table_ref",
-            f"unity://{table_metadata.get('table_name', 'unknown')}",
-        )
+        table_ref = table_metadata["table_ref"]
         unresolved = {u.column for u in stage_b.unresolved_columns}
 
         # Build column metadata index for trigger decisions
@@ -528,10 +519,7 @@ class SemanticEngine:
             )
 
             if stage_b.status == "B_FAILED":
-                table_ref = table_metadata.get(
-                    "table_ref",
-                    f"unity://{table_metadata.get('table_name', 'unknown')}",
-                )
+                table_ref = table_metadata["table_ref"]
                 raise StageBFailureError(
                     table_ref=table_ref,
                     stage_name="L2 stage_b",
@@ -555,10 +543,7 @@ class SemanticEngine:
         finally:
             self._llm_client.invoke = original_invoke
 
-        table_ref = table_metadata.get(
-            "table_ref",
-            f"unity://{table_metadata.get('table_name', 'unknown')}",
-        )
+        table_ref = table_metadata["table_ref"]
         assertions = merge_stage_outputs(
             table_ref, stage_a, stage_b,
             c_results=c_results,

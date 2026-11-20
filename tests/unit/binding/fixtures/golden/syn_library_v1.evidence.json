@@ -1,0 +1,58 @@
+{
+  "column_bindings": [
+    {
+      "concept_ref": "syn:SYN_ETHNICITY",
+      "dataset_label": "Unmapped Visits",
+      "dataset_id": "ds-0002",
+      "physical": null,
+      "columns": [
+        "ethnicity"
+      ],
+      "resolved": false,
+      "project": null
+    },
+    {
+      "concept_ref": "syn:SYN_RACE",
+      "dataset_label": "Synthetic Patients",
+      "dataset_id": "ds-0001",
+      "physical": "syn_cat.syn_schema.patient",
+      "columns": [
+        "race_label",
+        "race_cd"
+      ],
+      "resolved": true,
+      "project": "Synthetic Project"
+    }
+  ],
+  "value_mappings": [
+    {
+      "concept_ref": "syn:SYN_RACE",
+      "source_value": "asian american",
+      "codes": [
+        "SYN_RACE_ASIAN"
+      ],
+      "status": "Pending Ontologist Review",
+      "approved": false
+    },
+    {
+      "concept_ref": "syn:SYN_RACE",
+      "source_value": "caucasian",
+      "codes": [
+        "SYN_RACE_WHITE"
+      ],
+      "status": "Awaiting Review - LLM Prediction",
+      "approved": false
+    },
+    {
+      "concept_ref": "syn:SYN_RACE",
+      "source_value": "white",
+      "codes": [
+        "SYN_RACE_WHITE"
+      ],
+      "status": "Reviewed",
+      "approved": true
+    }
+  ],
+  "mappings": [],
+  "retirements": []
+}

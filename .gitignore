@@ -14,6 +14,10 @@ wheels/
 .env
 .env.local
 .env.*.local
+.sensitive-patterns
+
+# Partner profiles hold partner names; their values come from .env PARTNER_* keys
+showcase/ontology_query_benchmark/profiles/partner_timbr/
 *.pem
 *.key
 
@@ -57,3 +61,4 @@ graphify-out/
 .agents/
 .impeccable/
 skills-lock.json
+.sema/intake/

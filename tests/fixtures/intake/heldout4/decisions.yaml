@@ -1,0 +1,6 @@
+- stage: structure
+  subject: land_heldout4.sgc_cgt_2021_structure_eng
+  choice: concept_with_values_denormalized(group_by=Level, relation=land_heldout4.sgc_cgt_2021_structure_eng)
+- stage: structure
+  subject: land_heldout4.sgc_cgt_2021_structure_fra
+  choice: ignore

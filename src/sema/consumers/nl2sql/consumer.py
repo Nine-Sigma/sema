@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import sqlglot
+from sqlglot import exp
+
 from sema.consumers.base import (
     ConsumerDeps,
     ConsumerRequest,
@@ -22,6 +25,7 @@ class SQLPlan:
     valid: bool
     errors: list[str] = field(default_factory=list)
     attempts: int = 1
+    columns: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -66,6 +70,7 @@ class NL2SQLConsumer:
             valid=sql_plan.valid,
             errors=sql_plan.errors,
             attempts=sql_plan.attempts,
+            columns=sql_plan.columns,
         )
 
         if request.operation == "plan":
@@ -126,6 +131,7 @@ class NL2SQLConsumer:
                 if not errors:
                     return SQLPlan(
                         sql=sql, valid=True, attempts=attempt + 1,
+                        columns=_output_columns(sql, self.dialect),
                     )
             except Exception as e:
                 errors = [f"LLM error: {e}"]
@@ -155,6 +161,19 @@ class NL2SQLConsumer:
             request.question, plan.sql, exec_data, deps.llm,
         )
         return SQLResult(data=exec_data, summary=summary)
+
+
+def _output_columns(sql: str, dialect: str) -> list[str]:
+    """One entry per output column, in order: the alias, else a bare column's
+    name, else the expression's SQL text. A set operation's are its first branch's."""
+    parsed = sqlglot.parse_one(sql, dialect=dialect)
+    if not isinstance(parsed, exp.Query):
+        return []
+    return [
+        s.alias or (s.name if isinstance(s, exp.Column) and not s.is_star
+                    else s.sql(dialect=dialect))
+        for s in parsed.selects
+    ]
 
 
 def _extract_sql(response: Any) -> str:

@@ -24,7 +24,7 @@ pytestmark = pytest.mark.unit
 
 def _sample_meta() -> dict:
     return {
-        "table_ref": "unity://cdm.clinical.patient",
+        "table_ref": "databricks://ws/cdm/clinical/patient",
         "table_name": "patient",
         "columns": [{"name": "patient_id", "data_type": "STRING"}],
         "sample_rows": [],
@@ -68,7 +68,7 @@ class TestInterpretTable:
     def test_llm_stage_error_propagates(self) -> None:
         client = MagicMock(spec=LLMClient)
         client.invoke.side_effect = LLMStageError(
-            table_ref="unity://cdm.clinical.patient",
+            table_ref="databricks://ws/cdm/clinical/patient",
             stage_name="L2 stage_a",
             step_errors=[("structured_output", ValueError("fail"))],
         )

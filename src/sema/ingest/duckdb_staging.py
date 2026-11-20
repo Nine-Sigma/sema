@@ -12,6 +12,7 @@ from sema.ingest.duckdb_staging_utils import (
     build_create_table_sql,
     build_table_comment_sql,
     qualified,
+    quote_ident,
     resolve_db_path,
 )
 
@@ -100,7 +101,7 @@ class Staging:
                 return
             self._conn.register("_arrow_tmp", rows)
             try:
-                cols = ", ".join(f'"{c}"' for c in rows.column_names)
+                cols = ", ".join(quote_ident(c) for c in rows.column_names)
                 self._conn.execute(
                     f"INSERT INTO {target} ({cols}) SELECT {cols} FROM _arrow_tmp"
                 )

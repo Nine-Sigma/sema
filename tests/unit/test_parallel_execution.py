@@ -45,12 +45,12 @@ def _make_mock_resources(table_name):
     connector = MagicMock()
     connector.extract_table.return_value = [
         _make_assertion(
-            f"unity://cat.sch.{table_name}",
+            f"databricks://ws/cat/sch/{table_name}",
             AssertionPredicate.TABLE_EXISTS,
             {"table_type": "TABLE"},
         ),
         _make_assertion(
-            f"unity://cat.sch.{table_name}.col1",
+            f"databricks://ws/cat/sch/{table_name}/col1",
             AssertionPredicate.COLUMN_EXISTS,
             {"data_type": "STRING", "nullable": True},
         ),
@@ -88,7 +88,7 @@ class TestSequentialMode:
         for i in range(5):
             name = f"tbl{i}"
             work_item = TableWorkItem(
-                "cat", "sch", name, f"unity://cat.sch.{name}"
+                "cat", "sch", name, f"databricks://ws/cat/sch/{name}"
             )
             connector, llm_client, loader = _make_mock_resources(name)
             r = process_table(
@@ -111,7 +111,7 @@ class TestConcurrentMode:
         """table_workers=4 with 20 tables produces same results."""
         tables = [
             TableWorkItem(
-                "cat", "sch", f"tbl{i}", f"unity://cat.sch.tbl{i}"
+                "cat", "sch", f"tbl{i}", f"databricks://ws/cat/sch/tbl{i}"
             )
             for i in range(20)
         ]
@@ -144,7 +144,7 @@ class TestWorkerResourceIsolation:
         """Verify no shared state between concurrent workers."""
         tables = [
             TableWorkItem(
-                "cat", "sch", f"tbl{i}", f"unity://cat.sch.tbl{i}"
+                "cat", "sch", f"tbl{i}", f"databricks://ws/cat/sch/tbl{i}"
             )
             for i in range(4)
         ]
@@ -189,7 +189,7 @@ class TestNoDeadlock:
         without hanging even at full utilization."""
         tables = [
             TableWorkItem(
-                "cat", "sch", f"tbl{i}", f"unity://cat.sch.tbl{i}"
+                "cat", "sch", f"tbl{i}", f"databricks://ws/cat/sch/tbl{i}"
             )
             for i in range(4)
         ]

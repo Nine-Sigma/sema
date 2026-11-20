@@ -128,8 +128,8 @@ class TestConstraintExtraction:
             [("clinical",)],
             [("cbioportal_omop", "cancer_diagnosis", False)],
             [("patient_id", "STRING", "NO", None)],
-            # FK constraints: from_table, from_col, to_table, to_col
-            [("cancer_diagnosis", "patient_id", "patients", "patient_id")],
+            # declared keys: constraint, column, referenced catalog, schema, table, column
+            [("fk_diagnosis_patient", "patient_id", "cdm", "clinical", "patients", "patient_id")],
             [],  # tags
             [(50000,)],  # high cardinality
             [("P1",)],  # sample rows
@@ -142,7 +142,8 @@ class TestConstraintExtraction:
         assert len(join_assertions) == 1
         assert join_assertions[0].object_ref is not None
         assert "patients" in join_assertions[0].object_ref
-        assert join_assertions[0].payload["on_column"] == "patient_id"
+        [predicate] = join_assertions[0].payload["join_predicates"]
+        assert (predicate["left_column"], predicate["right_column"]) == ("patient_id", "patient_id")
 
     def test_no_fk_constraints(self, connector, mock_cursor):
         mock_cursor.fetchall.side_effect = [
@@ -350,12 +351,12 @@ class TestExtractTable:
         ]
         mock_cursor.description = [("col1",), ("col2",)]
 
-        work_item = TableWorkItem(catalog="cdm", schema="clinical", table_name="cancer_diagnosis", fqn="unity://cdm.clinical.cancer_diagnosis")
+        work_item = TableWorkItem(catalog="cdm", schema="clinical", table_name="cancer_diagnosis", fqn="databricks://test.databricks.com/cdm/clinical/cancer_diagnosis")
         assertions = connector.extract_table(work_item)
 
         table_assertions = [a for a in assertions if a.predicate == AssertionPredicate.TABLE_EXISTS]
         assert len(table_assertions) == 1
-        assert table_assertions[0].subject_ref == "unity://cdm.clinical.cancer_diagnosis"
+        assert table_assertions[0].subject_ref == "databricks://test.databricks.com/cdm/clinical/cancer_diagnosis"
 
         col_assertions = [a for a in assertions if a.predicate == AssertionPredicate.COLUMN_EXISTS]
         assert len(col_assertions) == 1
@@ -377,14 +378,15 @@ class TestExtractTable:
     def test_extract_table_with_fks_and_tags(self, connector, mock_cursor):
         mock_cursor.fetchall.side_effect = [
             [("patient_id", "STRING", "NO", None)],  # columns
-            [("cancer_diagnosis", "patient_id", "patients", "patient_id")],  # FK
+            [("fk_diagnosis_patient", "patient_id", "cdm", "clinical", "patients",
+              "patient_id")],  # declared key
             [("patient_id", "pii", "true")],  # tags
             [(50000,)],  # high cardinality — no top-k
             [("P1",)],  # sample rows
         ]
         mock_cursor.description = [("col1",)]
 
-        work_item = TableWorkItem(catalog="cdm", schema="clinical", table_name="cancer_diagnosis", fqn="unity://cdm.clinical.cancer_diagnosis")
+        work_item = TableWorkItem(catalog="cdm", schema="clinical", table_name="cancer_diagnosis", fqn="databricks://test.databricks.com/cdm/clinical/cancer_diagnosis")
         assertions = connector.extract_table(work_item)
 
         join_assertions = [a for a in assertions if a.predicate == AssertionPredicate.JOINS_TO]

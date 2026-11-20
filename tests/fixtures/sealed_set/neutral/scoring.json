@@ -1,0 +1,6 @@
+{
+  "questions": {
+    "N07": {"null_equals_empty": true},
+    "N11": {"excluded_from_rate": true, "reason": "the reference returns an empty result"}
+  }
+}
