@@ -22,6 +22,7 @@ from typing import Any
 from sqlglot.dialects.dialect import Dialect
 
 from showcase.ontology_query_benchmark.profile import Attribution
+from showcase.ontology_query_benchmark.profile_env import expand_env, profile_env
 from showcase.ontology_query_benchmark.product_spec import (
     CompanionRole,
     IdentityOverlay,
@@ -157,7 +158,7 @@ class BindingResolution:
 def load_sidecar(path: Path, harness_root: Path) -> Sidecar:
     """Parse the sidecar; spec and conventions paths are relative to ``harness_root``."""
     data = path.read_bytes()
-    raw = json.loads(data)
+    raw = expand_env(json.loads(data), profile_env())
     root, grain, target = harness_root, raw["grain"], raw["target_model"]
     return Sidecar(
         path=path,

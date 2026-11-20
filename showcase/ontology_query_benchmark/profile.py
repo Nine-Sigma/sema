@@ -22,6 +22,8 @@ from pydantic import (
     model_validator,
 )
 
+from showcase.ontology_query_benchmark.profile_env import expand_env, profile_env
+
 
 class Attribution(StrEnum):
     """How an input file came to be: discovered by code, supplied, or authored with help."""
@@ -289,7 +291,7 @@ class Profile(_Frozen):
 
 
 def load_profile(path: Path) -> Profile:
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    raw = expand_env(yaml.safe_load(Path(path).read_text(encoding="utf-8")), profile_env())
     return Profile.model_validate(raw, context={"base": Path(path).resolve().parent})
 
 

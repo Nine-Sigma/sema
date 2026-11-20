@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ import yaml
 from pydantic import ValidationError
 
 from showcase.ontology_query_benchmark.profile import Knobs, load_profile
+from showcase.ontology_query_benchmark.profile_env import expand_env, profile_env
 from showcase.ontology_query_benchmark.sema_bindings import load_products, load_sidecar
 from showcase.ontology_query_benchmark.sema_context import load_conventions
 
@@ -122,3 +124,47 @@ def test_a_sealed_set_profile_expands_home_and_resolves_relative_paths(
     assert profile.set_dir == tmp_path / "neutral"
     assert profile.harness.frozen == tmp_path / "frozen"
     assert (profile.model.provider, profile.knobs.budget_tokens) == ("openrouter", 12000)
+
+
+def test_a_profile_value_names_an_environment_variable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TOY_HOST", "toy.example.test")
+    profile = load_profile(_variant(tmp_path, {"routing.host": "https://${TOY_HOST}"}))
+    assert profile.routing.host == "https://toy.example.test"
+
+
+def test_an_unset_variable_is_refused_by_name_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("TOY_UNSET", raising=False)
+    with pytest.raises(ValueError, match=r"\$\{TOY_UNSET\}"):
+        load_profile(_variant(tmp_path, {"routing.host": "https://${TOY_UNSET}"}))
+
+
+def test_expansion_reaches_nested_values_and_leaves_format_fields() -> None:
+    raw = {"a": ["x-${TOY_A}", 3], "b": {"sql": "SELECT {relation}"}}
+    assert expand_env(raw, {"TOY_A": "one"}) == {
+        "a": ["x-one", 3], "b": {"sql": "SELECT {relation}"},
+    }
+
+
+def test_profile_env_reads_dotenv_lines_under_the_process_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dotenv = tmp_path / ".env"
+    dotenv.write_text('# note\nTOY_A=file\nTOY_B="two"\nnot a pair\n')
+    monkeypatch.setenv("TOY_A", "process")
+    env = profile_env(dotenv)
+    assert (env["TOY_A"], env["TOY_B"]) == ("process", "two")
+
+
+def test_a_sidecar_value_names_an_environment_variable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = json.loads((FIXTURES / "sidecar.json").read_text())
+    raw["physical"]["catalog"] = "${TOY_CATALOG}"
+    path = tmp_path / "sidecar.json"
+    path.write_text(json.dumps(raw))
+    monkeypatch.setenv("TOY_CATALOG", "toy_catalog")
+    assert load_sidecar(path, FIXTURES / "harness").catalog == "toy_catalog"
