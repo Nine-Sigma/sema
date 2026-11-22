@@ -21,11 +21,12 @@ from sema.engine.join_detector_utils import (
     enumerate_candidates_from_metadata,
 )
 from sema.engine.warehouse_lookup import (
+    WarehouseContainment,
     WarehouseProfileLookup,
     WarehouseSampler,
 )
-from sema.graph.join_materializer import materialize_join_paths
 from sema.graph.loader_utils import fetch_columns_by_schema
+from sema.models.assertions import Assertion
 from sema.models.config import (
     BuildConfig,
     QueryConfig,
@@ -264,13 +265,12 @@ def _compute_embeddings(
             click.echo(f"  Vector indexes created (dimensions={dimensions})")
 
         for label in embeddable_labels:
-            nodes = loader.query_nodes_by_label(label)
+            nodes = [n for n in loader.query_nodes_by_label(label)
+                     if n.get("model_role") != "TARGET"]
             if not nodes:
                 continue
             key_spec = EMBEDDING_KEY_MAP.get(label, ("name",))
-            _embed_label_nodes(
-                emb_engine, loader, label, key_spec, nodes,
-            )
+            _embed_label_nodes(emb_engine, loader, label, key_spec, nodes)
             if config.verbose:
                 click.echo(f"  {label}: embedded {len(nodes)} nodes")
     except EmbeddingDimensionMismatchError:
@@ -318,18 +318,17 @@ def run_fk_detection(
     config: BuildConfig,
     schemas: list[str],
     run_id: str,
-) -> None:
-    """Detect FK candidates per schema and materialize JoinPaths.
+) -> dict[str, list[Assertion]]:
+    """Detect FK candidates per schema; return the joins worth materializing.
 
-    Skips entirely when `enable_fk_detection=False`. Threshold derives
+    Returns nothing when `enable_fk_detection=False`. Threshold derives
     from `materialize_structural_fk` (0.70 if opt-in, else 0.80) so
     Tier-3 structural-only matches stay gated by an explicit user flag.
-    The detector receives a lazy `sampler` (Tier 1 sample-set
-    verification) and a pre-built `profiles` dict for candidate columns
-    (Tier 2 cardinality verification).
+    The detector receives a lazy `sampler` and `containment` (Tier 1) and
+    pre-built candidate `profiles` (uniqueness and Tier 2 cardinality).
     """
     if not config.enable_fk_detection:
-        return
+        return {}
     detector = JoinDetector(
         materialization_threshold=config.fk_materialization_threshold,
     )
@@ -339,6 +338,8 @@ def run_fk_detection(
     profile_lookup = WarehouseProfileLookup(
         query_fn=connector.execute_query, catalog=config.catalog,
     )
+    containment = WarehouseContainment(query_fn=connector.execute_query, catalog=config.catalog)
+    detected: dict[str, list[Assertion]] = {}
     for schema in schemas:
         columns = fetch_columns_by_schema(loader, schema)
         if not columns:
@@ -348,19 +349,12 @@ def run_fk_detection(
         )
         fks = detector.detect(
             columns=columns, source_schema=schema,
-            profiles=profiles, sampler=sampler,
+            profiles=profiles, sampler=sampler, containment=containment,
         )
         keep = [fk for fk in fks if detector.should_materialize(fk)]
-        if not keep:
-            continue
-        assertions = [to_fk_assertion(fk, run_id) for fk in keep]
-        groups = {
-            (a.subject_ref, a.predicate.value): [a]
-            for a in assertions
-        }
-        materialize_join_paths(
-            loader, groups, source_schema=schema,
-        )
+        if keep:
+            detected[schema] = [to_fk_assertion(fk, run_id) for fk in keep]
+    return detected
 
 
 def _prebuild_profiles_for_candidates(
@@ -394,6 +388,7 @@ def _retrieve_context(config: QueryConfig) -> Any:
         driver=driver,
         embedder=embedder,
         embedder_model_name=config.embedding.model,
+        hierarchy_anchor=config.hierarchy_anchor,
     )
     candidate_set = engine.retrieve(config.question)
     sco = prune_to_sco(candidate_set, consumer=config.consumer)

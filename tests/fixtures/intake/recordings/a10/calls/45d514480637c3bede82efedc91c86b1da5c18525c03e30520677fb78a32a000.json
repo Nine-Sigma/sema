@@ -1,0 +1,39 @@
+{
+  "model": "openai/gpt-6-luna",
+  "output": {
+    "confidences": [
+      0.99,
+      0.96,
+      0.98,
+      0.98,
+      0.98,
+      0.98,
+      0.62,
+      0.99,
+      0.98
+    ],
+    "reasons": [
+      "Column Name identifies the attribute described by each dictionary row.",
+      "No column is identified as holding an attribute's data type.",
+      "No column is identified as stating whether an attribute must have a value.",
+      "No column is identified as indicating key membership.",
+      "No column describes a referenced entity.",
+      "No column describes a referenced attribute.",
+      "Term, Acronym, or Code Definitions is the closest column to vocabulary information.",
+      "Column Description contains prose describing the listed attribute.",
+      "Additional Notes concerns column-specific context rather than the entity itself."
+    ],
+    "role_description": "Column Description",
+    "role_domain": "Term, Acronym, or Code Definitions",
+    "role_entity_description": "none",
+    "role_fk_entity": "none",
+    "role_fk_property": "none",
+    "role_primary_key": "none",
+    "role_property": "Column Name",
+    "role_required": "none",
+    "role_type": "none"
+  },
+  "prompt": "# prompt: roles v2\n\nYou read what the columns of one relation landed from a source stand for. Code has\nprofiled the relation and lists every column below with its facts. Code checks your answer\nafter you give it.\n\n## How to answer\n\n- Each `role_<name>` field asks one role of `land_acris.ACRIS___Country_Codes_Data_Dictionary__Column_Info`. Answer it with the exact name of\n  one column of `land_acris.ACRIS___Country_Codes_Data_Dictionary__Column_Info` listed under Relations, or `none` when no column holds that\n  role. A required role needs a column.\n- Never name one column for two roles in one answer, except `display` and `name`.\n- A claim in force from the lexicon is code's reading of the names: answer the same\n  column to keep it, or another column to contest it. A claim settled by the binding, a\n  decision, or memory stands; answer it as stated.\n- Each `reference_<n>` field asks one entry under Fields: answer it with exactly one member\n  listed there, or `abstain` when the evidence does not separate the members.\n- Fill `confidences` and `reasons` with one item per field, in field order. A list of any\n  other length fails the whole answer.\n- A reason is one short sentence naming the evidence that decided the answer.\n- Use only the evidence given here: names, types, comments, aggregates, lexicon and\n  embedding facts, findings, and the text of relations that describe the schema. Data\n  values are shown only under Values, for the columns a reviewer approved reading, with\n  the first landed rows of those columns after them in landed order.\n- Code sends an answer back once with its failures: a name that is not a column of the\n  relation, two roles on one column, or a column that fails its role's data fact. A\n  finding is a reading, not a failure.\n\n## Claims in force\n\nnone\n\n## Failed checks from previous answers\n\nnone\n\n## Relations\n\n### land_acris.ACRIS___Country_Codes_Data_Dictionary__Column_Info\nrows: 3\ncolumns:\n- Additional Notes (where applicable, include the range of possible values, units of measure, how to interpret null/zero values, whether there are specific relationships between columns, and information on column source): type VARCHAR, distinct 1, distinct ratio 1, null rate 0.6667, mean length 73, constant; lexicon tokens of property; findings constant, display_null_rate 0.6667\n- Column Name: type VARCHAR, distinct 3, distinct ratio 1, null rate 0, mean length 11.33, unique; lexicon tokens of property; findings definition_mean_length 11.33\n- Column Description: type VARCHAR, distinct 3, distinct ratio 1, null rate 0, mean length 33, unique; lexicon tokens of description, property\n- Term, Acronym, or Code Definitions: type VARCHAR, distinct 0, distinct ratio 0, null rate 1; lexicon tokens of description; findings display_null_rate 1\nschema text:\n- COUNTRY CODE | Country code store in ACRIS | None | code appearing in country field of ACRIS Real & Personal Parties datasets\n- DESCRIPTION | Country name for corresponding county code | None | None\n- RECORD TYPE | \u2018T\u2019 for Collateral type record | None | None\n\n### land_acris.ACRIS___Country_Codes_Data_Dictionary__Dataset_Info\nrows: 9\ncolumns:\n- ACRIS \u2013 Country Codes: type VARCHAR, distinct 6, distinct ratio 1, null rate 0.3333, mean length 54.83\n- Dataset Name: type VARCHAR, distinct 9, distinct ratio 1, null rate 0, mean length 47.89, unique\nschema text:\n- Agency Name | Department of Finance\n- Dataset Category | City Government\n- Dataset Description | ACRIS Country mapping for Codes in the ACRIS Real and Personal Property Parties Datasets\n- Dataset Keywords | dof, acris land records\n- Detailed Description | None\n- Form V 1.0 | None\n- List any additional information in order to provide context to the data for someone not familiar with your agency's operations. \n     | The Country Codes dataset maps the short codes stored in ACRIS to descriptive country names as displayed in ACRIS Document Search and appearing on documents recorded in ACRIS.\n- Update Frequency | Monthly\n- Why is this data collected?\n\nHow is this data collected?\n\nWhat does each record represent?\n\nHow can this data be used?\n\nWhat are the ideosyncracies or limitations of the data to be aware of? | None\n\n## Values\n\nnone\n\n## Fields\n\n- `role_property`: the name of one attribute an entity holds; required\n- `role_type`: the data type of one attribute; optional\n- `role_required`: whether an attribute must hold a value; optional\n- `role_primary_key`: whether an attribute is part of its entity's key; optional\n- `role_fk_entity`: the entity an attribute refers to; optional\n- `role_fk_property`: the attribute of the referred entity an attribute joins on; optional\n- `role_domain`: the vocabulary an attribute's values are drawn from; optional\n- `role_description`: prose explaining one attribute of an entity; optional\n- `role_entity_description`: prose explaining the entity itself; optional\n",
+  "schema_name": "RoleMapEntityModelRoles_v1",
+  "tokens": 2842
+}

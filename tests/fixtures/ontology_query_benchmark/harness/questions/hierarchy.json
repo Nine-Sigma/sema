@@ -1,0 +1,16 @@
+{
+ "questions": [
+  {
+   "id": "H01",
+   "class": "single_field",
+   "question": "How many people live in a northern region?",
+   "result_shape": "scalar",
+   "precision": 0,
+   "gold_answer": [
+    "5"
+   ],
+   "gold_sql": "SELECT 1",
+   "needs": []
+  }
+ ]
+}

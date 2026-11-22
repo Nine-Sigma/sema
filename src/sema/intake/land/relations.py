@@ -1,0 +1,91 @@
+"""Resolve a spec relation to a read query against the warehouse or staging.
+
+The importer never knows where a relation lives: it asks the provider for the
+query function of each ``RelationRef``. Statements are built by the caller from
+spec identifiers only, each quoted with the provider's identifier quote; the
+provider runs them unchanged.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from itertools import takewhile
+from typing import Any
+
+from sema.binding.spec_sections import RelationRef
+from sema.ingest.duckdb_staging import Staging
+from sema.ingest.duckdb_staging_utils import quote_ident
+
+QueryFn = Callable[[str], list[tuple[Any, ...]]]
+
+
+class MissingProviderError(ValueError):
+    """A spec names a provider the caller did not supply."""
+
+
+class UnquotableIdentifierError(ValueError):
+    """A spec identifier holds the provider's quote character and cannot be quoted."""
+
+
+@dataclass(frozen=True)
+class RelationProvider:
+    warehouse: QueryFn | None
+    staging: Staging | None
+
+    def query(self, ref: RelationRef) -> QueryFn:
+        if ref.provider == "staging":
+            return self._staging_query(ref)
+        if self.warehouse is None:
+            raise _missing(ref)
+        return self.warehouse
+
+    def quote(self, ref: RelationRef, identifier: str) -> str:
+        if ref.provider == "staging":
+            return quote_ident(identifier)
+        if "`" in identifier:
+            raise UnquotableIdentifierError(
+                f"warehouse identifier {identifier!r} holds a backtick; the "
+                f"warehouse quotes identifiers with backticks, so rename it"
+            )
+        return f"`{identifier}`"
+
+    def relation_sql(self, ref: RelationRef) -> str:
+        return ".".join(self.quote(ref, part) for part in ref.name.split("."))
+
+    def columns(self, ref: RelationRef) -> list[str]:
+        """Column names in table order; a warehouse listing stops at its first section."""
+        described = self.query(ref)(f"DESCRIBE TABLE {self.relation_sql(ref)}")
+        return [str(row[0]) for row in takewhile(_is_column_row, described)]
+
+    def require(self, refs: Iterable[RelationRef]) -> None:
+        for ref in refs:
+            if not self._supplies(ref):
+                raise _missing(ref)
+
+    def _supplies(self, ref: RelationRef) -> bool:
+        supplied = self.staging if ref.provider == "staging" else self.warehouse
+        return supplied is not None
+
+    def _staging_query(self, ref: RelationRef) -> QueryFn:
+        staging = self.staging
+        if staging is None:
+            raise _missing(ref)
+
+        def run(sql: str) -> list[tuple[Any, ...]]:
+            rows: list[tuple[Any, ...]] = staging.execute(sql).fetchall()
+            return rows
+
+        return run
+
+
+def _is_column_row(row: tuple[Any, ...]) -> bool:
+    return bool(row[0]) and not str(row[0]).startswith("#")
+
+
+def _missing(ref: RelationRef) -> MissingProviderError:
+    option = " (pass --staging <duckdb path>)" if ref.provider == "staging" else ""
+    return MissingProviderError(
+        f"the {ref.provider} provider was not supplied and relation {ref.name} "
+        f"needs it{option}"
+    )

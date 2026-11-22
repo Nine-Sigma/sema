@@ -67,6 +67,16 @@ class SynonymExpansion(BaseModel):
     synonyms: list[dict[str, Any]] = []
 
 
+class IdentityProposal(BaseModel):
+    """What one relation's rows describe (contract F4): the entity, the columns that identify
+    it, the column whose greatest value marks its newest version, and the row key."""
+
+    entity: str
+    entity_key: list[str]
+    latest_by: str | None = None
+    row_key: list[str] | None = None
+
+
 class LLMStageError(Exception):
     """Raised when all LLM fallback steps are exhausted for a call.
 
@@ -270,6 +280,7 @@ class LLMClient:
         )
         self.last_stats: InvocationStats = InvocationStats()
         self._last_response: Any = None
+        self._last_path: str | None = None
 
         if self._supports_structured:
             logger.info("LLMClient: using native structured output")
@@ -293,6 +304,7 @@ class LLMClient:
 
         start = time.monotonic_ns()
         self._last_response = None
+        self._last_path = None
         try:
             result = self._invoke_fallback_chain(
                 prompt, schema, table_ref, stage_name, simplified_prompt,
@@ -320,6 +332,11 @@ class LLMClient:
         invoke() return contract.
         """
         return self._last_response
+
+    @property
+    def last_path(self) -> str | None:
+        """The fallback step that served the most recent invoke; None if none did."""
+        return self._last_path
 
     def _response_text_for_stats(self, result: Any) -> str:
         if hasattr(result, "model_dump_json"):
@@ -356,7 +373,9 @@ class LLMClient:
 
         if self._supports_structured:
             try:
-                return self._invoke_structured(prompt, schema)
+                structured = self._invoke_structured(prompt, schema)
+                self._last_path = "structured_output"
+                return structured
             except Exception as e:
                 step_errors.append(("structured_output", e))
                 logger.debug(f"Structured output failed for {table_ref}: {e}")
@@ -366,7 +385,9 @@ class LLMClient:
                 lambda: self._raw_invoke(prompt),
                 step_name="plain_invoke",
             )
-            return parse_llm_response(raw, schema)
+            parsed = parse_llm_response(raw, schema)
+            self._last_path = "plain_invoke"
+            return parsed
         except Exception as e:
             step_errors.append(("plain_invoke", e))
             logger.debug(f"Plain invoke failed for {table_ref}: {e}")
@@ -377,7 +398,9 @@ class LLMClient:
                     lambda: self._raw_invoke(simplified_prompt),
                     step_name="simplified_prompt",
                 )
-                return parse_llm_response(raw, schema)
+                simplified = parse_llm_response(raw, schema)
+                self._last_path = "simplified_prompt"
+                return simplified
             except Exception as e:
                 step_errors.append(("simplified_prompt", e))
                 logger.debug(f"Simplified prompt failed for {table_ref}: {e}")

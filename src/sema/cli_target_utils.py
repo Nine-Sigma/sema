@@ -1,10 +1,29 @@
-"""Helpers for `cli_target.py`: shape `LoadedTarget` for CLI output."""
+"""Helpers for `cli_target.py`: CLI output shapes, the projection binding,
+and the recording driver behind `sema target project --writer in-memory`."""
 
 from __future__ import annotations
 
+from pathlib import Path
+from types import TracebackType
 from typing import Any
 
+import yaml
+from pydantic import BaseModel, ConfigDict, Field
+
+from sema.connectors.base import Connector
+from sema.graph.target_retrieval_loader import (
+    EntityTableBinding,
+    PhysicalSchemaBinding,
+)
 from sema.models.target.loaded import LoadedTarget
+
+
+def warehouse_connector() -> Connector:
+    """The warehouse connector `sema build` resolves from DATABRICKS_* settings."""
+    from sema.models.config import DatabricksConfig
+    from sema.pipeline.build import DatabricksConnectorFactory
+
+    return DatabricksConnectorFactory(DatabricksConfig()).create()
 
 
 def build_summary(loaded: LoadedTarget) -> dict[str, Any]:
@@ -45,4 +64,62 @@ def _decision_to_dict(record: Any) -> dict[str, Any]:
     }
 
 
-__all__ = ["build_summary"]
+class ProjectBinding(BaseModel):
+    """Operator-authored placement of target entities in one catalog.schema."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
+
+    catalog: str = Field(min_length=1)
+    schema_name: str = Field(alias="schema", min_length=1)
+    entity_tables: dict[str, str]
+
+    def to_physical(self) -> PhysicalSchemaBinding:
+        return PhysicalSchemaBinding(
+            catalog=self.catalog,
+            schema=self.schema_name,
+            entity_tables=tuple(
+                EntityTableBinding(entity, table)
+                for entity, table in self.entity_tables.items()
+            ),
+        )
+
+
+def load_project_binding(path: Path) -> PhysicalSchemaBinding:
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return ProjectBinding.model_validate(raw).to_physical()
+
+
+class RecordingDriver:
+    """Neo4j driver stand-in that records each statement instead of running it."""
+
+    def __init__(self) -> None:
+        self.statements: list[tuple[str, dict[str, Any]]] = []
+
+    def session(self) -> _RecordingSession:
+        return _RecordingSession(self.statements)
+
+    def close(self) -> None:
+        return None
+
+
+class _RecordingSession:
+    def __init__(self, statements: list[tuple[str, dict[str, Any]]]) -> None:
+        self._statements = statements
+
+    def __enter__(self) -> _RecordingSession:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        return None
+
+    def run(self, cypher: str, **params: Any) -> list[dict[str, Any]]:
+        self._statements.append((cypher, params))
+        return []
+
+
+__all__ = ["ProjectBinding", "RecordingDriver", "build_summary", "load_project_binding"]

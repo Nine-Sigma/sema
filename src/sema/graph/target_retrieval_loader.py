@@ -70,6 +70,9 @@ def project_target_to_retrieval_graph(
             continue
         physical = _read_physical_columns(binding, table, catalog)
         _load_physical_table(loader, binding, table, physical)
+        identity = entity.identity
+        for column in identity.columns if identity else ():
+            _assert_column_present(column, physical, binding, table)
         upsert_target_entity(
             loader,
             name=table,
@@ -79,6 +82,7 @@ def project_target_to_retrieval_graph(
             table_ref=_table_ref(binding, table),
             model_role=binding.model_role,
             source_schema=binding.schema,
+            identity=identity.model_dump_json() if identity else None,
         )
         for prop in entity.properties:
             if not is_column_property(prop):
@@ -95,6 +99,7 @@ def project_target_to_retrieval_graph(
                 column_name=prop.name,
                 model_role=binding.model_role,
                 source_schema=binding.schema,
+                exposure=prop.exposure,
             )
 
 

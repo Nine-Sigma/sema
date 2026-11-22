@@ -189,55 +189,6 @@ class TestExecuteTypedAPI:
         assert result.summary == "Found 1 row."
 
 
-# ── run() protocol dispatch tests (task 4.8) ──
-
-
-class TestRunDispatch:
-    def test_run_plan_returns_consumer_result(self, sample_sco):
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = MagicMock(
-            content="SELECT dx_type_cd FROM cdm.clinical.cancer_diagnosis",
-        )
-        consumer = NL2SQLConsumer()
-        deps = ConsumerDeps(llm=mock_llm)
-        req = ConsumerRequest(question="test", operation="plan")
-        result = consumer.run(req, sample_sco, deps)
-
-        assert result.valid is True
-        assert result.artifact.startswith("SELECT")
-
-    def test_run_gates_execute_on_invalid_plan(self, sample_sco):
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = MagicMock(
-            content="SELECT bad_col FROM bad_table",
-        )
-        runtime = MagicMock()
-        consumer = NL2SQLConsumer()
-        deps = ConsumerDeps(llm=mock_llm, sql_runtime=runtime)
-        req = ConsumerRequest(question="test", operation="execute")
-        result = consumer.run(req, sample_sco, deps)
-
-        assert result.valid is False
-        runtime.execute.assert_not_called()
-
-    def test_run_unsupported_operation(self, sample_sco):
-        consumer = NL2SQLConsumer()
-        deps = ConsumerDeps()
-        req = ConsumerRequest(question="test", operation="summarize")
-        with pytest.raises(ValueError, match="summarize"):
-            consumer.run(req, sample_sco, deps)
-
-    def test_execute_without_runtime_raises(self):
-        consumer = NL2SQLConsumer()
-        from sema.consumers.nl2sql.consumer import SQLPlan
-
-        plan = SQLPlan(sql="SELECT 1", valid=True)
-        deps = ConsumerDeps()
-        req = ConsumerRequest(question="test", operation="execute")
-        with pytest.raises(ValueError, match="runtime"):
-            consumer.execute(plan, req, deps)
-
-
 # ── Prompt tests (task 4.9) ──
 
 

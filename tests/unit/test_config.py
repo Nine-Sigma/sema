@@ -1,3 +1,8 @@
+import ast
+import re
+from pathlib import Path
+from typing import get_args
+
 import pytest
 
 pytestmark = pytest.mark.unit
@@ -115,6 +120,15 @@ class TestEmbeddingConfig:
         config = EmbeddingConfig(provider="sentence-transformers", model="all-MiniLM-L6-v2")
         assert config.provider == "sentence-transformers"
 
+    def test_cache_dir_field_defaults_to_none(self, monkeypatch):
+        monkeypatch.delenv("EMBEDDING_CACHE_DIR", raising=False)
+        assert EmbeddingConfig().cache_dir is None
+        assert EmbeddingConfig(cache_dir="/models/hf").cache_dir == "/models/hf"
+
+    def test_cache_dir_from_env_var(self, monkeypatch):
+        monkeypatch.setenv("EMBEDDING_CACHE_DIR", "/models/hf")
+        assert EmbeddingConfig().cache_dir == "/models/hf"
+
     def test_embeddable_labels_default(self):
         config = EmbeddingConfig()
         assert config.embeddable_labels == [
@@ -226,3 +240,39 @@ class TestQueryConfig:
     def test_freeform_operation(self):
         config = QueryConfig(question="test", operation="custom_op")
         assert config.operation == "custom_op"
+
+
+class TestEvidenceTier:
+    TIER_LITERAL = re.compile(r'Literal\[\s*"metadata_only",\s*"bounded_values",\s*"full"\s*\]')
+    SRC = Path(__file__).resolve().parents[2] / "src" / "sema"
+
+    def test_tier_literal_is_defined_once_in_models_config(self):
+        defining = sorted(
+            str(path.relative_to(self.SRC))
+            for path in self.SRC.rglob("*.py")
+            if self.TIER_LITERAL.search(path.read_text())
+        )
+        assert defining == ["models/config.py"]
+
+    def test_intake_profile_imports_the_tier_from_models_config(self):
+        from sema.intake.land import profile
+
+        tree = ast.parse(Path(profile.__file__).read_text())
+        imported = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module == "sema.models.config"
+            for alias in node.names
+        }
+        assert "EvidenceTier" in imported
+
+    def test_build_config_and_intake_policy_share_the_type(self):
+        from sema.intake.land.profile import EvidencePolicy
+        from sema.models.config import EvidenceTier
+
+        assert get_args(EvidenceTier) == ("metadata_only", "bounded_values", "full")
+        assert BuildConfig.model_fields["evidence_policy"].annotation == EvidenceTier
+        assert EvidencePolicy.model_fields["tier"].annotation == EvidenceTier
+
+    def test_build_default_stays_full(self):
+        assert BuildConfig().evidence_policy == "full"

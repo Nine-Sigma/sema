@@ -13,7 +13,7 @@ never any target vocabulary or entity.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class CatalogDriftError(RuntimeError):
@@ -58,8 +58,34 @@ class StaticPhysicalCatalogSource:
         return list(self._tables.get((catalog, schema, table), []))
 
 
+class DatabricksCatalogSource:
+    """`PhysicalCatalogSource` over a warehouse ``information_schema``."""
+
+    def __init__(self, cursor: Any) -> None:
+        self._cursor = cursor
+
+    def columns(
+        self, *, catalog: str, schema: str, table: str
+    ) -> list[PhysicalColumn]:
+        self._cursor.execute(
+            f"SELECT column_name, data_type, is_nullable "
+            f"FROM {catalog}.information_schema.columns "
+            "WHERE table_schema = ? AND table_name = ? "
+            "ORDER BY ordinal_position",
+            [schema, table],
+        )
+        return [
+            PhysicalColumn(
+                name=str(r[0]), data_type=str(r[1]),
+                nullable=str(r[2]).upper() == "YES",
+            )
+            for r in self._cursor.fetchall()
+        ]
+
+
 __all__ = [
     "CatalogDriftError",
+    "DatabricksCatalogSource",
     "PhysicalCatalogSource",
     "PhysicalColumn",
     "StaticPhysicalCatalogSource",

@@ -17,6 +17,7 @@ from sema.models.target.entity import TargetEntityDecl
 from sema.models.target.normalized import NormalizedTargetModel
 from sema.models.target.obligation import TargetObligationDecl
 from sema.models.target.properties import PropertyKind, TargetPropertyDecl
+from sema.models.target.refs import ExternalRef
 from sema.models.target.term import TargetTermDecl
 from sema.models.target.vocab_binding import VocabularyBindingDecl
 from sema.targets.hashing_utils import canonical_dumps
@@ -115,6 +116,7 @@ def _property_op(
     snapshot_hash: str,
 ) -> PropertyOp:
     is_endpoint = prop.property_kind is PropertyKind.ENDPOINT
+    concept_ref = prop.concept_ref
     return PropertyOp(
         target_model_id=descriptor.target_model_id,
         target_model_version=descriptor.target_model_version,
@@ -131,7 +133,16 @@ def _property_op(
         endpoint_cardinality=prop.endpoint_cardinality,
         endpoint_nullable=prop.endpoint_nullable,
         materialized_as_edge_property=False if is_endpoint else prop.materialized_as_edge_property,
+        concept_ref_system=concept_ref.identity_system if concept_ref else None,
+        concept_ref_id=concept_ref.id if concept_ref else None,
+        concept_ref_version=concept_ref.version if concept_ref else None,
+        definition=prop.definition,
+        external_refs=_encode_external_refs(prop.external_refs),
     )
+
+
+def _encode_external_refs(refs: list[ExternalRef]) -> list[str]:
+    return [f"{ref.system}:{ref.id}" for ref in refs]
 
 
 def _has_property_rel(
@@ -253,6 +264,9 @@ def write_term(
             vocabulary_name=term.vocabulary.name,
             code=term.code,
             display=term.display,
+            definition=term.definition,
+            synonyms=list(term.synonyms),
+            external_refs=_encode_external_refs(term.external_refs),
         )
     )
 

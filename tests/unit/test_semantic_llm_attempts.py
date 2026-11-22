@@ -22,7 +22,7 @@ pytestmark = pytest.mark.unit
 
 def _meta() -> dict:
     return {
-        "table_ref": "unity://cdm.clinical.patient",
+        "table_ref": "databricks://ws/cdm/clinical/patient",
         "table_name": "patient",
         "columns": [
             {"name": "patient_id", "data_type": "STRING"},

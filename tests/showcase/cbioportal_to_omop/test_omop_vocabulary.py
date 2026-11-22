@@ -6,33 +6,8 @@ import pytest
 
 from sema.ingest.duckdb_staging import Staging
 from showcase.cbioportal_to_omop.omop_ingest import ingest_vocabulary
-
-
-def _write_vocab_csv(path: Path, header: list[str], rows: list[list[str]]) -> None:
-    lines = ["\t".join(header)]
-    lines.extend("\t".join(row) for row in rows)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def _make_minimal_bundle(target: Path) -> None:
-    target.mkdir(parents=True, exist_ok=True)
-    _write_vocab_csv(
-        target / "CONCEPT.csv",
-        ["concept_id", "concept_name", "domain_id", "vocabulary_id", "concept_class_id"],
-        [["1", "Gender", "Meas", "HL7", "Class"], ["2", "Person", "Obs", "HL7", "Class"]],
-    )
-    _write_vocab_csv(
-        target / "CONCEPT_RELATIONSHIP.csv",
-        ["concept_id_1", "concept_id_2", "relationship_id"],
-        [["1", "2", "maps_to"]],
-    )
-    _write_vocab_csv(
-        target / "CONCEPT_ANCESTOR.csv",
-        ["ancestor_concept_id", "descendant_concept_id", "min_levels", "max_levels"],
-        [["1", "2", "1", "1"]],
-    )
-    _write_vocab_csv(target / "VOCABULARY.csv", ["vocabulary_id", "vocabulary_name"], [["HL7", "HL7 V3"]])
-    _write_vocab_csv(target / "DOMAIN.csv", ["domain_id", "domain_name"], [["Meas", "Measurement"]])
+from tests.support.athena_bundle import make_minimal_bundle as _make_minimal_bundle
+from tests.support.athena_bundle import write_vocab_csv as _write_vocab_csv
 
 
 @pytest.fixture

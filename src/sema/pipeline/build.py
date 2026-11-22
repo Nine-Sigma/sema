@@ -17,6 +17,7 @@ from sema.connectors.databricks import (
     DatabricksConnector,
     TableWorkItem,
 )
+from sema.connectors.duckdb import DuckDBConnectorFactory
 from sema.engine.semantic import SemanticEngine
 from sema.engine.vocabulary import VocabularyEngine
 from sema.graph.loader import GraphLoader
@@ -44,7 +45,6 @@ from sema.pipeline.build_utils import (
     _run_semantic_interpretation,
     _run_vocabulary_alignment,
 )
-
 
 
 @dataclass
@@ -118,19 +118,23 @@ class TableResult:
 class DatabricksConnectorFactory:
     """Creates one DatabricksConnector per worker."""
 
-    def __init__(
-        self,
-        config: DatabricksConfig,
-        profiling: ProfilingConfig | None = None,
-    ) -> None:
+    def __init__(self, config: DatabricksConfig, profiling: ProfilingConfig | None = None) -> None:
         self._config = config
         self._profiling = profiling or ProfilingConfig()
 
     def create(self) -> DatabricksConnector:
-        return DatabricksConnector(
-            config=self._config,
-            profiling=self._profiling,
-        )
+        return DatabricksConnector(config=self._config, profiling=self._profiling)
+
+
+def resolve_connector_factory(
+    config: BuildConfig,
+) -> DatabricksConnectorFactory | DuckDBConnectorFactory:
+    """The factory for the connector that `config.source` names."""
+    if config.source == "duckdb":
+        return DuckDBConnectorFactory(config.duckdb, config.profiling)
+    if config.source == "databricks":
+        return DatabricksConnectorFactory(config.databricks, config.profiling)
+    raise ValueError(f"Unknown source {config.source!r}; expected 'databricks' or 'duckdb'")
 
 
 class LLMClientFactory:

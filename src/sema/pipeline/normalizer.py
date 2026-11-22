@@ -19,6 +19,7 @@ from sema.models.extraction import (
     ExtractedTag,
     ExtractedTopValues,
 )
+from sema.models.physical_key import CanonicalRef, PhysicalKey
 
 
 class AssertionNormalizer:
@@ -35,15 +36,16 @@ class AssertionNormalizer:
         self._platform = platform
 
     def _table_ref(self, catalog: str, schema: str, table: str) -> str:
-        return (
-            f"{self._platform}://{self._workspace}"
-            f"/{catalog}/{schema}/{table}"
+        return CanonicalRef.build(
+            self._platform, PhysicalKey(self._workspace, catalog, schema, table),
         )
 
     def _column_ref(
         self, catalog: str, schema: str, table: str, column: str,
     ) -> str:
-        return f"{self._table_ref(catalog, schema, table)}/{column}"
+        return CanonicalRef.build(
+            self._platform, PhysicalKey(self._workspace, catalog, schema, table, column),
+        )
 
     def _make(
         self,
@@ -107,22 +109,24 @@ class AssertionNormalizer:
         self, fk: ExtractedForeignKey,
     ) -> list[Assertion]:
         from_ref = self._table_ref(
-            fk.from_catalog, fk.from_schema, fk.from_table,
+            fk.referenced_catalog, fk.referenced_schema, fk.referenced_table,
         )
         to_ref = self._table_ref(
-            fk.to_catalog, fk.to_schema, fk.to_table,
+            fk.referencing_catalog, fk.referencing_schema, fk.referencing_table,
         )
-        return [
-            self._make(
-                from_ref,
-                AssertionPredicate.JOINS_TO,
-                {
-                    "on_column": fk.from_columns[0] if fk.from_columns else "",
-                    "to_column": fk.to_columns[0] if fk.to_columns else "",
-                },
-                object_ref=to_ref,
-            ),
+        predicates = [
+            {
+                "left_table": fk.referenced_table, "left_column": referenced,
+                "right_table": fk.referencing_table, "right_column": referencing,
+                "operator": "=",
+            }
+            for referencing, referenced in fk.column_pairs
         ]
+        payload = {
+            "join_predicates": predicates, "from_ref": from_ref, "to_ref": to_ref,
+            "constraint_name": fk.constraint_name, "hop_count": 1,
+        }
+        return [self._make(to_ref, AssertionPredicate.JOINS_TO, payload, object_ref=from_ref)]
 
     def normalize_top_values(
         self, tv: ExtractedTopValues,

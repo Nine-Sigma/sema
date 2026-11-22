@@ -45,12 +45,12 @@ def _make_assertion(
 def _make_extraction_assertions() -> list[Assertion]:
     return [
         _make_assertion(
-            "unity://cat.sch.tbl",
+            "databricks://ws/cat/sch/tbl",
             AssertionPredicate.TABLE_EXISTS,
             {"table_type": "TABLE"},
         ),
         _make_assertion(
-            "unity://cat.sch.tbl.col1",
+            "databricks://ws/cat/sch/tbl/col1",
             AssertionPredicate.COLUMN_EXISTS,
             {"data_type": "STRING", "nullable": True, "comment": None},
         ),
@@ -61,7 +61,7 @@ def _make_stored_assertion_dicts() -> list[dict]:
     return [
         {
             "id": "a-1",
-            "subject_ref": "unity://cat.sch.tbl",
+            "subject_ref": "databricks://ws/cat/sch/tbl",
             "predicate": "table_exists",
             "payload": '{"table_type": "TABLE"}',
             "object_ref": None,
@@ -73,7 +73,7 @@ def _make_stored_assertion_dicts() -> list[dict]:
         },
         {
             "id": "a-2",
-            "subject_ref": "unity://cat.sch.tbl.col1",
+            "subject_ref": "databricks://ws/cat/sch/tbl/col1",
             "predicate": "column_exists",
             "payload": '{"data_type": "STRING", "nullable": true}',
             "object_ref": None,
@@ -87,7 +87,7 @@ def _make_stored_assertion_dicts() -> list[dict]:
 
 
 def _build_work_item() -> TableWorkItem:
-    return TableWorkItem("cat", "sch", "tbl", "unity://cat.sch.tbl")
+    return TableWorkItem("cat", "sch", "tbl", "databricks://ws/cat/sch/tbl")
 
 
 class TestResumeBuild:
@@ -203,7 +203,7 @@ class TestResumeBuild:
             run_id="run-1", resume=True,
         )
 
-        loader.has_assertions.assert_called_once_with("unity://cat.sch.tbl")
+        loader.has_assertions.assert_called_once_with("databricks://ws/cat/sch/tbl")
 
     def test_resume_rematerializes_skipped_tables(self) -> None:
         work_item = _build_work_item()

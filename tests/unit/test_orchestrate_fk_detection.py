@@ -19,10 +19,12 @@ def _columns_with_fk_pair() -> list[ExtractedColumn]:
         ExtractedColumn(
             name="patient_id", table_name="patient",
             catalog="workspace", schema=SCHEMA, data_type="string",
+            ref=f"databricks://workspace/workspace/{SCHEMA}/patient/patient_id",
         ),
         ExtractedColumn(
             name="patient_id", table_name="sample",
             catalog="workspace", schema=SCHEMA, data_type="string",
+            ref=f"databricks://workspace/workspace/{SCHEMA}/sample/patient_id",
         ),
     ]
 
@@ -89,7 +91,7 @@ def test_threshold_drops_to_070_with_structural_opt_in():
     assert captured["materialization_threshold"] == 0.70
 
 
-def test_filters_by_should_materialize_then_calls_materializer():
+def test_returns_only_joins_above_the_threshold_by_schema():
     loader = MagicMock()
     config = _build_config()
     columns = _columns_with_fk_pair()
@@ -110,21 +112,13 @@ def test_filters_by_should_materialize_then_calls_materializer():
         return_value=detector_inst,
     ), patch(
         "sema.pipeline.orchestrate_utils.to_fk_assertion"
-    ) as to_fk, patch(
-        "sema.pipeline.orchestrate_utils.materialize_join_paths"
-    ) as materialize:
-        to_fk.return_value = MagicMock(
-            subject_ref="ref-1",
-            predicate=MagicMock(value="fk_to"),
-        )
-        run_fk_detection(
+    ) as to_fk:
+        detected = run_fk_detection(
             loader, _connector(), config, [SCHEMA], run_id="r-1",
         )
 
     to_fk.assert_called_once_with(above, "r-1")
-    materialize.assert_called_once()
-    _, kwargs = materialize.call_args
-    assert kwargs["source_schema"] == SCHEMA
+    assert detected == {SCHEMA: [to_fk.return_value]}
 
 
 def test_skips_schemas_with_no_columns():
@@ -133,13 +127,11 @@ def test_skips_schemas_with_no_columns():
     with patch(
         "sema.pipeline.orchestrate_utils.fetch_columns_by_schema",
         return_value=[],
-    ), patch(
-        "sema.pipeline.orchestrate_utils.materialize_join_paths"
-    ) as materialize:
-        run_fk_detection(
+    ):
+        detected = run_fk_detection(
             loader, _connector(), config, [SCHEMA], run_id="r-1",
         )
-    materialize.assert_not_called()
+    assert detected == {}
 
 
 def test_passes_sampler_and_profiles_to_detector():
@@ -201,3 +193,29 @@ def test_prebuilds_profiles_only_for_candidate_columns():
     keys = set(profile_calls)
     assert (SCHEMA, "patient", "patient_id") in keys
     assert (SCHEMA, "sample", "patient_id") in keys
+
+
+def test_two_detected_joins_from_one_column_are_both_returned():
+    loader = MagicMock()
+    first = MagicMock(subject_ref="ref-1", predicate=MagicMock(value="fk_to"))
+    second = MagicMock(subject_ref="ref-1", predicate=MagicMock(value="fk_to"))
+    detector_inst = MagicMock()
+    detector_inst.detect.return_value = ["fk-a", "fk-b"]
+    detector_inst.should_materialize.return_value = True
+
+    with patch(
+        "sema.pipeline.orchestrate_utils.fetch_columns_by_schema",
+        return_value=_columns_with_fk_pair(),
+    ), patch(
+        "sema.pipeline.orchestrate_utils.JoinDetector",
+        return_value=detector_inst,
+    ), patch(
+        "sema.pipeline.orchestrate_utils.to_fk_assertion",
+        side_effect=[first, second],
+    ):
+        detected = run_fk_detection(
+            loader, _connector(), _build_config(), [SCHEMA], run_id="r-1",
+        )
+
+    assert detected == {SCHEMA: [first, second]}
+

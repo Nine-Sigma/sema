@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from sema.engine.warehouse_lookup import (
+    WarehouseContainment,
     WarehouseProfileLookup,
     WarehouseSampler,
 )
@@ -145,3 +146,32 @@ class TestWarehouseProfileLookup:
         assert "COUNT(DISTINCT" in second_sql
         assert "APPROX_COUNT_DISTINCT" not in second_sql
         assert "`patient_id`" in second_sql
+
+
+PK_KEY = ("cbioportal_msk_chord_2024", "patient", "patient_id")
+
+
+class TestWarehouseContainment:
+    def test_counts_values_found_in_the_whole_referenced_column(self):
+        query_fn = MagicMock(return_value=[(2,)])
+        containment = WarehouseContainment(query_fn=query_fn, catalog="workspace")
+        assert containment(PK_KEY, frozenset({"p1", "p2", "p'3"})) == 2
+        sql = query_fn.call_args[0][0]
+        assert "`workspace`.`cbioportal_msk_chord_2024`.`patient`" in sql
+        assert "LIMIT" not in sql
+        literals = sql.split(" IN (", 1)[1].rstrip(")").split(", ")
+        assert sorted(literals) == sorted(["'p1'", "'p2'", "'p\\'3'"])
+
+    def test_one_statement_per_column_and_sample(self):
+        query_fn = MagicMock(return_value=[(1,)])
+        containment = WarehouseContainment(query_fn=query_fn, catalog="workspace")
+        containment(PK_KEY, frozenset({"p1"}))
+        containment(PK_KEY, frozenset({"p1"}))
+        query_fn.assert_called_once()
+
+    def test_fails_closed_and_caches_the_failure(self):
+        query_fn = MagicMock(side_effect=RuntimeError("warehouse down"))
+        containment = WarehouseContainment(query_fn=query_fn, catalog="workspace")
+        assert containment(PK_KEY, frozenset({"p1"})) is None
+        assert containment(PK_KEY, frozenset({"p1"})) is None
+        query_fn.assert_called_once()

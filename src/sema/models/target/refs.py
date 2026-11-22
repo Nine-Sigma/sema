@@ -40,3 +40,18 @@ class VocabularyRef(BaseModel):
 
     name: str = Field(min_length=1)
     source: VocabularySource
+
+
+class ConceptRef(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    identity_system: str = Field(min_length=1)
+    id: str = Field(min_length=1)
+    version: str | None = None
+
+
+class ExternalRef(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    system: str = Field(min_length=1)
+    id: str = Field(min_length=1)

@@ -265,3 +265,57 @@ class TestPromptComposition:
         )
         # Should contain vocab family hints
         assert "vocabulary" in prompt.lower() or "ontolog" in prompt.lower()
+
+
+class TestInlineExamplesLayer:
+    """Intake turns the stage B inline examples off; build keeps its prompt byte for byte."""
+
+    EXAMPLES = ("diagnosis coding system", "gene symbol namespace")
+    # sha256 of the prompts rendered before the layer existed, for None and healthcare.
+    DIGESTS = (
+        "ef38298ab50feed0305bc61016d22c4c372dfa90656800bde736db131e1bf0f6",
+        "436cca4fa80e11fcbce3e179fe36f0391ab88cd65690ca776bb662e61f0d5112",
+    )
+
+    def _prompts(self, **layer_flags: bool) -> list[str]:
+        from sema.engine.stage_utils import PromptLayers, build_stage_b_prompt
+        from sema.models.stages import StageAResult
+
+        stage_a = StageAResult(
+            primary_entity="Order",
+            grain_hypothesis="one row per order",
+            confidence=0.9,
+        )
+        batch = [
+            {"name": "order_id", "data_type": "INT"},
+            {"name": "status", "data_type": "STRING", "comment": "order state"},
+        ]
+        layers = PromptLayers(**layer_flags) if layer_flags else None
+        return [
+            build_stage_b_prompt(
+                {"table_name": "orders"}, batch, stage_a,
+                domain_context=context, layers=layers,
+            )
+            for context in (None, _healthcare_ctx())
+        ]
+
+    def test_default_prompt_is_unchanged(self) -> None:
+        import hashlib
+
+        from sema.engine.stage_utils import PromptLayers
+
+        assert PromptLayers().enable_inline_examples is True
+        for prompt, digest in zip(self._prompts(), self.DIGESTS, strict=True):
+            assert hashlib.sha256(prompt.encode()).hexdigest() == digest
+            assert all(example in prompt for example in self.EXAMPLES)
+        assert self._prompts(enable_inline_examples=True) == self._prompts()
+
+    def test_off_omits_only_the_inline_examples(self) -> None:
+        on = self._prompts()
+        off = self._prompts(enable_inline_examples=False)
+
+        parenthetical = ' (e.g. "diagnosis coding system", "gene symbol namespace")'
+        for with_examples, without in zip(on, off, strict=True):
+            assert with_examples.count(parenthetical) == 1
+            assert without == with_examples.replace(parenthetical, "")
+        assert [e for e in self.EXAMPLES if e in off[0]] == []

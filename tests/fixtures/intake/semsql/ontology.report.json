@@ -1,0 +1,89 @@
+{
+  "concept_count": 1,
+  "vocabulary_count": 1,
+  "vocabularies": {
+    "VS_http://example.org/ex.owl": {
+      "term_count": 50,
+      "seeded": [
+        {
+          "code": "EX:0010",
+          "display": "Category 9"
+        },
+        {
+          "code": "EX:0012",
+          "display": "Item 2"
+        },
+        {
+          "code": "EX:0015",
+          "display": "Item 5"
+        },
+        {
+          "code": "EX:0017",
+          "display": "Item 7"
+        },
+        {
+          "code": "EX:0019",
+          "display": "Item 9"
+        },
+        {
+          "code": "EX:0042",
+          "display": "Item 32"
+        },
+        {
+          "code": "EX:0043",
+          "display": "Item 33"
+        },
+        {
+          "code": "EX:0044",
+          "display": "Item 34"
+        },
+        {
+          "code": "EX:0045",
+          "display": "Item 35"
+        },
+        {
+          "code": "EX:0046",
+          "display": "Item 36"
+        }
+      ],
+      "longest": [
+        {
+          "code": "EX:0002",
+          "display": "Category 1"
+        },
+        {
+          "code": "EX:0003",
+          "display": "Category 2"
+        },
+        {
+          "code": "EX:0004",
+          "display": "Category 3"
+        },
+        {
+          "code": "EX:0005",
+          "display": "Category 4"
+        },
+        {
+          "code": "EX:0006",
+          "display": "Category 5"
+        }
+      ],
+      "near_duplicates": [],
+      "null_required": [],
+      "duplicate_codes": []
+    }
+  },
+  "root_count": 1,
+  "max_depth": 2,
+  "orphan_parents": 0,
+  "lifecycle": {
+    "active": 48,
+    "retired": 2,
+    "replaced": 2
+  },
+  "external_refs": {
+    "NCIT": "unverifiable"
+  },
+  "entities": {},
+  "without_obligation": {}
+}

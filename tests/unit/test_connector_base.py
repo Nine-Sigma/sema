@@ -34,3 +34,18 @@ class TestConnectorProtocol:
     def test_connector_is_abstract(self):
         with pytest.raises(TypeError):
             Connector()
+
+
+class TestSchemaMetadataDefaults:
+    def test_base_read_schema_metadata_is_not_implemented(self):
+        with pytest.raises(NotImplementedError):
+            FakeConnector().read_schema_metadata("catalog_a", "schema_a")
+
+    def test_base_sql_dialect_is_none(self):
+        assert Connector.sql_dialect is None
+        assert FakeConnector().sql_dialect is None
+
+    def test_no_new_abstract_methods(self):
+        assert Connector.__abstractmethods__ == frozenset(
+            {"extract", "list_catalogs", "get_datasource_ref", "execute_query"}
+        )

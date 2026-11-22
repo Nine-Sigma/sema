@@ -13,7 +13,8 @@ dependencies = [
     "langchain>=0.3.0",
     "langchain-anthropic>=0.3.0",
     "langchain-openai>=0.3.0",
-    "langgraph>=0.2.0",
+    "langgraph>=1.0,<2",
+    "langgraph-checkpoint-sqlite>=2.0",
     "databricks-langchain>=0.5.0",
     "databricks-sdk>=0.30.0",
     "fastapi[standard]",
@@ -31,7 +32,11 @@ dependencies = [
     "pyarrow>=14.0.0",
     "pyyaml>=6.0",
     "packaging>=24.0",
+    "openpyxl>=3.1",
 ]
+
+[project.optional-dependencies]
+tracing-mlflow = ["mlflow-tracing>=3.11"]
 
 [project.scripts]
 sema = "sema.cli:cli"
@@ -80,4 +85,7 @@ dev = [
     "pytest-mock>=3.14.0",
     "mypy>=1.10",
     "types-pyyaml>=6.0.12.20250915",
+    "pytest-xdist>=3.6",
+    "jsonschema>=4.0",
+    "types-openpyxl>=3.1",
 ]

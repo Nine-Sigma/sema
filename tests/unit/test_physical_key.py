@@ -170,30 +170,6 @@ class TestNodeKey:
             "column_key": "ds1/cat/sch/tbl/col",
         }
 
-    def test_joinpath_key_deterministic(self) -> None:
-        k1 = NodeKey.joinpath(
-            "ds1", "table_a", "table_b",
-            [("col_a", "col_b")],
-        )
-        k2 = NodeKey.joinpath(
-            "ds1", "table_a", "table_b",
-            [("col_a", "col_b")],
-        )
-        assert k1 == k2
-        assert k1["datasource_id"] == "ds1"
-        assert k1["from_table"] == "table_a"
-        assert k1["to_table"] == "table_b"
-        assert len(k1["join_columns_hash"]) == 12
-
-    def test_joinpath_key_different_columns(self) -> None:
-        k1 = NodeKey.joinpath(
-            "ds1", "a", "b", [("x", "y")]
-        )
-        k2 = NodeKey.joinpath(
-            "ds1", "a", "b", [("p", "q")]
-        )
-        assert k1["join_columns_hash"] != k2["join_columns_hash"]
-
     def test_table_key_with_schema(self) -> None:
         pk = PhysicalKey("ds1", "cat", "sch", "tbl")
         key = NodeKey.table(pk)

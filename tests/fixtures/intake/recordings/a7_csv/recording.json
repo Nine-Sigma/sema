@@ -1,0 +1,15 @@
+{
+  "source": "a7_csv",
+  "provider": "openrouter",
+  "model": "openai/gpt-6-luna",
+  "prompt_versions": [
+    "roles v2",
+    "structure v1"
+  ],
+  "calls": 3,
+  "tokens": 9184,
+  "cost": 0.0020147999999999998,
+  "approver": null,
+  "value_asks": 0,
+  "agreement": true
+}

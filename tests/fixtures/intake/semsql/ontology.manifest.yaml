@@ -1,0 +1,748 @@
+manifest_version: 1
+descriptor:
+  target_model_id: ex-ontology
+  target_model_version: '2026-10-01'
+  display_name: ex-ontology
+vocabularies:
+- name: VS_http://example.org/ex.owl
+  source: INLINE
+terms:
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0001
+  display: Entity
+  definition: Definition of Entity.
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0002
+  display: Category 1
+  definition: Definition of Category 1.
+  synonyms:
+  - Category 1 synonym
+  external_refs:
+  - system: NCIT
+    id: C1000
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0003
+  display: Category 2
+  definition: Definition of Category 2.
+  synonyms:
+  - Category 2 synonym
+  external_refs:
+  - system: NCIT
+    id: C1001
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0004
+  display: Category 3
+  definition: Definition of Category 3.
+  synonyms:
+  - Category 3 synonym
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0005
+  display: Category 4
+  definition: Definition of Category 4.
+  synonyms:
+  - Category 4 synonym
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0006
+  display: Category 5
+  definition: Definition of Category 5.
+  synonyms:
+  - Category 5 synonym
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0007
+  display: Category 6
+  definition: Definition of Category 6.
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0008
+  display: Category 7
+  definition: Definition of Category 7.
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0009
+  display: Category 8
+  definition: Definition of Category 8.
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0010
+  display: Category 9
+  definition: Definition of Category 9.
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0011
+  display: Item 1
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0012
+  display: Item 2
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0013
+  display: Item 3
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0014
+  display: Item 4
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0015
+  display: Item 5
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0016
+  display: Item 6
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0017
+  display: Item 7
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0018
+  display: Item 8
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0019
+  display: Item 9
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0020
+  display: Item 10
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0021
+  display: Item 11
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0022
+  display: Item 12
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0023
+  display: Item 13
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0024
+  display: Item 14
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0025
+  display: Item 15
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0026
+  display: Item 16
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0027
+  display: Item 17
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0028
+  display: Item 18
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0029
+  display: Item 19
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0030
+  display: Item 20
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0031
+  display: Item 21
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0032
+  display: Item 22
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0033
+  display: Item 23
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0034
+  display: Item 24
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0035
+  display: Item 25
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0036
+  display: Item 26
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0037
+  display: Item 27
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0038
+  display: Item 28
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0039
+  display: Item 29
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0040
+  display: Item 30
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0041
+  display: Item 31
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0042
+  display: Item 32
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0043
+  display: Item 33
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0044
+  display: Item 34
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0045
+  display: Item 35
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0046
+  display: Item 36
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0047
+  display: Item 37
+  definition: null
+  synonyms: []
+  external_refs: []
+- vocabulary: VS_http://example.org/ex.owl
+  code: EX:0048
+  display: Item 38
+  definition: null
+  synonyms: []
+  external_refs: []
+entities:
+- qualified_name: ex.ontology
+  kind: CONCEPT_SCHEME
+  properties:
+  - name: http://example.org/ex.owl
+    type: string
+    synonyms: []
+    concept_ref:
+      identity_system: EX
+      id: http://example.org/ex.owl
+      version: '2026-10-01'
+    definition: null
+    external_refs: []
+    vocabulary_binding:
+      vocabulary: VS_http://example.org/ex.owl
+  context_card:
+    card_version: 2026.10.01
+    description: Example ontology landed through semantic-sql
+relationships:
+- from:
+    system: EX
+    id: EX:0002
+  to:
+    system: EX
+    id: EX:0001
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0003
+  to:
+    system: EX
+    id: EX:0001
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0004
+  to:
+    system: EX
+    id: EX:0001
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0005
+  to:
+    system: EX
+    id: EX:0001
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0006
+  to:
+    system: EX
+    id: EX:0001
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0007
+  to:
+    system: EX
+    id: EX:0001
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0008
+  to:
+    system: EX
+    id: EX:0001
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0009
+  to:
+    system: EX
+    id: EX:0001
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0010
+  to:
+    system: EX
+    id: EX:0001
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0011
+  to:
+    system: EX
+    id: EX:0004
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0012
+  to:
+    system: EX
+    id: EX:0005
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0013
+  to:
+    system: EX
+    id: EX:0006
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0014
+  to:
+    system: EX
+    id: EX:0007
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0015
+  to:
+    system: EX
+    id: EX:0008
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0016
+  to:
+    system: EX
+    id: EX:0009
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0017
+  to:
+    system: EX
+    id: EX:0010
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0018
+  to:
+    system: EX
+    id: EX:0002
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0019
+  to:
+    system: EX
+    id: EX:0003
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0020
+  to:
+    system: EX
+    id: EX:0004
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0021
+  to:
+    system: EX
+    id: EX:0005
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0022
+  to:
+    system: EX
+    id: EX:0006
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0023
+  to:
+    system: EX
+    id: EX:0007
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0024
+  to:
+    system: EX
+    id: EX:0008
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0025
+  to:
+    system: EX
+    id: EX:0009
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0026
+  to:
+    system: EX
+    id: EX:0010
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0027
+  to:
+    system: EX
+    id: EX:0002
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0028
+  to:
+    system: EX
+    id: EX:0003
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0029
+  to:
+    system: EX
+    id: EX:0004
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0030
+  to:
+    system: EX
+    id: EX:0005
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0031
+  to:
+    system: EX
+    id: EX:0006
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0032
+  to:
+    system: EX
+    id: EX:0007
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0033
+  to:
+    system: EX
+    id: EX:0008
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0034
+  to:
+    system: EX
+    id: EX:0009
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0035
+  to:
+    system: EX
+    id: EX:0010
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0036
+  to:
+    system: EX
+    id: EX:0002
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0037
+  to:
+    system: EX
+    id: EX:0003
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0038
+  to:
+    system: EX
+    id: EX:0004
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0039
+  to:
+    system: EX
+    id: EX:0005
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0040
+  to:
+    system: EX
+    id: EX:0006
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0041
+  to:
+    system: EX
+    id: EX:0007
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0042
+  to:
+    system: EX
+    id: EX:0008
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0043
+  to:
+    system: EX
+    id: EX:0009
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0044
+  to:
+    system: EX
+    id: EX:0010
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0045
+  to:
+    system: EX
+    id: EX:0002
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0046
+  to:
+    system: EX
+    id: EX:0003
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0047
+  to:
+    system: EX
+    id: EX:0004
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true
+- from:
+    system: EX
+    id: EX:0048
+  to:
+    system: EX
+    id: EX:0005
+  type: rdfs:subClassOf
+  hierarchical: true
+  far_end_loaded: true

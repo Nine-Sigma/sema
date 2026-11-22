@@ -1,0 +1,75 @@
+# Neutral synthetic profile for unit tests: invented host, catalog, relations and ids.
+profile_version: 1
+name: toy
+
+routing:
+  databricks_profile: TOY
+  host: https://toy.example.test
+  sql_warehouse_id: wh0001
+  chat_endpoint: toy-chat
+  embedding_endpoint: toy-embed
+  embedding_dimensions: 8
+  model_timeout_s: 30
+
+timbr:
+  url: https://ontology.example.test
+  mcp_path: /api/mcp
+  ontology: toy_ontology
+  allowed_tools: [execute_sql, describe_knowledge_graph]
+  env_keys: {token: TOY_TOKEN, ca_bundle: TOY_CA_BUNDLE, verify_ssl: TOY_VERIFY_SSL}
+
+harness:
+  root: harness
+  package: toy_harness
+  config: config/bench.json
+  question_dir: questions
+  question_files: [regular.json, hierarchy.json]
+  cache_dir: cache
+  kg_cache: kg.json
+  receipts: receipts
+  closure: [src/toy_harness/*.py, config/*.json, questions/*.json, cache/*]
+  retired_questions: [R99]
+
+limits:
+  input_ceiling: 16000
+  repair_reserve: 2066
+  output_ceiling: 8192
+  guard_chars_per_token: 2.334
+  conservative_chars_per_token: 2.08
+  row_limit: 1000
+  max_repairs: 2
+
+knobs: {budget_tokens: 3000, values_top_k: 5, description_cap_chars: 160}
+
+sweep:
+  budget_tokens: [3000, 50]
+  values_top_k: [25, 0]
+  description_cap_chars: [160]
+  input_ceiling: [16000, 36000]
+
+extract:
+  catalog: lib_cat
+  schema_name: lib
+  id_pattern: '^[A-Z0-9]+$'
+  elements:
+    relation: lib_element
+    key: element_id
+    member_key: member_id
+    order_keys: [element_id, member_id, element_row_id]
+  members:
+    relation: lib_concept
+    key: concept_id
+    order_keys: [concept_id]
+  row_limit: 10000
+
+sema:
+  sidecar: sidecar.json
+  concept_spec: concept_source.yaml
+  concept_spec_attribution: assisted
+
+sources:
+  version_sql: "SELECT v, at FROM toy_versions WHERE name = '{relation}' ORDER BY v DESC"
+  version_column: v
+  pins:
+    - {relation: main.s.person, version: 7}
+    - {relation: main.s.visit, version: 3}

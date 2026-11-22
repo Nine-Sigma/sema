@@ -40,6 +40,26 @@ class TestTokenizeQuery:
         assert tokenize_query("   ") == []
 
 
+QUOTED_FORMS = ("'bank loan'", '"bank loan"', "\u2018bank loan\u2019", "\u201cbank loan\u201d")
+
+
+class TestQuotedNames:
+    @pytest.mark.parametrize("quoted", QUOTED_FORMS)
+    def test_a_quoted_name_tokenizes_like_the_unquoted_name(self, quoted: str) -> None:
+        assert tokenize_query(f"members of {quoted}") == tokenize_query("members of bank loan")
+
+    @pytest.mark.parametrize("quoted", QUOTED_FORMS)
+    def test_lexical_search_sends_unquoted_tokens(self, quoted: str) -> None:
+        from sema.pipeline.retrieval import RetrievalEngine
+
+        engine = RetrievalEngine.__new__(RetrievalEngine)
+        engine._run_query = MagicMock(return_value=[])
+        engine._lexical_search(quoted)
+
+        sent = {c.kwargs["token"] for c in engine._run_query.call_args_list}
+        assert sent == {"bank", "loan"}
+
+
 class TestLexicalSearch:
     def test_term_matched_by_label(self) -> None:
         engine = MagicMock()

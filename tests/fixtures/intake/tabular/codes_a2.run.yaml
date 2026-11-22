@@ -1,0 +1,7 @@
+# A2 run descriptor: the values of codes_a2.spec.yaml that no predicate derives.
+id: codes-a2
+identity_system: a2
+release: "2026-10"
+scheme:
+  qualified_name: a2.codes
+  description: Synthetic code library landed from a workbook

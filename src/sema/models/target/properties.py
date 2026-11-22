@@ -7,12 +7,15 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from sema.models.target.refs import ConceptRef, ExternalRef
+
 _RESERVED_ENDPOINT_NAMES = frozenset({"subject", "object"})
 
 
 class PropertyKind(str, Enum):
     COLUMN = "COLUMN"
     ENDPOINT = "ENDPOINT"
+    CONCEPT = "CONCEPT"
 
 
 class TargetPropertyDecl(BaseModel):
@@ -30,6 +33,14 @@ class TargetPropertyDecl(BaseModel):
     endpoint_cardinality: Literal["one", "many"] | None = None
     endpoint_nullable: bool | None = None
     materialized_as_edge_property: bool = True
+    # A consumer policy; a denied column is still declared and stored in the graph.
+    exposure: Literal["denied"] | None = Field(default=None, exclude_if=lambda v: v is None)
+    # Unset concept fields stay out of dumps so pre-concept snapshot hashes hold.
+    concept_ref: ConceptRef | None = Field(default=None, exclude_if=lambda v: v is None)
+    definition: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    external_refs: list[ExternalRef] = Field(
+        default_factory=list, exclude_if=lambda v: not v
+    )
 
     @model_validator(mode="after")
     def _validate_kind_consistency(self) -> Self:

@@ -208,6 +208,54 @@ class TestLLMClientFallbackChain:
         assert result.entity_name == "Patient"
 
 
+class TestLLMClientLastPath:
+    def _structured_llm(self, structured_effect, plain_content):
+        llm = MagicMock()
+        structured_llm = MagicMock()
+        structured_llm.invoke.side_effect = structured_effect
+        llm.with_structured_output.return_value = structured_llm
+        response = MagicMock()
+        response.content = plain_content
+        llm.invoke.return_value = response
+        return llm
+
+    def test_last_path_is_none_before_any_call(self):
+        client = LLMClient(MagicMock(), retry_max_attempts=1)
+        assert client.last_path is None
+
+    def test_last_path_names_structured_output(self):
+        llm = self._structured_llm([TableSummary(entity_name="Patient")], "unused")
+        client = LLMClient(llm, retry_max_attempts=1, use_structured_output="true")
+        client.invoke("prompt", TableSummary)
+        assert client.last_path == "structured_output"
+
+    def test_last_path_names_plain_invoke_after_a_structured_failure(self):
+        llm = self._structured_llm(Exception("bad json"), '{"entity_name": "Patient"}')
+        client = LLMClient(llm, retry_max_attempts=1, use_structured_output="true")
+        client.invoke("prompt", TableSummary)
+        assert client.last_path == "plain_invoke"
+
+    def test_last_path_names_the_simplified_prompt(self):
+        llm = self._structured_llm(Exception("fail"), "garbage")
+        llm.invoke.side_effect = [
+            MagicMock(content="garbage"),
+            MagicMock(content='{"entity_name": "Patient"}'),
+        ]
+        client = LLMClient(llm, retry_max_attempts=1, use_structured_output="true")
+        client.invoke("prompt", TableSummary, simplified_prompt="simple")
+        assert client.last_path == "simplified_prompt"
+
+    def test_last_path_is_reset_by_an_exhausted_chain(self):
+        llm = self._structured_llm(
+            [TableSummary(entity_name="Patient"), Exception("fail")], "garbage"
+        )
+        client = LLMClient(llm, retry_max_attempts=1, use_structured_output="true")
+        client.invoke("prompt", TableSummary)
+        with pytest.raises(LLMStageError):
+            client.invoke("prompt", TableSummary)
+        assert client.last_path is None
+
+
 # ---------------------------------------------------------------------------
 # Provider detection tests (Task 2.3)
 # ---------------------------------------------------------------------------

@@ -1,0 +1,279 @@
+"""Helpers for the tabular loader: text encoding, header detection, column typing.
+
+A header is the first row, within the first ``HEADER_SCAN_ROWS``, where at least
+``HEADER_MIN_STRING_RATIO`` of the cells are non-empty strings (trailing columns
+empty throughout the window do not count), those strings are unique within the
+row ignoring case and whitespace runs, and none of them recurs in its own column
+in the window. Text that parses as a number is not a header string: CSV cells arrive
+as text.
+
+A column is numeric only when every text cell survives the round trip: ``1.10``
+and ``007`` stay text, because a code column must keep each code's identity.
+
+A text file's encoding comes from its bytes alone: a byte order mark wins, then
+the first strict decode among UTF-8 and Windows-1252, then Latin-1, which decodes
+every byte.
+"""
+
+from __future__ import annotations
+
+import codecs
+import csv
+import math
+import re
+from collections import Counter
+from collections.abc import Sequence
+from datetime import date, datetime
+from pathlib import Path
+from typing import Any
+
+HEADER_MIN_STRING_RATIO = 0.8
+HEADER_SCAN_ROWS = 50
+HEADER_TESTS = (
+    f"at least {HEADER_MIN_STRING_RATIO:.0%} of cells are non-empty strings",
+    "the strings are unique within the row, ignoring case and whitespace runs",
+    f"none recurs in its column within the first {HEADER_SCAN_ROWS} rows",
+)
+EMPTY_COLUMN_PREFIX = "_empty_"
+POSITIONAL_COLUMN_PREFIX = "_col_"
+UTF8_CODEC = "utf-8-sig"
+FALLBACK_CODEC = "latin-1"
+
+_INTEGER_TEXT = re.compile(r"^-?(0|[1-9]\d*)$")
+_BIGINT_RANGE = range(-(2**63), 2**63)
+_BOOL_TEXT = {"true": True, "false": False}
+_BYTE_ORDER_MARKS = (
+    (codecs.BOM_UTF8, UTF8_CODEC),
+    (codecs.BOM_UTF16_LE, "utf-16"),
+    (codecs.BOM_UTF16_BE, "utf-16"),
+)
+_STRICT_CODECS = (UTF8_CODEC, "cp1252")
+
+
+def detect_text_encoding(path: Path) -> str:
+    """The codec that decodes ``path``: BOM, strict UTF-8, strict cp1252, else Latin-1."""
+    data = path.read_bytes()
+    for mark, codec in _BYTE_ORDER_MARKS:
+        if data.startswith(mark):
+            return codec
+    for codec in _STRICT_CODECS:
+        try:
+            data.decode(codec)
+        except UnicodeDecodeError:
+            continue
+        return codec
+    return FALLBACK_CODEC
+
+
+def detect_header(rows: list[list[Any]]) -> int | None:
+    """1-based row number of the header, or ``None`` when no row passes."""
+    window = rows[:HEADER_SCAN_ROWS]
+    width = occupied_width(window)
+    if width == 0:
+        return None
+    counts = [Counter[str]() for _ in range(width)]
+    for row in window:
+        for index, cell in enumerate(row[:width]):
+            if (text := cell_text(cell)) is not None:
+                counts[index][text] += 1
+    for number, row in enumerate(window, start=1):
+        if _is_header(row, width, counts):
+            return number
+    return None
+
+
+def occupied_width(rows: list[list[Any]]) -> int:
+    """One past the highest column index holding a non-empty cell in any row."""
+    return max(
+        (
+            index + 1
+            for row in rows
+            for index, cell in enumerate(row)
+            if cell_text(cell) is not None
+        ),
+        default=0,
+    )
+
+
+def _is_header(row: list[Any], width: int, counts: list[Counter[str]]) -> bool:
+    strings = {
+        index: text
+        for index, cell in enumerate(row[:width])
+        if isinstance(cell, str)
+        and (text := cell_text(cell)) is not None
+        and not _parses_float(text)
+    }
+    if len(strings) < HEADER_MIN_STRING_RATIO * width - 1e-9:
+        return False
+    folded = {collapse_whitespace(text).casefold() for text in strings.values()}
+    if len(folded) != len(strings):
+        return False
+    return all(counts[index][text] == 1 for index, text in strings.items())
+
+
+def cell_text(cell: Any) -> str | None:
+    if cell is None:
+        return None
+    text = str(cell).strip()
+    return text or None
+
+
+def collapse_whitespace(text: str) -> str:
+    return " ".join(text.split())
+
+
+def column_names(header: list[Any], width: int) -> list[str]:
+    padded = list(header[:width]) + [None] * (width - len(header))
+    return [
+        collapse_whitespace(text)
+        if (text := cell_text(cell))
+        else f"{EMPTY_COLUMN_PREFIX}{index}"
+        for index, cell in enumerate(padded, start=1)
+    ]
+
+
+def positional_names(width: int) -> list[str]:
+    return [f"{POSITIONAL_COLUMN_PREFIX}{index}" for index in range(1, width + 1)]
+
+
+def column_type(values: list[Any]) -> str:
+    """DuckDB type for a column: typed only when every non-null cell agrees."""
+    present = [value for value in values if cell_text(value) is not None]
+    if not present:
+        return "VARCHAR"
+    for name, test in _TYPE_TESTS:
+        if all(test(value) for value in present):
+            return name
+    return "VARCHAR"
+
+
+def _is_bool(value: Any) -> bool:
+    return isinstance(value, bool) or (
+        isinstance(value, str) and value.strip().lower() in _BOOL_TEXT
+    )
+
+
+def _is_int(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return value in _BIGINT_RANGE
+    if not isinstance(value, str) or not _INTEGER_TEXT.match(value.strip()):
+        return False
+    return int(value) in _BIGINT_RANGE
+
+
+def _is_float(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return value in _BIGINT_RANGE
+    if isinstance(value, float):
+        return True
+    return isinstance(value, str) and _float_round_trips(value.strip())
+
+
+def _float_round_trips(text: str) -> bool:
+    try:
+        number = float(text)
+    except ValueError:
+        return False
+    return math.isfinite(number) and repr(number) == text
+
+
+def _parses_float(text: str) -> bool:
+    try:
+        float(text)
+    except ValueError:
+        return False
+    return True
+
+
+def _is_date(value: Any) -> bool:
+    if isinstance(value, datetime):
+        return value.time() == datetime.min.time()
+    if isinstance(value, date):
+        return True
+    return isinstance(value, str) and _parses_date(value)
+
+
+def _parses_date(text: str) -> bool:
+    try:
+        date.fromisoformat(text.strip())
+    except ValueError:
+        return False
+    return len(text.strip()) == 10
+
+
+def _is_timestamp(value: Any) -> bool:
+    return isinstance(value, (datetime, date))
+
+
+_TYPE_TESTS = (
+    ("BOOLEAN", _is_bool),
+    ("BIGINT", _is_int),
+    ("DOUBLE", _is_float),
+    ("DATE", _is_date),
+    ("TIMESTAMP", _is_timestamp),
+)
+
+
+def convert(value: Any, duckdb_type: str) -> Any:
+    """A cell as the Python value for its column type; text columns get ``str``."""
+    if cell_text(value) is None:
+        return None
+    if duckdb_type == "BOOLEAN":
+        return value if isinstance(value, bool) else _BOOL_TEXT[value.strip().lower()]
+    if duckdb_type == "BIGINT":
+        return int(value)
+    if duckdb_type == "DOUBLE":
+        return float(value)
+    if duckdb_type == "DATE":
+        return _as_date(value)
+    if duckdb_type == "TIMESTAMP":
+        return value
+    return _as_text(value)
+
+
+def _as_date(value: Any) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(str(value).strip())
+
+
+def _as_text(value: Any) -> str:
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return str(value)
+
+
+def choose_delimiter(
+    lines: list[str], sniffed: str, candidates: Sequence[str], quote: str
+) -> str:
+    """``sniffed`` unless it splits no row and a candidate splits most non-empty rows."""
+    if _split_score(lines, sniffed, quote)[0] > 0:
+        return sniffed
+    scores = {
+        candidate: _split_score(lines, candidate, quote)
+        for candidate in dict.fromkeys(candidates)
+        if candidate != sniffed
+    }
+    if not scores:
+        return sniffed
+    best = max(scores, key=lambda candidate: scores[candidate][:2])
+    split_rows, _, non_empty_rows = scores[best]
+    return best if 2 * split_rows > non_empty_rows else sniffed
+
+
+def _split_score(lines: list[str], delimiter: str, quote: str) -> tuple[int, int, int]:
+    """Rows split into more than one field, total fields, and non-empty rows."""
+    split_rows = fields = non_empty_rows = 0
+    for record in csv.reader(lines, delimiter=delimiter, quotechar=quote):
+        split_rows += len(record) > 1
+        fields += len(record)
+        non_empty_rows += len(record) > 0
+    return split_rows, fields, non_empty_rows

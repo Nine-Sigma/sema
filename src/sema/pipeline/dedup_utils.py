@@ -19,7 +19,7 @@ _STOP_WORDS: frozenset[str] = frozenset({
     "make", "like", "most", "many", "some",
 })
 
-_TOKEN_SPLIT_RE = re.compile(r"[\s\-_/.,;:!?()]+")
+_TOKEN_SPLIT_RE = re.compile(r"[\s\-_/.,;:!?()'\"\u2018\u2019\u201c\u201d]+")
 
 
 def merge_and_rank_candidates(
@@ -61,6 +61,37 @@ def tokenize_query(query: str) -> list[str]:
         t for t in raw_tokens
         if len(t) >= 3 and t not in _STOP_WORDS
     ]
+
+
+def states_name(question: str, name: str) -> bool:
+    """The question holds ``name`` as a phrase, its words in order; a plural on
+    either side's word does not matter."""
+    words, asked = _words(name), _words(question)
+    span = len(words)
+    return span > 0 and any(
+        all(map(_same_word, asked[i:i + span], words))
+        for i in range(len(asked) - span + 1)
+    )
+
+
+def _words(text: str) -> list[str]:
+    return [w for w in _TOKEN_SPLIT_RE.split(text.lower()) if w]
+
+
+def _same_word(a: str, b: str) -> bool:
+    return a == b or a in _plurals(b) or b in _plurals(a)
+
+
+def _plurals(word: str) -> set[str]:
+    """English plural forms of a singular of three letters or more."""
+    if len(word) < 3:
+        return set()
+    forms = {word + "s"}
+    if word.endswith(("s", "x", "z", "ch", "sh")):
+        forms.add(word + "es")
+    if word.endswith("y") and word[-2] not in "aeiou":
+        forms.add(word[:-1] + "ies")
+    return forms
 
 
 def normalize_vector_hit(
@@ -152,12 +183,9 @@ def _artifact_identity_key(
     art_type = art.get("type", "")
 
     if art_type == "entity":
-        return (
-            art_type,
-            art.get("catalog", ""),
-            art.get("schema", ""),
-            art.get("table", ""),
-        )
+        on_table = (art_type, art.get("catalog", ""), art.get("schema", ""), art.get("table", ""))
+        # An entity the identity step placed is a fact of its own beside L2's on the table.
+        return (*on_table, art.get("name", "")) if art.get("key_columns") else on_table
     if art_type == "property":
         return (
             art_type,
@@ -188,6 +216,15 @@ def _artifact_identity_key(
             art_type,
             art.get("vocabulary", ""),
             art.get("code") or art.get("label", ""),
+        )
+    if art_type == "hierarchy_anchor":
+        return (
+            art_type,
+            art.get("vocabulary") or "",
+            art.get("code", ""),
+            art.get("schema", ""),
+            art.get("table", ""),
+            art.get("column", ""),
         )
     if art_type == "ancestry":
         return (

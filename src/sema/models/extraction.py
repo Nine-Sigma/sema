@@ -29,18 +29,20 @@ class ExtractedColumn:
     data_type: str
     nullable: bool = True
     comment: str | None = None
+    ref: str | None = None
 
 
 @dataclass(frozen=True)
 class ExtractedForeignKey:
-    from_table: str
-    from_columns: list[str]
-    to_table: str
-    to_columns: list[str]
-    from_catalog: str = ""
-    from_schema: str = ""
-    to_catalog: str = ""
-    to_schema: str = ""
+    """One declared constraint; `column_pairs` is (referencing, referenced) in ordinal order."""
+    constraint_name: str
+    referencing_catalog: str
+    referencing_schema: str
+    referencing_table: str
+    referenced_catalog: str
+    referenced_schema: str
+    referenced_table: str
+    column_pairs: tuple[tuple[str, str], ...]
 
 
 @dataclass(frozen=True)
@@ -70,7 +72,7 @@ class ExtractedSampleRows:
     table_name: str
     catalog: str
     schema: str
-    rows: list[list[str]]
+    rows: list[dict[str, str]]
     column_names: list[str]
 
 

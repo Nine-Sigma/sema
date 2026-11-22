@@ -1,0 +1,12 @@
+- stage: structure
+  subject: standard_library.data_element_mappings
+  choice: ignore
+- stage: structure
+  subject: standard_library.standard_library_concept_relationship
+  choice: ignore
+- stage: structure
+  subject: standard_library.permissible_value_mappings_edited
+  choice: ignore
+- stage: structure
+  subject: standard_library.standard_library_concept
+  choice: ignore

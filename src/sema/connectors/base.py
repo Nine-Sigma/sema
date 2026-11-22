@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from sema.connectors.databricks_utils import unique_keys_from_rows, unique_keys_query
 from sema.models.assertions import Assertion
 from sema.models.extraction import (
     ExtractedColumn,
@@ -12,9 +13,18 @@ from sema.models.extraction import (
     ExtractedTag,
     ExtractedTopValues,
 )
+from sema.models.schema_metadata import SchemaMetadata, Unreadable
 
 if TYPE_CHECKING:
     from sema.connectors.databricks import TableWorkItem
+
+
+class RowCapExceeded(RuntimeError):
+    """A bounded read's result has more rows than its cap."""
+
+
+class StatementTimeout(TimeoutError):
+    """A bounded read ran past its timeout and was interrupted."""
 
 
 class Connector(ABC):
@@ -29,6 +39,8 @@ class Connector(ABC):
     method is kept for backward compatibility with the Databricks
     connector.
     """
+
+    sql_dialect: str | None = None
 
     @abstractmethod
     def extract(
@@ -68,6 +80,20 @@ class Connector(ABC):
         cursor/connection handling.
         """
         ...
+
+    def extract_unique_keys(self, catalog: str, schema: str) -> list[tuple[str, tuple[str, ...]]]:
+        """Each primary key and unique constraint one schema declares: (relation, columns)."""
+        return unique_keys_from_rows(self.execute_query(unique_keys_query(catalog, schema)))
+
+    def execute_query_with_columns(
+        self, query: str, *, max_rows: int | None = None, timeout_s: float | None = None,
+    ) -> tuple[list[str], list[tuple[Any, ...]]]:
+        """Run one read statement as written and return its column names and rows.
+
+        Past ``max_rows`` rows it raises ``RowCapExceeded``; past ``timeout_s`` seconds,
+        ``StatementTimeout``. Neither bound is applied when it is None.
+        """
+        raise NotImplementedError
 
     # --- Per-table orchestration contract ---
 
@@ -120,4 +146,10 @@ class Connector(ABC):
         self, catalog: str, schema: str, table: str,
     ) -> list[ExtractedTag]:
         """Extract tags/labels. Override in new connectors."""
+        raise NotImplementedError
+
+    def read_schema_metadata(
+        self, catalog: str, schema: str,
+    ) -> SchemaMetadata | Unreadable:
+        """Read one schema's objects, columns, and view text. Override."""
         raise NotImplementedError

@@ -40,6 +40,17 @@ class AssertionPredicate(str, Enum):
     ENTITY_ON_TABLE = "entity_on_table"
     PROPERTY_ON_COLUMN = "property_on_column"
     FK_TO = "fk_to"
+    HAS_VALUE_SET = "has_value_set"
+    HAS_KEY = "has_key"
+    HAS_IDENTITY = "has_identity"
+
+
+# The `verification` words a coded column's `has_value_set` payload states.
+VERIFIED, UNVERIFIED = "verified", "unverified"
+# The grades a `has_key` or `has_identity` payload states (contract F2); a reader states a
+# fact only under one of STATED_GRADES.
+PROVEN, SUPPORTED, OPEN, REJECTED = "proven", "supported", "open", "rejected"
+STATED_GRADES = frozenset({PROVEN, SUPPORTED})
 
 
 # Predicates whose payload "value" is a name/alias that becomes a graph MERGE

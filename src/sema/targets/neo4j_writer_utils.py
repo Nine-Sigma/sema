@@ -102,6 +102,10 @@ def property_merge(op: PropertyOp) -> tuple[str, dict[str, Any]]:
         "n.endpoint_cardinality = $endpoint_cardinality, "
         "n.endpoint_nullable = $endpoint_nullable, "
         "n.materialized_as_edge_property = $materialized_as_edge_property, "
+        "n.concept_ref_system = $concept_ref_system, "
+        "n.concept_ref_id = $concept_ref_id, "
+        "n.concept_ref_version = $concept_ref_version, "
+        "n.definition = $definition, n.external_refs = $external_refs, "
         "n.is_current = $is_current, "
         "n.model_role = $model_role, n.id = $id"
     )
@@ -121,6 +125,11 @@ def property_merge(op: PropertyOp) -> tuple[str, dict[str, Any]]:
         "endpoint_cardinality": op.endpoint_cardinality,
         "endpoint_nullable": op.endpoint_nullable,
         "materialized_as_edge_property": op.materialized_as_edge_property,
+        "concept_ref_system": op.concept_ref_system,
+        "concept_ref_id": op.concept_ref_id,
+        "concept_ref_version": op.concept_ref_version,
+        "definition": op.definition,
+        "external_refs": list(op.external_refs),
         "is_current": op.is_current,
         "model_role": _TARGET_ROLE,
         "id": _property_id(op),
@@ -155,7 +164,9 @@ def term_merge(op: TermOp) -> tuple[str, dict[str, Any]]:
         "vocabulary_name: $vocabulary_name, "
         "code: $code"
         "}) "
-        "SET n.display = $display, n.is_current = $is_current, "
+        "SET n.display = $display, n.definition = $definition, "
+        "n.synonyms = $synonyms, n.external_refs = $external_refs, "
+        "n.is_current = $is_current, "
         "n.model_role = $model_role, n.id = $id"
     )
     return cypher, {
@@ -165,6 +176,9 @@ def term_merge(op: TermOp) -> tuple[str, dict[str, Any]]:
         "vocabulary_name": op.vocabulary_name,
         "code": op.code,
         "display": op.display,
+        "definition": op.definition,
+        "synonyms": list(op.synonyms),
+        "external_refs": list(op.external_refs),
         "is_current": True,
         "model_role": _TARGET_ROLE,
         "id": (

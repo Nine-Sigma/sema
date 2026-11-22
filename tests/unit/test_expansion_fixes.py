@@ -45,6 +45,25 @@ class TestTermGovernedValues:
         assert len(values) >= 1
         assert values[0]["column"] == "tnm_stage"
 
+    def test_governed_value_from_a_term_hit_keeps_the_term_label(
+        self, mock_engine,
+    ) -> None:
+        def run_query(query, **params):
+            if ("MEMBER_OF" in query and "HAS_VALUE_SET" in query
+                    and "MAPS_TO_CONCEPT" not in query):
+                return [
+                    {"column_name": "sex_code", "table_name": "person",
+                     "value_set_name": "sex_values"},
+                ]
+            return []
+
+        mock_engine._run_query.side_effect = run_query
+        hit = {"code": "C2", "label": "Female", "final_score": 0.9}
+        results = _expand_term_hit(mock_engine, hit)
+        values = [r for r in results if r["type"] == "value"]
+        assert values
+        assert {(v["code"], v["label"]) for v in values} == {("C2", "Female")}
+
     def test_term_without_member_of_returns_no_values(
         self, mock_engine,
     ) -> None:

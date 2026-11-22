@@ -1,0 +1,16 @@
+{
+  "source": "heldout",
+  "provider": "openrouter",
+  "model": "openai/gpt-6-luna",
+  "prompt_versions": [
+    "layout v2",
+    "roles v2",
+    "structure v1"
+  ],
+  "calls": 16,
+  "tokens": 101523,
+  "cost": 0.0187911,
+  "approver": "dean",
+  "value_asks": 2,
+  "agreement": true
+}

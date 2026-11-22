@@ -10,7 +10,6 @@ from sema.engine.join_detector import FKAssertion, to_fk_assertion
 from sema.engine.join_detector_utils import FKCandidate
 from sema.graph.join_materializer import (
     _build_join_path_records,
-    _derive_join_path_name,
     materialize_join_paths,
 )
 from sema.models.assertions import (
@@ -24,20 +23,20 @@ pytestmark = pytest.mark.unit
 SCHEMA = "cbioportal_msk_chord_2024"
 
 
-def _join_assertion(name: str = "patient_to_sample"):
+def _join_assertion(name: str = "owner_to_event"):
     payload = {
         "join_predicates": [{
-            "left_table": "patient", "left_column": "patient_id",
-            "right_table": "sample", "right_column": "patient_id",
+            "left_table": "owner", "left_column": "owner_id",
+            "right_table": "event", "right_column": "owner_id",
             "operator": "=",
         }],
         "hop_count": 1,
-        "from_table": "databricks://ws/cat/sch/patient",
-        "to_table": "databricks://ws/cat/sch/sample",
+        "from_ref": "databricks://ws/cat/sch/owner",
+        "to_ref": "databricks://ws/cat/sch/event",
     }
     return Assertion(
         id=f"a-{name}",
-        subject_ref="databricks://ws/cat/sch/patient",
+        subject_ref="databricks://ws/cat/sch/owner",
         predicate=AssertionPredicate.HAS_JOIN_EVIDENCE,
         payload=payload,
         source="fk_detector",
@@ -46,14 +45,6 @@ def _join_assertion(name: str = "patient_to_sample"):
         run_id="run-1",
         observed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-
-
-def test_derive_join_path_name():
-    name = _derive_join_path_name([
-        {"left_table": "p", "left_column": "id",
-         "right_table": "s", "right_column": "p_id"},
-    ])
-    assert name == "p/id=s/p_id"
 
 
 def test_build_join_path_records_skips_empty_group():
@@ -76,10 +67,13 @@ def test_materialize_threads_source_schema_to_batch():
 
 def _fk_to_assertion(tier: int = 1, confidence: float = 0.95) -> Assertion:
     candidate = FKCandidate(
-        pk_table="patient", pk_column="patient_id",
-        fk_table="sample", fk_column="patient_id",
+        pk_table="owner", pk_column="owner_id",
+        fk_table="event", fk_column="owner_id",
         pk_type="string", fk_type="string",
-        schema_name=SCHEMA, catalog="workspace",
+        schema_name=SCHEMA,
+        pk_ref=f"databricks://workspace/workspace/{SCHEMA}/owner/owner_id",
+        fk_ref=f"databricks://workspace/workspace/{SCHEMA}/event/owner_id",
+        catalog="workspace",
     )
     fk = FKAssertion(
         candidate=candidate, confidence=confidence,
@@ -100,7 +94,7 @@ def test_fk_to_predicate_produces_join_path():
     rows = batch_calls[0].kwargs["rows"]
     assert len(rows) == 1
     rec = rows[0]
-    assert rec["name"] == "patient/patient_id=sample/patient_id"
+    assert rec["name"] == "owner/owner_id=event/owner_id"
     assert rec["confidence"] == 0.95
     assert rec["source_schema"] == SCHEMA
     loader.add_join_path_uses.assert_called()
@@ -109,21 +103,16 @@ def test_fk_to_predicate_produces_join_path():
         assert call.kwargs.get("source_schema") == SCHEMA
 
 
-def test_fk_to_and_legacy_join_evidence_coexist():
+def test_fk_to_and_join_evidence_on_one_pair_merge_into_one_record():
     loader = MagicMock()
-    legacy = _join_assertion(name="legacy")
+    evidence = _join_assertion(name="evidence")
     fk = _fk_to_assertion()
     groups = {
-        (legacy.subject_ref, legacy.predicate.value): [legacy],
+        (evidence.subject_ref, evidence.predicate.value): [evidence],
         (fk.subject_ref, fk.predicate.value): [fk],
     }
     materialize_join_paths(loader, groups, source_schema=SCHEMA)
     rows = [
         c for c in loader.method_calls if c[0] == "_run"
     ][0].kwargs["rows"]
-    names = sorted(r["name"] for r in rows)
-    assert names == [
-        "patient/patient_id=sample/patient_id",
-        "patient/patient_id=sample/patient_id",
-    ]
-    assert len(rows) == 2
+    assert [r["name"] for r in rows] == ["owner/owner_id=event/owner_id"]
