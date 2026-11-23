@@ -8,7 +8,7 @@ set_dir: ~/dev/ai/graphrag-semantic-ontology/docs/poc/query-accuracy-eval/acris
 duckdb: ~/.sema/acris.duckdb
 
 harness:
-  frozen: ~/dev/ai/graphrag-semantic-ontology/docs/poc/partner-timbr-benchmark/runs/partner-bench-20261109-r1/frozen/8b4cfdc02f8d13c6af00bc2c84c08bb94818c7bbef8b0900198a84a790b69a04
+  frozen: ~/.sema/harness/8b4cfdc02f8d13c6af00bc2c84c08bb94818c7bbef8b0900198a84a790b69a04
   package: timbr_demographics_poc
 
 model:
