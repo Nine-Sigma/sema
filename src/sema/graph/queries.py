@@ -5,10 +5,17 @@ class CypherQueries:
 
     @staticmethod
     def vector_search(index_name: str, top_k: int = 10) -> str:
+        # The quantized approximate index misplaces exact neighbours near its cut: on the
+        # neutral fixture a 3x read missed some, 5x and up missed none; 10x keeps a read of
+        # at least 30 at top_k 3.
+        width = top_k * 10
         return (
-            f"CALL db.index.vector.queryNodes('{index_name}', {top_k}, $embedding) "
-            f"YIELD node, score "
-            f"RETURN node, score ORDER BY score DESC"
+            f"CALL db.index.vector.queryNodes('{index_name}', {width}, $embedding) "
+            f"YIELD node "
+            f"WITH node, vector.similarity.cosine(node.embedding, $embedding) AS score "
+            f"RETURN node, score ORDER BY score DESC, node.ref, node.schema_name, "
+            f"node.entity_name, node.name, node.vocabulary_name, node.code, "
+            f"node.target_key, node.text LIMIT {top_k}"
         )
 
     @staticmethod

@@ -129,7 +129,8 @@ def _expand_source_term_bridge(
         rows = in_stable_order(engine._run_query(
             CypherQueries.resolve_concept_for_source_term(),
             code=code, source_vocabulary=None,
-        ), "concept_vocabulary", "concept_code", "schema_name", "table_name", "column_name")
+        ), "concept_vocabulary", "concept_code", "catalog", "schema_name", "table_name",
+            "column_name")
     except Exception:
         return []
 
@@ -333,7 +334,7 @@ def _expand_term_governed_values(
             CypherQueries.find_value_sets_for_term(),
             code=code,
             vocabulary_name=vocabulary_name or None,
-        ), "schema_name", "table_name", "column_name")
+        ), "catalog", "schema_name", "table_name", "column_name")
     except Exception:
         return []
 
