@@ -19,6 +19,7 @@ from sema.binding.spec import ConceptSourceSpec
 from sema.binding.spec_sections import Provider, ShapeEntry
 from sema.intake.structure.described_data_utils import (
     SCHEMA_SLOTS,
+    described_beside,
     described_by,
     per_file_dictionaries,
     schema_slot_relations,
@@ -281,6 +282,8 @@ def _bind_described(
     Only a dictionary that ends up bound may describe a relation, so a describing dictionary
     left unbound returns what it described to the candidates and the groups bind again.
     """
+    eligible = [[b for b in g if not described_beside(b, by_name, tools)] for g in graph.candidates]
+    graph = replace(graph, candidates=eligible)
     found = [binding for group in graph.candidates for binding in group]
     dictionaries = [by_name[name] for name in per_file_dictionaries([*pinned, *found])]
     targets = [by_name[name] for name in schema_slot_relations(found)]
