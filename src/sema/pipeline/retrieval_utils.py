@@ -18,6 +18,7 @@ from sema.pipeline.dedup_utils import (
     in_stable_order,
     normalize_vector_hit as _normalize_vector_hit,
     physical_row_in_order,
+    physical_row_key,
     states_name,
     tokenize_query,
 )
@@ -86,9 +87,7 @@ def _resolve_physical_for(
         rows = engine._run_query(
             CypherQueries.resolve_physical_mapping(), entity_name=name,
         )
-    return in_stable_order(
-        [physical_row_in_order(row) for row in rows], "catalog", "schema_name", "table_name",
-    )
+    return sorted((physical_row_in_order(row) for row in rows), key=physical_row_key)
 
 
 def _expand_joins(

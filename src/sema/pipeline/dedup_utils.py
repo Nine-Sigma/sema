@@ -70,8 +70,23 @@ def physical_row_in_order(row: dict[str, Any]) -> dict[str, Any]:
     )
     ordered = {**row, "columns": [_labels_in_order(c) for c in columns]}
     if row.get("shared_entities"):
-        ordered["shared_entities"] = in_stable_order(row["shared_entities"], "entity")
+        ordered["shared_entities"] = in_stable_order(
+            [_least_owner(s) for s in row["shared_entities"]], "entity")
     return ordered
+
+
+def physical_row_key(row: dict[str, Any]) -> tuple[Any, ...]:
+    """A relation's MERGE key, then the edge's own values for two edges to one relation; the
+    owner edge first, as it carries the entity's identity."""
+    relation = tuple(str(row.get(f) or "") for f in ("catalog", "schema_name", "table_name"))
+    edge = tuple(str(row.get(f) or "") for f in (
+        "key_columns", "verification", "identity", "null_key_rows"))
+    return (*relation, row.get("owner") is not True, *edge)
+
+
+def _least_owner(shared: dict[str, Any]) -> dict[str, Any]:
+    owners = in_stable_order(shared.get("owners") or [], "catalog", "schema", "table")
+    return {**shared, "owner": owners[0] if owners else None}
 
 
 def _labels_in_order(column: dict[str, Any]) -> dict[str, Any]:
@@ -81,7 +96,7 @@ def _labels_in_order(column: dict[str, Any]) -> dict[str, Any]:
         {**label, "via": sorted(label["via"], key=str)} if label.get("via") else label
         for label in column["labels"]
     ]
-    return {**column, "labels": in_stable_order(labels, "table", "column")}
+    return {**column, "labels": in_stable_order(labels, "catalog", "schema", "table", "column")}
 
 
 def tokenize_query(query: str) -> list[str]:

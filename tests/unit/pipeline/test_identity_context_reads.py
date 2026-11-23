@@ -57,7 +57,7 @@ def label(verification: str = "verified") -> dict[str, Any]:
 def shared(verification: str = "proven", owner: dict[str, str] | None = HULL_OWNER,
            ) -> dict[str, Any]:
     return {"entity": "Hull", "key_columns": ["hull_no"], "verification": verification,
-            "owner": owner}
+            "owners": [owner] if owner else []}
 
 
 def lines_for(*rows: dict[str, Any]) -> list[str]:
@@ -104,6 +104,41 @@ def test_labels_and_shared_entities_render_the_same_whatever_order_the_graph_ret
 
     assert "label: rig_class.class_title on" in table_line(forward, "hull_rev")
     assert len(section_lines(forward)) == 2, forward
+    assert forward == backward
+
+
+def test_label_relations_of_one_name_in_two_schemas_render_the_same_whatever_order(
+) -> None:
+    alt_join = {**RIG_JOIN, "left_column": "rig_alt"}
+    labels = [{**label(), "catalog": IDENTITY_CATALOG, "schema": IDENTITY_SCHEMA},
+              {**label(), "catalog": IDENTITY_CATALOG, "schema": f"{IDENTITY_SCHEMA}_b",
+               "via": [json.dumps([alt_join])]}]
+
+    forward, backward = (lines_for(labeled(mapping_row("hull_rev"), "rig_type", *order))
+                         for order in (labels, labels[::-1]))
+
+    assert "rig_kind.rig_alt" in table_line(forward, "hull_rev")
+    assert forward == backward
+
+
+def test_a_shared_entity_with_two_owner_edges_names_the_least_owner_in_both_orders() -> None:
+    owners = [{**HULL_OWNER, "table": "hull_survey"}, HULL_OWNER]
+
+    def body(order: list[dict[str, str]]) -> list[str]:
+        cargo = mapping_row("hull_cargo", shared_entities=[{**shared(), "owners": order}])
+        return section_lines(lines_for(mapping_row("hull_rev"), cargo))
+
+    assert body(owners) == body(owners[::-1]) == [SHARED_LINE]
+
+
+def test_an_entity_with_two_edges_to_one_table_renders_the_same_whatever_order() -> None:
+    edges = [mapping_row("hull_rev", **owner_edge(HULL_IDENTITY), **HULL_KEY),
+             mapping_row("hull_rev", key_columns=["hull_no", "rev_no"], verification="open",
+                         **HULL_KEY)]
+
+    forward, backward = lines_for(*edges), lines_for(*edges[::-1])
+
+    assert EXPECTED_SECTION[3] in section_lines(forward), forward
     assert forward == backward
 
 
