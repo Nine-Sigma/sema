@@ -150,6 +150,7 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
 
     from sema.graph.join_materializer import materialize_schema_joins
     from sema.pipeline.coded_columns import run_coded_columns
+    from sema.pipeline.declared_joins import run_declared_joins
     from sema.pipeline.identity import run_identity
     schemas = sorted({wi.schema for wi in work_items})
     detected = run_fk_detection(
@@ -158,11 +159,14 @@ def run_build(config: BuildConfig) -> dict[str, Any]:
     coded = run_coded_columns(
         loader, discovery_connector, config, schemas, run_id=run_id,
     )
+    declared = run_declared_joins(
+        loader, discovery_connector, config, schemas, run_id=run_id,
+    )
     # Joins wait for every table of the run: either end may be built last.
     for schema in schemas:
-        materialize_schema_joins(
-            loader, schema, [*detected.get(schema, []), *coded.get(schema, [])],
-        )
+        materialize_schema_joins(loader, schema, [
+            *detected.get(schema, []), *coded.get(schema, []), *declared.get(schema, []),
+        ])
     # After the joins, so join-path entity links never see an edge this step writes.
     run_identity(loader, discovery_connector, config, schemas, run_id=run_id,
                  client=_identity_client(llm_factory))
