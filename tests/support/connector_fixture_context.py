@@ -10,6 +10,7 @@ which names an entity after its table and a property after its column.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -17,7 +18,13 @@ from typing import Any
 
 from sema.graph.queries import CypherQueries
 from sema.pipeline.retrieval import RetrievalEngine
-from tests.support.connector_fixture import CATALOG, MAIN_SCHEMA, MAIN_TABLES
+from tests.support.connector_fixture import (
+    CATALOG,
+    EXPECTED_DETECTED_JOINS,
+    MAIN_SCHEMA,
+    MAIN_TABLES,
+    FixtureJoin,
+)
 
 TERM_INDEX = "term_embedding_index"
 ENTITY_INDEX = "entity_embedding_index"
@@ -81,6 +88,7 @@ CLOSEST_SCORE = 0.95
 
 RESULT_COLUMNS = ("region_code", "customer_count")
 SHAPE_QUESTION = "How many customers are in each region?"
+JOIN_QUESTION = "How much was moved between accounts?"
 SHAPE_SQL = (
     f"SELECT region_code, COUNT(*) AS customer_count "
     f"FROM {CATALOG}.{MAIN_SCHEMA}.customer GROUP BY region_code"
@@ -118,11 +126,13 @@ class _Record:
 class CaseGraph:
     """A driver whose sessions answer the core query path's reads from the declared facts."""
 
-    def __init__(self, vector_hits: Mapping[str, list[tuple[dict[str, Any], float]]]) -> None:
+    def __init__(self, vector_hits: Mapping[str, list[tuple[dict[str, Any], float]]],
+                 joins: tuple[FixtureJoin, ...] = ()) -> None:
         self._vector = {
             CypherQueries.vector_search(index, k): vector_hits.get(index, [])
             for index in _VECTOR_INDEXES for k in _TOP_K_RANGE
         }
+        self._joins = joins
 
     def session(self, **_: Any) -> CaseGraph:
         return self
@@ -136,8 +146,24 @@ class CaseGraph:
     def run(self, query: str, **params: Any) -> Iterator[_Record]:
         if query in self._vector:
             return iter([_Record({"node": n, "score": s}) for n, s in self._vector[query]])
+        if query == CypherQueries.find_join_paths():
+            asked = set(params["table_names"])
+            return iter([_Record(join_row(j)) for j in self._joins
+                         if asked & {j.referencing_table, j.referenced_table}])
         answer = _READS.get(query)
         return iter([_Record(row) for row in answer(params)] if answer else [])
+
+
+def join_row(join: FixtureJoin) -> dict[str, Any]:
+    """A JoinPath read row for one detected join, at the fixture's one confidence."""
+    left = f"{CATALOG}.{MAIN_SCHEMA}.{join.referencing_table}"
+    right = f"{CATALOG}.{MAIN_SCHEMA}.{join.referenced_table}"
+    predicate = {"left_table": left, "left_column": join.referencing_column,
+                 "right_table": right, "right_column": join.referenced_column}
+    return {"name": f"{join.referencing_table}_{join.referencing_column}_join",
+            "source_schema": MAIN_SCHEMA, "join_predicates": json.dumps([predicate]),
+            "hop_count": 1, "cardinality_hint": None, "sql_snippet": None,
+            "confidence": _CONFIDENCE}
 
 
 def _token_hits(nodes: list[dict[str, Any]], field: str, token: str) -> list[dict[str, Any]]:
@@ -248,6 +274,14 @@ def ranking_graph(question: str) -> CaseGraph:
     entities = [(entity_node(table), ENTITY_SCORE) for table in ENTITY_HITS.get(question, ())]
     return CaseGraph({PROPERTY_INDEX: sorted(hits, key=lambda hit: -hit[1]),
                       ENTITY_INDEX: entities})
+
+
+def join_graph() -> CaseGraph:
+    """Two relations at one score, and every detected join that uses either, at one confidence."""
+    tables = ("transfer", "account")
+    joins = tuple(j for j in EXPECTED_DETECTED_JOINS
+                  if {j.referencing_table, j.referenced_table} & set(tables))
+    return CaseGraph({ENTITY_INDEX: [(entity_node(t), ENTITY_SCORE) for t in tables]}, joins)
 
 
 def lines_naming(text: str, token: str) -> list[str]:
