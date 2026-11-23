@@ -5,9 +5,9 @@ class CypherQueries:
 
     @staticmethod
     def vector_search(index_name: str, top_k: int = 10) -> str:
-        # The quantized approximate index misplaces exact neighbours near its cut: a 3x read
-        # missed some on the neutral fixture and ACRIS, 5x and up missed none; 10x keeps a
-        # read of at least 30 at top_k 3.
+        # The quantized approximate index misplaces exact neighbours near its cut: on the
+        # neutral fixture a 3x read missed some, 5x and up missed none; 10x keeps a read of
+        # at least 30 at top_k 3.
         width = top_k * 10
         return (
             f"CALL db.index.vector.queryNodes('{index_name}', {width}, $embedding) "
