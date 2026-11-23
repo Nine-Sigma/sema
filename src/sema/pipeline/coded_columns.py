@@ -10,11 +10,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
-from sema.binding.importer import import_concept_source
-from sema.binding.spec import load_concept_source_spec
 from sema.connectors.base import Connector
 from sema.engine.coded_column_utils import (
     DECLARED_KEY,
@@ -63,27 +60,14 @@ from sema.graph.join_materializer_utils import (
 )
 from sema.graph.loader import GraphLoader
 from sema.graph.loader_utils import fetch_columns_by_schema
-from sema.ingest.duckdb_staging import Staging
-from sema.intake.land.relations import RelationProvider
 from sema.log import logger
 from sema.models.assertions import VERIFIED, Assertion, AssertionPredicate
 from sema.models.config import BuildConfig
 from sema.models.extraction import ExtractedColumn
 from sema.models.physical_key import CanonicalRef
+from sema.pipeline.dictionary_import_utils import Dictionary, read_dictionary
 
 _VERIFIED_TERM_CONFIDENCE = 0.95
-
-
-@dataclass(frozen=True)
-class Dictionary:
-    """What intake's concept spec states: its domains, each code list's codes and labels, its
-    code and display role columns, and each foreign key's reference columns."""
-
-    spec_id: str
-    domains: tuple[StatedDomain, ...]
-    code_lists: dict[str, dict[str, str | None]]
-    roles: dict[str, tuple[str, str | None]]
-    reference_keys: list[tuple[str, ...]]
 
 
 @dataclass(frozen=True)
@@ -103,35 +87,6 @@ class _Run:
     run_id: str
     schema: str
     joins: list[Assertion] = field(default_factory=list)
-
-
-def read_dictionary(spec_path: str | None, staging_path: str | None) -> Dictionary | None:
-    if spec_path is None:
-        return None
-    if staging_path is None:
-        raise ValueError("concept_spec needs concept_staging, the file its relations live in")
-    spec = load_concept_source_spec(Path(spec_path))
-    with Staging(staging_path, schemas=()) as staging:
-        provider = RelationProvider(warehouse=None, staging=staging)
-        terms = import_concept_source(spec, provider, dataset_map={}).manifest["terms"]
-    code_lists: dict[str, dict[str, str | None]] = {}
-    for term in terms:
-        code_lists.setdefault(term["vocabulary"], {})[str(term["code"])] = term.get("display")
-    # shortcut: domains are read from per-file entries' `domains` maps only; read a role
-    # column's domain too once a source states its domains that way.
-    entries = (spec.entity_model.entities or []) if spec.entity_model else []
-    domains = tuple(
-        StatedDomain(entry.entity, prop, vocabulary)
-        for entry in entries for prop, vocabulary in entry.domains.items()
-    )
-    roles: dict[str, tuple[str, str | None]] = {
-        entry.vocabulary_id: (entry.roles.code, entry.roles.display)
-        for entry in spec.code_lists or []
-    }
-    reference_keys = [
-        tuple(key.reference_columns) for entry in entries for key in entry.foreign_keys
-    ]
-    return Dictionary(spec.id, domains, code_lists, roles, reference_keys)
 
 
 def run_coded_columns(
