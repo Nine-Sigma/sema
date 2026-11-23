@@ -88,6 +88,25 @@ def test_a_shared_entity_reaches_the_section() -> None:
                     "through hull_no"]
 
 
+def test_labels_and_shared_entities_render_the_same_whatever_order_the_graph_returns_them(
+) -> None:
+    class_join = {**RIG_JOIN, "left_table": "rig_class", "left_column": "class_code"}
+    labels = [label(), {**label(), "table": "rig_class", "column": "class_title",
+                        "via": [json.dumps([class_join]), json.dumps([RIG_JOIN])]}]
+    entities = [shared(), {**shared(), "entity": "Cargo"}]
+
+    def render(order: Any) -> list[str]:
+        cargo = mapping_row("hull_cargo", shared_entities=order(entities))
+        return lines_for(labeled(mapping_row("hull_rev"), "rig_type", *order(labels)), cargo)
+
+    forward, backward = render(list), render(lambda rows: [
+        {**row, "via": row["via"][::-1]} if "via" in row else row for row in rows[::-1]])
+
+    assert "label: rig_class.class_title on" in table_line(forward, "hull_rev")
+    assert len(section_lines(forward)) == 2, forward
+    assert forward == backward
+
+
 def test_an_unreadable_identity_states_no_entity() -> None:
     hull = mapping_row("hull_rev", **{**owner_edge(HULL_IDENTITY), "identity": "{not json"})
 
