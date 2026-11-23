@@ -4,13 +4,11 @@ class CypherQueries:
     """Parameterized Cypher query templates for the semantic graph."""
 
     @staticmethod
-    def _vector_read_factor() -> int:
-        # An approximate (HNSW, quantized) index can misplace exact neighbours near its cut.
-        return 3
-
-    @staticmethod
     def vector_search(index_name: str, top_k: int = 10) -> str:
-        width = top_k * CypherQueries._vector_read_factor()
+        # The quantized approximate index misplaces exact neighbours near its cut: a 3x read
+        # missed some on the neutral fixture and ACRIS, 5x and up missed none; 10x keeps a
+        # read of at least 30 at top_k 3.
+        width = top_k * 10
         return (
             f"CALL db.index.vector.queryNodes('{index_name}', {width}, $embedding) "
             f"YIELD node "
