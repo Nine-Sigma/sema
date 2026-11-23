@@ -70,8 +70,8 @@ def physical_row_in_order(row: dict[str, Any]) -> dict[str, Any]:
     )
     ordered = {**row, "columns": [_labels_in_order(c) for c in columns]}
     if row.get("shared_entities"):
-        ordered["shared_entities"] = in_stable_order(
-            [_least_owner(s) for s in row["shared_entities"]], "entity")
+        ordered["shared_entities"] = sorted(
+            (_least_owner(s) for s in row["shared_entities"]), key=_shared_entity_key)
     return ordered
 
 
@@ -87,6 +87,15 @@ def physical_row_key(row: dict[str, Any]) -> tuple[Any, ...]:
 def _least_owner(shared: dict[str, Any]) -> dict[str, Any]:
     owners = in_stable_order(shared.get("owners") or [], "catalog", "schema", "table")
     return {**shared, "owner": owners[0] if owners else None}
+
+
+def _shared_entity_key(shared: dict[str, Any]) -> tuple[str, ...]:
+    """Name, then the rendered values: a target and a source layer each write a node of one name."""
+    owner = shared.get("owner") or {}
+    return (
+        *(str(shared.get(f) or "") for f in ("entity", "key_columns", "identity")),
+        *(str(owner.get(f) or "") for f in ("catalog", "schema", "table")),
+    )
 
 
 def _labels_in_order(column: dict[str, Any]) -> dict[str, Any]:

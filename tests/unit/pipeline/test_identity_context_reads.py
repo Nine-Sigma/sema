@@ -131,6 +131,21 @@ def test_a_shared_entity_with_two_owner_edges_names_the_least_owner_in_both_orde
     assert body(owners) == body(owners[::-1]) == [SHARED_LINE]
 
 
+def test_shared_entities_of_one_name_render_the_same_whatever_order() -> None:
+    survey = {**HULL_OWNER, "table": "hull_survey"}
+    entities = [shared(owner=survey), shared(), {**shared(), "entity": "Cargo"}]
+
+    def body(order: list[dict[str, Any]]) -> list[str]:
+        cargo = mapping_row("hull_cargo", shared_entities=order)
+        return section_lines(lines_for(mapping_row("hull_rev"), cargo))
+
+    def line(entity: str, owner: str) -> str:
+        return f"{fqn('hull_cargo')}: rows belong to {entity} of {fqn(owner)} through hull_no"
+
+    assert body(entities) == body(entities[::-1]) == [
+        line("Cargo", "hull_rev"), line("Hull", "hull_rev"), line("Hull", "hull_survey")]
+
+
 def test_an_entity_with_two_edges_to_one_table_renders_the_same_whatever_order() -> None:
     edges = [mapping_row("hull_rev", **owner_edge(HULL_IDENTITY), **HULL_KEY),
              mapping_row("hull_rev", key_columns=["hull_no", "rev_no"], verification="open",
