@@ -74,15 +74,20 @@ def _resolve_physical_for(
     engine: RetrievalEngine, name: str, scope: Any,
 ) -> list[dict[str, Any]]:
     if scope is not None and scope.is_active():
-        return engine._run_query(
+        rows = engine._run_query(
             CypherQueries.resolve_physical_mapping_scoped(),
             entity_name=name,
             model_role=scope.model_role,
             schema_name=scope.schema_name,
         )
-    return engine._run_query(
-        CypherQueries.resolve_physical_mapping(), entity_name=name,
-    )
+    else:
+        rows = engine._run_query(
+            CypherQueries.resolve_physical_mapping(), entity_name=name,
+        )
+    # Neo4j's collect() order is unspecified and a column has no ordinal, so sort by name.
+    return [{**row, "columns": sorted(
+        row.get("columns", []), key=lambda c: (c.get("column") or "", c.get("property") or ""),
+    )} for row in rows]
 
 
 def _expand_joins(

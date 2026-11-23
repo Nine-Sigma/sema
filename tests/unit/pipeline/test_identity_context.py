@@ -347,9 +347,9 @@ def test_an_open_or_rejected_fact_renders_nothing(grade: str) -> None:
 
 BASE_GRAPH_RENDER = [
     "\nAVAILABLE TABLES AND COLUMNS:",
-    "  fixident.yard.hull_rev: hull_no, rev_no, paint_band, keel_class, rig_type",
-    "  fixident.yard.hull_cargo: cargo_no, hull_no, cargo_tons, hatch_kind",
-    "  fixident.yard.crane_rev: crane_rev_id, crane_no, rev_no, lift_tons",
+    "  fixident.yard.hull_rev: hull_no, keel_class, paint_band, rev_no, rig_type",
+    "  fixident.yard.hull_cargo: cargo_no, cargo_tons, hatch_kind, hull_no",
+    "  fixident.yard.crane_rev: crane_no, crane_rev_id, lift_tons, rev_no",
     "\nDIALECT NOTES (DuckDB SQL):",
     "- Use the table names as listed: catalog.schema.table",
     "- Use double quotes for an identifier that is a reserved word or holds a character other "
@@ -363,3 +363,10 @@ def test_a_graph_with_none_of_the_properties_renders_as_the_base_tip() -> None:
 
     assert context(MappingGraph(mapping, ["Hull", "Crane"]), QUESTION) == BASE_GRAPH_RENDER
 
+
+def test_a_table_line_renders_the_same_whatever_order_the_graph_returns_its_columns() -> None:
+    row = mapping_row("hull_rev")
+    reordered = {**row, "columns": row["columns"][::-1]}
+
+    assert context(MappingGraph({"Hull": [row]}, ["Hull"]), QUESTION) == context(
+        MappingGraph({"Hull": [reordered]}, ["Hull"]), QUESTION)
