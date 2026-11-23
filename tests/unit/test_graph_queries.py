@@ -22,6 +22,18 @@ class TestVectorSearch:
             q = CypherQueries.vector_search(index, 10)
             assert index in q
 
+    @pytest.mark.parametrize("top_k", [3, 10])
+    def test_vector_search_reads_wide_and_rescores_exactly(self, top_k: int) -> None:
+        identity = ("ref", "schema_name", "entity_name", "name", "vocabulary_name", "code",
+                    "target_key", "text")
+        q = " ".join(CypherQueries.vector_search("an_index", top_k).split())
+
+        assert f"queryNodes('an_index', {10 * top_k}, $embedding)" in q
+        assert "vector.similarity.cosine(node.embedding, $embedding) AS score" in q
+        order = "ORDER BY score DESC, " + ", ".join(f"node.{key}" for key in identity)
+        assert order in q
+        assert q.endswith(f"{order} LIMIT {top_k}")
+
 
 class TestAncestryTraversal:
     def test_parent_of_expansion(self):
