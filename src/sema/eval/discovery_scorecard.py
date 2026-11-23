@@ -113,11 +113,17 @@ def _resolved(made: Cells, claims: Cells) -> Cells:
     }
 
 
-def render(card: DiscoveryCard) -> str:
-    """A markdown table: one row per fact kind under the cell header, no total row."""
+def render(
+    card: DiscoveryCard, *, declared: int | None = None, discovered: int | None = None,
+) -> str:
+    """A markdown table: one row per fact kind under the cell header, no total row; then the
+    graph joins read from a declaration and those discovered on the data, when given."""
     rows = [HEADER, tuple("---" for _ in HEADER)]
     rows += [(kind, *_cells(row)) for kind, row in card.kinds.items()]
-    return "".join(f"| {' | '.join(row)} |\n" for row in rows)
+    table = "".join(f"| {' | '.join(row)} |\n" for row in rows)
+    if declared is None and discovered is None:
+        return table
+    return f"{table}\njoins from declarations: {declared}\njoins discovered: {discovered}\n"
 
 
 def _cells(row: KindRow) -> tuple[str, ...]:
@@ -132,12 +138,23 @@ def facts_from_graph(
 ) -> dict[str, Cells]:
     """The build's joins for the catalog and schemas, in oracle keys; no schemas means every
     schema of the catalog. A join with no recorded cardinality is key-only."""
-    with driver.session() as session:
-        records = list(session.run(GRAPH_JOINS, catalog=catalog, schemas=schemas or None))
     return {JOIN: {
         graph_join_key(record["predicates"]): record["cardinality"] or KEY_ONLY
-        for record in records
+        for record in _graph_joins(driver, catalog, schemas)
     }}
+
+
+def joins_from_graph(
+    driver: Any, catalog: str | None = None, schemas: list[str] | None = None,
+) -> list[tuple[str, str | None]]:
+    """Each graph join's predicates text and the source that wrote it."""
+    return [(record["predicates"], record["join_source"])
+            for record in _graph_joins(driver, catalog, schemas)]
+
+
+def _graph_joins(driver: Any, catalog: str | None, schemas: list[str] | None) -> list[Any]:
+    with driver.session() as session:
+        return list(session.run(GRAPH_JOINS, catalog=catalog, schemas=schemas or None))
 
 
 def declared_constraints(
@@ -162,16 +179,19 @@ def declared_constraints(
 
 def recheck(
     connector: Connector, catalog: str, schemas: list[str] | None,
-    produced: Mapping[str, Cells],
+    produced: Mapping[str, Cells], *, join_predicates: Iterable[str] = (),
 ) -> dict[str, int]:
-    """Produced joins and identity facts whose evidence recomputes on the data."""
+    """Produced joins and identity facts whose evidence recomputes on the data; a join on
+    several columns rechecks only when `join_predicates` holds its column pairs."""
     tables = {
         table.table_name.lower(): (table.schema, table.table_name)
         for table in connector.discover_tables(catalog, schemas or None)
     }
     joins = produced.get(JOIN, {})
+    paired = {graph_join_key(text): text for text in join_predicates}
     identity = identity_counts(RelationEvidence(connector, catalog), tables, produced)
-    return {JOIN: sum(join_holds(connector, catalog, tables, key) for key in joins), **identity}
+    return {JOIN: sum(join_holds(connector, catalog, tables, key, paired.get(key))
+                      for key in joins), **identity}
 
 
 def read_identity(

@@ -14,7 +14,13 @@ from typing import Any, NamedTuple
 
 from sema.connectors.base import Connector
 from sema.engine.coded_column_utils import CONTAINMENT, label_reading
-from sema.engine.warehouse_lookup import ColumnKey, WarehouseProfileLookup, WarehouseValues
+from sema.engine.identity_utils import Counts
+from sema.engine.warehouse_lookup import (
+    ColumnKey,
+    RelationEvidence,
+    WarehouseProfileLookup,
+    WarehouseValues,
+)
 from sema.intake.run.scorecard import Cells, Key
 from sema.log import logger
 from sema.models.extraction import ExtractedForeignKey
@@ -124,7 +130,8 @@ GRAPH_JOINS = (
     "WHERE ($schemas IS NULL OR jp.source_schema IN $schemas) "
     "AND ($catalog IS NULL OR EXISTS { "
     "MATCH (jp)-[:USES]->(:Table {catalog: $catalog, schema_name: jp.source_schema}) }) "
-    "RETURN jp.join_predicates AS predicates, properties(jp).cardinality_hint AS cardinality"
+    "RETURN jp.join_predicates AS predicates, properties(jp).cardinality_hint AS cardinality, "
+    "jp.source AS join_source"
 )
 
 
@@ -178,16 +185,18 @@ def orphan_count_query(
 
 def join_holds(
     connector: Connector, catalog: str, tables: Mapping[str, tuple[str, str]], key: Key,
+    predicates_json: str | None = None,
 ) -> bool:
     """Whether a one-column join's referenced column is unique on the data and holds every
-    non-NULL referencing value.
-
-    shortcut: a composite key's columns are stored sorted, not paired, so a composite join is
-    never rechecked; upgrade when the fact keeps its column pairs.
-    """
+    non-NULL referencing value. A join on several columns is rechecked only from its
+    predicates, which keep its column pairs."""
     relation, columns, referenced, referenced_columns = key
-    if COLUMN_SEPARATOR in columns or relation not in tables or referenced not in tables:
+    if relation not in tables or referenced not in tables:
         return False
+    if COLUMN_SEPARATOR in columns:
+        return predicates_json is not None and _pairs_hold(
+            Counts(RelationEvidence(connector, catalog)), tables[relation], tables[referenced],
+            json.loads(predicates_json))
     referenced_column = (*tables[referenced], referenced_columns)
     queries = (
         duplicate_count_query(catalog, referenced_column),
@@ -199,6 +208,27 @@ def join_holds(
         logger.warning("Join recheck on {} failed: {}", key, exc)
         return False
     return all(rows and int(rows[0][0]) == 0 for rows in counts)
+
+
+def _pairs_hold(
+    counts: Counts, child: tuple[str, str], parent: tuple[str, str],
+    predicates: list[dict[str, Any]],
+) -> bool:
+    """No referenced tuple with every part non-NULL repeats, and the referencing tuples are
+    held at the containment floor, on the column lists in pair order. A count left undecided
+    leaves the join open, so it does not recheck."""
+    columns = tuple(p["right_column"] for p in predicates)
+    parent_columns = tuple(p["left_column"] for p in predicates)
+    rows, null_rows = counts.rows(parent), counts.null_rows(parent, parent_columns)
+    distinct = counts.evidence.contained(parent, parent_columns, parent, parent_columns)
+    held = counts.evidence.contained(child, columns, parent, parent_columns)
+    if rows is None or null_rows is None or distinct is None or held is None:
+        logger.warning("Join recheck on {} -> {} left open: a count is undecided", child, parent)
+        return False
+    repeated = rows - null_rows - distinct[0]
+    logger.info("Join recheck on {} -> {}: {} orphan pairs, {} repeated referenced tuples",
+                child, parent, held[0] - held[1], repeated)
+    return repeated == 0 and counts.within(child, columns, parent, parent_columns)
 
 
 def read_oracle(path: Path, kinds: Iterable[str]) -> dict[str, Cells]:
