@@ -123,7 +123,7 @@ def run_slot(slot: Slot, question: Any, runtime: Any, model: Any, contract: scor
         "error_class": record["error_class"], "answer": record["answer"],
         "response_excerpt": None if record["sql"] else _excerpt(meter.last_reply),
         "earliest_failure_stage": _earliest_stage(record, applied, outcome),
-        "request_estimates": meter.request_estimates,
+        "request_estimates": meter.request_estimates, "embedding_calls": meter.embedding_calls,
     }  # fmt: skip
 
 
@@ -144,7 +144,8 @@ def _runner_error(slot: Slot, meter: Meter, message: str) -> dict[str, Any]:
             "prompt_tokens": meter.prompt_tokens, "completion_tokens": meter.completion_tokens,
             "usage_reported": meter.usage_reported, "overflow": meter.overflow,
             "cost_usd": round(meter.cost_usd, 6),
-            "request_estimates": meter.request_estimates}  # fmt: skip
+            "request_estimates": meter.request_estimates,
+            "embedding_calls": meter.embedding_calls}  # fmt: skip
 
 
 def _slot_fields(slot: Slot) -> dict[str, Any]:

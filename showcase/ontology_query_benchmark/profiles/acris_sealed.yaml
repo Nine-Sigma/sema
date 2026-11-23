@@ -31,8 +31,9 @@ limits:
 knobs: {budget_tokens: 16000, values_top_k: 25}
 
 settings:
-  # OpenRouter catalog prices for the model, read 2026-11-17. The run stops at max_cost_usd,
-  # below the approved $15 ceiling, leaving room for embedding calls the meter does not count.
-  prices: {input_usd_per_1m: 2.5, output_usd_per_1m: 15.0}
-  max_cost_usd: 13.5
+  # OpenRouter catalog prices for the model, read 2026-11-17, and for the embedding model
+  # (prompt/token 0.00000002), read 2026-11-22. The meter charges raised calls and arm S's
+  # embedding calls, so the run stops at the approved $15 ceiling.
+  prices: {input_usd_per_1m: 2.5, output_usd_per_1m: 15.0, embedding_usd_per_1m: 0.02}
+  max_cost_usd: 15.0
   max_wall_s: 10800

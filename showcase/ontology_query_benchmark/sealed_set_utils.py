@@ -169,6 +169,11 @@ class DialectFrame:
         """The S provider's last context, read by the runner for its identity."""
         return getattr(self.context, "last", None)
 
+    @property
+    def last_embedding_usd(self) -> float:
+        """The cost of the S provider's embedding calls for its last context."""
+        return float(getattr(self.context, "last_embedding_usd", 0.0))
+
     def __call__(self, question: str) -> Any:
         built = self.context(question)
         own = getattr(self.harness.context, "ARM_A_NOTE", None)

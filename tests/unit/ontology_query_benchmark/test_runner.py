@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from showcase.ontology_query_benchmark import runner, runner_utils, scorer
-from showcase.ontology_query_benchmark.profile import Limits, Profile
+from showcase.ontology_query_benchmark.profile import Knobs, Limits, Profile
 from showcase.ontology_query_benchmark.routing import RoutingError
 from tests.unit.ontology_query_benchmark.conftest import PROFILE_PATH, write_settings
 from tests.unit.ontology_query_benchmark.runner_env import (
@@ -35,15 +35,16 @@ def settings(profile: Profile, max_cost: float = 100.0,
 
 
 def runtimes_for(harness: SimpleNamespace, frozen: Path, profile: Profile,
-                 executors: dict[str, Any], provider: Any) -> dict[str, Any]:  # fmt: skip
+                 executors: dict[str, Any], provider: Any,
+                 knobs: Knobs = Knobs()) -> dict[str, Any]:  # fmt: skip
     return runner_utils.arm_runtimes(harness, frozen, profile.harness, executors, provider,
-                                     profile.limits)  # fmt: skip
+                                     profile.limits, knobs)  # fmt: skip
 
 
 def run_r01(harness: SimpleNamespace, frozen: Path, profile: Profile, model: FakeModel,
             executor: FakeExecutor, provider: Callable[[str], FakeSContext],
-            limits: Limits | None = None) -> dict[str, Any]:  # fmt: skip
-    runtimes = runtimes_for(harness, frozen, profile, {"S": executor}, provider)
+            limits: Limits | None = None, knobs: Knobs = Knobs()) -> dict[str, Any]:  # fmt: skip
+    runtimes = runtimes_for(harness, frozen, profile, {"S": executor}, provider, knobs)
     question = runner_utils.public_questions(harness, frozen, profile.harness, ("R01",))[0]
     paths = runner_utils.question_paths(frozen, profile.harness)
     contract = scorer.load_contracts(paths, profile.harness.retired_questions)["R01"]
@@ -372,7 +373,8 @@ def test_guard_sends_a_request_that_only_the_conservative_ratio_would_refuse(
     harness: SimpleNamespace, frozen: Path, profile: Profile
 ) -> None:
     model, executor = FakeModel(harness, [R01_SQL]), FakeExecutor(harness, ((GOLD,),))
-    receipt = run_r01(harness, frozen, profile, model, executor, s_provider(text="x" * 30_500))
+    receipt = run_r01(harness, frozen, profile, model, executor, s_provider(text="x" * 30_500),
+                      knobs=Knobs(budget_tokens=36_000))
     assert len(model.calls) == 1 and receipt["outcome"] == "correct"
     limits = profile.limits
     lenient = runner_utils.estimate_request_tokens(model.calls[0], 2.334)
@@ -388,8 +390,22 @@ def test_a_wider_frozen_ceiling_admits_a_larger_first_prompt(
     wide = profile.limits.model_copy(update={"input_ceiling": 36_000})
     assert wide.first_prompt_ceiling == 33_934
     provider = s_provider(text="x" * 40_000)
-    receipt = run_r01(harness, frozen, profile, model, executor, provider, wide)
+    receipt = run_r01(harness, frozen, profile, model, executor, provider, wide,
+                      Knobs(budget_tokens=36_000))
     assert len(model.calls) == 1 and receipt["outcome"] == "correct"
+
+
+def test_an_s_context_over_the_run_budget_is_an_overflow_with_no_model_call(
+    harness: SimpleNamespace, frozen: Path, profile: Profile
+) -> None:
+    text = "x" * 20_000
+    budget = harness.context.estimate_tokens(text) - 1
+    assert budget < profile.limits.first_prompt_ceiling
+    model, executor = FakeModel(harness, [R01_SQL]), FakeExecutor(harness, ((GOLD,),))
+    receipt = run_r01(harness, frozen, profile, model, executor, s_provider(text=text),
+                      knobs=Knobs(budget_tokens=budget))
+    assert (receipt["outcome"], receipt["overflow"]) == ("overflow", "context")
+    assert model.calls == []
 
 
 def test_a_repair_may_use_the_whole_input_ceiling(harness: SimpleNamespace, profile: Profile) -> None:

@@ -139,6 +139,7 @@ class Meter:
     last_execution: Any = None
     last_reply: str | None = None
     request_estimates: list[list[int]] = field(default_factory=list)
+    embedding_calls: int = 0
 
 
 def load_harness(frozen: Path, layout: Harness) -> SimpleNamespace:
@@ -199,16 +200,19 @@ class SArmContext:
     """Adapt the S provider's SContext to the harness ArmContext; keep the last one."""
 
     def __init__(self, harness: SimpleNamespace, provider: SProvider, budget: int,
-                 is_denied: Callable[[str], bool]) -> None:  # fmt: skip
+                 is_denied: Callable[[str], bool], embedding_usd_per_1m: float = 0.0) -> None:
         self.harness, self.provider, self.budget = harness, provider, budget
-        self.is_denied = is_denied
+        self.is_denied, self.embedding_usd_per_1m = is_denied, embedding_usd_per_1m
         self.last: SContextLike | None = None
 
     def __call__(self, question: str) -> Any:
-        supplied = self.provider(question, self.is_denied)
-        self.last = supplied
-        overflow = any(f.message.split(":")[0] == OVERFLOW_FINDING for f in supplied.findings)
+        self.last = supplied = self.provider(question, self.is_denied)
+        embedded = getattr(supplied, "embedded", ())
+        self.last_embedding_usd = self.embedding_usd_per_1m / 1e6 * sum(
+            map(self.harness.context.estimate_tokens, embedded))
         tokens = self.harness.context.estimate_tokens(supplied.text)
+        overflow = tokens > self.budget or any(
+            f.message.split(":")[0] == OVERFLOW_FINDING for f in supplied.findings)
         return self.harness.models.ArmContext(
             "S", self.harness.context.ARM_A_DIALECT, supplied.text, tokens, self.budget, overflow
         )
@@ -216,7 +220,8 @@ class SArmContext:
 
 def arm_runtimes(harness: SimpleNamespace, frozen: Path, layout: Harness,
                  executors: Mapping[str, Any], s_provider: SProvider | None,
-                 limits: Limits, knobs: Knobs = Knobs()) -> dict[str, Any]:  # fmt: skip
+                 limits: Limits, knobs: Knobs = Knobs(),
+                 embedding_usd_per_1m: float = 0.0) -> dict[str, Any]:  # fmt: skip
     """One ArmRuntime per arm in ``executors``, all with the config rules and matched limits."""
     config = _with_knobs(harness.config.load_bench_config(frozen / layout.config), knobs)
     policy, budget = config.policy, config.budget_tokens
@@ -240,7 +245,8 @@ def arm_runtimes(harness: SimpleNamespace, frozen: Path, layout: Harness,
     if "S" in executors:
         if s_provider is None:
             raise ValueError("arm S needs an S context provider")
-        contexts["S"] = SArmContext(harness, s_provider, budget, policy.is_denied)
+        contexts["S"] = SArmContext(harness, s_provider, budget, policy.is_denied,
+                                    embedding_usd_per_1m)  # fmt: skip
         executors = {**executors, "S": _s_executor(harness, executors["S"], s_provider,
                                                    policy)}  # fmt: skip
     return {
@@ -293,9 +299,20 @@ class GuardedModel:
             self.meter.overflow = "context" if first else "pre_call"
             raise TokenOverflow(f"request certainly exceeds {ceiling}: estimate {lenient}")
         self.meter.generation_calls += 1
-        generation = self.inner.complete(messages)
+        try:
+            generation = self.inner.complete(messages)
+        except Exception:
+            self._charge(estimate, None, None)  # a sent call that raised reports no usage
+            raise
         self.meter.last_reply = generation.text
-        prompt, completion = generation.prompt_tokens, generation.completion_tokens
+        prompt_n, completion_n = self._charge(estimate, generation.prompt_tokens,
+                                              generation.completion_tokens)  # fmt: skip
+        if prompt_n > self.limits.input_ceiling or completion_n > self.limits.output_ceiling:
+            self.meter.overflow = "post_call"
+            raise TokenOverflow(f"endpoint usage {prompt_n}/{completion_n} exceeds a ceiling")
+        return generation
+
+    def _charge(self, estimate: int, prompt: int | None, completion: int | None) -> tuple[int, int]:
         if prompt is None or completion is None:
             self.meter.usage_reported = False
         # shortcut: missing usage is charged at the estimate and the output ceiling.
@@ -305,10 +322,7 @@ class GuardedModel:
         self.meter.completion_tokens += completion_n
         self.meter.cost_usd += (prompt_n * self.prices.input_usd_per_1m
                                 + completion_n * self.prices.output_usd_per_1m) / 1e6  # fmt: skip
-        if prompt_n > self.limits.input_ceiling or completion_n > self.limits.output_ceiling:
-            self.meter.overflow = "post_call"
-            raise TokenOverflow(f"endpoint usage {prompt_n}/{completion_n} exceeds a ceiling")
-        return generation
+        return prompt_n, completion_n
 
 
 class MeteredExecutor:
@@ -334,6 +348,8 @@ def metered_context(context: Callable[[str], Any], meter: Meter) -> Callable[[st
             meter.context_identity = hashlib.sha256(built.text.encode()).hexdigest()
         else:
             meter.context_identity, meter.findings = supplied.identity, tuple(supplied.findings)
+            meter.embedding_calls += len(getattr(supplied, "embedded", ()))
+            meter.cost_usd += getattr(context, "last_embedding_usd", 0.0)
         return built
 
     return build
