@@ -116,7 +116,7 @@ class RetrievalEngine:
                         "index": index,
                     })
             except Exception as e:
-                logger.debug(f"Vector search on {index} failed: {e}")
+                logger.warning(f"Vector search on {index} failed: {e}")
 
         return candidates
 

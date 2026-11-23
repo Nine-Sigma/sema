@@ -193,6 +193,8 @@ docker compose up -d
 
 This starts Neo4j 5.26 with APOC on `bolt://localhost:7687`. Browser UI at `http://localhost:7474`.
 
+SEMA needs Neo4j 5.26 or later. The build's duplicate-node collapse in `GraphLoader.ensure_core_constraints` uses a scoped `CALL (keep, dup) { ... }` subquery (5.23) and dynamic relationship types in `CREATE` (5.26), and the vector read re-scores candidates with `vector.similarity.cosine` (5.18).
+
 ### 4. Build the knowledge graph
 
 ```bash

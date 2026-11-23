@@ -133,6 +133,7 @@ class GraphLoader:
                 f"WHERE {' AND '.join(f'{k} IS NOT NULL' for k in keys)} "
                 f"WITH [{key}] AS key, collect({var}) AS nodes "
                 "WHERE size(nodes) > 1 "
+                # Any node may be kept: id is a per-write uuid4, ref is None, key is the identity.
                 "WITH nodes[0] AS keep, nodes[1..] AS dups "
                 "UNWIND dups AS dup "
                 + self._move_relationships("-", "->")
