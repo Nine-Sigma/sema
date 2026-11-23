@@ -32,7 +32,8 @@ SEALED_ARMS = ("A", "S")
 
 def run_settings(profile: SealedSetProfile) -> runner.RunSettings:
     ceilings = profile.settings
-    return runner.RunSettings(profile.limits, ru.Prices(**ceilings.prices.model_dump()),
+    prices = ceilings.prices.model_dump(exclude={"embedding_usd_per_1m"})
+    return runner.RunSettings(profile.limits, ru.Prices(**prices),
                               ceilings.max_cost_usd, ceilings.max_wall_s)  # fmt: skip
 
 
@@ -66,6 +67,7 @@ def run_sealed_set(profile_path: Path, arms: Sequence[str], repetitions: int, *,
                      for arm in arms}  # fmt: skip
         runtimes = su.in_dialect(harness, ru.arm_runtimes(
             harness, run_dir, layout, executors, s_provider, profile.limits, profile.knobs,
+            profile.settings.prices.embedding_usd_per_1m,
         ), connector.sql_dialect)  # fmt: skip
         summary = runner.run(slots, su.harness_questions(harness, sealed_set), runtimes, model,
                              su.contracts(sealed_set), harness, settings,

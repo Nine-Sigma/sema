@@ -29,18 +29,36 @@ class CoreSContext:
     text: str
     identity: str
     findings: tuple[Any, ...] = ()
+    embedded: tuple[str, ...] = ()
 
 
 class CoreSContextProvider:
     """An `SProvider`: `(question, is_denied) -> SContextLike` through the core query path."""
 
     def __init__(self, driver: Any, embedder: Any = None) -> None:
-        self.engine = RetrievalEngine(driver, embedder=embedder)
+        self.embedder = None if embedder is None else CountingEmbedder(embedder)
+        self.engine = RetrievalEngine(driver, embedder=self.embedder)
 
     def __call__(self, question: str, is_denied: Callable[[str], bool]) -> CoreSContext:
+        if self.embedder is not None:
+            self.embedder.texts.clear()
         sco = without_denied(prune_to_sco(self.engine.retrieve(question)), is_denied)
         text = "\n".join(render_sections(sco, DuckDBConnector.sql_dialect or ""))
-        return CoreSContext(text, hashlib.sha256(text.encode()).hexdigest())
+        embedded = tuple(self.embedder.texts) if self.embedder is not None else ()
+        return CoreSContext(text, hashlib.sha256(text.encode()).hexdigest(), embedded=embedded)
+
+
+class CountingEmbedder:
+    """The embedder as given, recording each text it embeds so the runner can meter it."""
+
+    def __init__(self, inner: Any) -> None:
+        self.inner, self.texts = inner, list[str]()
+
+    def embed_documents(self, texts: list[str]) -> Any:
+        self.texts.extend(texts)
+        if hasattr(self.inner, "embed_documents"):
+            return self.inner.embed_documents(texts)
+        return self.inner.encode(texts)
 
 
 def without_denied(sco: SemanticContextObject,

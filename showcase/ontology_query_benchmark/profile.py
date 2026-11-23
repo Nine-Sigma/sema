@@ -312,6 +312,7 @@ class ModelRoute(_Frozen):
 class PriceSettings(_Frozen):
     input_usd_per_1m: float = Field(ge=0)
     output_usd_per_1m: float = Field(ge=0)
+    embedding_usd_per_1m: float = Field(default=0.0, ge=0)
 
 
 class RunCeilings(_Frozen):
