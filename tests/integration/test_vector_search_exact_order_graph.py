@@ -105,15 +105,6 @@ def _exact_top_k(
     return [_identity(n) for n in ranked[:top_k]]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "the vector index is approximate (HNSW, quantized): a 10x read re-scored exactly"
-        " still misses an exact neighbour in about 1 of 120 reads on some builds of the"
-        " 1,170-node neutral term index; exactness is not guaranteed at any finite read"
-        " width. Follow-up in unit-8 STATE.md."
-    ),
-)
 def test_each_vector_read_is_the_exact_top_k_under_a_total_order(
     clean_neo4j: Any, tmp_path: Path,
 ) -> None:
@@ -132,4 +123,7 @@ def test_each_vector_read_is_the_exact_top_k_under_a_total_order(
                 if got != _exact_top_k(clean_neo4j, label, query, top_k):
                     differing.append((probe, top_k, index))
 
-    assert differing == [], f"{len(differing)} of {len(probes) * 2 * len(labels)} reads differ"
+    # 10x measured 0 to 1 differing reads of 120 and 3x measured 4 to 6, so 3 separates them.
+    max_differing = 3
+    reads = len(probes) * 2 * len(labels)
+    assert len(differing) <= max_differing, f"{len(differing)} of {reads} reads differ"
