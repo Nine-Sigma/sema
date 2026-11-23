@@ -76,7 +76,8 @@ class CypherQueries:
             "data_type: c.data_type, semantic_type: p.semantic_type, "
             "labels: CASE WHEN c IS NULL THEN [] ELSE "
             "[(c)-[l:LABELED_BY]->(lc:Column)-[:IN_TABLE]->(lt:Table) | "
-            "{table: lt.name, column: lc.name, verification: l.verification, "
+            "{catalog: lt.catalog, schema: lt.schema_name, table: lt.name, column: lc.name, "
+            "verification: l.verification, "
             "via: [(jp:JoinPath)-[:USES]->(lt) WHERE jp.name IN coalesce(l.via, []) "
             "| jp.join_predicates]}] END}) AS columns "
             "RETURN t.name AS table_name, t.schema_name AS schema_name, "
@@ -88,8 +89,8 @@ class CypherQueries:
             "WHERE s.key_columns IS NOT NULL AND coalesce(s.owner, false) = false | "
             "{entity: o.name, key_columns: s.key_columns, verification: s.verification, "
             "identity: s.identity, "
-            "owner: head([(o)-[w:ENTITY_ON_TABLE]->(ot:Table) WHERE w.owner = true | "
-            "{catalog: ot.catalog, schema: ot.schema_name, table: ot.name}])}] "
+            "owners: [(o)-[w:ENTITY_ON_TABLE]->(ot:Table) WHERE w.owner = true | "
+            "{catalog: ot.catalog, schema: ot.schema_name, table: ot.name}]}] "
             "AS shared_entities"
         )
 
