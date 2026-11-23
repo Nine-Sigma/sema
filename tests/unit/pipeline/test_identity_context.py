@@ -347,9 +347,9 @@ def test_an_open_or_rejected_fact_renders_nothing(grade: str) -> None:
 
 BASE_GRAPH_RENDER = [
     "\nAVAILABLE TABLES AND COLUMNS:",
-    "  fixident.yard.hull_rev: hull_no, keel_class, paint_band, rev_no, rig_type",
-    "  fixident.yard.hull_cargo: cargo_no, cargo_tons, hatch_kind, hull_no",
     "  fixident.yard.crane_rev: crane_no, crane_rev_id, lift_tons, rev_no",
+    "  fixident.yard.hull_cargo: cargo_no, cargo_tons, hatch_kind, hull_no",
+    "  fixident.yard.hull_rev: hull_no, keel_class, paint_band, rev_no, rig_type",
     "\nDIALECT NOTES (DuckDB SQL):",
     "- Use the table names as listed: catalog.schema.table",
     "- Use double quotes for an identifier that is a reserved word or holds a character other "

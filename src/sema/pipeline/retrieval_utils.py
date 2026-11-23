@@ -15,7 +15,9 @@ from sema.pipeline.dedup_utils import (
     dedup_artifacts as _dedup_artifacts,
     dedup_seeds as _dedup_seeds,
     merge_and_rank_candidates,
+    in_stable_order,
     normalize_vector_hit as _normalize_vector_hit,
+    physical_row_in_order,
     states_name,
     tokenize_query,
 )
@@ -84,10 +86,9 @@ def _resolve_physical_for(
         rows = engine._run_query(
             CypherQueries.resolve_physical_mapping(), entity_name=name,
         )
-    # Neo4j's collect() order is unspecified and a column has no ordinal, so sort by name.
-    return [{**row, "columns": sorted(
-        row.get("columns", []), key=lambda c: (c.get("column") or "", c.get("property") or ""),
-    )} for row in rows]
+    return in_stable_order(
+        [physical_row_in_order(row) for row in rows], "catalog", "schema_name", "table_name",
+    )
 
 
 def _expand_joins(
@@ -96,10 +97,10 @@ def _expand_joins(
     if not table_names:
         return []
     try:
-        return engine._run_query(
+        return in_stable_order(engine._run_query(
             CypherQueries.find_join_paths(),
             table_names=table_names,
-        )
+        ), "name", "source_schema")
     except (Neo4jError, DriverError):
         logger.error(f"Join path read failed for tables {table_names}")
         raise
@@ -119,12 +120,12 @@ def _expand_values(
             if not col_name or not table_name:
                 continue
             try:
-                vs_results = engine._run_query(
+                vs_results = in_stable_order(engine._run_query(
                     CypherQueries.find_value_set_members_by_column(),
                     column_name=col_name,
                     table_name=table_name,
                     schema_name=r.get("schema_name"),
-                )
+                ), "vocabulary_name", "code")
                 values.extend([
                     {**v, "property": col["property"],
                      "column": col_name,
@@ -142,10 +143,10 @@ def _expand_metrics(
     metrics: list[dict[str, Any]] = []
     for name in entity_names:
         try:
-            results = engine._run_query(
+            results = in_stable_order(engine._run_query(
                 CypherQueries.expand_metrics(),
                 entity_name=name,
-            )
+            ), "name")
             for m in results:
                 metrics.append({
                     "name": m.get("name", ""),
@@ -200,10 +201,10 @@ def _property_vocabulary(
     if not (datasource_id and column_key):
         return {}
     try:
-        vocab_results = engine._run_query(
+        vocab_results = in_stable_order(engine._run_query(
             CypherQueries.find_property_vocabulary(),
             ds=datasource_id, ck=column_key,
-        )
+        ), "vocabulary_name")
     except Exception:
         return {}
     if not vocab_results:
@@ -305,9 +306,9 @@ def _expand_alias_hit(
     target_labels: list[str] = []
     resolved_name = target_name
     try:
-        deref = engine._run_query(
+        deref = in_stable_order(engine._run_query(
             CypherQueries.dereference_alias(), text=text,
-        )
+        ), "target_labels", "target_name")
         if deref:
             target_labels = deref[0].get("target_labels", [])
             resolved_name = (

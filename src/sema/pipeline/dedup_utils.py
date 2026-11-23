@@ -45,9 +45,43 @@ def merge_and_rank_candidates(
             + match_boost
             + 0.3
         )
-    return sorted(
-        active, key=lambda c: c["final_score"], reverse=True,
+    return sorted(active, key=_seed_order_key)
+
+
+def _seed_order_key(seed: dict[str, Any]) -> tuple[Any, ...]:
+    """Score first; ties fall to the node's identity and MERGE key, which every build writes
+    the same, never to the order an index or a lexical read returned the hits in."""
+    merge_key = tuple(str(seed.get(k) or "") for k in (
+        "name", "entity_name", "vocabulary_name", "code", "target_key", "text"))
+    return (-seed["final_score"], _seed_identity_key(seed), merge_key)
+
+
+def in_stable_order(rows: list[dict[str, Any]], *fields: str) -> list[dict[str, Any]]:
+    """Graph rows sorted on values every build writes the same: Neo4j returns and collects
+    rows in no specified order."""
+    return sorted(rows, key=lambda row: tuple(str(row.get(f) or "") for f in fields))
+
+
+def physical_row_in_order(row: dict[str, Any]) -> dict[str, Any]:
+    """A physical mapping row with its columns, their label sources and its shared entities
+    in name order; a column has no ordinal."""
+    columns = sorted(
+        row.get("columns", []), key=lambda c: (c.get("column") or "", c.get("property") or ""),
     )
+    ordered = {**row, "columns": [_labels_in_order(c) for c in columns]}
+    if row.get("shared_entities"):
+        ordered["shared_entities"] = in_stable_order(row["shared_entities"], "entity")
+    return ordered
+
+
+def _labels_in_order(column: dict[str, Any]) -> dict[str, Any]:
+    if not column.get("labels"):
+        return column
+    labels = [
+        {**label, "via": sorted(label["via"], key=str)} if label.get("via") else label
+        for label in column["labels"]
+    ]
+    return {**column, "labels": in_stable_order(labels, "table", "column")}
 
 
 def tokenize_query(query: str) -> list[str]:
