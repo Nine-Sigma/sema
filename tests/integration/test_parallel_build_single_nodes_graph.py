@@ -17,6 +17,7 @@ from sema.models.config import Neo4jConfig
 from sema.pipeline.orchestrate import run_build
 from tests.support.connector_fixture import (
     CATALOG,
+    MAIN_SCHEMA,
     SCHEMA_TABLES,
     fake_model_environment,
     fixture_build_config,
@@ -105,3 +106,48 @@ def test_a_build_keeps_each_edge_of_a_duplicate_schema_it_does_not_rebuild(
             other=other, catalog=CATALOG,
         ).single()
     assert (row["schemas"], sorted(row["tables"])) == (1, ["t1", "t2"])
+
+
+def test_a_schema_name_under_a_second_catalog_stays_its_own_node_with_its_edges(
+    clean_neo4j: Any, tmp_path: Path,
+) -> None:
+    second = "second_catalog"
+    tables = sorted(table.name for table in SCHEMA_TABLES[MAIN_SCHEMA])
+    with clean_neo4j.session() as session:
+        for constraint in ("schema_catalog_name_unique", "catalog_name_unique"):
+            session.run(f"DROP CONSTRAINT {constraint} IF EXISTS").consume()
+        session.run(
+            "UNWIND [$catalog, $catalog, $second] AS catalog "
+            "CREATE (s:Schema {name: $schema, catalog: catalog})"
+            "-[:IN_CATALOG]->(:Catalog {name: catalog}) "
+            "WITH s, catalog WHERE catalog = $second "
+            "UNWIND $tables AS table "
+            "CREATE (:Table {name: table, schema_name: $schema, catalog: catalog})"
+            "-[:IN_SCHEMA]->(s)",
+            catalog=CATALOG, second=second, schema=MAIN_SCHEMA, tables=tables,
+        ).consume()
+    config = fixture_build_config(_neo4j_config(), database=write_fixture_database(tmp_path))
+    with fake_model_environment():
+        report = run_build(config)
+    assert report["tables_failed"] == 0, report["failed_tables"]
+    with clean_neo4j.session() as session:
+        catalogs = {
+            row["name"]: row["nodes"]
+            for row in session.run("MATCH (c:Catalog) RETURN c.name AS name, count(*) AS nodes")
+        }
+        schemas = {
+            row["catalog"]: (row["schemas"], sorted(row["tables"]), row["catalogs"])
+            for row in session.run(
+                "MATCH (s:Schema {name: $schema}) "
+                "OPTIONAL MATCH (t:Table)-[:IN_SCHEMA]->(s) "
+                "OPTIONAL MATCH (s)-[:IN_CATALOG]->(c:Catalog) "
+                "RETURN s.catalog AS catalog, count(DISTINCT s) AS schemas, "
+                "collect(DISTINCT t.name) AS tables, collect(DISTINCT c.name) AS catalogs",
+                schema=MAIN_SCHEMA,
+            )
+        }
+    assert catalogs == {CATALOG: 1, second: 1}, catalogs
+    assert schemas == {
+        CATALOG: (1, tables, [CATALOG]),
+        second: (1, tables, [second]),
+    }, schemas
