@@ -12,6 +12,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
+from sema.binding.identifier_utils import entity_identifier
 from sema.connectors.base import Connector
 from sema.engine.coded_column_utils import (
     DECLARED_KEY,
@@ -46,6 +47,7 @@ from sema.engine.join_detector_utils import (
     is_text,
     nominate_by_data_shape,
     nominate_by_name,
+    normalized_name,
 )
 from sema.engine.warehouse_lookup import (
     RelationEvidence,
@@ -147,7 +149,7 @@ def _place(
     every = [c for columns in by_schema.values() for c in columns]
     placed = []
     for domain in dictionary.domains:
-        named = place(domain, every, bound.get(domain.entity) if domain.entity else None)
+        named = place(domain, every, _bound_relation(domain.entity, bound))
         placed += [(domain, column) for column in named]
         if named:
             continue
@@ -157,6 +159,19 @@ def _place(
                 source_schema=schema,
             )
     return placed
+
+
+def _bound_relation(entity: str | None, bound: dict[str, Relation]) -> Relation | None:
+    """The relation bound to `entity`: an import's qualified name as it is, a spec entry's name
+    by the identifier the import derives from it; an ambiguous name binds nothing."""
+    if entity is None or entity in bound:
+        return bound.get(entity) if entity else None
+    wanted = normalized_name(entity_identifier(entity))
+    found = {
+        relation for name, relation in bound.items()
+        if normalized_name(name.rpartition(".")[2]) == wanted
+    }
+    return found.pop() if len(found) == 1 else None
 
 
 def _uncoded(run: _Run, profiles: Profiles, column: ExtractedColumn, bound: int) -> str | None:
