@@ -79,3 +79,29 @@ def test_each_parallel_build_holds_one_node_per_catalog_schema_and_vocabulary_ke
         assert _keys(nodes_per_key, "Vocabulary"), (build, "the build wrote no Vocabulary")
         duplicates[build] = {key: n for key, n in nodes_per_key.items() if n != 1}
     assert duplicates == {1: {}, 2: {}}, duplicates
+
+
+def test_a_build_keeps_each_edge_of_a_duplicate_schema_it_does_not_rebuild(
+    clean_neo4j: Any, tmp_path: Path,
+) -> None:
+    other = "other_study"
+    with clean_neo4j.session() as session:
+        session.run("DROP CONSTRAINT schema_catalog_name_unique IF EXISTS").consume()
+        session.run(
+            "UNWIND ['t1', 't2'] AS table "
+            "CREATE (:Table {name: table, schema_name: $other, catalog: $catalog})"
+            "-[:IN_SCHEMA]->(:Schema {name: $other, catalog: $catalog})",
+            other=other, catalog=CATALOG,
+        ).consume()
+    config = fixture_build_config(_neo4j_config(), database=write_fixture_database(tmp_path))
+    with fake_model_environment():
+        report = run_build(config)
+    assert report["tables_failed"] == 0, report["failed_tables"]
+    with clean_neo4j.session() as session:
+        row = session.run(
+            "MATCH (s:Schema {name: $other, catalog: $catalog}) "
+            "OPTIONAL MATCH (t:Table)-[:IN_SCHEMA]->(s) "
+            "RETURN count(DISTINCT s) AS schemas, collect(t.name) AS tables",
+            other=other, catalog=CATALOG,
+        ).single()
+    assert (row["schemas"], sorted(row["tables"])) == (1, ["t1", "t2"])
