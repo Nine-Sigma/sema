@@ -81,7 +81,7 @@ def generation_cost(receipt: dict[str, Any], path: Path) -> float:
 def test_a_call_that_raises_after_it_is_sent_is_charged_its_estimate(
     frozen: Path, tmp_path: Path,
 ) -> None:
-    path = profile_with(tmp_path / "sealed_set", frozen)
+    path = profile_with(tmp_path / "sealed_set", frozen, max_cost_usd=100.0)
     model = RaisedAfterSend()
 
     summary, receipts = run(path, ("A",), model)
