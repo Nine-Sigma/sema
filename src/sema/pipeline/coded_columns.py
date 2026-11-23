@@ -34,6 +34,8 @@ from sema.engine.coded_column_utils import (
     unplaced_assertion,
     unread_key_assertion,
 )
+from sema.engine.declared_join_utils import bind_declared
+from sema.engine.identity_utils import Counts, Relation
 from sema.engine.join_detector import TIER_1, FKAssertion, to_fk_assertion
 from sema.engine.join_detector_utils import (
     Profiles,
@@ -45,7 +47,11 @@ from sema.engine.join_detector_utils import (
     nominate_by_data_shape,
     nominate_by_name,
 )
-from sema.engine.warehouse_lookup import WarehouseProfileLookup, WarehouseValues
+from sema.engine.warehouse_lookup import (
+    RelationEvidence,
+    WarehouseProfileLookup,
+    WarehouseValues,
+)
 from sema.graph.concept_value_set import (
     CodedMember,
     ValueSetColumn,
@@ -106,7 +112,8 @@ def run_coded_columns(
         column_key(c): stats for c in by_ref.values()
         if (stats := profile_lookup(column_key(c))) is not None
     }
-    placed = _place(loader, dictionary, by_schema, run_id)
+    placed = _place(loader, dictionary, by_schema, run_id, _bound(dictionary, by_schema, Counts(
+        RelationEvidence(connector, config.catalog))))
     joins: dict[str, list[Assertion]] = {}
     for schema, columns in by_schema.items():
         run = _Run(loader, values, dictionary, columns, by_ref, run_id, schema)
@@ -117,17 +124,30 @@ def run_coded_columns(
     return joins
 
 
+def _bound(
+    dictionary: Dictionary | None, by_schema: dict[str, list[ExtractedColumn]], counts: Counts,
+) -> dict[str, Relation]:
+    """The loaded relation each entity a declared join binds is, by the entity's name."""
+    if dictionary is None:
+        return {}
+    columns: dict[Relation, list[str]] = {}
+    for column in (c for schema_columns in by_schema.values() for c in schema_columns):
+        columns.setdefault((column.schema, column.table_name), []).append(column.name)
+    return bind_declared(dictionary.entities, dictionary.declared_joins, columns, counts).bound
+
+
 def _place(
     loader: GraphLoader, dictionary: Dictionary | None,
-    by_schema: dict[str, list[ExtractedColumn]], run_id: str,
+    by_schema: dict[str, list[ExtractedColumn]], run_id: str, bound: dict[str, Relation],
 ) -> list[tuple[StatedDomain, ExtractedColumn]]:
-    """Each stated domain on the run's columns; one placed nowhere is recorded in each schema."""
+    """Each stated domain on the run's columns, on its entity's bound relation when a declared
+    join binds one; one placed nowhere is recorded in each schema."""
     if dictionary is None:
         return []
     every = [c for columns in by_schema.values() for c in columns]
     placed = []
     for domain in dictionary.domains:
-        named = place(domain, every)
+        named = place(domain, every, bound.get(domain.entity) if domain.entity else None)
         placed += [(domain, column) for column in named]
         if named:
             continue

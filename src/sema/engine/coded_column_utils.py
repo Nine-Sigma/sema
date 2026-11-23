@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from sema.engine.identity_utils import Relation
 from sema.engine.join_detector_utils import (
     COVERAGE_THRESHOLD,
     Containment,
@@ -85,14 +86,19 @@ class StatedDomain:
     vocabulary: str
 
 
-def place(domain: StatedDomain, columns: Sequence[ExtractedColumn]) -> list[ExtractedColumn]:
-    """Columns whose normalized name equals the property's, in the entity's table if one is named.
+def place(
+    domain: StatedDomain, columns: Sequence[ExtractedColumn], bound: Relation | None,
+) -> list[ExtractedColumn]:
+    """Columns whose normalized name equals the property's, on the relation a declared join
+    bound the entity to, else in the entity's table if one is named.
 
     `columns` are every column of the run, so an entity's table in one schema limits all.
     """
     wanted = normalized_name(domain.property)
     entity = normalized_name(domain.entity) if domain.entity else None
-    named = {(c.schema, c.table_name) for c in columns if normalized_name(c.table_name) == entity}
+    named = {bound} if bound is not None else {
+        (c.schema, c.table_name) for c in columns if normalized_name(c.table_name) == entity
+    }
     return [
         c for c in columns
         if normalized_name(c.name) == wanted and (not named or (c.schema, c.table_name) in named)
