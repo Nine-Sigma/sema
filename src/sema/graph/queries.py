@@ -4,11 +4,20 @@ class CypherQueries:
     """Parameterized Cypher query templates for the semantic graph."""
 
     @staticmethod
+    def _vector_read_factor() -> int:
+        # An approximate (HNSW, quantized) index can misplace exact neighbours near its cut.
+        return 3
+
+    @staticmethod
     def vector_search(index_name: str, top_k: int = 10) -> str:
+        width = top_k * CypherQueries._vector_read_factor()
         return (
-            f"CALL db.index.vector.queryNodes('{index_name}', {top_k}, $embedding) "
-            f"YIELD node, score "
-            f"RETURN node, score ORDER BY score DESC"
+            f"CALL db.index.vector.queryNodes('{index_name}', {width}, $embedding) "
+            f"YIELD node "
+            f"WITH node, vector.similarity.cosine(node.embedding, $embedding) AS score "
+            f"RETURN node, score ORDER BY score DESC, node.ref, node.schema_name, "
+            f"node.entity_name, node.name, node.vocabulary_name, node.code, "
+            f"node.target_key, node.text LIMIT {top_k}"
         )
 
     @staticmethod
