@@ -104,6 +104,19 @@ class GraphLoader:
             ("vocabulary_name_unique", "v", "Vocabulary", ("v.name",)),
         )
 
+    @staticmethod
+    def _move_relationships(tail: str, head: str) -> str:
+        # A duplicate hub node (Schema, Catalog, Vocabulary) can hold edges of studies
+        # outside this build, so its edges move to the kept node before it is deleted.
+        return (
+            "CALL (keep, dup) { "
+            f"MATCH (dup){tail}[r]{head}(other) WHERE NOT other IN [keep, dup] "
+            f"AND NOT EXISTS {{ MATCH (keep){tail}[e]{head}(other) "
+            "WHERE type(e) = type(r) AND properties(e) = properties(r) } "
+            f"CREATE (keep){tail}[moved:$(type(r))]{head}(other) "
+            "SET moved = properties(r) } "
+        )
+
     def ensure_core_constraints(self) -> None:
         """Create core graph constraints, deduping any violations first.
 
@@ -120,8 +133,11 @@ class GraphLoader:
                 f"WHERE {' AND '.join(f'{k} IS NOT NULL' for k in keys)} "
                 f"WITH [{key}] AS key, collect({var}) AS nodes "
                 "WHERE size(nodes) > 1 "
-                "UNWIND nodes[1..] AS dup "
-                "DETACH DELETE dup"
+                "WITH nodes[0] AS keep, nodes[1..] AS dups "
+                "UNWIND dups AS dup "
+                + self._move_relationships("-", "->")
+                + self._move_relationships("<-", "-")
+                + "DETACH DELETE dup"
             )
             required = key if len(keys) == 1 else f"({key})"
             self._run(
