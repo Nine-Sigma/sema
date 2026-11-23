@@ -95,28 +95,39 @@ class GraphLoader:
 
         return run_with_retry(op, statement_summary(cypher))
 
+    @staticmethod
+    def _unique_node_keys() -> tuple[tuple[str, str, str, tuple[str, ...]], ...]:
+        return (
+            ("assertion_id_unique", "a", "Assertion", ("a.id",)),
+            ("catalog_name_unique", "c", "Catalog", ("c.name",)),
+            ("schema_catalog_name_unique", "s", "Schema", ("s.catalog", "s.name")),
+            ("vocabulary_name_unique", "v", "Vocabulary", ("v.name",)),
+        )
+
     def ensure_core_constraints(self) -> None:
         """Create core graph constraints, deduping any violations first.
 
-        Idempotent; run once per build before table workers commit. The
-        Assertion.id uniqueness constraint both prevents duplicate
-        assertions and backs the MERGE in _ASSERTION_UPSERT_CYPHER with an
-        index. Pre-existing duplicate-id assertions (e.g. from pre-MERGE
-        builds) are collapsed to one node first, because CREATE CONSTRAINT
-        fails on already-violating data.
+        Idempotent; run once per build before table workers commit. Each
+        uniqueness constraint backs its label's MERGE with an index and makes
+        parallel table workers write one node per key (bug-1153). Pre-existing
+        duplicates (e.g. from unconstrained builds) are collapsed to one node
+        first, because CREATE CONSTRAINT fails on already-violating data.
         """
-        self._run(
-            "MATCH (a:Assertion) "
-            "WHERE a.id IS NOT NULL "
-            "WITH a.id AS id, collect(a) AS nodes "
-            "WHERE size(nodes) > 1 "
-            "UNWIND nodes[1..] AS dup "
-            "DETACH DELETE dup"
-        )
-        self._run(
-            "CREATE CONSTRAINT assertion_id_unique IF NOT EXISTS "
-            "FOR (a:Assertion) REQUIRE a.id IS UNIQUE"
-        )
+        for name, var, label, keys in self._unique_node_keys():
+            key = ", ".join(keys)
+            self._run(
+                f"MATCH ({var}:{label}) "
+                f"WHERE {' AND '.join(f'{k} IS NOT NULL' for k in keys)} "
+                f"WITH [{key}] AS key, collect({var}) AS nodes "
+                "WHERE size(nodes) > 1 "
+                "UNWIND nodes[1..] AS dup "
+                "DETACH DELETE dup"
+            )
+            required = key if len(keys) == 1 else f"({key})"
+            self._run(
+                f"CREATE CONSTRAINT {name} IF NOT EXISTS "
+                f"FOR ({var}:{label}) REQUIRE {required} IS UNIQUE"
+            )
 
     def upsert_datasource(
         self, id: str, ref: str, platform: str, workspace: str,
