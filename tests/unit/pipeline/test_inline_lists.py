@@ -9,9 +9,13 @@ the dictionary's join binds links only the bound relation's column.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
+from sema.engine.coded_column_utils import STATED_DOMAIN
 from sema.pipeline.coded_columns import run_coded_columns
+from tests.support import connector_fixture_declared as declared
 from tests.support.connector_fixture_declared import LID_LIST, TRAY_LIST, prepare_declared_step
 from tests.support.connector_fixture_identity import IDENTITY_SCHEMA
 from tests.support.connector_fixture_identity_runs import STEP_RUN_ID, StepRun, run_step
@@ -84,3 +88,28 @@ def test_an_unbound_entitys_stated_domain_is_placed_as_today(coded: StepRun) -> 
         assert _verification(coded, table, "tray_kind") == VERIFIED
         labels = coded.built().labels(_ref(coded, table, "tray_kind"))
         assert labels == TRAY_LIST
+
+
+@pytest.fixture(scope="module")
+def stated_on_bound(tmp_path_factory: pytest.TempPathFactory) -> StepRun:
+    """The fixture with a spec domain on the bound entity's `crate_bay`, a column the
+    unbound decoy relation holds too."""
+    entry = replace(declared.CRATE_ENTRY, domains={"crate_bay": "tray_kinds"})
+    entries = tuple(entry if e is declared.CRATE_ENTRY else e for e in declared.DICTIONARY_ENTRIES)
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(declared, "DICTIONARY_ENTRIES", entries)
+        prepared = prepare_declared_step(tmp_path_factory.mktemp("stated"))
+    return run_step(prepared, _coded_step)
+
+
+def _stated(step: StepRun, table: str, column: str) -> list[dict[str, object]]:
+    ref = _ref(step, table, column)
+    return [a.payload for a in step.built().assertions
+            if a.subject_ref == ref and a.payload.get("evidence") == STATED_DOMAIN]
+
+
+def test_a_bound_entitys_spec_domain_is_placed_only_on_the_bound_relation(
+    stated_on_bound: StepRun,
+) -> None:
+    assert _stated(stated_on_bound, "crate_head", "crate_bay")
+    assert not _stated(stated_on_bound, "crate_head_spare", "crate_bay")
