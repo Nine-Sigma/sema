@@ -123,7 +123,8 @@ class CypherQueries:
             "jp.hop_count AS hop_count, "
             "jp.cardinality_hint AS cardinality_hint, "
             "jp.sql_snippet AS sql_snippet, "
-            "jp.confidence AS confidence"
+            "jp.confidence AS confidence, "
+            "jp.source_schema AS source_schema"
         )
 
     @staticmethod
