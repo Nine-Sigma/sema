@@ -15,6 +15,7 @@ from collections.abc import Sequence
 
 from sema.binding.spec_sections import Provider
 from sema.intake.structure.described_data_utils import (
+    described_beside,
     described_by,
     per_file_dictionaries,
     uses_described,
@@ -81,7 +82,7 @@ def verify_structure(
     for entry in stated:
         failures += _verified(entry, profiles, tools)
     described = _described(proposal, by_name, tools)
-    failures += _described_failures(stated, described)
+    failures += _described_failures(stated, described, by_name, tools)
     failures += _shared_claim_failures(known)
     removed = {name for e in proposal.bound if e.source == HUMAN for name in e.binding.relations}
     removed |= {name for e in stated for name in e.binding.relations}
@@ -155,8 +156,12 @@ def _group_failures(
     tools: ProfileTools,
     described: dict[str, str],
 ) -> list[Failure]:
-    names = {profile.ref.name for profile in members}
-    found = [b for b in group_candidates(members, tools) if not uses_described(b, described)]
+    by_name = {profile.ref.name: profile for profile in members}
+    names = set(by_name)
+    found = [
+        b for b in group_candidates(members, tools)
+        if not uses_described(b, described) and not described_beside(b, by_name, tools)
+    ]
     decided = apply_precedence(found)
     keys = {binding_key(binding) for binding in found}
     in_force = [*decided.candidates, *(entry.binding for entry in known)]
@@ -214,22 +219,29 @@ def _described(
 
 
 def _described_failures(
-    stated: Sequence[BoundEntry], described: dict[str, str]
+    stated: Sequence[BoundEntry],
+    described: dict[str, str],
+    by_name: dict[str, RelationProfile],
+    tools: ProfileTools,
 ) -> list[Failure]:
     """A pinned or proposed binding that reads described data as a dictionary or header."""
-    return [
-        failure(
-            IN_ELIGIBILITY_SET,
-            name,
-            template=entry.binding.template,
-            source=entry.source,
-            described_by=described[name],
-        )
-        for entry in stated
-        if uses_described(entry.binding, described)
-        for name in dict.fromkeys(entry.binding.relations)
-        if name in described
-    ]
+    failures = []
+    for entry in stated:
+        found = described | described_beside(entry.binding, by_name, tools)
+        if not uses_described(entry.binding, found):
+            continue
+        failures += [
+            failure(
+                IN_ELIGIBILITY_SET,
+                name,
+                template=entry.binding.template,
+                source=entry.source,
+                described_by=found[name],
+            )
+            for name in dict.fromkeys(entry.binding.relations)
+            if name in found
+        ]
+    return failures
 
 
 def _proposed(entry: BoundEntry, targets: set[str]) -> bool:
