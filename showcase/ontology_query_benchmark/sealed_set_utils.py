@@ -148,7 +148,8 @@ def _top_values(connector: Connector, item: Any, columns: Sequence[Any],
 
 
 class DialectFrame:
-    """An arm's context builder whose frame names the executor's dialect and no other.
+    """An arm's context builder whose frame names the executor's dialect and no other, and
+    which holds every arm to the run's context budget the way arm A's own context is held.
 
     The harness frames both arms in its own dialect; the connector runs statements as
     written, so the frame's dialect field and its leading note name the connector's
@@ -180,7 +181,8 @@ class DialectFrame:
         body = built.text.replace(f"{own}\n\n", "", 1) if own else built.text
         text = f"{self.note}\n\n{body}"
         return dataclasses.replace(built, dialect=self.name, text=text,
-                                   tokens=self.harness.context.estimate_tokens(text))
+                                   tokens=self.harness.context.estimate_tokens(text),
+                                   overflow=built.overflow or built.tokens > built.budget)
 
 
 def in_dialect(harness: SimpleNamespace, runtimes: Mapping[str, Any],
