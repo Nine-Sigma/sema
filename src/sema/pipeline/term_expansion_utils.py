@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 from sema.graph.queries import CypherQueries
 from sema.graph.term_identity_utils import UNSCOPED_VOCAB
 from sema.log import logger
-from sema.pipeline.dedup_utils import states_name
+from sema.pipeline.dedup_utils import in_stable_order, states_name
 
 if TYPE_CHECKING:
     from sema.pipeline.retrieval import RetrievalEngine
@@ -47,11 +47,11 @@ def _expand_ancestry(
     ancestry: list[dict[str, Any]] = []
     for code in names_or_codes:
         try:
-            results = engine._run_query(
+            results = in_stable_order(engine._run_query(
                 CypherQueries.expand_ancestry(),
                 code=code,
                 vocabulary_name=vocabulary_name,
-            )
+            ), "vocabulary_name", "code", "parent_code")
             ancestry.extend(results)
         except Exception:
             pass
@@ -126,10 +126,11 @@ def _expand_source_term_bridge(
     if not code:
         return []
     try:
-        rows = engine._run_query(
+        rows = in_stable_order(engine._run_query(
             CypherQueries.resolve_concept_for_source_term(),
             code=code, source_vocabulary=None,
-        )
+        ), "concept_vocabulary", "concept_code", "catalog", "schema_name", "table_name",
+            "column_name")
     except Exception:
         return []
 
@@ -329,11 +330,11 @@ def _expand_term_governed_values(
     so an unscoped match can cross vocabularies.
     """
     try:
-        vs_results = engine._run_query(
+        vs_results = in_stable_order(engine._run_query(
             CypherQueries.find_value_sets_for_term(),
             code=code,
             vocabulary_name=vocabulary_name or None,
-        )
+        ), "catalog", "schema_name", "table_name", "column_name")
     except Exception:
         return []
 

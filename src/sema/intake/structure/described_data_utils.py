@@ -11,7 +11,7 @@ relation has columns.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 
 from sema.intake.land.landing import LOADER_COLUMN_PREFIX
 from sema.intake.roles.lexicon import normalize
@@ -53,6 +53,18 @@ def uses_described(binding: SlotBinding, described: Collection[str]) -> bool:
     return binding.template == entity_model.ID and any(
         binding.slots.get(slot) in described for slot in SCHEMA_SLOTS
     )
+
+
+def described_beside(
+    binding: SlotBinding, by_name: Mapping[str, RelationProfile], tools: ProfileTools
+) -> dict[str, str]:
+    """The candidate's dictionary mapped to the relation in another schema slot describing it."""
+    dictionary = binding.slots.get(entity_model.DICTIONARY, "")
+    if binding.template != entity_model.ID or dictionary not in by_name:
+        return {}
+    beside = [by_name[name] for name in schema_slot_relations([binding]) if name != dictionary
+              and name in by_name]  # fmt: skip
+    return described_by(beside, [by_name[dictionary]], tools)
 
 
 def described_by(

@@ -8,7 +8,7 @@ set_dir: ~/dev/ai/graphrag-semantic-ontology/docs/poc/query-accuracy-eval/acris
 duckdb: ~/.sema/acris.duckdb
 
 harness:
-  frozen: ~/dev/ai/graphrag-semantic-ontology/docs/poc/partner-timbr-benchmark/runs/partner-bench-20261109-r1/frozen/8b4cfdc02f8d13c6af00bc2c84c08bb94818c7bbef8b0900198a84a790b69a04
+  frozen: ~/.sema/harness/8b4cfdc02f8d13c6af00bc2c84c08bb94818c7bbef8b0900198a84a790b69a04
   package: timbr_demographics_poc
 
 model:
@@ -31,8 +31,9 @@ limits:
 knobs: {budget_tokens: 16000, values_top_k: 25}
 
 settings:
-  # OpenRouter catalog prices for the model, read 2026-11-17. The run stops at max_cost_usd,
-  # below the approved $15 ceiling, leaving room for embedding calls the meter does not count.
-  prices: {input_usd_per_1m: 2.5, output_usd_per_1m: 15.0}
-  max_cost_usd: 13.5
+  # OpenRouter catalog prices for the model, read 2026-11-17, and for the embedding model
+  # (prompt/token 0.00000002), read 2026-11-22. The meter charges raised calls and arm S's
+  # embedding calls, so the run stops at the approved $15 ceiling.
+  prices: {input_usd_per_1m: 2.5, output_usd_per_1m: 15.0, embedding_usd_per_1m: 0.02}
+  max_cost_usd: 15.0
   max_wall_s: 10800

@@ -5,10 +5,17 @@ class CypherQueries:
 
     @staticmethod
     def vector_search(index_name: str, top_k: int = 10) -> str:
+        # The quantized HNSW index is approximate. Re-scoring a 10x read exactly gives the exact
+        # top_k of what the index returned, not the exact top_k in general. On the neutral
+        # fixture 10x missed 0 or 1 read in 120, and 3x missed 4 to 6.
+        width = top_k * 10
         return (
-            f"CALL db.index.vector.queryNodes('{index_name}', {top_k}, $embedding) "
-            f"YIELD node, score "
-            f"RETURN node, score ORDER BY score DESC"
+            f"CALL db.index.vector.queryNodes('{index_name}', {width}, $embedding) "
+            f"YIELD node "
+            f"WITH node, vector.similarity.cosine(node.embedding, $embedding) AS score "
+            f"RETURN node, score ORDER BY score DESC, node.ref, node.schema_name, "
+            f"node.entity_name, node.name, node.vocabulary_name, node.code, "
+            f"node.target_key, node.text LIMIT {top_k}"
         )
 
     @staticmethod
@@ -76,7 +83,8 @@ class CypherQueries:
             "data_type: c.data_type, semantic_type: p.semantic_type, "
             "labels: CASE WHEN c IS NULL THEN [] ELSE "
             "[(c)-[l:LABELED_BY]->(lc:Column)-[:IN_TABLE]->(lt:Table) | "
-            "{table: lt.name, column: lc.name, verification: l.verification, "
+            "{catalog: lt.catalog, schema: lt.schema_name, table: lt.name, column: lc.name, "
+            "verification: l.verification, "
             "via: [(jp:JoinPath)-[:USES]->(lt) WHERE jp.name IN coalesce(l.via, []) "
             "| jp.join_predicates]}] END}) AS columns "
             "RETURN t.name AS table_name, t.schema_name AS schema_name, "
@@ -88,8 +96,8 @@ class CypherQueries:
             "WHERE s.key_columns IS NOT NULL AND coalesce(s.owner, false) = false | "
             "{entity: o.name, key_columns: s.key_columns, verification: s.verification, "
             "identity: s.identity, "
-            "owner: head([(o)-[w:ENTITY_ON_TABLE]->(ot:Table) WHERE w.owner = true | "
-            "{catalog: ot.catalog, schema: ot.schema_name, table: ot.name}])}] "
+            "owners: [(o)-[w:ENTITY_ON_TABLE]->(ot:Table) WHERE w.owner = true | "
+            "{catalog: ot.catalog, schema: ot.schema_name, table: ot.name}]}] "
             "AS shared_entities"
         )
 
@@ -123,7 +131,8 @@ class CypherQueries:
             "jp.hop_count AS hop_count, "
             "jp.cardinality_hint AS cardinality_hint, "
             "jp.sql_snippet AS sql_snippet, "
-            "jp.confidence AS confidence"
+            "jp.confidence AS confidence, "
+            "jp.source_schema AS source_schema"
         )
 
     @staticmethod
