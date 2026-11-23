@@ -72,7 +72,6 @@ from tests.support.connector_fixture_scorecard import (
 pytestmark = pytest.mark.integration
 
 GRAPH_JOIN_KEYS = DECLARED_JOIN_KEYS | DETECTED_JOIN_KEYS
-SINGLE_COLUMN_GRAPH_JOIN_KEYS = frozenset(k for k in GRAPH_JOIN_KEYS if "+" not in k[1])
 OTHER_CATALOG = "othercat"
 DECOY_SCHEMA_JOIN = join_key("ledger", ["holder_id"], "holder", ["holder_id"])
 KEY_ONLY = "key_only"
@@ -286,7 +285,7 @@ def test_the_discovery_command_scores_the_graph_against_the_declared_constraints
     assert {cell: rows["join"][cell] for cell in JOIN_SHAPE} == {
         cell: str(count) for cell, count in JOIN_SHAPE.items()
     }
-    assert rows["join"]["rechecked"] == str(len(SINGLE_COLUMN_GRAPH_JOIN_KEYS))
+    assert rows["join"]["rechecked"] == str(len(GRAPH_JOIN_KEYS))
     assert {cell: rows["candidate_key"][cell] for cell in ("equal", "missing", "wrong")} == {
         "equal": str(len(MAIN_TABLES)), "missing": "0", "wrong": "0",
     }

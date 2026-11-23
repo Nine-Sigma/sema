@@ -102,7 +102,8 @@ def _checked(
     relation, names = parent
     rows, nulls = counts.rows(relation), counts.null_rows(relation, names)
     distinct = counts.evidence.contained(relation, names, relation, names)
-    if rows is None or nulls is None or distinct is None:
+    contained = counts.evidence.contained(child[0], child[1], relation, names)
+    if rows is None or nulls is None or distinct is None or contained is None:
         return None
     holds = rows - nulls == distinct[0] and counts.within(child[0], child[1], relation, names)
     return nulls, holds
