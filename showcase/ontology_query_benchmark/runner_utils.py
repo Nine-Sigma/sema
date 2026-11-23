@@ -206,13 +206,13 @@ class SArmContext:
         self.last: SContextLike | None = None
 
     def __call__(self, question: str) -> Any:
-        supplied = self.provider(question, self.is_denied)
-        self.last = supplied
+        self.last = supplied = self.provider(question, self.is_denied)
         embedded = getattr(supplied, "embedded", ())
         self.last_embedding_usd = self.embedding_usd_per_1m / 1e6 * sum(
             map(self.harness.context.estimate_tokens, embedded))
-        overflow = any(f.message.split(":")[0] == OVERFLOW_FINDING for f in supplied.findings)
         tokens = self.harness.context.estimate_tokens(supplied.text)
+        overflow = tokens > self.budget or any(
+            f.message.split(":")[0] == OVERFLOW_FINDING for f in supplied.findings)
         return self.harness.models.ArmContext(
             "S", self.harness.context.ARM_A_DIALECT, supplied.text, tokens, self.budget, overflow
         )
