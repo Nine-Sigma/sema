@@ -9,6 +9,7 @@ describes, so no test depends on how the import spells an entity name.
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -60,7 +61,7 @@ class Bound:
         return str(entity)
 
 
-def _bind(directory: Path) -> Bound:
+def _bind(directory: Path, wrap: Callable[[Any], Any] = lambda evidence: evidence) -> Bound:
     from sema.engine.declared_join_utils import bind_declared
     from sema.pipeline.dictionary_import_utils import read_dictionary
 
@@ -74,7 +75,7 @@ def _bind(directory: Path) -> Bound:
                     IDENTITY_CATALOG, IDENTITY_SCHEMA, table.name)]
             for table in DECLARED_TABLES
         }
-        counts = Counts(RelationEvidence(connector, IDENTITY_CATALOG))
+        counts = Counts(wrap(RelationEvidence(connector, IDENTITY_CATALOG)))
         bindings = bind_declared(dictionary.entities, dictionary.declared_joins, columns, counts)
     finally:
         connector.close()
@@ -201,3 +202,29 @@ def test_only_the_accepted_joins_bind_and_an_entity_in_no_join_is_not_bound(
     assert sorted(built.entry(j.referencing).relation for j in built.bindings.rejected) == sorted(
         REJECTED)
     assert built.name_of("tray_stock") not in built.bindings.bound
+
+
+class _ContainmentMissing:
+    """The fixture's evidence, with no count for one relation's tuples within another's."""
+
+    def __init__(self, evidence: RelationEvidence, relation: tuple[str, str]) -> None:
+        self._evidence, self._relation = evidence, relation
+
+    def contained(self, relation: Any, columns: Any, owner: Any, owner_columns: Any) -> Any:
+        if tuple(relation) == self._relation and tuple(owner) != self._relation:
+            return None
+        return self._evidence.contained(relation, columns, owner, owner_columns)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._evidence, name)
+
+
+def test_a_join_whose_containment_count_is_missing_is_open(tmp_path: Path) -> None:
+    built = _bind(
+        tmp_path, lambda evidence: _ContainmentMissing(evidence, _relation("crate_line")),
+    ).built()
+    (join,) = built.join_of("crate_line")
+
+    assert join in built.bindings.open
+    assert join not in built.bindings.rejected
+    assert not _accepted(built, "crate_line")
