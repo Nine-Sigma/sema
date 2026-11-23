@@ -160,7 +160,7 @@ def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> N
     from sema.eval.discovery_scorecard_utils import read_oracle
     from sema.models.config import BuildConfig
     from sema.pipeline.build import resolve_connector_factory
-    from sema.pipeline.coded_columns import read_dictionary
+    from sema.pipeline.dictionary_import_utils import read_dictionary
 
     config = BuildConfig.from_file(config_path)
     connector = resolve_connector_factory(config).create()
