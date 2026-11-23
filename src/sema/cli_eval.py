@@ -164,27 +164,32 @@ def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> N
 
     config = BuildConfig.from_file(config_path)
     connector = resolve_connector_factory(config).create()
-    driver = _get_neo4j_driver(config.neo4j)
     try:
-        joins = facts_from_graph(driver, config.catalog, config.schemas)
-        coded = read_coded_bindings(driver, config.catalog, config.schemas)
-        keys, entities = read_identity(driver, config.catalog, config.schemas)
+        driver = _get_neo4j_driver(config.neo4j)
+        try:
+            joins = facts_from_graph(driver, config.catalog, config.schemas)
+            coded = read_coded_bindings(driver, config.catalog, config.schemas)
+            keys, entities = read_identity(driver, config.catalog, config.schemas)
+        finally:
+            driver.close()
+        dictionary = read_dictionary(config.concept_spec, config.concept_staging)
+        code_lists = dictionary.code_lists if dictionary else {}
+        loaded = loaded_code_lists(connector, config.catalog, config.schemas, coded, code_lists)
+        produced = {**joins, **coded_facts(coded, loaded), **identity_facts(keys, entities)}
+        oracle = (
+            read_oracle(Path(oracle_path), FACT_KINDS) if oracle_path
+            else declared_constraints(connector, config.catalog, config.schemas)
+        )
+        rechecked = {
+            **recheck(connector, config.catalog, config.schemas, produced),
+            **recheck_coded(connector, config.catalog, coded, code_lists),
+        }
+        Path(out_path).write_text(render(score_discovery(produced, oracle, rechecked)))
+        click.echo(out_path)
     finally:
-        driver.close()
-    dictionary = read_dictionary(config.concept_spec, config.concept_staging)
-    code_lists = dictionary.code_lists if dictionary else {}
-    loaded = loaded_code_lists(connector, config.catalog, config.schemas, coded, code_lists)
-    produced = {**joins, **coded_facts(coded, loaded), **identity_facts(keys, entities)}
-    oracle = (
-        read_oracle(Path(oracle_path), FACT_KINDS) if oracle_path
-        else declared_constraints(connector, config.catalog, config.schemas)
-    )
-    rechecked = {
-        **recheck(connector, config.catalog, config.schemas, produced),
-        **recheck_coded(connector, config.catalog, coded, code_lists),
-    }
-    Path(out_path).write_text(render(score_discovery(produced, oracle, rechecked)))
-    click.echo(out_path)
+        close = getattr(connector, "close", None)  # DatabricksConnector has no close
+        if close is not None:
+            close()
 
 
 def _execute_run(
