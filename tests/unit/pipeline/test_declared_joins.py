@@ -137,3 +137,42 @@ def test_a_build_with_join_detection_off_gets_none(tmp_path: Path) -> None:
 
     assert prepared.error is None, prepared.error
     assert returned == {}
+
+
+class _EveryCountHolds:
+    """Counts where every relation has two rows, none NULL, and every tuple is held."""
+
+    def __init__(self) -> None:
+        self.evidence = self
+        self.asked: list[tuple[tuple[str, str], tuple[str, ...]]] = []
+
+    def rows(self, relation: Any) -> int:
+        return 2
+
+    def null_rows(self, relation: Any, columns: Any) -> int:
+        return 0
+
+    def contained(self, relation: Any, columns: Any, owner: Any, owner_columns: Any) -> Any:
+        self.asked.append((tuple(relation), tuple(columns)))
+        return (2, 2)
+
+
+def test_a_column_spelled_two_ways_is_written_as_the_one_checked() -> None:
+    from sema.engine.declared_join_utils import DeclaredJoin, DictionaryEntity, bind_declared
+    from sema.pipeline.declared_joins import _foreign_key
+
+    child, parent = ("land", "owner_line"), ("land", "owner")
+    columns = {child: ["owner id", "owner_id", "line_no"], parent: ["id", "name"]}
+    join = DeclaredJoin("Owner Line", "Owner", (("owner_id", "id"),))
+    counts = _EveryCountHolds()
+
+    bindings = bind_declared(
+        [DictionaryEntity("Owner Line", ("owner_id", "line_no")),
+         DictionaryEntity("Owner", ("id", "name"))],
+        [join], columns, counts,  # type: ignore[arg-type]
+    )
+    key = _foreign_key("cat", join, (child, columns[child]), (parent, columns[parent]))
+
+    assert [j for j, *_ in bindings.accepted] == [join]
+    (checked,) = {names for relation, names in counts.asked if relation == child}
+    assert tuple(local for local, _ in key.column_pairs) == checked

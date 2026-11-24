@@ -66,4 +66,5 @@ def _foreign_key(
 
 
 def _spelled(name: str, names: Sequence[str]) -> str:
-    return next(n for n in names if normalized_name(n) == normalized_name(name))
+    """As `bind_declared` spells it: of two columns that normalize alike, the last."""
+    return {normalized_name(n): n for n in names}[normalized_name(name)]
