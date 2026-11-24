@@ -89,7 +89,8 @@ def _entity_record(
         joins += [
             DeclaredJoin(name, join["referenced_entity"],
                          tuple((local, remote) for local, remote in join["join_keys"]))
-            for join in entity.get("joins") or []
+            for join in [*(entity.get("joins") or []),
+                         *(entity.get("obligation") or {}).get("foreign_keys", [])]
         ]
         inline_lists += [
             InlineList(name, p["name"], dict(p["decoded_values"]))

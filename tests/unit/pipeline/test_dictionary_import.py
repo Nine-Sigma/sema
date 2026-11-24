@@ -151,3 +151,33 @@ def test_a_spec_with_no_entities_gives_three_empty_fields(files: DictionaryFiles
     assert list(dictionary.declared_joins) == []
     assert list(dictionary.inline_lists) == []
     assert dictionary.code_lists == {"tray_kinds": TRAY_LIST}
+
+
+@pytest.mark.parametrize("primary_key", [None, ["line_no"]])
+def test_a_foreign_key_is_a_declared_join_whether_or_not_a_primary_key_is_stated(
+    primary_key: list[str] | None,
+) -> None:
+    from sema.engine.declared_join_utils import DeclaredJoin
+    from sema.intake.land.table_schema import (
+        Constraints,
+        Field,
+        ForeignKey,
+        Reference,
+        TableSchema,
+        to_manifest_entity,
+    )
+    from sema.pipeline.dictionary_import_utils import _entity_record
+
+    required = Constraints(required=True)
+    schema = TableSchema(
+        fields=[Field(name=n, type="string", constraints=required) for n in ("line_no", "crate_no")],
+        primary_key=primary_key,
+        foreign_keys=[ForeignKey(fields=["crate_no"],
+                                 reference=Reference(resource="crate_record", fields=["crate_no"]))],
+    )
+    entity = to_manifest_entity(schema, "fixdecl.crate_entry", namespace="fixdecl")
+
+    _, joins, _ = _entity_record([entity])
+
+    assert joins == (DeclaredJoin("fixdecl.crate_entry", "fixdecl.crate_record",
+                                  (("crate_no", "crate_no"),)),)
