@@ -228,3 +228,32 @@ def test_a_join_whose_containment_count_is_missing_is_open(tmp_path: Path) -> No
     assert join in built.bindings.open
     assert join not in built.bindings.rejected
     assert not _accepted(built, "crate_line")
+
+
+class _ContainmentOnce:
+    """The fixture's evidence, answering each containment of one relation within another once."""
+
+    def __init__(self, evidence: RelationEvidence, relation: tuple[str, str]) -> None:
+        self._evidence, self._relation = evidence, relation
+        self._asked: set[tuple[str, ...]] = set()
+
+    def contained(self, relation: Any, columns: Any, owner: Any, owner_columns: Any) -> Any:
+        if tuple(relation) == self._relation and tuple(owner) != self._relation:
+            if tuple(owner) in self._asked:
+                return None
+            self._asked.add(tuple(owner))
+        return self._evidence.contained(relation, columns, owner, owner_columns)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._evidence, name)
+
+
+def test_a_join_is_decided_on_one_containment_count_per_pair(tmp_path: Path) -> None:
+    built = _bind(
+        tmp_path, lambda evidence: _ContainmentOnce(evidence, _relation("crate_line")),
+    ).built()
+    (join,) = built.join_of("crate_line")
+
+    assert join not in built.bindings.rejected
+    assert [parts[2] for parts in _accepted(built, "crate_line")] == [
+        _relation(ACCEPTED["crate_line"])]

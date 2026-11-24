@@ -105,7 +105,8 @@ def _checked(
     contained = counts.evidence.contained(child[0], child[1], relation, names)
     if rows is None or nulls is None or distinct is None or contained is None:
         return None
-    holds = rows - nulls == distinct[0] and counts.within(child[0], child[1], relation, names)
+    held = contained[0] > 0 and contained[1] / contained[0] >= COVERAGE_THRESHOLD
+    holds = rows - nulls == distinct[0] and held
     return nulls, holds
 
 
