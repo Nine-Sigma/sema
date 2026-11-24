@@ -115,3 +115,15 @@ def test_the_build_from_an_approved_run_writes_what_the_two_files_write(tmp_path
 
     assert _written(by_files)
     assert _written(by_run) == _written(by_files)
+
+
+def test_a_run_under_a_folder_named_with_a_hash_resolves_and_writes_nothing(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "runs#1"
+    run = write_intake_run(root, stage="import", status="approved")
+
+    config = _config(intake_run=str(run))
+
+    assert Path(str(config.concept_spec)) == run / "artifacts" / "spec.json"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["runs#1"]

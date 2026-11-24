@@ -226,7 +226,7 @@ class BuildConfig(BaseSettings):
                 raise ValueError(f"intake run {folder} has no {path}")
         registry = folder.parent / "registry.sqlite"
         try:
-            with closing(sqlite3.connect(f"file:{registry}?mode=ro", uri=True)) as db:
+            with closing(sqlite3.connect(f"{registry.resolve().as_uri()}?mode=ro", uri=True)) as db:
                 row = db.execute(
                     "SELECT stage, status FROM runs WHERE run_id = ?", (folder.name,),
                 ).fetchone()
