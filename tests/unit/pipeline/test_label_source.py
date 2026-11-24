@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from sema.pipeline.coded_columns import read_dictionary, run_coded_columns
+from sema.pipeline.coded_columns import run_coded_columns
+from sema.pipeline.dictionary_import_utils import read_dictionary
 from tests.support.connector_fixture_identity import (
     CODE_LIST_ROLES,
     DOCK,

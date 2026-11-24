@@ -149,6 +149,7 @@ def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> N
         declared_constraints,
         facts_from_graph,
         identity_facts,
+        joins_from_graph,
         loaded_code_lists,
         read_coded_bindings,
         read_identity,
@@ -160,7 +161,7 @@ def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> N
     from sema.eval.discovery_scorecard_utils import read_oracle
     from sema.models.config import BuildConfig
     from sema.pipeline.build import resolve_connector_factory
-    from sema.pipeline.coded_columns import read_dictionary
+    from sema.pipeline.dictionary_import_utils import read_dictionary
 
     config = BuildConfig.from_file(config_path)
     connector = resolve_connector_factory(config).create()
@@ -168,6 +169,7 @@ def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> N
         driver = _get_neo4j_driver(config.neo4j)
         try:
             joins = facts_from_graph(driver, config.catalog, config.schemas)
+            joins_read = joins_from_graph(driver, config.catalog, config.schemas)
             coded = read_coded_bindings(driver, config.catalog, config.schemas)
             keys, entities = read_identity(driver, config.catalog, config.schemas)
         finally:
@@ -181,10 +183,14 @@ def discovery_cmd(config_path: str, oracle_path: str | None, out_path: str) -> N
             else declared_constraints(connector, config.catalog, config.schemas)
         )
         rechecked = {
-            **recheck(connector, config.catalog, config.schemas, produced),
+            **recheck(connector, config.catalog, config.schemas, produced,
+                      join_predicates=[predicates for predicates, _ in joins_read]),
             **recheck_coded(connector, config.catalog, coded, code_lists),
         }
-        Path(out_path).write_text(render(score_discovery(produced, oracle, rechecked)))
+        declared = sum(source == "dictionary_declared" for _, source in joins_read)
+        Path(out_path).write_text(render(score_discovery(produced, oracle, rechecked),
+                                         declared=declared,
+                                         discovered=len(joins_read) - declared))
         click.echo(out_path)
     finally:
         close = getattr(connector, "close", None)  # DatabricksConnector has no close

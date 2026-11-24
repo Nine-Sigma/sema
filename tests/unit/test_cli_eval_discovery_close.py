@@ -27,7 +27,8 @@ from sema.models.config import BuildConfig
 
 pytestmark = pytest.mark.unit
 
-STUBS = {"facts_from_graph": {}, "read_coded_bindings": [], "read_identity": ([], []),
+STUBS = {"facts_from_graph": {}, "joins_from_graph": [], "read_coded_bindings": [],
+         "read_identity": ([], []),
          "loaded_code_lists": {}, "coded_facts": {}, "identity_facts": {},
          "declared_constraints": {}, "recheck": {}, "recheck_coded": {},
          "score_discovery": {}, "render": "stub scorecard\n"}  # fmt: skip

@@ -10,11 +10,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
-from sema.binding.importer import import_concept_source
-from sema.binding.spec import load_concept_source_spec
+from sema.binding.identifier_utils import entity_identifier
 from sema.connectors.base import Connector
 from sema.engine.coded_column_utils import (
     DECLARED_KEY,
@@ -37,6 +35,8 @@ from sema.engine.coded_column_utils import (
     unplaced_assertion,
     unread_key_assertion,
 )
+from sema.engine.declared_join_utils import bind_declared
+from sema.engine.identity_utils import Counts, Relation
 from sema.engine.join_detector import TIER_1, FKAssertion, to_fk_assertion
 from sema.engine.join_detector_utils import (
     Profiles,
@@ -47,8 +47,13 @@ from sema.engine.join_detector_utils import (
     is_text,
     nominate_by_data_shape,
     nominate_by_name,
+    normalized_name,
 )
-from sema.engine.warehouse_lookup import WarehouseProfileLookup, WarehouseValues
+from sema.engine.warehouse_lookup import (
+    RelationEvidence,
+    WarehouseProfileLookup,
+    WarehouseValues,
+)
 from sema.graph.concept_value_set import (
     CodedMember,
     ValueSetColumn,
@@ -63,27 +68,14 @@ from sema.graph.join_materializer_utils import (
 )
 from sema.graph.loader import GraphLoader
 from sema.graph.loader_utils import fetch_columns_by_schema
-from sema.ingest.duckdb_staging import Staging
-from sema.intake.land.relations import RelationProvider
 from sema.log import logger
 from sema.models.assertions import VERIFIED, Assertion, AssertionPredicate
 from sema.models.config import BuildConfig
 from sema.models.extraction import ExtractedColumn
 from sema.models.physical_key import CanonicalRef
+from sema.pipeline.dictionary_import_utils import Dictionary, read_dictionary
 
 _VERIFIED_TERM_CONFIDENCE = 0.95
-
-
-@dataclass(frozen=True)
-class Dictionary:
-    """What intake's concept spec states: its domains, each code list's codes and labels, its
-    code and display role columns, and each foreign key's reference columns."""
-
-    spec_id: str
-    domains: tuple[StatedDomain, ...]
-    code_lists: dict[str, dict[str, str | None]]
-    roles: dict[str, tuple[str, str | None]]
-    reference_keys: list[tuple[str, ...]]
 
 
 @dataclass(frozen=True)
@@ -105,35 +97,6 @@ class _Run:
     joins: list[Assertion] = field(default_factory=list)
 
 
-def read_dictionary(spec_path: str | None, staging_path: str | None) -> Dictionary | None:
-    if spec_path is None:
-        return None
-    if staging_path is None:
-        raise ValueError("concept_spec needs concept_staging, the file its relations live in")
-    spec = load_concept_source_spec(Path(spec_path))
-    with Staging(staging_path, schemas=()) as staging:
-        provider = RelationProvider(warehouse=None, staging=staging)
-        terms = import_concept_source(spec, provider, dataset_map={}).manifest["terms"]
-    code_lists: dict[str, dict[str, str | None]] = {}
-    for term in terms:
-        code_lists.setdefault(term["vocabulary"], {})[str(term["code"])] = term.get("display")
-    # shortcut: domains are read from per-file entries' `domains` maps only; read a role
-    # column's domain too once a source states its domains that way.
-    entries = (spec.entity_model.entities or []) if spec.entity_model else []
-    domains = tuple(
-        StatedDomain(entry.entity, prop, vocabulary)
-        for entry in entries for prop, vocabulary in entry.domains.items()
-    )
-    roles: dict[str, tuple[str, str | None]] = {
-        entry.vocabulary_id: (entry.roles.code, entry.roles.display)
-        for entry in spec.code_lists or []
-    }
-    reference_keys = [
-        tuple(key.reference_columns) for entry in entries for key in entry.foreign_keys
-    ]
-    return Dictionary(spec.id, domains, code_lists, roles, reference_keys)
-
-
 def run_coded_columns(
     loader: GraphLoader, connector: Connector, config: BuildConfig, schemas: list[str],
     run_id: str,
@@ -151,7 +114,8 @@ def run_coded_columns(
         column_key(c): stats for c in by_ref.values()
         if (stats := profile_lookup(column_key(c))) is not None
     }
-    placed = _place(loader, dictionary, by_schema, run_id)
+    placed = _place(loader, dictionary, by_schema, run_id, _bound(dictionary, by_schema, Counts(
+        RelationEvidence(connector, config.catalog))))
     joins: dict[str, list[Assertion]] = {}
     for schema, columns in by_schema.items():
         run = _Run(loader, values, dictionary, columns, by_ref, run_id, schema)
@@ -162,17 +126,30 @@ def run_coded_columns(
     return joins
 
 
+def _bound(
+    dictionary: Dictionary | None, by_schema: dict[str, list[ExtractedColumn]], counts: Counts,
+) -> dict[str, Relation]:
+    """The loaded relation each entity a declared join binds is, by the entity's name."""
+    if dictionary is None:
+        return {}
+    columns: dict[Relation, list[str]] = {}
+    for column in (c for schema_columns in by_schema.values() for c in schema_columns):
+        columns.setdefault((column.schema, column.table_name), []).append(column.name)
+    return bind_declared(dictionary.entities, dictionary.declared_joins, columns, counts).bound
+
+
 def _place(
     loader: GraphLoader, dictionary: Dictionary | None,
-    by_schema: dict[str, list[ExtractedColumn]], run_id: str,
+    by_schema: dict[str, list[ExtractedColumn]], run_id: str, bound: dict[str, Relation],
 ) -> list[tuple[StatedDomain, ExtractedColumn]]:
-    """Each stated domain on the run's columns; one placed nowhere is recorded in each schema."""
+    """Each stated domain on the run's columns, on its entity's bound relation when a declared
+    join binds one; one placed nowhere is recorded in each schema."""
     if dictionary is None:
         return []
     every = [c for columns in by_schema.values() for c in columns]
     placed = []
     for domain in dictionary.domains:
-        named = place(domain, every)
+        named = place(domain, every, _bound_relation(domain.entity, bound))
         placed += [(domain, column) for column in named]
         if named:
             continue
@@ -182,6 +159,19 @@ def _place(
                 source_schema=schema,
             )
     return placed
+
+
+def _bound_relation(entity: str | None, bound: dict[str, Relation]) -> Relation | None:
+    """The relation bound to `entity`: an import's qualified name as it is, a spec entry's name
+    by the identifier the import derives from it; an ambiguous name binds nothing."""
+    if entity is None or entity in bound:
+        return bound.get(entity) if entity else None
+    wanted = normalized_name(entity_identifier(entity))
+    found = {
+        relation for name, relation in bound.items()
+        if normalized_name(name.rpartition(".")[2]) == wanted
+    }
+    return found.pop() if len(found) == 1 else None
 
 
 def _uncoded(run: _Run, profiles: Profiles, column: ExtractedColumn, bound: int) -> str | None:

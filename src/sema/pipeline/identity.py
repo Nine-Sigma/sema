@@ -58,7 +58,7 @@ from sema.models.assertions import (
 from sema.models.config import BuildConfig
 from sema.models.extraction import ExtractedColumn
 from sema.models.physical_key import CanonicalRef
-from sema.pipeline.coded_columns import Dictionary, read_dictionary
+from sema.pipeline.dictionary_import_utils import Dictionary, read_dictionary
 
 # A relation's candidate keys are few; the declared and stated sets come first, so past this
 # cap only further uncorroborated single columns go unmeasured.

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any, Literal
 
@@ -167,6 +169,7 @@ class BuildConfig(BaseSettings):
     # Intake's concept spec and the staging file its relations live in: stated domains, code lists.
     concept_spec: str | None = None
     concept_staging: str | None = None
+    intake_run: str | None = None
 
     evidence_policy: EvidenceTier = "full"
     max_distinct_values_read: int = 200
@@ -208,6 +211,30 @@ class BuildConfig(BaseSettings):
             "sample_rows": 0, "top_k_values": 0, "enable_distinct_counts": False,
         })
         self.enable_fk_detection = False
+        return self
+
+    @model_validator(mode="after")
+    def _resolve_intake_run(self) -> BuildConfig:
+        if self.intake_run is None:
+            return self
+        if self.model_fields_set & {"concept_spec", "concept_staging"}:
+            raise ValueError("intake_run cannot be set with concept_spec or concept_staging")
+        folder = Path(self.intake_run)
+        spec, staging = folder / "artifacts" / "spec.json", folder / "staging.duckdb"
+        for path in (folder, spec, staging):
+            if not path.exists():
+                raise ValueError(f"intake run {folder} has no {path}")
+        registry = folder.parent / "registry.sqlite"
+        try:
+            with closing(sqlite3.connect(f"{registry.resolve().as_uri()}?mode=ro", uri=True)) as db:
+                row = db.execute(
+                    "SELECT stage, status FROM runs WHERE run_id = ?", (folder.name,),
+                ).fetchone()
+        except sqlite3.Error as exc:
+            raise ValueError(f"cannot read the intake registry {registry}: {exc}") from exc
+        if row != ("import", "approved"):
+            raise ValueError(f"intake run {folder.name} is not approved at import: {row}")
+        self.concept_spec, self.concept_staging = str(spec), str(staging)
         return self
 
     @property
